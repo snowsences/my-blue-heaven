@@ -505,6 +505,24 @@
     z-index: 2;
   }
   .details-edit-btn:hover{ background: var(--amber); color: var(--ink); }
+  .details-website-btn{
+    position: absolute;
+    top: 20px;
+    right: 96px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(15,33,36,0.72);
+    color: #fff;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+  .details-website-btn:hover{ background: var(--amber); color: var(--ink); }
 
   .restaurant-edit-form{
     display: flex;
@@ -1132,6 +1150,87 @@
     color: var(--chalk-dim);
     font-weight: 600;
   }
+
+  /* ---------- GOLD TIER GRID (Michelin-style photo cards) ----------
+     Desktop: 5 columns. Mobile override below drops to 2. Only gold-tier
+     restaurants ever render here — everything else (silver, bronze,
+     untiered) stays in the existing list-row layout beneath this grid.
+     Reuses .art-drop-hint for the no-photo placeholder glyph (same visual
+     language as Albums' own empty-art state), but drag/click wiring is
+     separate — restaurants store a cover photo directly on the restaurant
+     object (r.coverPhoto) rather than in the hash-keyed art cache Albums
+     uses, since restaurants don't have Albums' stable string identity to
+     key off of. */
+  .restaurant-gold-grid{
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .restaurant-gold-card{
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+  }
+  .restaurant-gold-card.drag-over{ border-color: var(--amber); }
+  .restaurant-gold-card img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .restaurant-gold-card .art-drop-hint{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    opacity: 0.35;
+  }
+  .restaurant-gold-card-rank{
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: 'Figtree', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 999px;
+  }
+  .restaurant-gold-card-overlay{
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 22px 10px 8px;
+    background: linear-gradient(to top, rgba(15,33,36,0.94), rgba(15,33,36,0));
+    color: #fff;
+  }
+  .restaurant-gold-card-name{
+    font-family: 'Figtree', sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .restaurant-gold-card-meta{
+    font-size: 11px;
+    color: rgba(255,255,255,0.75);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .grouping-chip{
     display: inline-block;
     font-size: 10.5px;
@@ -1244,6 +1343,8 @@
   .year-filter-input{ width: 120px; }
   .artist-filter-input{ width: 160px; }
   .grouping-filter-input{ width: 140px; }
+  .restaurant-cuisine-filter-input{ width: 150px; }
+  .restaurant-location-filter-input{ width: 160px; }
 
   .filter-clear{
     position: absolute;
@@ -1878,6 +1979,7 @@
        cramped to be a usable tap target. Three columns keeps tiles a
        reasonable size down to the narrowest common phone widths. */
     .results-list.grid-mode{ grid-template-columns: repeat(3, 1fr); }
+    .restaurant-gold-grid{ grid-template-columns: repeat(2, 1fr); }
 
     /* ---- Bottom-fixed tab bar (mobile only) ----
        Desktop/tablet keeps the fixed top bar (brand + underlined tabs +
@@ -2279,6 +2381,21 @@
         <button class="btn-primary" id="restaurant-new-btn" type="button">+ New Restaurant</button>
       </div>
 
+      <div class="filters-group">
+        <div class="filter-wrap">
+          <input type="text" class="filter-input restaurant-cuisine-filter-input" id="restaurant-cuisine-filter-input" list="restaurant-cuisine-filter-datalist" placeholder="All Cuisines" autocomplete="off">
+          <datalist id="restaurant-cuisine-filter-datalist"></datalist>
+          <button class="filter-clear" id="restaurant-cuisine-filter-clear" type="button" title="Clear cuisine filter" style="display:none;">✕</button>
+        </div>
+        <div class="filter-wrap">
+          <input type="text" class="filter-input restaurant-location-filter-input" id="restaurant-location-filter-input" list="restaurant-location-filter-datalist" placeholder="All Locations" autocomplete="off">
+          <datalist id="restaurant-location-filter-datalist"></datalist>
+          <button class="filter-clear" id="restaurant-location-filter-clear" type="button" title="Clear location filter" style="display:none;">✕</button>
+        </div>
+      </div>
+
+      <div class="restaurant-gold-grid" id="restaurant-gold-grid"></div>
+
       <ol class="results-list" id="restaurant-list"></ol>
 
       <div class="tiers-panel" id="restaurant-tiers-panel">
@@ -2616,7 +2733,14 @@
   const topNavRestaurantsBtn = document.getElementById('top-nav-restaurants-btn');
   const pageRestaurants = document.getElementById('page-restaurants');
   const restaurantListEl = document.getElementById('restaurant-list');
+  const restaurantGoldGridEl = document.getElementById('restaurant-gold-grid');
   const restaurantNewBtn = document.getElementById('restaurant-new-btn');
+  const restaurantCuisineFilterInput = document.getElementById('restaurant-cuisine-filter-input');
+  const restaurantCuisineFilterDatalist = document.getElementById('restaurant-cuisine-filter-datalist');
+  const restaurantCuisineFilterClear = document.getElementById('restaurant-cuisine-filter-clear');
+  const restaurantLocationFilterInput = document.getElementById('restaurant-location-filter-input');
+  const restaurantLocationFilterDatalist = document.getElementById('restaurant-location-filter-datalist');
+  const restaurantLocationFilterClear = document.getElementById('restaurant-location-filter-clear');
   const restaurantTiersPanel = document.getElementById('restaurant-tiers-panel');
   const restaurantTierPreviewBar = document.getElementById('restaurant-tier-preview-bar');
   const restaurantTiersEditorBody = document.getElementById('restaurant-tiers-editor-body');
@@ -5999,6 +6123,91 @@
     return trimmed; // already has $ or its own formatting (e.g. "$$") -> leave as-is
   }
 
+  // A website typed without a scheme (e.g. "restaurant.com") would otherwise
+  // be treated as a relative path when opened — this only affects opening
+  // the link, the raw value the user typed is left untouched in storage.
+  function normalizeWebsiteUrl(url){
+    if (!url) return '';
+    return /^https?:\/\//i.test(url) ? url : 'https://' + url;
+  }
+
+  // ---------- RESTAURANT COVER PHOTO (gold-tier grid cards) ----------
+  // Stored directly on the restaurant object as a base64 data URL, not in
+  // Albums' hash-keyed art cache — restaurants are identified by array
+  // index, not a stable string, so that keying scheme doesn't apply here.
+  // Interaction mirrors Albums' own art handling: grid cards accept drag-
+  // drop only (matching Albums' grid cards — click there opens details, not
+  // a file picker), while the details panel's own cover photo area supports
+  // click-to-browse when empty and opens the lightbox once a photo exists,
+  // exactly like Albums' details-panel art.
+  function setRestaurantCoverPhoto(index, dataUrl){
+    if (!restaurantRows[index]) return;
+    restaurantRows[index].coverPhoto = dataUrl;
+    saveRestaurantProgress();
+    renderRestaurantsPage();
+    if (openRestaurantIndex === index) renderRestaurantDetailsContent();
+  }
+
+  function handleRestaurantCoverPhotoFile(index, file){
+    if (!file || !file.type || !file.type.startsWith('image/')){
+      showToast('That file isn\'t an image');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setRestaurantCoverPhoto(index, reader.result);
+    reader.onerror = () => showToast('Could not read that image');
+    reader.readAsDataURL(file);
+  }
+
+  // Grid card — drag-and-drop only, same reasoning as Albums' grid cards:
+  // the whole card is already a click target for opening details, so click-
+  // to-browse would conflict with that rather than complement it.
+  function wireRestaurantCoverPhotoDragOnly(el, index){
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      handleRestaurantCoverPhotoFile(index, file);
+    });
+  }
+
+  // Details panel's own cover photo drop zone — click opens the lightbox if
+  // a photo is already set (drag-and-drop still replaces it either way), or
+  // a file picker if not, same conditional-click pattern as Albums' art.
+  function wireRestaurantCoverPhotoDropZone(el, r, index){
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      handleRestaurantCoverPhotoFile(index, file);
+    });
+    el.addEventListener('click', () => {
+      if (r.coverPhoto){
+        openArtLightbox(r.coverPhoto);
+      } else {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.addEventListener('change', () => handleRestaurantCoverPhotoFile(index, input.files[0]));
+        input.click();
+      }
+    });
+  }
+
   // ---------- RESTAURANT TIERS ----------
   // Same slider-based control as Albums, but only 3 tiers, each individually
   // bounded (Gold/Silver/Bronze all have an explicit end, unlike Albums
@@ -6151,15 +6360,106 @@
     }).join('');
   }
 
+  let restaurantCuisineFilter = ''; // '' = show all cuisines; otherwise an exact cuisine value
+  let restaurantLocationFilter = ''; // '' = show all locations; otherwise an exact location value
+
+  function renderRestaurantCuisineFilterOptions(list){
+    const cuisines = Array.from(new Set(list.map(r => r.cuisine).filter(Boolean))).sort();
+    restaurantCuisineFilterDatalist.innerHTML = cuisines.map(c => '<option value="' + escapeAttr(c) + '">').join('');
+    if (!cuisines.includes(restaurantCuisineFilter)) restaurantCuisineFilter = '';
+    restaurantCuisineFilterInput.value = restaurantCuisineFilter;
+    restaurantCuisineFilterClear.style.display = restaurantCuisineFilter ? 'flex' : 'none';
+  }
+
+  function renderRestaurantLocationFilterOptions(list){
+    const locations = Array.from(new Set(list.map(r => r.location).filter(Boolean))).sort();
+    restaurantLocationFilterDatalist.innerHTML = locations.map(l => '<option value="' + escapeAttr(l) + '">').join('');
+    if (!locations.includes(restaurantLocationFilter)) restaurantLocationFilter = '';
+    restaurantLocationFilterInput.value = restaurantLocationFilter;
+    restaurantLocationFilterClear.style.display = restaurantLocationFilter ? 'flex' : 'none';
+  }
+
+  restaurantCuisineFilterInput.addEventListener('input', () => {
+    const val = restaurantCuisineFilterInput.value.trim();
+    if (!val){
+      if (restaurantCuisineFilter){ restaurantCuisineFilter = ''; renderRestaurantsPage(); }
+      return;
+    }
+    // Only actually apply once it's an exact match — i.e. a datalist
+    // suggestion was picked, or the full correct value was typed. A partial
+    // in-progress string doesn't touch the active filter, so mid-typing
+    // never flashes an empty/wrong result.
+    const known = Array.from(restaurantCuisineFilterDatalist.options).map(o => o.value);
+    if (known.includes(val) && val !== restaurantCuisineFilter){
+      restaurantCuisineFilter = val;
+      renderRestaurantsPage();
+    }
+  });
+  restaurantCuisineFilterClear.addEventListener('click', () => {
+    restaurantCuisineFilterInput.value = '';
+    restaurantCuisineFilter = '';
+    renderRestaurantsPage();
+  });
+
+  restaurantLocationFilterInput.addEventListener('input', () => {
+    const val = restaurantLocationFilterInput.value.trim();
+    if (!val){
+      if (restaurantLocationFilter){ restaurantLocationFilter = ''; renderRestaurantsPage(); }
+      return;
+    }
+    const known = Array.from(restaurantLocationFilterDatalist.options).map(o => o.value);
+    if (known.includes(val) && val !== restaurantLocationFilter){
+      restaurantLocationFilter = val;
+      renderRestaurantsPage();
+    }
+  });
+  restaurantLocationFilterClear.addEventListener('click', () => {
+    restaurantLocationFilterInput.value = '';
+    restaurantLocationFilter = '';
+    renderRestaurantsPage();
+  });
+
   function renderRestaurantsPage(){
     maybeInitRestaurantTiers(restaurantRows.length);
+    renderRestaurantCuisineFilterOptions(restaurantRows);
+    renderRestaurantLocationFilterOptions(restaurantRows);
     if (!restaurantRows.length){
+      restaurantGoldGridEl.innerHTML = '';
       restaurantListEl.innerHTML = '<p class="details-future-note">No restaurants yet — use Import All Data in Settings to restore a backup.</p>';
       restaurantTiersPanel.style.display = 'none';
       return;
     }
-    restaurantListEl.innerHTML = restaurantRows.map((r, idx) => {
+
+    const goldCards = [];
+    const listRows = [];
+
+    restaurantRows.forEach((r, idx) => {
+      // Rank number always reflects true, unfiltered position (matching
+      // Albums) — filtering only hides non-matching rows, it never
+      // renumbers the ones still shown, in either section.
+      if (restaurantCuisineFilter && r.cuisine !== restaurantCuisineFilter) return;
+      if (restaurantLocationFilter && r.location !== restaurantLocationFilter) return;
+
       const rank = idx + 1;
+      const tier = restaurantTierBoundaries ? getRestaurantTierForRank(rank, restaurantTierBoundaries) : null;
+
+      if (tier && tier.key === 'gold'){
+        const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
+        goldCards.push(
+          '<div class="restaurant-gold-card" data-restaurant-index="' + idx + '">' +
+            '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+            (r.coverPhoto
+              ? '<img src="' + escapeAttr(r.coverPhoto) + '" alt="">'
+              : '<span class="art-drop-hint">📷</span>') +
+            '<div class="restaurant-gold-card-overlay">' +
+              '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
+              (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
+            '</div>' +
+          '</div>'
+        );
+        return;
+      }
+
       const stars = restaurantStarsCount(r);
       const { visits } = parseRestaurantNotes(r.notes);
       const starsHtml = stars > 0
@@ -6175,36 +6475,49 @@
 
       let tierChipHtml = '';
       let borderAttr = '';
-      if (restaurantTierBoundaries){
-        const tier = getRestaurantTierForRank(rank, restaurantTierBoundaries);
-        if (tier){
-          borderAttr = ' style="border-left:4px solid ' + tier.color + ';"';
-          tierChipHtml = '<span class="tier-chip" style="background:' + hexToRgba(tier.color, 0.18) + '; color:' + tier.color + ';">' + tier.name + '</span>';
-        }
+      if (tier){
+        borderAttr = ' style="border-left:4px solid ' + tier.color + ';"';
+        tierChipHtml = '<span class="tier-chip" style="background:' + hexToRgba(tier.color, 0.18) + '; color:' + tier.color + ';">' + tier.name + '</span>';
       }
 
-      return '<li' + borderAttr + '>' +
-        '<span class="rank-num">' + rank + '</span>' +
-        '<span class="rank-item">' +
-          '<span class="restaurant-name-row">' +
-            '<span class="rank-album">' + escapeHtml(r.name) + '</span>' +
-            starsHtml + visitsHtml +
+      listRows.push(
+        '<li' + borderAttr + ' data-restaurant-index="' + idx + '">' +
+          '<span class="rank-num">' + rank + '</span>' +
+          '<span class="rank-item">' +
+            '<span class="restaurant-name-row">' +
+              '<span class="rank-album">' + escapeHtml(r.name) + '</span>' +
+              starsHtml + visitsHtml +
+            '</span>' +
+            (function(){
+              const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
+              return meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '';
+            })() +
           '</span>' +
-          (function(){
-            const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
-            return meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '';
-          })() +
-        '</span>' +
-        '<span class="restaurant-stats">' +
-          (total ? '<span class="restaurant-total">' + escapeHtml(total) + '</span>' : '') +
-          (breakdown ? '<span class="restaurant-breakdown">' + escapeHtml(breakdown) + '</span>' : '') +
-          (price ? '<span class="restaurant-price">' + escapeHtml(price) + '</span>' : '') +
-        '</span>' +
-        tierChipHtml +
-      '</li>';
-    }).join('');
+          '<span class="restaurant-stats">' +
+            (total ? '<span class="restaurant-total">' + escapeHtml(total) + '</span>' : '') +
+            (breakdown ? '<span class="restaurant-breakdown">' + escapeHtml(breakdown) + '</span>' : '') +
+            (price ? '<span class="restaurant-price">' + escapeHtml(price) + '</span>' : '') +
+          '</span>' +
+          tierChipHtml +
+        '</li>'
+      );
+    });
 
-    Array.from(restaurantListEl.children).forEach((li, idx) => {
+    restaurantGoldGridEl.innerHTML = goldCards.join('');
+    restaurantGoldGridEl.style.display = goldCards.length ? 'grid' : 'none';
+    restaurantListEl.innerHTML = listRows.join('');
+
+    // Keyed off data-restaurant-index (the true position in restaurantRows)
+    // rather than DOM-child position — filtering can skip rows, so those two
+    // stop matching the moment any filter is active. Without this, a filtered
+    // view would open the wrong restaurant entirely.
+    Array.from(restaurantGoldGridEl.children).forEach(card => {
+      const idx = Number(card.dataset.restaurantIndex);
+      card.addEventListener('click', () => openRestaurantDetailsPanel(idx));
+      wireRestaurantCoverPhotoDragOnly(card, idx);
+    });
+    Array.from(restaurantListEl.children).forEach(li => {
+      const idx = Number(li.dataset.restaurantIndex);
       li.addEventListener('click', () => openRestaurantDetailsPanel(idx));
     });
   }
@@ -6240,7 +6553,7 @@
   // mid-creation.
   function openNewRestaurantForm(){
     openRestaurantIndex = null;
-    newRestaurantDraft = { name: '', cuisine: '', location: '', stars: '' };
+    newRestaurantDraft = { name: '', cuisine: '', location: '', stars: '', website: '' };
     restaurantDetailsPanel.classList.add('open');
     document.body.classList.add('details-open-lock');
     renderRestaurantDetailsContent();
@@ -6275,6 +6588,7 @@
     const cuisine = restaurantDetailsPanelInner.querySelector('#restaurant-edit-cuisine').value.trim();
     const location = restaurantDetailsPanelInner.querySelector('#restaurant-edit-location').value.trim();
     const stars = restaurantDetailsPanelInner.querySelector('#restaurant-edit-stars').value;
+    const website = restaurantDetailsPanelInner.querySelector('#restaurant-edit-website').value.trim();
 
     if (!name){
       showToast('Give it a name first');
@@ -6285,7 +6599,7 @@
       // Appended to the end — unranked/untiered by default, same as any
       // fresh entry with no established score yet.
       restaurantRows.push({
-        name, cuisine, location, stars,
+        name, cuisine, location, stars, website,
         notes: '', bestFlavor: '', flavorVariety: '', total: '', price: '', year: '', bests: '',
         photos: [], courses: []
       });
@@ -6303,6 +6617,7 @@
         rest.cuisine = cuisine;
         rest.location = location;
         rest.stars = stars;
+        rest.website = website;
       });
       renderRestaurantsPage(); // list card reflects a renamed restaurant too
     }
@@ -6463,6 +6778,8 @@
           '<select class="restaurant-edit-input" id="restaurant-edit-stars">' +
             [0, 1, 2, 3].map(n => '<option value="' + n + '"' + (String(starsVal) === String(n) ? ' selected' : '') + '>' + n + (n === 0 ? ' (none)' : '') + '</option>').join('') +
           '</select>' +
+          '<label class="restaurant-edit-label">Website</label>' +
+          '<input type="text" class="restaurant-edit-input" id="restaurant-edit-website" placeholder="restaurant-website.com" value="' + escapeAttr(r.website || '') + '">' +
         '</div>' +
         '<div class="restaurant-edit-actions">' +
           '<button class="btn-primary" id="restaurant-edit-save-btn" type="button">Save</button>' +
@@ -6490,6 +6807,10 @@
 
     restaurantDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
+        '<div class="art-drop restaurant-cover-drop"' + (r.coverPhoto ? ' title="Click to view full size, or drag an image here to replace it"' : ' title="Drag an image here, or click to browse"') + '>' +
+          (r.coverPhoto ? '<img src="' + escapeAttr(r.coverPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
+        '</div>' +
+        (r.website ? '<button class="details-website-btn" type="button" title="Visit website">🌐</button>' : '') +
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
       '</div>' +
@@ -6511,6 +6832,13 @@
 
     restaurantDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeRestaurantDetailsPanel);
     restaurantDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', enterRestaurantEditMode);
+    wireRestaurantCoverPhotoDropZone(restaurantDetailsPanelInner.querySelector('.restaurant-cover-drop'), r, openRestaurantIndex);
+    const websiteBtn = restaurantDetailsPanelInner.querySelector('.details-website-btn');
+    if (websiteBtn){
+      websiteBtn.addEventListener('click', () => {
+        window.open(normalizeWebsiteUrl(r.website), '_blank', 'noopener,noreferrer');
+      });
+    }
 
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-details-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => switchRestaurantDetailsTab(btn.dataset.tab));
