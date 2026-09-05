@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rank Heaven</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#142A2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rank Heaven">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap');
 
@@ -485,6 +493,87 @@
     color: var(--amber);
     line-height: 1;
     padding: 4px 6px;
+  }
+
+  /* ---------- RESTAURANT VISITS ----------
+     Top-level tabs (one per visit) sitting below the cover photo and
+     restaurant data, each holding its own Courses/Photos sub-tabs
+     (.restaurant-details-tabs, already styled above, is reused as-is for
+     that inner layer — only the outer visit tabs get their own look here,
+     an underline style to visually separate the two tab levels). */
+  .restaurant-visits-header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 22px 24px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .restaurant-visit-tabs{
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .restaurant-visit-tab-btn{
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--chalk-dim);
+    font-family: 'Figtree', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 0 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .restaurant-visit-tab-btn.active{ color: var(--chalk); border-bottom-color: var(--amber); }
+  .restaurant-visit-badge{
+    background: var(--bg-2);
+    color: var(--amber);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--panel-line);
+  }
+  .restaurant-visit-select{
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    padding: 7px 10px;
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    font-size: 13px;
+  }
+  .restaurant-visit-content{ padding: 16px 24px 24px; }
+  .restaurant-visit-meta-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .restaurant-visit-date-display{
+    font-family: 'Figtree', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--chalk);
+  }
+  .restaurant-visit-notes-display{
+    font-size: 13px;
+    color: var(--chalk-dim);
+    line-height: 1.5;
+    margin: 4px 0 0;
+  }
+  .restaurant-visit-edit-form{ margin-top: 0; }
+  .restaurant-visit-edit-notes{
+    resize: vertical;
+    min-height: 70px;
+    font-family: 'Figtree', sans-serif;
   }
 
   .details-edit-btn{
@@ -1163,7 +1252,7 @@
      key off of. */
   .restaurant-gold-grid{
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 12px;
     margin-bottom: 28px;
   }
@@ -1453,6 +1542,17 @@
     flex-wrap: wrap;
     gap: 10px;
   }
+  /* Collapse only applies where the header has this cursor + toggle icon —
+     Albums' own tiers panel doesn't use this, so it's unaffected. */
+  #restaurant-tiers-panel-header{ cursor: pointer; margin-bottom: 0; }
+  .tiers-panel-toggle-icon{
+    color: var(--chalk-dim);
+    font-size: 13px;
+    transition: transform 0.15s ease;
+  }
+  #restaurant-tiers-panel:not(.collapsed) .tiers-panel-toggle-icon{ transform: rotate(90deg); }
+  #restaurant-tiers-panel .tiers-panel-body{ margin-top: 14px; }
+  #restaurant-tiers-panel.collapsed .tiers-panel-body{ display: none; }
 
   .tier-preview-bar{
     display: flex;
@@ -2398,13 +2498,16 @@
 
       <ol class="results-list" id="restaurant-list"></ol>
 
-      <div class="tiers-panel" id="restaurant-tiers-panel">
-        <div class="tiers-panel-header">
+      <div class="tiers-panel collapsed" id="restaurant-tiers-panel">
+        <div class="tiers-panel-header" id="restaurant-tiers-panel-header">
           <p class="insights-block-title" style="margin:0;">Tiers</p>
+          <span class="tiers-panel-toggle-icon">▸</span>
         </div>
-        <div class="tier-preview-bar" id="restaurant-tier-preview-bar"></div>
-        <div id="restaurant-tiers-editor-body"></div>
-        <p class="tiers-note">Gold, Silver, and Bronze only — everything past the Bronze boundary is left untiered.</p>
+        <div class="tiers-panel-body">
+          <div class="tier-preview-bar" id="restaurant-tier-preview-bar"></div>
+          <div id="restaurant-tiers-editor-body"></div>
+          <p class="tiers-note">Gold, Silver, and Bronze only — everything past the Bronze boundary is left untiered.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -2742,6 +2845,10 @@
   const restaurantLocationFilterDatalist = document.getElementById('restaurant-location-filter-datalist');
   const restaurantLocationFilterClear = document.getElementById('restaurant-location-filter-clear');
   const restaurantTiersPanel = document.getElementById('restaurant-tiers-panel');
+  const restaurantTiersPanelHeader = document.getElementById('restaurant-tiers-panel-header');
+  restaurantTiersPanelHeader.addEventListener('click', () => {
+    restaurantTiersPanel.classList.toggle('collapsed');
+  });
   const restaurantTierPreviewBar = document.getElementById('restaurant-tier-preview-bar');
   const restaurantTiersEditorBody = document.getElementById('restaurant-tiers-editor-body');
   const restaurantDetailsPanel = document.getElementById('restaurant-details-panel');
@@ -6444,12 +6551,14 @@
       const tier = restaurantTierBoundaries ? getRestaurantTierForRank(rank, restaurantTierBoundaries) : null;
 
       if (tier && tier.key === 'gold'){
-        const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
+        const goldStars = restaurantStarsCount(r);
+        const goldStarsText = goldStars > 0 ? '⭐'.repeat(goldStars) : '';
+        const meta = [goldStarsText, r.location].filter(Boolean).join(' • ');
         goldCards.push(
           '<div class="restaurant-gold-card" data-restaurant-index="' + idx + '">' +
             '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
             (r.coverPhoto
-              ? '<img src="' + escapeAttr(r.coverPhoto) + '" alt="">'
+              ? '<img class="art-img" src="' + escapeAttr(r.coverPhoto) + '" alt="">'
               : '<span class="art-drop-hint">📷</span>') +
             '<div class="restaurant-gold-card-overlay">' +
               '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
@@ -6535,6 +6644,64 @@
   let restaurantDetailsActiveTab = 'courses'; // Courses is now the first tab, so it's the default
   let restaurantEditMode = false;
   let newRestaurantDraft = null; // { name, cuisine, location, stars } while creating a brand-new restaurant; null otherwise
+  let restaurantActiveVisitId = null; // which visit's Courses/Photos are currently shown
+  let restaurantVisitEditMode = false; // editing the active visit's date/notes (separate from restaurantEditMode, which is the restaurant's own basic info)
+
+  // Visits didn't always exist — courses/photos used to live directly on the
+  // restaurant. The first time a restaurant's visits are touched, whatever
+  // it already has gets migrated into a single visit (undated, so it sorts
+  // last) rather than lost. Idempotent: once r.visits exists, this is a
+  // no-op on every subsequent call.
+  function ensureRestaurantVisits(r){
+    if (!r.visits){
+      r.visits = [];
+      if ((r.courses && r.courses.length) || (r.photos && r.photos.length)){
+        r.visits.push({
+          id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2),
+          date: '',
+          notes: '',
+          courses: r.courses || [],
+          photos: r.photos || []
+        });
+        delete r.courses;
+        delete r.photos;
+        saveRestaurantProgress(); // persist the migration right away rather than leaving it stranded in memory until some unrelated edit happens to save
+      }
+    }
+    return r.visits;
+  }
+
+  function sortedRestaurantVisits(r){
+    const visits = ensureRestaurantVisits(r);
+    return visits.slice().sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;  // undated visits sort last
+      if (!b.date) return -1;
+      return b.date.localeCompare(a.date); // newest first
+    });
+  }
+
+  function getActiveVisit(r){
+    const sorted = sortedRestaurantVisits(r);
+    if (!sorted.length) return null;
+    return sorted.find(v => v.id === restaurantActiveVisitId) || sorted[0];
+  }
+
+  function formatVisitDate(dateStr){
+    if (!dateStr) return 'No date';
+    const d = new Date(dateStr + 'T00:00:00'); // avoids a timezone-driven off-by-one day
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function computeVisitAverageScore(visit){
+    const scored = (visit.courses || [])
+      .map(c => c.score)
+      .filter(s => s !== null && s !== undefined && s !== '')
+      .map(Number);
+    if (!scored.length) return null;
+    return Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 10) / 10;
+  }
 
   function openRestaurantDetailsPanel(index){
     openRestaurantIndex = index;
@@ -6792,6 +6959,109 @@
     restaurantDetailsPanelInner.querySelector('#restaurant-edit-cancel-btn').addEventListener('click', cancelRestaurantEdit);
   }
 
+  function addRestaurantVisit(){
+    if (openRestaurantIndex === null) return;
+    restaurantVisitEditMode = false;
+    updateOpenRestaurant(rest => {
+      const visits = ensureRestaurantVisits(rest);
+      const newVisit = { id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2), date: '', notes: '', courses: [], photos: [] };
+      visits.push(newVisit);
+      restaurantActiveVisitId = newVisit.id;
+      restaurantVisitEditMode = true; // jump straight into editing so a date can be set right away
+    });
+  }
+
+  function switchActiveVisit(visitId){
+    restaurantActiveVisitId = visitId;
+    restaurantVisitEditMode = false;
+    renderRestaurantDetailsContent();
+  }
+
+  function enterVisitEditMode(){
+    restaurantVisitEditMode = true;
+    renderRestaurantDetailsContent();
+  }
+
+  function cancelVisitEdit(){
+    restaurantVisitEditMode = false;
+    renderRestaurantDetailsContent();
+  }
+
+  function saveVisitEdit(){
+    const date = restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-date').value;
+    const notes = restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-notes').value.trim();
+    restaurantVisitEditMode = false;
+    updateOpenRestaurant(rest => {
+      const visit = getActiveVisit(rest);
+      if (visit){
+        visit.date = date;
+        visit.notes = notes;
+      }
+    });
+  }
+
+  function deleteActiveVisit(){
+    showConfirmModal(
+      'Delete this visit?',
+      "This removes its courses and photos too. This can't be undone.",
+      () => {
+        updateOpenRestaurant(rest => {
+          const visits = ensureRestaurantVisits(rest);
+          const idx = visits.findIndex(v => v.id === restaurantActiveVisitId);
+          if (idx !== -1) visits.splice(idx, 1);
+          restaurantActiveVisitId = null; // getActiveVisit falls back to the new newest visit
+          restaurantVisitEditMode = false;
+        });
+      }
+    );
+  }
+
+  // >5 visits switches from a tab row to a dropdown — kept as a <select> for
+  // the same reason course/flavor scores are: it's still a normal, fully
+  // native, fully accessible control either way.
+  function renderRestaurantVisitTabsHtml(sortedVisits, activeVisit){
+    if (sortedVisits.length > 5){
+      const options = sortedVisits.map(v => {
+        const avg = computeVisitAverageScore(v);
+        const label = formatVisitDate(v.date) + (avg !== null ? ' (' + avg + ')' : '');
+        return '<option value="' + v.id + '"' + (v.id === activeVisit.id ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+      }).join('');
+      return '<select class="restaurant-visit-select" id="restaurant-visit-select">' + options + '</select>';
+    }
+    return '<div class="restaurant-visit-tabs">' + sortedVisits.map(v => {
+      const avg = computeVisitAverageScore(v);
+      const badge = avg !== null ? '<span class="restaurant-visit-badge">' + avg + '</span>' : '';
+      return '<button class="restaurant-visit-tab-btn' + (v.id === activeVisit.id ? ' active' : '') + '" data-visit-id="' + v.id + '" type="button">' +
+        escapeHtml(formatVisitDate(v.date)) + badge +
+      '</button>';
+    }).join('') + '</div>';
+  }
+
+  function renderRestaurantVisitMetaHtml(visit){
+    if (restaurantVisitEditMode){
+      return (
+        '<div class="restaurant-edit-form restaurant-visit-edit-form">' +
+          '<label class="restaurant-edit-label">Date</label>' +
+          '<input type="date" class="restaurant-edit-input" id="restaurant-visit-edit-date" value="' + escapeAttr(visit.date || '') + '">' +
+          '<label class="restaurant-edit-label">Notes</label>' +
+          '<textarea class="restaurant-edit-input restaurant-visit-edit-notes" id="restaurant-visit-edit-notes" placeholder="Notes about this visit...">' + escapeHtml(visit.notes || '') + '</textarea>' +
+          '<div class="restaurant-edit-actions">' +
+            '<button class="btn-primary" id="restaurant-visit-save-btn" type="button">Save</button>' +
+            '<button class="btn-ghost" id="restaurant-visit-cancel-btn" type="button">Cancel</button>' +
+            '<button class="btn-danger" id="restaurant-visit-delete-btn" type="button">Delete Visit</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+    return (
+      '<div class="restaurant-visit-meta-row">' +
+        '<span class="restaurant-visit-date-display">' + escapeHtml(formatVisitDate(visit.date)) + '</span>' +
+        '<button class="btn-ghost" id="restaurant-visit-edit-btn" type="button">Edit</button>' +
+      '</div>' +
+      (visit.notes ? '<p class="restaurant-visit-notes-display">' + escapeHtml(visit.notes) + '</p>' : '')
+    );
+  }
+
   function renderRestaurantDetailsContent(){
     if (newRestaurantDraft || restaurantEditMode){
       renderRestaurantEditForm();
@@ -6805,10 +7075,43 @@
     const starsHtml = starsCount > 0 ? ' <span class="restaurant-stars">' + '⭐'.repeat(starsCount) + '</span>' : '';
     const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
 
+    const sortedVisits = sortedRestaurantVisits(r);
+    const activeVisit = getActiveVisit(r);
+    if (activeVisit) restaurantActiveVisitId = activeVisit.id; // locks in the resolved id (e.g. after a fallback to the newest visit)
+
+    const visitsSectionHtml = sortedVisits.length
+      ? (
+          '<div class="restaurant-visits-header">' +
+            renderRestaurantVisitTabsHtml(sortedVisits, activeVisit) +
+            '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
+          '</div>' +
+          '<div class="restaurant-visit-content">' +
+            renderRestaurantVisitMetaHtml(activeVisit) +
+            (restaurantVisitEditMode ? '' :
+              '<div class="restaurant-details-tabs">' +
+                '<button class="restaurant-details-tab-btn' + (restaurantDetailsActiveTab === 'courses' ? ' active' : '') + '" data-tab="courses" type="button">Courses</button>' +
+                '<button class="restaurant-details-tab-btn' + (restaurantDetailsActiveTab === 'photos' ? ' active' : '') + '" data-tab="photos" type="button">Photos</button>' +
+              '</div>' +
+              '<div class="restaurant-details-tab-panel' + (restaurantDetailsActiveTab === 'courses' ? ' active' : '') + '" id="restaurant-tab-courses">' +
+                renderRestaurantCoursesTabHtml(activeVisit) +
+              '</div>' +
+              '<div class="restaurant-details-tab-panel' + (restaurantDetailsActiveTab === 'photos' ? ' active' : '') + '" id="restaurant-tab-photos">' +
+                renderRestaurantPhotosTabHtml(activeVisit) +
+              '</div>'
+            ) +
+          '</div>'
+        )
+      : (
+          '<div class="restaurant-visits-header">' +
+            '<p class="restaurant-course-empty" style="margin:0;">No visits logged yet.</p>' +
+            '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
+          '</div>'
+        );
+
     restaurantDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
         '<div class="art-drop restaurant-cover-drop"' + (r.coverPhoto ? ' title="Click to view full size, or drag an image here to replace it"' : ' title="Drag an image here, or click to browse"') + '>' +
-          (r.coverPhoto ? '<img src="' + escapeAttr(r.coverPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
+          (r.coverPhoto ? '<img class="art-img" src="' + escapeAttr(r.coverPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
         '</div>' +
         (r.website ? '<button class="details-website-btn" type="button" title="Visit website">🌐</button>' : '') +
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
@@ -6819,16 +7122,7 @@
         (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
         renderRestaurantScoresRowHtml(r) +
       '</div>' +
-      '<div class="restaurant-details-tabs">' +
-        '<button class="restaurant-details-tab-btn' + (restaurantDetailsActiveTab === 'courses' ? ' active' : '') + '" data-tab="courses" type="button">Courses</button>' +
-        '<button class="restaurant-details-tab-btn' + (restaurantDetailsActiveTab === 'photos' ? ' active' : '') + '" data-tab="photos" type="button">Photos</button>' +
-      '</div>' +
-      '<div class="restaurant-details-tab-panel' + (restaurantDetailsActiveTab === 'courses' ? ' active' : '') + '" id="restaurant-tab-courses">' +
-        renderRestaurantCoursesTabHtml(r) +
-      '</div>' +
-      '<div class="restaurant-details-tab-panel' + (restaurantDetailsActiveTab === 'photos' ? ' active' : '') + '" id="restaurant-tab-photos">' +
-        renderRestaurantPhotosTabHtml(r) +
-      '</div>';
+      visitsSectionHtml;
 
     restaurantDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeRestaurantDetailsPanel);
     restaurantDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', enterRestaurantEditMode);
@@ -6839,10 +7133,6 @@
         window.open(normalizeWebsiteUrl(r.website), '_blank', 'noopener,noreferrer');
       });
     }
-
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-details-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => switchRestaurantDetailsTab(btn.dataset.tab));
-    });
 
     // Best Flavor / Flavor Variety wiring
     updateRestaurantScoreTotalDisplay();
@@ -6859,7 +7149,33 @@
       updateRestaurantScoreTotalDisplay();
     });
 
-    // Photos tab wiring
+    // Visit tabs / dropdown / add wiring
+    const visitAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-add-btn');
+    if (visitAddBtn) visitAddBtn.addEventListener('click', addRestaurantVisit);
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-visit-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchActiveVisit(btn.dataset.visitId));
+    });
+    const visitSelect = restaurantDetailsPanelInner.querySelector('#restaurant-visit-select');
+    if (visitSelect){
+      visitSelect.addEventListener('change', () => switchActiveVisit(visitSelect.value));
+    }
+
+    if (!activeVisit) return; // no visits at all yet — nothing else to wire
+
+    if (restaurantVisitEditMode){
+      restaurantDetailsPanelInner.querySelector('#restaurant-visit-save-btn').addEventListener('click', saveVisitEdit);
+      restaurantDetailsPanelInner.querySelector('#restaurant-visit-cancel-btn').addEventListener('click', cancelVisitEdit);
+      restaurantDetailsPanelInner.querySelector('#restaurant-visit-delete-btn').addEventListener('click', deleteActiveVisit);
+      return; // sub-tabs aren't shown while editing a visit's date/notes
+    }
+
+    restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-btn').addEventListener('click', enterVisitEditMode);
+
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-details-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchRestaurantDetailsTab(btn.dataset.tab));
+    });
+
+    // Photos tab wiring — scoped to the ACTIVE VISIT's photos, not the restaurant's
     const photoUrlInput = restaurantDetailsPanelInner.querySelector('#restaurant-photo-url-input');
     const photoAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-photo-add-btn');
     if (photoAddBtn){
@@ -6867,8 +7183,9 @@
         const url = photoUrlInput.value.trim();
         if (!url) return;
         updateOpenRestaurant(rest => {
-          if (!rest.photos) rest.photos = [];
-          rest.photos.push(url);
+          const visit = getActiveVisit(rest);
+          if (!visit.photos) visit.photos = [];
+          visit.photos.push(url);
         });
       };
       photoAddBtn.addEventListener('click', addPhoto);
@@ -6877,7 +7194,7 @@
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-photo-thumb').forEach(thumb => {
       thumb.addEventListener('click', (e) => {
         if (e.target.closest('.restaurant-photo-remove-btn')) return; // handled separately below
-        const photos = r.photos || [];
+        const photos = activeVisit.photos || [];
         openPhotoLightbox(photos, Number(thumb.dataset.photoIndex));
       });
     });
@@ -6885,17 +7202,18 @@
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const i = Number(btn.dataset.removePhotoIndex);
-        updateOpenRestaurant(rest => { rest.photos.splice(i, 1); });
+        updateOpenRestaurant(rest => { getActiveVisit(rest).photos.splice(i, 1); });
       });
     });
 
-    // Courses tab wiring
+    // Courses tab wiring — scoped to the ACTIVE VISIT's courses
     const courseAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-course-add-btn');
     if (courseAddBtn){
       courseAddBtn.addEventListener('click', () => {
         updateOpenRestaurant(rest => {
-          if (!rest.courses) rest.courses = [];
-          rest.courses.push({ text: '' });
+          const visit = getActiveVisit(rest);
+          if (!visit.courses) visit.courses = [];
+          visit.courses.push({ text: '' });
         });
         // Focus the newly-added (last) course's textarea once it renders.
         const textareas = restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text');
@@ -6910,20 +7228,20 @@
       // for why re-rendering here specifically broke the Add Course button.
       textarea.addEventListener('blur', () => {
         const i = Number(textarea.dataset.courseIndex);
-        saveOpenRestaurantQuietly(rest => { rest.courses[i].text = textarea.value; });
+        saveOpenRestaurantQuietly(rest => { getActiveVisit(rest).courses[i].text = textarea.value; });
       });
     });
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-score-select[data-course-index]').forEach(select => {
       select.addEventListener('change', () => {
         const i = Number(select.dataset.courseIndex);
         select.classList.toggle('has-score', !!select.value); // direct DOM update, not a re-render — see saveOpenRestaurantQuietly
-        saveOpenRestaurantQuietly(rest => { rest.courses[i].score = select.value || null; });
+        saveOpenRestaurantQuietly(rest => { getActiveVisit(rest).courses[i].score = select.value || null; });
       });
     });
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-remove-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const i = Number(btn.dataset.removeCourseIndex);
-        updateOpenRestaurant(rest => { rest.courses.splice(i, 1); });
+        updateOpenRestaurant(rest => { getActiveVisit(rest).courses.splice(i, 1); });
       });
     });
   }
