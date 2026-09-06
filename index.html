@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rank Heaven</title>
+<title>My Blue Heaven</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#142A2E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rank Heaven">
+<meta name="apple-mobile-web-app-title" content="My Blue Heaven">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap');
 
@@ -1427,8 +1427,7 @@
   .year-filter-input{ width: 120px; }
   .artist-filter-input{ width: 160px; }
   .grouping-filter-input{ width: 140px; }
-  .restaurant-cuisine-filter-input{ width: 150px; }
-  .restaurant-location-filter-input{ width: 160px; }
+  .restaurant-search-filter-input{ width: 280px; }
 
   .filter-clear{
     position: absolute;
@@ -2116,6 +2115,7 @@
        320-430px phone widths with no wrap set — this was overflowing the
        viewport horizontally rather than dropping to a second line. */
     .filters-group{ flex-wrap: wrap; row-gap: 10px; }
+    .restaurant-search-filter-input{ width: 100%; max-width: 280px; }
 
     /* Five fixed grid columns leaves ~60-70px tiles on a phone width —
        technically not broken (grid columns are fluid via 1fr) but too
@@ -2238,7 +2238,7 @@
 
   <div class="top-nav-wrap">
     <div class="top-nav-inner">
-      <span class="top-nav-brand">Rank Heaven</span>
+      <span class="top-nav-brand">My Blue Heaven</span>
       <div class="top-nav">
         <button class="top-nav-btn active" id="top-nav-albums-btn" type="button"><span class="top-nav-icon">💿</span><span class="top-nav-label">Albums</span></button>
         <button class="top-nav-btn" id="top-nav-songs-btn" type="button"><span class="top-nav-icon">🎵</span><span class="top-nav-label">Songs</span></button>
@@ -2253,7 +2253,7 @@
 
   <!-- SCREEN 1: INPUT -->
   <section class="screen active" id="screen-input">
-    <p class="eyebrow">Rank Heaven</p>
+    <p class="eyebrow">My Blue Heaven</p>
     <h1>Rank anything,<br>one duel at a time.</h1>
     <p class="sub">Paste your list — one item per line. You'll get a series of head-to-head picks, and a full ranking falls out the other end.</p>
 
@@ -2537,14 +2537,8 @@
 
       <div class="filters-group">
         <div class="filter-wrap">
-          <input type="text" class="filter-input restaurant-cuisine-filter-input" id="restaurant-cuisine-filter-input" list="restaurant-cuisine-filter-datalist" placeholder="All Cuisines" autocomplete="off">
-          <datalist id="restaurant-cuisine-filter-datalist"></datalist>
-          <button class="filter-clear" id="restaurant-cuisine-filter-clear" type="button" title="Clear cuisine filter" style="display:none;">✕</button>
-        </div>
-        <div class="filter-wrap">
-          <input type="text" class="filter-input restaurant-location-filter-input" id="restaurant-location-filter-input" list="restaurant-location-filter-datalist" placeholder="All Locations" autocomplete="off">
-          <datalist id="restaurant-location-filter-datalist"></datalist>
-          <button class="filter-clear" id="restaurant-location-filter-clear" type="button" title="Clear location filter" style="display:none;">✕</button>
+          <input type="text" class="filter-input restaurant-search-filter-input" id="restaurant-search-filter-input" placeholder="Search name, cuisine, or location..." autocomplete="off">
+          <button class="filter-clear" id="restaurant-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
         </div>
       </div>
 
@@ -2938,12 +2932,8 @@
   const restaurantRearrangeBtn = document.getElementById('restaurant-rearrange-btn');
   const restaurantRearrangeSaveBtn = document.getElementById('restaurant-rearrange-save-btn');
   const restaurantRearrangeCancelBtn = document.getElementById('restaurant-rearrange-cancel-btn');
-  const restaurantCuisineFilterInput = document.getElementById('restaurant-cuisine-filter-input');
-  const restaurantCuisineFilterDatalist = document.getElementById('restaurant-cuisine-filter-datalist');
-  const restaurantCuisineFilterClear = document.getElementById('restaurant-cuisine-filter-clear');
-  const restaurantLocationFilterInput = document.getElementById('restaurant-location-filter-input');
-  const restaurantLocationFilterDatalist = document.getElementById('restaurant-location-filter-datalist');
-  const restaurantLocationFilterClear = document.getElementById('restaurant-location-filter-clear');
+  const restaurantSearchFilterInput = document.getElementById('restaurant-search-filter-input');
+  const restaurantSearchFilterClear = document.getElementById('restaurant-search-filter-clear');
   const restaurantTiersPanel = document.getElementById('restaurant-tiers-panel');
   const restaurantTiersPanelHeader = document.getElementById('restaurant-tiers-panel-header');
   restaurantTiersPanelHeader.addEventListener('click', () => {
@@ -3201,7 +3191,8 @@
         items, history, isComplete, finalRanking, loadingDock, art,
         tierBoundaries, tierBoundariesTotal, savedAt: new Date().toISOString(),
         songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt,
-        restaurantRows, restaurantSavedAt: restaurantLastSavedAt
+        restaurantRows, restaurantSavedAt: restaurantLastSavedAt,
+        lastfmApiKey, lastfmUsername
       });
       console.log('Firestore payload size:', (payload.length / 1024 / 1024).toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
       const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
@@ -3265,6 +3256,16 @@
         renderRestaurantsPage();
       }
     }
+    // No timestamp on this one (it's just two short config strings, not
+    // something that grows/changes over time) — fills in from remote only
+    // if local hasn't been configured at all, never overwrites a config
+    // you've deliberately set on this device.
+    if (!lastfmApiKey && !lastfmUsername && (existing.lastfmApiKey || existing.lastfmUsername)){
+      lastfmApiKey = existing.lastfmApiKey || '';
+      lastfmUsername = existing.lastfmUsername || '';
+      saveLastfmConfig();
+      updateLastfmUI();
+    }
 
     const hasCurrentData = (Array.isArray(items) && items.length >= 2)
       || (Array.isArray(songItems) && songItems.length >= 2)
@@ -3281,6 +3282,12 @@
       if (user){
         await localDataReadyPromise; // see this promise's own comment — avoids racing checkSavedProgress
         await loadOrSeedFirestoreData();
+        // loadMusicbeeLibrary() is called fire-and-forget at script load and
+        // may not have finished yet — re-awaiting it here is harmless (it's
+        // idempotent) and guarantees musicbeeTracks is actually loaded
+        // before comparing it against Firestore's copy.
+        await loadMusicbeeLibrary();
+        await loadOrSeedMusicbeeFirestore();
       }
     });
     firebaseSigninBtn.addEventListener('click', firebaseSignIn);
@@ -3497,10 +3504,66 @@
     showToast('Cloudinary connected');
   });
 
+  // Cloudinary's free plan hard-caps image uploads at 10MB — phone camera
+  // photos routinely exceed this. Downscales dimensions first (this app
+  // never displays a photo anywhere near this large — even the lightbox,
+  // its biggest use, is comfortably served by 2000px on the long side),
+  // then re-encodes as JPEG, stepping quality down further only if still
+  // needed. Small files pass through completely untouched — re-encoding a
+  // JPEG that doesn't need it just loses quality for no reason.
+  const CLOUDINARY_TARGET_BYTES = 9.5 * 1024 * 1024; // small safety margin under Cloudinary's exact 10MB cap
+  const CLOUDINARY_MAX_DIMENSION = 2000;
+
+  function compressImageForCloudinary(file){
+    return new Promise((resolve) => {
+      if (!file || file.size <= CLOUDINARY_TARGET_BYTES){
+        resolve(file);
+        return;
+      }
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        if (width > CLOUDINARY_MAX_DIMENSION || height > CLOUDINARY_MAX_DIMENSION){
+          const scale = CLOUDINARY_MAX_DIMENSION / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const tryQuality = (quality) => {
+          canvas.toBlob((blob) => {
+            if (!blob){
+              resolve(file); // encoding failed for some reason — fall back to the original rather than losing the photo entirely
+              return;
+            }
+            if (blob.size <= CLOUDINARY_TARGET_BYTES || quality <= 0.4){
+              resolve(blob);
+            } else {
+              tryQuality(quality - 0.15);
+            }
+          }, 'image/jpeg', quality);
+        };
+        tryQuality(0.85);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file); // couldn't even load it as an image — let the normal upload path handle/report whatever's wrong with it
+      };
+      img.src = objectUrl;
+    });
+  }
+
   async function uploadToCloudinary(fileOrBlob, folder){
     if (!cloudinaryConfig) throw new Error('Cloudinary not configured');
+    const uploadable = await compressImageForCloudinary(fileOrBlob);
     const formData = new FormData();
-    formData.append('file', fileOrBlob);
+    formData.append('file', uploadable);
     formData.append('upload_preset', cloudinaryConfig.uploadPreset);
     formData.append('folder', folder || 'RankHeaven/AlbumArt');
     const res = await fetch('https://api.cloudinary.com/v1_1/' + cloudinaryConfig.cloudName + '/image/upload', {
@@ -3870,6 +3933,7 @@
     try{
       await window.storage.set(LASTFM_STORAGE_KEY, JSON.stringify({ apiKey: lastfmApiKey, username: lastfmUsername }), false);
     }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
   }
 
   function updateLastfmUI(){
@@ -4075,6 +4139,70 @@
       await window.storage.set(MUSICBEE_STORAGE_KEY, JSON.stringify({ tracks: musicbeeTracks, importedAt: musicbeeImportedAt }), false);
     }catch(e){
       showToast("Couldn't save the MusicBee library — it may be too large");
+    }
+    writeMusicbeeFirestore();
+  }
+
+  // MusicBee's own Firestore document, kept separate from the main
+  // items/songs/restaurants one — a full library export can run to
+  // thousands of tracks, large enough on its own to risk the 1MB-per-
+  // document cap. Isolating it here means a big music collection can never
+  // threaten the sync that actually matters most (your rankings), even if
+  // the library itself turns out too large to sync at all.
+  async function writeMusicbeeFirestore(){
+    const fb = window.__firebase;
+    if (!fb || !firebaseUser) return;
+    try{
+      const payload = JSON.stringify({ tracks: musicbeeTracks, importedAt: musicbeeImportedAt });
+      console.log('MusicBee Firestore payload size:', (payload.length / 1024 / 1024).toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
+      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
+      await fb.setDoc(docRef, { json: payload });
+    }catch(e){
+      console.error('Firestore MusicBee write failed:', e);
+      showToast("⚠️ Couldn't sync MusicBee library to Firebase (" + (e && e.code ? e.code : 'unknown error') + ") — see console. Your library still works locally either way.");
+    }
+  }
+
+  async function readMusicbeeFirestore(){
+    const fb = window.__firebase;
+    if (!fb || !firebaseUser) return null;
+    try{
+      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
+      const snap = await fb.getDoc(docRef);
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      if (!data || !data.json) return null;
+      return JSON.parse(data.json);
+    }catch(e){
+      console.error('Firestore MusicBee read failed:', e);
+      return null;
+    }
+  }
+
+  // Same newest-wins principle as the main sync, compared against its own
+  // importedAt rather than the main document's savedAt — this is a
+  // genuinely separate sync running independently, not a sub-part of it.
+  async function loadOrSeedMusicbeeFirestore(){
+    const existing = await readMusicbeeFirestore();
+    if (!existing){
+      if (musicbeeTracks.length) writeMusicbeeFirestore(); // nothing remote yet — seed it with what's here
+      return;
+    }
+    if (Array.isArray(existing.tracks) && existing.tracks.length){
+      const remoteTime = new Date(existing.importedAt || 0).getTime();
+      const localTime = new Date(musicbeeImportedAt || 0).getTime();
+      if (remoteTime > localTime){
+        musicbeeTracks = existing.tracks;
+        musicbeeImportedAt = existing.importedAt || null;
+        rebuildMusicbeeAlbumIndex();
+        try{ await window.storage.set(MUSICBEE_STORAGE_KEY, JSON.stringify({ tracks: musicbeeTracks, importedAt: musicbeeImportedAt }), false); }catch(e){ /* best effort */ }
+        updateMusicbeeUI();
+        renderResultsTab(); // track-rank badges / tracklists in the details panel reflect the newly-loaded library
+      } else if (musicbeeTracks.length){
+        writeMusicbeeFirestore(); // local was ahead — push it so Firestore catches up
+      }
+    } else if (musicbeeTracks.length){
+      writeMusicbeeFirestore();
     }
   }
 
@@ -6839,69 +6967,29 @@
   restaurantRearrangeSaveBtn.addEventListener('click', saveRestaurantRearrange);
   restaurantRearrangeCancelBtn.addEventListener('click', cancelRestaurantRearrange);
 
-  let restaurantCuisineFilter = ''; // '' = show all cuisines; otherwise an exact cuisine value
-  let restaurantLocationFilter = ''; // '' = show all locations; otherwise an exact location value
+  let restaurantSearchFilter = ''; // '' = show all; otherwise a lowercase substring matched against name/cuisine/location
 
-  function renderRestaurantCuisineFilterOptions(list){
-    const cuisines = Array.from(new Set(list.map(r => r.cuisine).filter(Boolean))).sort();
-    restaurantCuisineFilterDatalist.innerHTML = cuisines.map(c => '<option value="' + escapeAttr(c) + '">').join('');
-    if (!cuisines.includes(restaurantCuisineFilter)) restaurantCuisineFilter = '';
-    restaurantCuisineFilterInput.value = restaurantCuisineFilter;
-    restaurantCuisineFilterClear.style.display = restaurantCuisineFilter ? 'flex' : 'none';
+  function restaurantMatchesSearch(r, query){
+    const q = query.toLowerCase();
+    return (r.name || '').toLowerCase().includes(q)
+      || (r.cuisine || '').toLowerCase().includes(q)
+      || (r.location || '').toLowerCase().includes(q);
   }
 
-  function renderRestaurantLocationFilterOptions(list){
-    const locations = Array.from(new Set(list.map(r => r.location).filter(Boolean))).sort();
-    restaurantLocationFilterDatalist.innerHTML = locations.map(l => '<option value="' + escapeAttr(l) + '">').join('');
-    if (!locations.includes(restaurantLocationFilter)) restaurantLocationFilter = '';
-    restaurantLocationFilterInput.value = restaurantLocationFilter;
-    restaurantLocationFilterClear.style.display = restaurantLocationFilter ? 'flex' : 'none';
-  }
-
-  restaurantCuisineFilterInput.addEventListener('input', () => {
-    const val = restaurantCuisineFilterInput.value.trim();
-    if (!val){
-      if (restaurantCuisineFilter){ restaurantCuisineFilter = ''; renderRestaurantsPage(); }
-      return;
-    }
-    // Only actually apply once it's an exact match — i.e. a datalist
-    // suggestion was picked, or the full correct value was typed. A partial
-    // in-progress string doesn't touch the active filter, so mid-typing
-    // never flashes an empty/wrong result.
-    const known = Array.from(restaurantCuisineFilterDatalist.options).map(o => o.value);
-    if (known.includes(val) && val !== restaurantCuisineFilter){
-      restaurantCuisineFilter = val;
-      renderRestaurantsPage();
-    }
-  });
-  restaurantCuisineFilterClear.addEventListener('click', () => {
-    restaurantCuisineFilterInput.value = '';
-    restaurantCuisineFilter = '';
+  restaurantSearchFilterInput.addEventListener('input', () => {
+    restaurantSearchFilter = restaurantSearchFilterInput.value.trim();
+    restaurantSearchFilterClear.style.display = restaurantSearchFilter ? 'flex' : 'none';
     renderRestaurantsPage();
   });
-
-  restaurantLocationFilterInput.addEventListener('input', () => {
-    const val = restaurantLocationFilterInput.value.trim();
-    if (!val){
-      if (restaurantLocationFilter){ restaurantLocationFilter = ''; renderRestaurantsPage(); }
-      return;
-    }
-    const known = Array.from(restaurantLocationFilterDatalist.options).map(o => o.value);
-    if (known.includes(val) && val !== restaurantLocationFilter){
-      restaurantLocationFilter = val;
-      renderRestaurantsPage();
-    }
-  });
-  restaurantLocationFilterClear.addEventListener('click', () => {
-    restaurantLocationFilterInput.value = '';
-    restaurantLocationFilter = '';
+  restaurantSearchFilterClear.addEventListener('click', () => {
+    restaurantSearchFilterInput.value = '';
+    restaurantSearchFilter = '';
+    restaurantSearchFilterClear.style.display = 'none';
     renderRestaurantsPage();
   });
 
   function renderRestaurantsPage(){
     maybeInitRestaurantTiers(restaurantRows.length);
-    renderRestaurantCuisineFilterOptions(restaurantRows);
-    renderRestaurantLocationFilterOptions(restaurantRows);
 
     restaurantRearrangeBtn.style.display = restaurantRearrangeMode ? 'none' : 'inline-block';
     restaurantRearrangeSaveBtn.style.display = restaurantRearrangeMode ? 'inline-block' : 'none';
@@ -6955,8 +7043,7 @@
       // Rank number always reflects true, unfiltered position (matching
       // Albums) — filtering only hides non-matching rows, it never
       // renumbers the ones still shown, in either section.
-      if (restaurantCuisineFilter && r.cuisine !== restaurantCuisineFilter) return;
-      if (restaurantLocationFilter && r.location !== restaurantLocationFilter) return;
+      if (restaurantSearchFilter && !restaurantMatchesSearch(r, restaurantSearchFilter)) return;
 
       const rank = idx + 1;
       const tier = restaurantTierBoundaries ? getRestaurantTierForRank(rank, restaurantTierBoundaries) : null;
