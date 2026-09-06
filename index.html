@@ -3312,6 +3312,16 @@
   // separate feature on its own.
   let firebaseUser = null;
   let firestoreWriteTimer = null;
+  // Firebase's auth state and the app's own local-data loading (in
+  // checkSavedProgress, called separately at the bottom of this script) are
+  // two independent async operations with no inherent ordering between them.
+  // Without this, a fast-resolving signed-in session could fire the first
+  // Firestore write before albums/restaurants had finished loading locally —
+  // capturing (and then syncing everywhere else) an incomplete snapshot with
+  // only whichever domain happened to load first. resolveLocalDataReady()
+  // is called at the very end of checkSavedProgress().
+  let resolveLocalDataReady;
+  const localDataReadyPromise = new Promise(resolve => { resolveLocalDataReady = resolve; });
 
   function updateFirebaseUI(){
     if (firebaseUser){
@@ -3432,7 +3442,10 @@
     fb.onAuthStateChanged(fb.auth, async (user) => {
       firebaseUser = user;
       updateFirebaseUI();
-      if (user) await loadOrSeedFirestoreData();
+      if (user){
+        await localDataReadyPromise; // see this promise's own comment — avoids racing checkSavedProgress
+        await loadOrSeedFirestoreData();
+      }
     });
     firebaseSigninBtn.addEventListener('click', firebaseSignIn);
     firebaseSignoutBtn.addEventListener('click', firebaseSignOut);
@@ -3531,6 +3544,8 @@
     if (restaurantParsed && Array.isArray(restaurantParsed.restaurantRows) && restaurantParsed.restaurantRows.length){
       restaurantRows = restaurantParsed.restaurantRows;
     }
+
+    resolveLocalDataReady(); // albums, songs, and restaurants have all finished loading — safe for Firebase sync to compare/write now
   }
 
   // ---------- PARSE INPUT ----------
