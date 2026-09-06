@@ -3333,7 +3333,9 @@
       await fb.signInWithPopup(fb.auth, provider);
       // onAuthStateChanged (wired in initFirebaseSync) handles the rest.
     }catch(e){
-      if (e && e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed');
+      if (e && e.code === 'auth/popup-closed-by-user') return; // you closed it yourself — not a real failure
+      console.error('Firebase sign-in failed:', e);
+      showToast('Sign-in failed: ' + (e && e.code ? e.code : 'unknown error') + ' — see console for details');
     }
   }
 
