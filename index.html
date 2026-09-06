@@ -328,26 +328,9 @@
   .restaurant-details-tab-panel{ display: none; padding: 0 24px 24px; }
   .restaurant-details-tab-panel.active{ display: block; }
 
-  .restaurant-photo-add-row{
-    display: flex;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .restaurant-photo-add-row input{
-    flex: 1;
-    min-width: 0;
-    background: var(--bg-2);
-    border: 1px solid var(--panel-line);
-    border-radius: 8px;
-    padding: 8px 10px;
-    color: var(--chalk);
-    font-family: 'Figtree', sans-serif;
-    font-size: 13px;
-  }
-  .restaurant-photo-add-row input:focus{ outline: none; border-color: var(--amber); }
   .restaurant-photo-grid{
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
     gap: 8px;
   }
   .restaurant-photo-thumb{
@@ -380,7 +363,36 @@
     align-items: center;
     justify-content: center;
   }
-  .restaurant-photo-empty,
+  /* The "add" tile sits as the last item in the same grid as the thumbnails
+     — same drag/click-to-browse drop-zone behavior as everywhere else,
+     replacing the old paste-a-URL input now that direct upload exists. */
+  .restaurant-photo-add-tile{
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    border: 1px dashed var(--panel-line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 22px;
+    color: var(--chalk-dim);
+    background: var(--bg-2);
+  }
+  .restaurant-photo-add-tile.drag-over{ outline: 2px solid var(--amber); outline-offset: -2px; }
+  .restaurant-other-photos-section{
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--panel-line);
+  }
+  .restaurant-other-photos-label{
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--chalk-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 8px;
+    display: block;
+  }
   .restaurant-course-empty{
     font-size: 13px;
     color: var(--chalk-dim);
@@ -396,11 +408,37 @@
   }
   .restaurant-course-card{
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
     background: var(--bg-2);
     border: 1px solid var(--panel-line);
     border-radius: 10px;
+    overflow: hidden; /* keeps the photo's corners rounded with the card */
+  }
+  /* Full-width, landscape — same drop-zone interaction as the main cover
+     photo (tap when empty to browse, drag-drop always works, tap when set
+     opens the shared gallery rather than a single-image view). */
+  .restaurant-course-photo-drop{
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    cursor: pointer;
+    background: var(--bg-3, var(--bg-2));
+    position: relative;
+  }
+  .restaurant-course-photo-drop.drag-over{ outline: 2px solid var(--amber); outline-offset: -2px; }
+  .restaurant-course-photo-drop img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+  .restaurant-course-photo-drop .art-drop-hint{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    opacity: 0.35;
+  }
+  .restaurant-course-card-body{
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
     padding: 10px;
   }
   .restaurant-course-num{
@@ -1836,6 +1874,31 @@
   }
   .art-lightbox-overlay.multi .lightbox-counter{ display: block; }
 
+  /* Only appears when the gallery was opened with a cover-toggle context
+     (i.e. always, for the restaurant gallery — this lightbox has no other
+     multi-photo caller) — gated by its own "show" class rather than just
+     .multi, so a future non-cover multi-photo use of this same lightbox
+     wouldn't need this button to also appear. */
+  .lightbox-cover-toggle-btn{
+    display: none;
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-family: 'Figtree', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(15,33,36,0.72);
+    border: none;
+    padding: 7px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    z-index: 301;
+  }
+  .lightbox-cover-toggle-btn.show{ display: block; }
+  .lightbox-cover-toggle-btn.is-cover{ background: var(--amber); color: var(--ink); }
+
   /* ---------- INSIGHTS ---------- */
   .insights-section{
     display: none;
@@ -2695,6 +2758,7 @@
   <img class="art-lightbox-img" id="art-lightbox-img" src="" alt="">
   <button class="lightbox-nav-btn lightbox-next-btn" id="lightbox-next-btn" type="button" title="Next">›</button>
   <span class="lightbox-counter" id="lightbox-counter"></span>
+  <button class="lightbox-cover-toggle-btn" id="lightbox-cover-toggle-btn" type="button"></button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -2903,6 +2967,7 @@
   const lightboxPrevBtn = document.getElementById('lightbox-prev-btn');
   const lightboxNextBtn = document.getElementById('lightbox-next-btn');
   const lightboxCounter = document.getElementById('lightbox-counter');
+  const lightboxCoverToggleBtn = document.getElementById('lightbox-cover-toggle-btn');
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
   const topNavAlbumsBtn = document.getElementById('top-nav-albums-btn');
@@ -3380,10 +3445,12 @@
         songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt,
         restaurantRows, restaurantSavedAt: restaurantLastSavedAt
       });
+      console.log('Firestore payload size:', (payload.length / 1024 / 1024).toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
       const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
       await fb.setDoc(docRef, { json: payload });
     }catch(e){
-      showToast("⚠️ Couldn't sync to Firebase — will retry on the next change");
+      console.error('Firestore write failed:', e);
+      showToast("⚠️ Couldn't sync to Firebase (" + (e && e.code ? e.code : 'unknown error') + ") — see console, will retry on the next change");
     }
   }
 
@@ -3398,6 +3465,7 @@
       if (!data || !data.json) return null;
       return JSON.parse(data.json);
     }catch(e){
+      console.error('Firestore read failed:', e);
       return null;
     }
   }
@@ -3703,12 +3771,12 @@
     showToast('Cloudinary connected');
   });
 
-  async function uploadToCloudinary(fileOrBlob){
+  async function uploadToCloudinary(fileOrBlob, folder){
     if (!cloudinaryConfig) throw new Error('Cloudinary not configured');
     const formData = new FormData();
     formData.append('file', fileOrBlob);
     formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-    formData.append('folder', 'RankHeaven/AlbumArt');
+    formData.append('folder', folder || 'RankHeaven/AlbumArt');
     const res = await fetch('https://api.cloudinary.com/v1_1/' + cloudinaryConfig.cloudName + '/image/upload', {
       method: 'POST',
       body: formData
@@ -3716,6 +3784,31 @@
     if (!res.ok) throw new Error('Cloudinary upload failed (' + res.status + ')');
     const data = await res.json();
     return data.secure_url;
+  }
+
+  // Shared by cover photos, course photos, and general visit photos — tries
+  // Cloudinary first when configured (keeping the synced JSON small, which
+  // matters for the 1MB Firestore document cap), falling back to a local
+  // base64 data URL on failure or when Cloudinary isn't set up, so a photo
+  // is never lost just because an upload failed.
+  async function uploadRestaurantPhoto(file, folder){
+    if (!file || !file.type || !file.type.startsWith('image/')){
+      showToast("That file isn't an image");
+      return null;
+    }
+    if (cloudinaryConfig){
+      try{
+        return await uploadToCloudinary(file, folder);
+      }catch(e){
+        showToast("Couldn't upload to Cloudinary — saving locally instead");
+      }
+    }
+    try{
+      return await fileToDataUrl(file);
+    }catch(e){
+      showToast("Couldn't read that image");
+      return null;
+    }
   }
 
   cloudinaryMigrateBtn.addEventListener('click', async () => {
@@ -3896,25 +3989,35 @@
   // closes it again.
   let lightboxPhotos = null; // array of URLs when in gallery mode, else null
   let lightboxIndex = 0;
+  let lightboxCoverContext = null; // { restaurantIndex } when opened from a restaurant gallery, else null
 
   function openArtLightbox(src){
     lightboxPhotos = null;
+    lightboxCoverContext = null;
     artLightboxImg.src = src;
     artLightboxOverlay.classList.remove('multi');
+    lightboxCoverToggleBtn.classList.remove('show');
     artLightboxOverlay.classList.add('show');
   }
 
   // Multi-photo mode (restaurant galleries) — same overlay, same "click
   // anywhere closes" behavior, plus prev/next arrows and a counter that the
   // single-image mode never shows. Navigation wraps around at both ends.
-  function openPhotoLightbox(photos, startIndex){
+  // coverContext (optional) adds the "set as cover" toggle — every current
+  // caller is a restaurant gallery, so it's always passed there, but stays
+  // optional here in case a future multi-photo use of this lightbox has no
+  // cover concept at all.
+  function openPhotoLightbox(photos, startIndex, coverContext){
     if (!photos || !photos.length) return;
     lightboxPhotos = photos;
     lightboxIndex = startIndex;
+    lightboxCoverContext = coverContext || null;
     artLightboxImg.src = photos[lightboxIndex];
     artLightboxOverlay.classList.add('multi');
     artLightboxOverlay.classList.add('show');
+    lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
     updateLightboxCounter();
+    updateLightboxCoverToggle();
   }
 
   function updateLightboxCounter(){
@@ -3922,24 +4025,50 @@
     lightboxCounter.textContent = (lightboxIndex + 1) + ' / ' + lightboxPhotos.length;
   }
 
+  function updateLightboxCoverToggle(){
+    if (!lightboxCoverContext) return;
+    const r = restaurantRows[lightboxCoverContext.restaurantIndex];
+    if (!r) return;
+    const isCover = r.coverPhoto === lightboxPhotos[lightboxIndex];
+    lightboxCoverToggleBtn.textContent = isCover ? '★ Cover photo' : '☆ Set as cover';
+    lightboxCoverToggleBtn.classList.toggle('is-cover', isCover);
+  }
+
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
     artLightboxImg.src = lightboxPhotos[lightboxIndex];
     updateLightboxCounter();
+    updateLightboxCoverToggle();
   }
 
   function closeArtLightbox(){
     artLightboxOverlay.classList.remove('show');
     artLightboxOverlay.classList.remove('multi');
+    lightboxCoverToggleBtn.classList.remove('show');
     artLightboxImg.src = '';
     lightboxPhotos = null;
+    lightboxCoverContext = null;
   }
   artLightboxOverlay.addEventListener('click', closeArtLightbox);
-  // Arrows need to stop the click from reaching the overlay's own close
-  // handler — otherwise navigating would also close the lightbox.
+  // Arrows (and the cover toggle) need to stop the click from reaching the
+  // overlay's own close handler — otherwise using them would also close
+  // the lightbox.
   lightboxPrevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(-1); });
   lightboxNextBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(1); });
+  lightboxCoverToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!lightboxCoverContext) return;
+    const idx = lightboxCoverContext.restaurantIndex;
+    const r = restaurantRows[idx];
+    if (!r) return;
+    const currentUrl = lightboxPhotos[lightboxIndex];
+    // Toggling off just clears the cover entirely — there's always at most
+    // one, never a "previous" one to fall back to.
+    const newCover = r.coverPhoto === currentUrl ? '' : currentUrl;
+    setRestaurantCoverPhoto(idx, newCover);
+    updateLightboxCoverToggle();
+  });
 
   // Matches the classic Wikipedia search-results URL shape, e.g.
   // https://en.wikipedia.org/w/index.php?search=muse+origin+of+symmetry&title=Special:Search&ns0=1
@@ -6632,15 +6761,9 @@
     if (openRestaurantIndex === index) renderRestaurantDetailsContent();
   }
 
-  function handleRestaurantCoverPhotoFile(index, file){
-    if (!file || !file.type || !file.type.startsWith('image/')){
-      showToast('That file isn\'t an image');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setRestaurantCoverPhoto(index, reader.result);
-    reader.onerror = () => showToast('Could not read that image');
-    reader.readAsDataURL(file);
+  async function handleRestaurantCoverPhotoFile(index, file){
+    const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCovers');
+    if (url) setRestaurantCoverPhoto(index, url);
   }
 
   // Grid card — drag-and-drop only, same reasoning as Albums' grid cards:
@@ -6681,7 +6804,9 @@
     });
     el.addEventListener('click', () => {
       if (r.coverPhoto){
-        openArtLightbox(r.coverPhoto);
+        const allPhotos = gatherAllRestaurantPhotos(r);
+        const startIndex = allPhotos.indexOf(r.coverPhoto);
+        openPhotoLightbox(allPhotos, startIndex === -1 ? 0 : startIndex, { restaurantIndex: index });
       } else {
         const input = document.createElement('input');
         input.type = 'file';
@@ -7018,7 +7143,6 @@
   // a stable id — safe for now since nothing currently reorders that array;
   // worth revisiting if a manual-reorder feature is ever added later.
   let openRestaurantIndex = null;
-  let restaurantDetailsActiveTab = 'courses'; // Courses is now the first tab, so it's the default
   let restaurantEditMode = false;
   let newRestaurantDraft = null; // { name, cuisine, location, stars } while creating a brand-new restaurant; null otherwise
   let restaurantActiveVisitId = null; // which visit's Courses/Photos are currently shown
@@ -7080,11 +7204,35 @@
     return Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 10) / 10;
   }
 
+  // Powers the unified gallery — every course photo and every general
+  // ("other") visit photo, across all visits, newest visit first (matching
+  // the visit tabs' own order). This is now the only place any restaurant
+  // photo is actually viewed full-size, since there's no separate Photos
+  // tab anymore — tapping any photo (the cover, or a course's) opens this
+  // same list, just starting at a different position. The cover photo is
+  // always included first (deduplicated) even if it isn't also a course or
+  // visit photo — it can be uploaded directly onto the cover slot itself,
+  // not just picked from the gallery, and clicking it should always find
+  // itself in the list it opens.
+  function gatherAllRestaurantPhotos(r){
+    const visits = sortedRestaurantVisits(r);
+    const photos = [];
+    if (r.coverPhoto) photos.push(r.coverPhoto);
+    visits.forEach(visit => {
+      (visit.courses || []).forEach(course => {
+        if (course.photo && course.photo !== r.coverPhoto) photos.push(course.photo);
+      });
+      (visit.photos || []).forEach(url => {
+        if (url && url !== r.coverPhoto) photos.push(url);
+      });
+    });
+    return photos;
+  }
+
   function openRestaurantDetailsPanel(index){
     openRestaurantIndex = index;
     newRestaurantDraft = null;
     restaurantEditMode = false;
-    restaurantDetailsActiveTab = 'courses'; // always starts here on a fresh open
     restaurantDetailsPanel.classList.add('open');
     document.body.classList.add('details-open-lock');
     renderRestaurantDetailsContent();
@@ -7149,7 +7297,6 @@
       });
       newRestaurantDraft = null;
       openRestaurantIndex = restaurantRows.length - 1;
-      restaurantDetailsActiveTab = 'courses';
       saveRestaurantProgress();
       renderRestaurantsPage();
       renderRestaurantDetailsContent();
@@ -7195,30 +7342,6 @@
     saveRestaurantProgress();
   }
 
-  function switchRestaurantDetailsTab(tab){
-    restaurantDetailsActiveTab = tab;
-    renderRestaurantDetailsContent();
-  }
-
-  function renderRestaurantPhotosTabHtml(r){
-    const photos = r.photos || [];
-    const gridHtml = photos.length
-      ? photos.map((url, i) =>
-          '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
-            '<img src="' + escapeAttr(url) + '" alt="" loading="lazy">' +
-            '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
-          '</div>'
-        ).join('')
-      : '<p class="restaurant-photo-empty">No photos yet — paste a Cloudinary (or any) image URL above to add one.</p>';
-    return (
-      '<div class="restaurant-photo-add-row">' +
-        '<input type="text" id="restaurant-photo-url-input" placeholder="Paste an image URL...">' +
-        '<button class="btn-ghost" id="restaurant-photo-add-btn" type="button">Add</button>' +
-      '</div>' +
-      '<div class="restaurant-photo-grid">' + gridHtml + '</div>'
-    );
-  }
-
   // Shared "plain text until clicked" score select builder — used by course
   // cards and the Best Flavor / Flavor Variety selects near the heading.
   // 12/18 (the top of each range) come first in the option list — matches
@@ -7241,21 +7364,52 @@
     return buildScoreSelectHtml(RESTAURANT_COURSE_SCORES, course.score, 'data-course-index="' + index + '"');
   }
 
-  function renderRestaurantCoursesTabHtml(r){
-    const courses = r.courses || [];
+  // Courses are now the only content shown per visit — no more Courses/
+  // Photos tab switcher. Each course card leads with a full-width landscape
+  // photo (same drop-zone interaction as the main cover: tap when empty to
+  // browse, drag-drop always works, tap when set opens the shared gallery
+  // rather than a single-image view), with the number/notes/score/remove
+  // row below it. General ("other") photos for the visit — a menu, the
+  // sign, anything not tied to one course — get their own small section
+  // beneath the course list, since they still need somewhere to live now
+  // that there's no separate Photos tab.
+  function renderRestaurantCoursesContentHtml(visit){
+    const courses = visit.courses || [];
     const listHtml = courses.length
       ? courses.map((course, i) =>
           '<div class="restaurant-course-card">' +
-            '<span class="restaurant-course-num">' + (i + 1) + '</span>' +
-            '<textarea class="restaurant-course-text" data-course-index="' + i + '" placeholder="Course name, notes...">' + escapeHtml(course.text || '') + '</textarea>' +
-            restaurantCourseScoreSelectHtml(course, i) +
-            '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
+            '<div class="restaurant-course-photo-drop art-drop" data-course-photo-index="' + i + '"' +
+              (course.photo ? ' title="Click to view in the gallery, or drag an image here to replace it"' : ' title="Drag an image here, or click to browse"') + '>' +
+              (course.photo ? '<img class="art-img" src="' + escapeAttr(course.photo) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
+            '</div>' +
+            '<div class="restaurant-course-card-body">' +
+              '<span class="restaurant-course-num">' + (i + 1) + '</span>' +
+              '<textarea class="restaurant-course-text" data-course-index="' + i + '" placeholder="Course name, notes...">' + escapeHtml(course.text || '') + '</textarea>' +
+              restaurantCourseScoreSelectHtml(course, i) +
+              '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
+            '</div>' +
           '</div>'
         ).join('')
       : '<p class="restaurant-course-empty">No courses added yet.</p>';
+
+    const otherPhotos = visit.photos || [];
+    const otherPhotosGridHtml = otherPhotos.map((url, i) =>
+      '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
+        '<img src="' + escapeAttr(url) + '" alt="" loading="lazy">' +
+        '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
+      '</div>'
+    ).join('');
+
     return (
       '<div class="restaurant-course-list">' + listHtml + '</div>' +
-      '<button class="btn-ghost" id="restaurant-course-add-btn" type="button">+ Add Course</button>'
+      '<button class="btn-ghost" id="restaurant-course-add-btn" type="button">+ Add Course</button>' +
+      '<div class="restaurant-other-photos-section">' +
+        '<span class="restaurant-other-photos-label">Other Photos (menu, sign, etc.)</span>' +
+        '<div class="restaurant-photo-grid">' +
+          otherPhotosGridHtml +
+          '<div class="restaurant-photo-add-tile art-drop" id="restaurant-other-photo-add-tile" title="Drag an image here, or click to browse">+</div>' +
+        '</div>' +
+      '</div>'
     );
   }
 
@@ -7464,18 +7618,7 @@
           '</div>' +
           '<div class="restaurant-visit-content">' +
             renderRestaurantVisitMetaHtml(activeVisit) +
-            (restaurantVisitEditMode ? '' :
-              '<div class="restaurant-details-tabs">' +
-                '<button class="restaurant-details-tab-btn' + (restaurantDetailsActiveTab === 'courses' ? ' active' : '') + '" data-tab="courses" type="button">Courses</button>' +
-                '<button class="restaurant-details-tab-btn' + (restaurantDetailsActiveTab === 'photos' ? ' active' : '') + '" data-tab="photos" type="button">Photos</button>' +
-              '</div>' +
-              '<div class="restaurant-details-tab-panel' + (restaurantDetailsActiveTab === 'courses' ? ' active' : '') + '" id="restaurant-tab-courses">' +
-                renderRestaurantCoursesTabHtml(activeVisit) +
-              '</div>' +
-              '<div class="restaurant-details-tab-panel' + (restaurantDetailsActiveTab === 'photos' ? ' active' : '') + '" id="restaurant-tab-photos">' +
-                renderRestaurantPhotosTabHtml(activeVisit) +
-              '</div>'
-            ) +
+            (restaurantVisitEditMode ? '' : renderRestaurantCoursesContentHtml(activeVisit)) +
           '</div>'
         )
       : (
@@ -7487,7 +7630,7 @@
 
     restaurantDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
-        '<div class="art-drop restaurant-cover-drop"' + (r.coverPhoto ? ' title="Click to view full size, or drag an image here to replace it"' : ' title="Drag an image here, or click to browse"') + '>' +
+        '<div class="art-drop restaurant-cover-drop"' + (r.coverPhoto ? ' title="Click to open the photo gallery, or drag an image here to replace the cover"' : ' title="Drag an image here, or click to browse"') + '>' +
           (r.coverPhoto ? '<img class="art-img" src="' + escapeAttr(r.coverPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
         '</div>' +
         (r.website ? '<button class="details-website-btn" type="button" title="Visit website">🌐</button>' : '') +
@@ -7543,36 +7686,88 @@
       restaurantDetailsPanelInner.querySelector('#restaurant-visit-save-btn').addEventListener('click', saveVisitEdit);
       restaurantDetailsPanelInner.querySelector('#restaurant-visit-cancel-btn').addEventListener('click', cancelVisitEdit);
       restaurantDetailsPanelInner.querySelector('#restaurant-visit-delete-btn').addEventListener('click', deleteActiveVisit);
-      return; // sub-tabs aren't shown while editing a visit's date/notes
+      return; // course/photo content isn't shown while editing a visit's date/notes
     }
 
     restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-btn').addEventListener('click', enterVisitEditMode);
 
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-details-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => switchRestaurantDetailsTab(btn.dataset.tab));
+    // Course photo drop zones — each tap-to-browse/drag-drop uploads (via
+    // Cloudinary when configured, else base64) directly onto that course;
+    // once a photo exists, tapping it opens the same shared gallery every
+    // other restaurant photo uses, positioned at that exact photo.
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-drop').forEach(el => {
+      const i = Number(el.dataset.coursePhotoIndex);
+      el.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        el.classList.add('drag-over');
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', async (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses');
+        if (url) updateOpenRestaurant(rest => { getActiveVisit(rest).courses[i].photo = url; });
+      });
+      el.addEventListener('click', () => {
+        const course = activeVisit.courses[i];
+        if (course.photo){
+          const allPhotos = gatherAllRestaurantPhotos(r);
+          openPhotoLightbox(allPhotos, allPhotos.indexOf(course.photo), { restaurantIndex: openRestaurantIndex });
+        } else {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.addEventListener('change', async () => {
+            const url = await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses');
+            if (url) updateOpenRestaurant(rest => { getActiveVisit(rest).courses[i].photo = url; });
+          });
+          input.click();
+        }
+      });
     });
 
-    // Photos tab wiring — scoped to the ACTIVE VISIT's photos, not the restaurant's
-    const photoUrlInput = restaurantDetailsPanelInner.querySelector('#restaurant-photo-url-input');
-    const photoAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-photo-add-btn');
-    if (photoAddBtn){
-      const addPhoto = () => {
-        const url = photoUrlInput.value.trim();
-        if (!url) return;
-        updateOpenRestaurant(rest => {
+    // "Other photos" (unattached to a course) — same upload-first pattern,
+    // shown as a thumbnail grid with an add tile as the last item, all
+    // opening the same shared gallery on click.
+    const otherPhotoAddTile = restaurantDetailsPanelInner.querySelector('#restaurant-other-photo-add-tile');
+    if (otherPhotoAddTile){
+      const addOtherPhotoFile = async (file) => {
+        const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantVisitPhotos');
+        if (url) updateOpenRestaurant(rest => {
           const visit = getActiveVisit(rest);
           if (!visit.photos) visit.photos = [];
           visit.photos.push(url);
         });
       };
-      photoAddBtn.addEventListener('click', addPhoto);
-      photoUrlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPhoto(); });
+      otherPhotoAddTile.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        otherPhotoAddTile.classList.add('drag-over');
+      });
+      otherPhotoAddTile.addEventListener('dragleave', () => otherPhotoAddTile.classList.remove('drag-over'));
+      otherPhotoAddTile.addEventListener('drop', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        otherPhotoAddTile.classList.remove('drag-over');
+        addOtherPhotoFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
+      otherPhotoAddTile.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.addEventListener('change', () => addOtherPhotoFile(input.files[0]));
+        input.click();
+      });
     }
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-photo-thumb').forEach(thumb => {
       thumb.addEventListener('click', (e) => {
         if (e.target.closest('.restaurant-photo-remove-btn')) return; // handled separately below
-        const photos = activeVisit.photos || [];
-        openPhotoLightbox(photos, Number(thumb.dataset.photoIndex));
+        const url = (activeVisit.photos || [])[Number(thumb.dataset.photoIndex)];
+        const allPhotos = gatherAllRestaurantPhotos(r);
+        openPhotoLightbox(allPhotos, allPhotos.indexOf(url), { restaurantIndex: openRestaurantIndex });
       });
     });
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-photo-remove-btn').forEach(btn => {
@@ -7583,7 +7778,7 @@
       });
     });
 
-    // Courses tab wiring — scoped to the ACTIVE VISIT's courses
+    // Courses wiring
     const courseAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-course-add-btn');
     if (courseAddBtn){
       courseAddBtn.addEventListener('click', () => {
