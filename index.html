@@ -1331,9 +1331,21 @@
      object (r.coverPhoto) rather than in the hash-keyed art cache Albums
      uses, since restaurants don't have Albums' stable string identity to
      key off of. */
+  /* auto-fill/minmax rather than a fixed repeat(4, 1fr) — this reacts to
+     the grid's own actual available width, not the viewport's. That's the
+     difference that matters here: when the details panel opens (600px,
+     see #restaurant-details-panel), #main-content genuinely shrinks (it's
+     flex:1), but a fixed column count has no way to know that and would
+     just cram 4 columns into whatever's left. This adapts continuously —
+     4 columns full-width, naturally down to 2-3 with the panel open,
+     exactly as if it were a narrower viewport, without a media query tied
+     to viewport width (which can't see the panel at all) or any JS. The
+     768px mobile override below still applies as before — its own layout
+     (a full-screen overlay, not a side panel) never faces this problem.
+  */
   .restaurant-gold-grid{
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 12px;
     margin-bottom: 28px;
   }
@@ -1553,9 +1565,13 @@
   .filter-clear:hover{ background: var(--brick); color: #fff; }
 
   /* ---------- GRID VIEW ---------- */
+  /* Same auto-fill/minmax reasoning as the restaurant gold grid's own
+     comment — reacts to actual available width so it adapts when
+     #details-panel (400px) opens alongside it, rather than cramming a
+     fixed 5 columns into whatever space is left. */
   .results-list.grid-mode{
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 2px;
     padding-bottom: 12px;
     align-items: start;
