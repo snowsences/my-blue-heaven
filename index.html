@@ -2171,6 +2171,46 @@
     }
   }
 </style>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAsSDjH4BV7kEp8PTIKfZQy0Lwm9WEkfyw",
+    authDomain: "rank-heaven.firebaseapp.com",
+    projectId: "rank-heaven",
+    storageBucket: "rank-heaven.firebasestorage.app",
+    messagingSenderId: "20693828250",
+    appId: "1:20693828250:web:413b9d0f623cc622085523"
+  };
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const firebaseAuth = getAuth(firebaseApp);
+  const firestoreDb = getFirestore(firebaseApp);
+
+  // Exposed on window because the main app script below is a classic
+  // (non-module) script — modules and classic scripts don't share scope
+  // otherwise. Kept to a small, explicit surface rather than exposing the
+  // whole SDK, so it's clear exactly what the main script depends on here.
+  window.__firebase = {
+    auth: firebaseAuth,
+    db: firestoreDb,
+    GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+    doc, getDoc, setDoc
+  };
+  // Module scripts always run deferred (after the whole document is parsed),
+  // but the main app below is a classic script that runs immediately when
+  // the parser reaches it — meaning it starts running BEFORE this module
+  // does. window.__firebase wouldn't exist yet if the main app looked for
+  // it synchronously, so it waits for this event instead (see
+  // initFirebaseSync's own comment for how).
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
 </head>
 <body>
 
@@ -2533,6 +2573,39 @@
       </div>
 
       <div class="settings-section">
+        <h2 class="settings-section-title">Cloud Sync (Firebase)</h2>
+        <div class="lastfm-block">
+          <div class="lastfm-row">
+            <span class="lastfm-status-text" id="firebase-status-text">Not signed in</span>
+            <button class="btn-ghost" id="firebase-signin-btn" type="button">Sign in with Google</button>
+            <button class="btn-ghost" id="firebase-signout-btn" type="button" style="display:none;">Sign out</button>
+          </div>
+          <p class="footer-note" style="margin-top:8px;">Syncs albums, songs, and restaurants automatically across any device signed into the same Google account — no folder to reconnect. Works alongside folder sync below; you don't need both.</p>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="settings-section-title">Cloudinary (Photo Hosting)</h2>
+        <div class="lastfm-block">
+          <div class="lastfm-row">
+            <span class="lastfm-status-text" id="cloudinary-status-text">Cloudinary: not connected</span>
+            <button class="btn-ghost" id="cloudinary-connect-btn" type="button">Connect Cloudinary</button>
+            <button class="btn-ghost" id="cloudinary-disconnect-btn" type="button" style="display:none;">Disconnect</button>
+          </div>
+          <div class="lastfm-form" id="cloudinary-form" style="display:none;">
+            <input type="text" id="cloudinary-cloudname-input" placeholder="Cloud name" autocomplete="off">
+            <input type="text" id="cloudinary-preset-input" placeholder="Unsigned upload preset" autocomplete="off">
+            <button class="btn-primary" id="cloudinary-save-btn" type="button">Save</button>
+            <a class="lastfm-help-link" href="https://cloudinary.com/documentation/upload_images#unsigned_upload" target="_blank" rel="noopener noreferrer">How to create an unsigned preset →</a>
+          </div>
+        </div>
+        <div class="import-row" id="cloudinary-migrate-row" style="display:none;">
+          <span id="cloudinary-migrate-status">Move existing album art from local storage to Cloudinary</span>
+          <button class="btn-ghost" id="cloudinary-migrate-btn" type="button">Migrate Art to Cloudinary</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h2 class="settings-section-title">Album Ranker Settings</h2>
 
         <div class="import-row">
@@ -2805,6 +2878,19 @@
   const reorderCancelBtn = document.getElementById('reorder-cancel-btn');
 
   const syncReconnectBanner = document.getElementById('sync-reconnect-banner');
+  const firebaseStatusText = document.getElementById('firebase-status-text');
+  const firebaseSigninBtn = document.getElementById('firebase-signin-btn');
+  const firebaseSignoutBtn = document.getElementById('firebase-signout-btn');
+  const cloudinaryStatusText = document.getElementById('cloudinary-status-text');
+  const cloudinaryConnectBtn = document.getElementById('cloudinary-connect-btn');
+  const cloudinaryDisconnectBtn = document.getElementById('cloudinary-disconnect-btn');
+  const cloudinaryForm = document.getElementById('cloudinary-form');
+  const cloudinaryCloudnameInput = document.getElementById('cloudinary-cloudname-input');
+  const cloudinaryPresetInput = document.getElementById('cloudinary-preset-input');
+  const cloudinarySaveBtn = document.getElementById('cloudinary-save-btn');
+  const cloudinaryMigrateRow = document.getElementById('cloudinary-migrate-row');
+  const cloudinaryMigrateStatus = document.getElementById('cloudinary-migrate-status');
+  const cloudinaryMigrateBtn = document.getElementById('cloudinary-migrate-btn');
   const modalOverlay = document.getElementById('modal-overlay');
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
@@ -3097,10 +3183,17 @@
     }
   }
 
+  // Covers both sync paths from every existing call site — folder sync and
+  // Firebase sync are independent (either, both, or neither can be active),
+  // but anything that changed data wants to try both, so this stays the one
+  // function every part of the app already calls after a change rather than
+  // needing every one of those call sites to know about Firebase too.
   function scheduleSyncWrite(){
-    if (syncStatus !== 'connected') return;
-    clearTimeout(syncWriteTimer);
-    syncWriteTimer = setTimeout(writeSyncFile, 600);
+    if (syncStatus === 'connected'){
+      clearTimeout(syncWriteTimer);
+      syncWriteTimer = setTimeout(writeSyncFile, 600);
+    }
+    scheduleFirestoreWrite(); // no-op internally when not signed in
   }
 
   async function writeSyncFile(){
@@ -3198,6 +3291,157 @@
   document.querySelectorAll('.sync-connect-btn').forEach(el => el.addEventListener('click', connectSyncFolder));
   document.querySelectorAll('.sync-reconnect-btn').forEach(el => el.addEventListener('click', reconnectSyncPermission));
   updateSyncUI(); // sets correct show/hide immediately; loadSyncHandle() below fills in the actual status text once it resolves
+
+  // ---------- FIREBASE SYNC (Auth + Firestore) ----------
+  // A second, independent sync path alongside the folder sync above — either,
+  // both, or neither can be active. Kept alongside rather than replacing the
+  // folder sync outright: this is new, untested against your real Firebase
+  // project (I can't reach your actual account from here), so having the
+  // working folder sync still available as a fallback if anything's off
+  // seemed safer than removing it in the same change.
+  //
+  // The synced document is one JSON string field — same shape as the folder
+  // sync's own file — deliberately, so all the existing resume/merge logic
+  // (resumeFromData, resumeSongDataFromSync, the newest-wins comparison in
+  // checkSavedProgress) works unchanged; only the transport differs.
+  //
+  // Firestore documents cap out at 1MB. With album art still stored as
+  // base64 here, a large collection can exceed that easily — moving art to
+  // Cloudinary (see that section) shrinks this payload down to just text
+  // and URLs, which is why that migration matters even though it's a
+  // separate feature on its own.
+  let firebaseUser = null;
+  let firestoreWriteTimer = null;
+
+  function updateFirebaseUI(){
+    if (firebaseUser){
+      firebaseStatusText.textContent = '🔄 Synced as ' + (firebaseUser.email || firebaseUser.displayName || 'signed in');
+      firebaseSigninBtn.style.display = 'none';
+      firebaseSignoutBtn.style.display = 'inline-block';
+    } else {
+      firebaseStatusText.textContent = 'Not signed in';
+      firebaseSigninBtn.style.display = 'inline-block';
+      firebaseSignoutBtn.style.display = 'none';
+    }
+  }
+
+  async function firebaseSignIn(){
+    const fb = window.__firebase;
+    if (!fb){ showToast('Still loading — try again in a moment'); return; }
+    try{
+      const provider = new fb.GoogleAuthProvider();
+      await fb.signInWithPopup(fb.auth, provider);
+      // onAuthStateChanged (wired in initFirebaseSync) handles the rest.
+    }catch(e){
+      if (e && e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed');
+    }
+  }
+
+  async function firebaseSignOut(){
+    const fb = window.__firebase;
+    if (!fb) return;
+    try{ await fb.signOut(fb.auth); }catch(e){ /* best effort */ }
+  }
+
+  function scheduleFirestoreWrite(){
+    if (!firebaseUser) return;
+    clearTimeout(firestoreWriteTimer);
+    firestoreWriteTimer = setTimeout(writeFirestoreData, 600);
+  }
+
+  async function writeFirestoreData(){
+    const fb = window.__firebase;
+    if (!fb || !firebaseUser) return;
+    try{
+      const artKeys = Array.from(new Set([...items, ...loadingDock]));
+      const art = {};
+      await Promise.all(artKeys.map(async (raw) => {
+        if (artCache[raw]){ art[raw] = artCache[raw]; return; }
+        try{
+          const res = await window.storage.get(artKeyFor(raw), false);
+          if (res && res.value) art[raw] = res.value;
+        }catch(e){ /* no art for this item */ }
+      }));
+      const payload = JSON.stringify({
+        items, history, isComplete, finalRanking, loadingDock, art,
+        tierBoundaries, tierBoundariesTotal, savedAt: new Date().toISOString(),
+        songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt,
+        restaurantRows, restaurantSavedAt: restaurantLastSavedAt
+      });
+      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
+      await fb.setDoc(docRef, { json: payload });
+    }catch(e){
+      showToast("⚠️ Couldn't sync to Firebase — will retry on the next change");
+    }
+  }
+
+  async function readFirestoreData(){
+    const fb = window.__firebase;
+    if (!fb || !firebaseUser) return null;
+    try{
+      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
+      const snap = await fb.getDoc(docRef);
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      if (!data || !data.json) return null;
+      return JSON.parse(data.json);
+    }catch(e){
+      return null;
+    }
+  }
+
+  // Mirrors loadOrSeedSyncFile's exact logic — reads what's already there
+  // first, never blindly overwrites good synced data with an empty local
+  // session the moment you sign in.
+  async function loadOrSeedFirestoreData(){
+    const existing = await readFirestoreData();
+    const hasExistingAlbumSync = existing && Array.isArray(existing.items) && existing.items.length >= 2;
+    const hasCurrentAlbumData = Array.isArray(items) && items.length >= 2;
+    const hasExistingSongSync = existing && Array.isArray(existing.songItems) && existing.songItems.length >= 2;
+    const hasCurrentSongData = Array.isArray(songItems) && songItems.length >= 2;
+    const hasExistingSync = hasExistingAlbumSync || hasExistingSongSync;
+    const hasCurrentData = hasCurrentAlbumData || hasCurrentSongData;
+
+    const applyExisting = () => {
+      if (hasExistingAlbumSync) resumeFromData(existing);
+      if (hasExistingSongSync) resumeSongDataFromSync({ songItems: existing.songItems, songHistory: existing.songHistory, songIsComplete: existing.songIsComplete, songFinalRanking: existing.songFinalRanking });
+    };
+
+    if (hasExistingSync && hasCurrentData){
+      const parts = [];
+      if (hasExistingAlbumSync) parts.push(existing.items.length + ' albums');
+      if (hasExistingSongSync) parts.push(existing.songItems.length + ' songs');
+      showConfirmModal(
+        'Load synced data from Firebase?',
+        'Your Firebase account already has saved data (' + parts.join(', ') + '). Load it here, replacing what\'s currently open? Choose Cancel to leave what\'s open here alone.',
+        applyExisting
+      );
+    } else if (hasExistingSync){
+      showToast('Found existing Firebase data — loading it');
+      applyExisting();
+    } else {
+      writeFirestoreData();
+    }
+  }
+
+  function initFirebaseSync(){
+    const fb = window.__firebase;
+    if (!fb) return;
+    fb.onAuthStateChanged(fb.auth, async (user) => {
+      firebaseUser = user;
+      updateFirebaseUI();
+      if (user) await loadOrSeedFirestoreData();
+    });
+    firebaseSigninBtn.addEventListener('click', firebaseSignIn);
+    firebaseSignoutBtn.addEventListener('click', firebaseSignOut);
+  }
+  // See the module script's own comment for why this can't just call
+  // initFirebaseSync() directly — window.__firebase may not exist yet.
+  if (window.__firebase){
+    initFirebaseSync();
+  } else {
+    window.addEventListener('firebase-ready', initFirebaseSync, { once: true });
+  }
 
   async function checkSavedProgress(){
     await loadSyncHandle();
@@ -3387,6 +3631,112 @@
   // recompression. Was previously downscaled to fit window.storage's per-key
   // cap; IndexedDB (see the fallback above, and the real artifact storage
   // API too) comfortably holds full-resolution art for a large collection.
+  // ---------- CLOUDINARY (album art hosting) ----------
+  // Optional — when configured, new art uploads go to Cloudinary instead of
+  // being stored as base64 locally, and the "Migrate" button below moves
+  // existing base64 art over too. Uses an unsigned upload preset (configured
+  // in your Cloudinary dashboard), the only kind of upload safe to do from
+  // public client-side code — it can't expose your account secret the way a
+  // signed upload would need to.
+  const CLOUDINARY_CONFIG_KEY = 'cloudinary-config';
+  let cloudinaryConfig = null; // { cloudName, uploadPreset } once connected, else null
+
+  function updateCloudinaryUI(){
+    if (cloudinaryConfig && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset){
+      cloudinaryStatusText.textContent = '✅ Connected: ' + cloudinaryConfig.cloudName;
+      cloudinaryConnectBtn.style.display = 'none';
+      cloudinaryDisconnectBtn.style.display = 'inline-block';
+      cloudinaryForm.style.display = 'none';
+      cloudinaryMigrateRow.style.display = 'flex';
+    } else {
+      cloudinaryStatusText.textContent = 'Cloudinary: not connected';
+      cloudinaryConnectBtn.style.display = 'inline-block';
+      cloudinaryDisconnectBtn.style.display = 'none';
+      cloudinaryMigrateRow.style.display = 'none';
+    }
+  }
+
+  async function loadCloudinaryConfig(){
+    try{
+      const res = await window.storage.get(CLOUDINARY_CONFIG_KEY, false);
+      if (res && res.value) cloudinaryConfig = res.value;
+    }catch(e){ /* not configured yet */ }
+    updateCloudinaryUI();
+  }
+
+  cloudinaryConnectBtn.addEventListener('click', () => {
+    cloudinaryForm.style.display = 'flex';
+    cloudinaryConnectBtn.style.display = 'none';
+  });
+
+  cloudinaryDisconnectBtn.addEventListener('click', async () => {
+    cloudinaryConfig = null;
+    try{ await window.storage.delete(CLOUDINARY_CONFIG_KEY, false); }catch(e){ /* best effort */ }
+    updateCloudinaryUI();
+    showToast('Cloudinary disconnected — new art saves locally again');
+  });
+
+  cloudinarySaveBtn.addEventListener('click', async () => {
+    const cloudName = cloudinaryCloudnameInput.value.trim();
+    const uploadPreset = cloudinaryPresetInput.value.trim();
+    if (!cloudName || !uploadPreset){ showToast('Enter both a cloud name and an upload preset'); return; }
+    cloudinaryConfig = { cloudName, uploadPreset };
+    try{ await window.storage.set(CLOUDINARY_CONFIG_KEY, cloudinaryConfig, false); }catch(e){ /* best effort */ }
+    updateCloudinaryUI();
+    showToast('Cloudinary connected');
+  });
+
+  async function uploadToCloudinary(fileOrBlob){
+    if (!cloudinaryConfig) throw new Error('Cloudinary not configured');
+    const formData = new FormData();
+    formData.append('file', fileOrBlob);
+    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+    formData.append('folder', 'RankHeaven/AlbumArt');
+    const res = await fetch('https://api.cloudinary.com/v1_1/' + cloudinaryConfig.cloudName + '/image/upload', {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Cloudinary upload failed (' + res.status + ')');
+    const data = await res.json();
+    return data.secure_url;
+  }
+
+  cloudinaryMigrateBtn.addEventListener('click', async () => {
+    if (!cloudinaryConfig) return;
+    const allRaws = Array.from(new Set([...items, ...loadingDock]));
+    const toMigrate = [];
+    for (const raw of allRaws){
+      let val = artCache[raw];
+      if (val === undefined){
+        try{
+          const res = await window.storage.get(artKeyFor(raw), false);
+          val = (res && res.value) ? res.value : null;
+        }catch(e){ val = null; }
+      }
+      if (val && val.indexOf('data:') === 0) toMigrate.push({ raw, dataUrl: val }); // already-migrated (a URL, not data:) items are skipped
+    }
+    if (!toMigrate.length){ showToast('No local art left to migrate'); return; }
+
+    cloudinaryMigrateBtn.disabled = true;
+    let done = 0;
+    // Sequential, not parallel — safer against Cloudinary rate limits for a
+    // large collection, though slower. Each failure is skipped (left as
+    // base64 for now) rather than stopping the whole batch.
+    for (const { raw, dataUrl } of toMigrate){
+      try{
+        const blob = await (await fetch(dataUrl)).blob();
+        const url = await uploadToCloudinary(blob);
+        await setArtForItem(raw, url);
+      }catch(e){ /* best effort — this one stays as base64, move on */ }
+      done++;
+      cloudinaryMigrateStatus.textContent = 'Migrating… ' + done + ' / ' + toMigrate.length;
+    }
+    cloudinaryMigrateBtn.disabled = false;
+    cloudinaryMigrateStatus.textContent = 'Migrated ' + done + ' of ' + toMigrate.length + ' images to Cloudinary';
+  });
+
+  loadCloudinaryConfig();
+
   function fileToDataUrl(file){
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -3470,6 +3820,16 @@
     if (!file || file.type.indexOf('image/') !== 0){
       showToast('Drop an image file to set the art');
       return;
+    }
+    if (cloudinaryConfig){
+      try{
+        const url = await uploadToCloudinary(file);
+        await setArtForItem(raw, url);
+        return;
+      }catch(e){
+        showToast("Couldn't upload to Cloudinary — saving locally instead");
+        // falls through to the local save below rather than losing the image entirely
+      }
     }
     try{
       const dataUrl = await fileToDataUrl(file);
