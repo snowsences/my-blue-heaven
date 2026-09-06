@@ -854,6 +854,11 @@
     flex-wrap: wrap;
   }
   .page-heading-row h1{ margin: 0 0 14px; }
+  .restaurant-heading-actions{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
 
   .sub{
     color: var(--chalk-dim);
@@ -1268,9 +1273,19 @@
     color: var(--amber);
     line-height: 1;
   }
-  .restaurant-breakdown{
-    font-size: 11px;
+  .restaurant-scores-line{
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .restaurant-score-part{
+    font-size: 12px;
     color: var(--chalk-dim);
+    font-weight: 600;
+  }
+  .restaurant-score-sep{
+    font-size: 11px;
+    color: var(--panel-line);
   }
   .restaurant-price{
     font-size: 12px;
@@ -2604,7 +2619,12 @@
       <p class="eyebrow">Restaurants</p>
       <div class="page-heading-row">
         <h1>Restaurant List</h1>
-        <button class="btn-primary" id="restaurant-new-btn" type="button">+ New Restaurant</button>
+        <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="restaurant-rearrange-btn" type="button">Rearrange</button>
+          <button class="btn-primary" id="restaurant-rearrange-save-btn" type="button" style="display:none;">Save Order</button>
+          <button class="btn-ghost" id="restaurant-rearrange-cancel-btn" type="button" style="display:none;">Cancel</button>
+          <button class="btn-primary" id="restaurant-new-btn" type="button">+ New Restaurant</button>
+        </div>
       </div>
 
       <div class="filters-group">
@@ -3014,6 +3034,9 @@
   const restaurantListEl = document.getElementById('restaurant-list');
   const restaurantGoldGridEl = document.getElementById('restaurant-gold-grid');
   const restaurantNewBtn = document.getElementById('restaurant-new-btn');
+  const restaurantRearrangeBtn = document.getElementById('restaurant-rearrange-btn');
+  const restaurantRearrangeSaveBtn = document.getElementById('restaurant-rearrange-save-btn');
+  const restaurantRearrangeCancelBtn = document.getElementById('restaurant-rearrange-cancel-btn');
   const restaurantCuisineFilterInput = document.getElementById('restaurant-cuisine-filter-input');
   const restaurantCuisineFilterDatalist = document.getElementById('restaurant-cuisine-filter-datalist');
   const restaurantCuisineFilterClear = document.getElementById('restaurant-cuisine-filter-clear');
@@ -3353,18 +3376,25 @@
     const hasCurrentAlbumData = Array.isArray(items) && items.length >= 2;
     const hasExistingSongSync = existing && Array.isArray(existing.songItems) && existing.songItems.length >= 2;
     const hasCurrentSongData = Array.isArray(songItems) && songItems.length >= 2;
-    const hasExistingSync = hasExistingAlbumSync || hasExistingSongSync;
-    const hasCurrentData = hasCurrentAlbumData || hasCurrentSongData;
+    const hasExistingRestaurantSync = existing && Array.isArray(existing.restaurantRows) && existing.restaurantRows.length >= 1;
+    const hasCurrentRestaurantData = Array.isArray(restaurantRows) && restaurantRows.length >= 1;
+    const hasExistingSync = hasExistingAlbumSync || hasExistingSongSync || hasExistingRestaurantSync;
+    const hasCurrentData = hasCurrentAlbumData || hasCurrentSongData || hasCurrentRestaurantData;
 
     const applyExisting = () => {
       if (hasExistingAlbumSync) resumeFromData(existing);
       if (hasExistingSongSync) resumeSongDataFromSync({ songItems: existing.songItems, songHistory: existing.songHistory, songIsComplete: existing.songIsComplete, songFinalRanking: existing.songFinalRanking });
+      if (hasExistingRestaurantSync){
+        restaurantRows = existing.restaurantRows;
+        renderRestaurantsPage();
+      }
     };
 
     if (hasExistingSync && hasCurrentData){
       const parts = [];
       if (hasExistingAlbumSync) parts.push(existing.items.length + ' albums');
       if (hasExistingSongSync) parts.push(existing.songItems.length + ' songs');
+      if (hasExistingRestaurantSync) parts.push(existing.restaurantRows.length + ' restaurants');
       showConfirmModal(
         'Load synced data?',
         'This folder already has saved data (' + parts.join(', ') + '). Load it here, replacing what\'s currently open? Choose Cancel to leave what\'s open here alone — it just won\'t overwrite the synced file until you make a change here.',
@@ -3504,18 +3534,25 @@
     const hasCurrentAlbumData = Array.isArray(items) && items.length >= 2;
     const hasExistingSongSync = existing && Array.isArray(existing.songItems) && existing.songItems.length >= 2;
     const hasCurrentSongData = Array.isArray(songItems) && songItems.length >= 2;
-    const hasExistingSync = hasExistingAlbumSync || hasExistingSongSync;
-    const hasCurrentData = hasCurrentAlbumData || hasCurrentSongData;
+    const hasExistingRestaurantSync = existing && Array.isArray(existing.restaurantRows) && existing.restaurantRows.length >= 1;
+    const hasCurrentRestaurantData = Array.isArray(restaurantRows) && restaurantRows.length >= 1;
+    const hasExistingSync = hasExistingAlbumSync || hasExistingSongSync || hasExistingRestaurantSync;
+    const hasCurrentData = hasCurrentAlbumData || hasCurrentSongData || hasCurrentRestaurantData;
 
     const applyExisting = () => {
       if (hasExistingAlbumSync) resumeFromData(existing);
       if (hasExistingSongSync) resumeSongDataFromSync({ songItems: existing.songItems, songHistory: existing.songHistory, songIsComplete: existing.songIsComplete, songFinalRanking: existing.songFinalRanking });
+      if (hasExistingRestaurantSync){
+        restaurantRows = existing.restaurantRows;
+        renderRestaurantsPage();
+      }
     };
 
     if (hasExistingSync && hasCurrentData){
       const parts = [];
       if (hasExistingAlbumSync) parts.push(existing.items.length + ' albums');
       if (hasExistingSongSync) parts.push(existing.songItems.length + ' songs');
+      if (hasExistingRestaurantSync) parts.push(existing.restaurantRows.length + ' restaurants');
       showConfirmModal(
         'Load synced data from Firebase?',
         'Your Firebase account already has saved data (' + parts.join(', ') + '). Load it here, replacing what\'s currently open? Choose Cancel to leave what\'s open here alone.',
@@ -7041,6 +7078,91 @@
     }).join('');
   }
 
+  // ---------- RESTAURANT REARRANGE MODE ----------
+  // Similar in spirit to Albums' Edit Mode, but scoped to position only — no
+  // renaming, adding, or removing. Combines both of Albums' two separate
+  // reorder affordances (its plain drag handle, and Edit Mode's editable
+  // rank-number inputs) into one mode at once, since both being available
+  // together is what was actually asked for here.
+  let restaurantRearrangeMode = false;
+  let restaurantDragSourceEl = null;
+
+  function toggleRestaurantRearrangeMode(){
+    restaurantRearrangeMode = true;
+    renderRestaurantsPage();
+  }
+
+  function cancelRestaurantRearrange(){
+    restaurantRearrangeMode = false;
+    renderRestaurantsPage();
+  }
+
+  // Reads whichever of the two inputs a row currently reflects — its number
+  // field, most recently, if it was dragged since the last renumber (see
+  // makeRestaurantRowDraggable) — sorts by that key, then applies the new
+  // order. Same "invalid position sinks to the end" rule as Albums' own
+  // saveReorder.
+  function saveRestaurantRearrange(){
+    const rows = restaurantListEl.querySelectorAll('li');
+    const pairs = [];
+    rows.forEach(li => {
+      const idx = Number(li.dataset.originalIndex);
+      const numInput = li.querySelector('.rank-num-input');
+      const raw = Number(numInput.value);
+      const key = (numInput.value.trim() !== '' && Number.isFinite(raw)) ? raw : 1e9;
+      pairs.push({ restaurant: restaurantRows[idx], key });
+    });
+    pairs.sort((a, b) => a.key - b.key);
+    restaurantRows = pairs.map(p => p.restaurant);
+    restaurantRearrangeMode = false;
+    saveRestaurantProgress();
+    renderRestaurantsPage();
+    showToast('Order updated');
+  }
+
+  // After a drag settles, the number fields are reset to clean multiples of
+  // 10 matching the new DOM order — so the two reorder methods (drag,
+  // typing a number) always agree with what's currently on screen, and
+  // typing a number afterward is relative to this updated baseline rather
+  // than the row's original pre-drag position.
+  function renumberRestaurantRearrangeRows(){
+    const rows = restaurantListEl.querySelectorAll('li');
+    rows.forEach((li, i) => {
+      const numInput = li.querySelector('.rank-num-input');
+      if (numInput) numInput.value = (i + 1) * 10;
+    });
+  }
+
+  function makeRestaurantRowDraggable(li){
+    const dragHandle = li.querySelector('.row-drag-handle');
+    if (!dragHandle) return;
+    dragHandle.setAttribute('draggable', 'true');
+    dragHandle.addEventListener('dragstart', () => {
+      restaurantDragSourceEl = li;
+      li.classList.add('dragging');
+    });
+    dragHandle.addEventListener('dragend', () => {
+      li.classList.remove('dragging');
+      restaurantDragSourceEl = null;
+      renumberRestaurantRearrangeRows();
+    });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!restaurantDragSourceEl || restaurantDragSourceEl === li || !li.parentNode) return;
+      if (isBeforeInDom(restaurantDragSourceEl, li)){
+        li.parentNode.insertBefore(restaurantDragSourceEl, li.nextSibling);
+      } else {
+        li.parentNode.insertBefore(restaurantDragSourceEl, li);
+      }
+    });
+    li.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  restaurantRearrangeBtn.addEventListener('click', toggleRestaurantRearrangeMode);
+  restaurantRearrangeSaveBtn.addEventListener('click', saveRestaurantRearrange);
+  restaurantRearrangeCancelBtn.addEventListener('click', cancelRestaurantRearrange);
+
   let restaurantCuisineFilter = ''; // '' = show all cuisines; otherwise an exact cuisine value
   let restaurantLocationFilter = ''; // '' = show all locations; otherwise an exact location value
 
@@ -7104,10 +7226,49 @@
     maybeInitRestaurantTiers(restaurantRows.length);
     renderRestaurantCuisineFilterOptions(restaurantRows);
     renderRestaurantLocationFilterOptions(restaurantRows);
+
+    restaurantRearrangeBtn.style.display = restaurantRearrangeMode ? 'none' : 'inline-block';
+    restaurantRearrangeSaveBtn.style.display = restaurantRearrangeMode ? 'inline-block' : 'none';
+    restaurantRearrangeCancelBtn.style.display = restaurantRearrangeMode ? 'inline-block' : 'none';
+    restaurantNewBtn.style.display = restaurantRearrangeMode ? 'none' : 'inline-block';
+
     if (!restaurantRows.length){
       restaurantGoldGridEl.innerHTML = '';
       restaurantListEl.innerHTML = '<p class="details-future-note">No restaurants yet — use Import All Data in Settings to restore a backup.</p>';
       restaurantTiersPanel.style.display = 'none';
+      return;
+    }
+
+    // Rearrange mode shows the full list as one uniform set of rows —
+    // ignoring the gold/regular tier split (rearranging while some rows
+    // render as photo cards and others as list rows would be needlessly
+    // complex) and ignoring any active cuisine/location filter, for the
+    // same reason Albums' own drag-reorder needs its full, unfiltered list
+    // present in the DOM: reordering a partial view is ambiguous about
+    // where the hidden rows would even go.
+    if (restaurantRearrangeMode){
+      restaurantGoldGridEl.innerHTML = '';
+      restaurantGoldGridEl.style.display = 'none';
+      restaurantListEl.innerHTML = restaurantRows.map((r, idx) => {
+        const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
+        return (
+          '<li data-original-index="' + idx + '">' +
+            '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">' +
+            '<span class="rank-item">' +
+              '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(r.name) + '</span></span>' +
+              (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+            '</span>' +
+            '<span class="row-drag-handle" title="Drag to reorder">' +
+              '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" draggable="false">' +
+                '<circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>' +
+                '<circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/>' +
+                '<circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>' +
+              '</svg>' +
+            '</span>' +
+          '</li>'
+        );
+      }).join('');
+      Array.from(restaurantListEl.children).forEach(li => makeRestaurantRowDraggable(li));
       return;
     }
 
@@ -7153,8 +7314,18 @@
         : '';
       const price = formatRestaurantPrice(r.price);
       const total = (r.total || '').trim();
-      const breakdownParts = [r.bestFlavor, r.flavorVariety].filter(Boolean);
-      const breakdown = breakdownParts.join(' + ');
+      // Best Flavor / Flavor Variety / Total now share one line (separated
+      // by "|"), rather than Total alone on its own line above a separate
+      // "12 + 14" breakdown line — drops the card from 3 lines to 2 on this
+      // side. Total keeps its existing larger/amber styling; the other two
+      // reuse the plainer style the old breakdown line had.
+      const scoreLineParts = [];
+      if (r.bestFlavor) scoreLineParts.push('<span class="restaurant-score-part">' + escapeHtml(r.bestFlavor) + '</span>');
+      if (r.flavorVariety) scoreLineParts.push('<span class="restaurant-score-part">' + escapeHtml(r.flavorVariety) + '</span>');
+      if (total) scoreLineParts.push('<span class="restaurant-total">' + escapeHtml(total) + '</span>');
+      const scoreLineHtml = scoreLineParts.length
+        ? '<span class="restaurant-scores-line">' + scoreLineParts.join('<span class="restaurant-score-sep">|</span>') + '</span>'
+        : '';
 
       let tierChipHtml = '';
       let borderAttr = '';
@@ -7177,8 +7348,7 @@
             })() +
           '</span>' +
           '<span class="restaurant-stats">' +
-            (total ? '<span class="restaurant-total">' + escapeHtml(total) + '</span>' : '') +
-            (breakdown ? '<span class="restaurant-breakdown">' + escapeHtml(breakdown) + '</span>' : '') +
+            scoreLineHtml +
             (price ? '<span class="restaurant-price">' + escapeHtml(price) + '</span>' : '') +
           '</span>' +
           tierChipHtml +
