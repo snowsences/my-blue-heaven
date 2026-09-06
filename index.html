@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#142A2E">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="My Blue Heaven">
 <style>
@@ -4143,39 +4144,87 @@
     writeMusicbeeFirestore();
   }
 
-  // MusicBee's own Firestore document, kept separate from the main
-  // items/songs/restaurants one — a full library export can run to
-  // thousands of tracks, large enough on its own to risk the 1MB-per-
-  // document cap. Isolating it here means a big music collection can never
-  // threaten the sync that actually matters most (your rankings), even if
-  // the library itself turns out too large to sync at all.
+  // MusicBee's own Firestore storage, kept separate from the main
+  // items/songs/restaurants document — confirmed in practice that a real
+  // library (4.88MB) can be nearly 5x over Firestore's 1MB-per-document cap
+  // on its own, so a single document was never going to work here. Split
+  // into a small "manifest" document (just the chunk count and import
+  // timestamp — cheap to read on its own to check for newer data without
+  // pulling the whole library) plus numbered chunk documents, each kept
+  // safely under the cap regardless of how large the library grows.
+  const MUSICBEE_CHUNK_TARGET_BYTES = 800 * 1024; // well under the ~1MB cap, leaving margin
+
+  function chunkMusicbeeTracks(tracks){
+    const chunks = [];
+    let current = [];
+    let currentSize = 0;
+    for (const track of tracks){
+      const trackSize = JSON.stringify(track).length;
+      if (currentSize + trackSize > MUSICBEE_CHUNK_TARGET_BYTES && current.length){
+        chunks.push(current);
+        current = [];
+        currentSize = 0;
+      }
+      current.push(track);
+      currentSize += trackSize;
+    }
+    if (current.length) chunks.push(current);
+    return chunks;
+  }
+
   async function writeMusicbeeFirestore(){
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return;
     try{
-      const payload = JSON.stringify({ tracks: musicbeeTracks, importedAt: musicbeeImportedAt });
-      console.log('MusicBee Firestore payload size:', (payload.length / 1024 / 1024).toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
-      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
-      await fb.setDoc(docRef, { json: payload });
+      const chunks = chunkMusicbeeTracks(musicbeeTracks);
+      console.log('MusicBee library split into', chunks.length, 'chunk(s) for Firestore (', musicbeeTracks.length, 'tracks )');
+      const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
+      await fb.setDoc(manifestRef, { chunkCount: chunks.length, importedAt: musicbeeImportedAt });
+      await Promise.all(chunks.map((chunk, i) => {
+        const chunkRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'musicbeeChunks', String(i));
+        return fb.setDoc(chunkRef, { json: JSON.stringify(chunk) });
+      }));
     }catch(e){
       console.error('Firestore MusicBee write failed:', e);
       showToast("⚠️ Couldn't sync MusicBee library to Firebase (" + (e && e.code ? e.code : 'unknown error') + ") — see console. Your library still works locally either way.");
     }
   }
 
-  async function readMusicbeeFirestore(){
+  // Reads just the manifest — enough to compare timestamps — without
+  // pulling any chunk data. Callers fetch the actual chunks separately,
+  // only once they've confirmed the remote copy is actually newer.
+  async function readMusicbeeManifest(){
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return null;
     try{
-      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
-      const snap = await fb.getDoc(docRef);
+      const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
+      const snap = await fb.getDoc(manifestRef);
       if (!snap.exists()) return null;
-      const data = snap.data();
-      if (!data || !data.json) return null;
-      return JSON.parse(data.json);
+      return snap.data();
     }catch(e){
-      console.error('Firestore MusicBee read failed:', e);
+      console.error('Firestore MusicBee manifest read failed:', e);
       return null;
+    }
+  }
+
+  async function readMusicbeeChunks(chunkCount){
+    const fb = window.__firebase;
+    if (!fb || !firebaseUser) return [];
+    try{
+      const chunkSnaps = await Promise.all(Array.from({ length: chunkCount }, (_, i) => {
+        const chunkRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'musicbeeChunks', String(i));
+        return fb.getDoc(chunkRef);
+      }));
+      let tracks = [];
+      for (const snap of chunkSnaps){
+        if (!snap.exists()) continue;
+        const data = snap.data();
+        if (data && data.json) tracks = tracks.concat(JSON.parse(data.json));
+      }
+      return tracks;
+    }catch(e){
+      console.error('Firestore MusicBee chunk read failed:', e);
+      return [];
     }
   }
 
@@ -4183,26 +4232,25 @@
   // importedAt rather than the main document's savedAt — this is a
   // genuinely separate sync running independently, not a sub-part of it.
   async function loadOrSeedMusicbeeFirestore(){
-    const existing = await readMusicbeeFirestore();
-    if (!existing){
+    const manifest = await readMusicbeeManifest();
+    if (!manifest || !manifest.chunkCount){
       if (musicbeeTracks.length) writeMusicbeeFirestore(); // nothing remote yet — seed it with what's here
       return;
     }
-    if (Array.isArray(existing.tracks) && existing.tracks.length){
-      const remoteTime = new Date(existing.importedAt || 0).getTime();
-      const localTime = new Date(musicbeeImportedAt || 0).getTime();
-      if (remoteTime > localTime){
-        musicbeeTracks = existing.tracks;
-        musicbeeImportedAt = existing.importedAt || null;
+    const remoteTime = new Date(manifest.importedAt || 0).getTime();
+    const localTime = new Date(musicbeeImportedAt || 0).getTime();
+    if (remoteTime > localTime){
+      const tracks = await readMusicbeeChunks(manifest.chunkCount);
+      if (tracks.length){
+        musicbeeTracks = tracks;
+        musicbeeImportedAt = manifest.importedAt || null;
         rebuildMusicbeeAlbumIndex();
         try{ await window.storage.set(MUSICBEE_STORAGE_KEY, JSON.stringify({ tracks: musicbeeTracks, importedAt: musicbeeImportedAt }), false); }catch(e){ /* best effort */ }
         updateMusicbeeUI();
         renderResultsTab(); // track-rank badges / tracklists in the details panel reflect the newly-loaded library
-      } else if (musicbeeTracks.length){
-        writeMusicbeeFirestore(); // local was ahead — push it so Firestore catches up
       }
     } else if (musicbeeTracks.length){
-      writeMusicbeeFirestore();
+      writeMusicbeeFirestore(); // local was ahead — push it so Firestore catches up
     }
   }
 
