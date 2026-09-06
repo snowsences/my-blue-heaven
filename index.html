@@ -355,6 +355,49 @@
     border-radius: 10px;
     overflow: hidden; /* keeps the photo's corners rounded with the card */
   }
+  .restaurant-course-pairing-btn{
+    background: transparent;
+    border: none;
+    color: var(--chalk-dim);
+    font-size: 15px;
+    cursor: pointer;
+    padding: 4px;
+    flex-shrink: 0;
+  }
+  .restaurant-course-pairing-btn:hover{ opacity: 0.7; }
+  /* Indented under its course, with a small vertical-then-horizontal line
+     (an "L") showing it belongs to the card above rather than being its own
+     independent course. Pulled up slightly (negative margin) to visually
+     tuck against the course card above rather than sitting a full gap away. */
+  .restaurant-drink-pairing-wrap{
+    display: flex;
+    align-items: stretch;
+    margin: -4px 0 0 22px;
+  }
+  .restaurant-drink-pairing-connector{
+    width: 18px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .restaurant-drink-pairing-connector::before{
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -8px;
+    width: 2px;
+    height: 32px;
+    background: var(--panel-line);
+  }
+  .restaurant-drink-pairing-connector::after{
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 24px;
+    width: 12px;
+    height: 2px;
+    background: var(--panel-line);
+  }
+  .restaurant-drink-pairing-card{ flex: 1; min-width: 0; }
   /* Full-width, landscape — same drop-zone interaction as the main cover
      photo (tap when empty to browse, drag-drop always works, tap when set
      opens the shared gallery rather than a single-image view). 4:3 rather
@@ -7080,6 +7123,10 @@
         const photos = ensureCoursePhotosArray(course);
         const i = photos.indexOf(url);
         if (i !== -1) photos.splice(i, 1);
+        if (course.drinkPairing && course.drinkPairing.photos){
+          const pi = course.drinkPairing.photos.indexOf(url);
+          if (pi !== -1) course.drinkPairing.photos.splice(pi, 1);
+        }
       });
       if (visit.photos){
         visit.photos = visit.photos.filter(p => p !== url);
@@ -7664,6 +7711,11 @@
         ensureCoursePhotosArray(course).forEach(url => {
           if (url && url !== r.coverPhoto) photos.push(url);
         });
+        if (course.drinkPairing){
+          (course.drinkPairing.photos || []).forEach(url => {
+            if (url && url !== r.coverPhoto) photos.push(url);
+          });
+        }
       });
       (visit.photos || []).forEach(url => {
         if (url && url !== r.coverPhoto) photos.push(url);
@@ -7816,6 +7868,38 @@
   // sign, anything not tied to one course — get their own small section
   // beneath the course list, since they still need somewhere to live now
   // that there's no separate Photos tab.
+  // Drink pairing — at most one per course, deliberately (the button to add
+  // one disappears once it exists; there's no "+" for a second). Reuses the
+  // same shape as a course itself (photo(s), notes, score) and the same
+  // buildScoreSelectHtml/photo-drop patterns, just with its own data
+  // attributes throughout so its wiring never collides with the course's own.
+  function renderDrinkPairingCardHtml(course, courseIndex){
+    const pairing = course.drinkPairing;
+    if (!pairing) return '';
+    if (!pairing.photos) pairing.photos = [];
+    const firstPhoto = pairing.photos[0];
+    const countBadgeHtml = pairing.photos.length > 1 ? '<span class="restaurant-course-photo-count">' + pairing.photos.length + ' photos</span>' : '';
+    return (
+      '<div class="restaurant-drink-pairing-wrap">' +
+        '<div class="restaurant-drink-pairing-connector"></div>' +
+        '<div class="restaurant-course-card restaurant-drink-pairing-card">' +
+          '<div class="restaurant-course-photo-drop" data-pairing-photo-index="' + courseIndex + '"' +
+            (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
+            (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">🍷</span>') +
+            countBadgeHtml +
+            '<button class="restaurant-course-photo-add-btn" type="button" data-add-pairing-photo-index="' + courseIndex + '" title="Add another photo">+</button>' +
+          '</div>' +
+          '<div class="restaurant-course-card-body">' +
+            '<span class="restaurant-course-num" title="Drink pairing">🍷</span>' +
+            '<textarea class="restaurant-course-text" data-pairing-index="' + courseIndex + '" placeholder="Drink, notes...">' + escapeHtml(pairing.text || '') + '</textarea>' +
+            buildScoreSelectHtml(RESTAURANT_COURSE_SCORES, pairing.score, 'data-pairing-score-index="' + courseIndex + '"') +
+            '<button class="restaurant-course-remove-btn" type="button" data-remove-pairing-index="' + courseIndex + '" title="Remove pairing">✕</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   function renderRestaurantCoursesContentHtml(visit){
     const courses = visit.courses || [];
     const listHtml = courses.length
@@ -7823,9 +7907,12 @@
           const photos = ensureCoursePhotosArray(course);
           const firstPhoto = photos[0];
           const countBadgeHtml = photos.length > 1 ? '<span class="restaurant-course-photo-count">' + photos.length + ' photos</span>' : '';
+          const pairingBtnHtml = course.drinkPairing
+            ? ''
+            : '<button class="restaurant-course-pairing-btn" type="button" data-add-pairing-index="' + i + '" title="Add a drink pairing">🍷</button>';
           return (
             '<div class="restaurant-course-card">' +
-              '<div class="restaurant-course-photo-drop art-drop" data-course-photo-index="' + i + '"' +
+              '<div class="restaurant-course-photo-drop" data-course-photo-index="' + i + '"' +
                 (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
                 (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
                 countBadgeHtml +
@@ -7835,9 +7922,11 @@
                 '<span class="restaurant-course-num">' + (i + 1) + '</span>' +
                 '<textarea class="restaurant-course-text" data-course-index="' + i + '" placeholder="Course name, notes...">' + escapeHtml(course.text || '') + '</textarea>' +
                 restaurantCourseScoreSelectHtml(course, i) +
+                pairingBtnHtml +
                 '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
               '</div>' +
-            '</div>'
+            '</div>' +
+            renderDrinkPairingCardHtml(course, i)
           );
         }).join('')
       : '<p class="restaurant-course-empty">No courses added yet.</p>';
@@ -7857,7 +7946,7 @@
         '<span class="restaurant-other-photos-label">Other Photos (menu, sign, etc.)</span>' +
         '<div class="restaurant-photo-grid">' +
           otherPhotosGridHtml +
-          '<div class="restaurant-photo-add-tile art-drop" id="restaurant-other-photo-add-tile" title="Drag an image here, or click to browse">+</div>' +
+          '<div class="restaurant-photo-add-tile" id="restaurant-other-photo-add-tile" title="Drag an image here, or click to browse">+</div>' +
         '</div>' +
       '</div>'
     );
@@ -8148,7 +8237,7 @@
     // the same shared gallery every other restaurant photo uses, positioned
     // at that course's first photo — the explicit "+" button is what adds
     // more from here, rather than tapping the image doing double duty.
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-drop').forEach(el => {
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-drop[data-course-photo-index]').forEach(el => {
       const i = Number(el.dataset.coursePhotoIndex);
       const addPhotoToCourse = (url) => {
         if (!url) return;
@@ -8187,7 +8276,7 @@
         }
       });
     });
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-add-btn').forEach(btn => {
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-add-btn[data-add-photo-course-index]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation(); // don't also trigger the photo-drop's own click (which would open the gallery instead)
         const i = Number(btn.dataset.addPhotoCourseIndex);
@@ -8264,12 +8353,16 @@
           visit.courses.push({ text: '' });
         });
         // Focus the newly-added (last) course's textarea once it renders.
-        const textareas = restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text');
+        const textareas = restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text[data-course-index]');
         const last = textareas[textareas.length - 1];
         if (last) last.focus();
       });
     }
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text').forEach(textarea => {
+    // Scoped to [data-course-index] specifically, not just the shared class
+    // — the drink pairing textarea below reuses the same class name (for
+    // identical styling) but a different data attribute, and would
+    // otherwise be incorrectly caught by this same loop.
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text[data-course-index]').forEach(textarea => {
       autoGrowTextarea(textarea); // sizes existing content correctly on render, not just as you type
       textarea.addEventListener('input', () => autoGrowTextarea(textarea));
       // Saves on blur rather than every keystroke — avoids a storage write
@@ -8288,10 +8381,105 @@
         saveOpenRestaurantQuietly(rest => { getActiveVisit(rest).courses[i].score = select.value || null; });
       });
     });
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-remove-btn').forEach(btn => {
+    // Scoped the same way as the textarea above, for the same reason — the
+    // pairing's own remove button reuses this class for identical styling.
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-remove-btn[data-remove-course-index]').forEach(btn => {
       btn.addEventListener('click', () => {
         const i = Number(btn.dataset.removeCourseIndex);
         updateOpenRestaurant(rest => { getActiveVisit(rest).courses.splice(i, 1); });
+      });
+    });
+
+    // Drink pairing wiring — the "add a pairing" button on the course card
+    // itself, then (once one exists) its photo drop zone, add-photo button,
+    // text, score, and remove button — each fully separate from the
+    // course's own equivalents via distinct data attributes throughout.
+    restaurantDetailsPanelInner.querySelectorAll('[data-add-pairing-index]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.addPairingIndex);
+        updateOpenRestaurant(rest => {
+          getActiveVisit(rest).courses[i].drinkPairing = { text: '', score: null, photos: [] };
+        });
+      });
+    });
+    restaurantDetailsPanelInner.querySelectorAll('[data-pairing-photo-index]').forEach(el => {
+      const i = Number(el.dataset.pairingPhotoIndex);
+      const addPhotoToPairing = (url) => {
+        if (!url) return;
+        updateOpenRestaurant(rest => {
+          const pairing = getActiveVisit(rest).courses[i].drinkPairing;
+          if (!pairing.photos) pairing.photos = [];
+          pairing.photos.push(url);
+        });
+      };
+      el.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        el.classList.add('drag-over');
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', async (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        addPhotoToPairing(await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses'));
+      });
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.restaurant-course-photo-add-btn')) return; // handled separately below
+        const pairing = activeVisit.courses[i].drinkPairing;
+        const photos = pairing.photos || [];
+        if (photos.length){
+          const allPhotos = gatherAllRestaurantPhotos(r);
+          openPhotoLightbox(allPhotos, allPhotos.indexOf(photos[0]), { restaurantIndex: openRestaurantIndex });
+        } else {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.addEventListener('change', async () => {
+            addPhotoToPairing(await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses'));
+          });
+          input.click();
+        }
+      });
+    });
+    restaurantDetailsPanelInner.querySelectorAll('[data-add-pairing-photo-index]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = Number(btn.dataset.addPairingPhotoIndex);
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.addEventListener('change', async () => {
+          const url = await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses');
+          if (url) updateOpenRestaurant(rest => {
+            const pairing = getActiveVisit(rest).courses[i].drinkPairing;
+            if (!pairing.photos) pairing.photos = [];
+            pairing.photos.push(url);
+          });
+        });
+        input.click();
+      });
+    });
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text[data-pairing-index]').forEach(textarea => {
+      autoGrowTextarea(textarea);
+      textarea.addEventListener('input', () => autoGrowTextarea(textarea));
+      textarea.addEventListener('blur', () => {
+        const i = Number(textarea.dataset.pairingIndex);
+        saveOpenRestaurantQuietly(rest => { getActiveVisit(rest).courses[i].drinkPairing.text = textarea.value; });
+      });
+    });
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-score-select[data-pairing-score-index]').forEach(select => {
+      select.addEventListener('change', () => {
+        const i = Number(select.dataset.pairingScoreIndex);
+        select.classList.toggle('has-score', !!select.value);
+        saveOpenRestaurantQuietly(rest => { getActiveVisit(rest).courses[i].drinkPairing.score = select.value || null; });
+      });
+    });
+    restaurantDetailsPanelInner.querySelectorAll('[data-remove-pairing-index]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.removePairingIndex);
+        updateOpenRestaurant(rest => { delete getActiveVisit(rest).courses[i].drinkPairing; });
       });
     });
   }
