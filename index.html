@@ -126,66 +126,6 @@
   .top-nav-settings-btn:hover{ background: var(--bg); color: var(--chalk); }
   .top-nav-settings-btn.active{ color: var(--amber); }
 
-  /* ---------- SYNC RECONNECT BANNER ----------
-     z-index 400 — above literally everything else (the art lightbox at 300,
-     the mobile full-screen details panel at 200), since this is meant to be
-     a persistent, always-visible notice regardless of what else is open.
-     Toggling .show on the banner and .sync-banner-visible on body happens
-     together in updateSyncUI() — the body class is what the layout
-     adjustments below key off, so the nav/content/details-panel shift down
-     to make room only while the banner is actually showing. */
-  .sync-reconnect-banner{
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 40px;
-    z-index: 400;
-    background: var(--brick);
-    color: #fff;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-family: 'Figtree', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 0 16px;
-    text-align: center;
-  }
-  .sync-reconnect-banner.show{ display: flex; }
-  .sync-banner-link{
-    background: transparent;
-    color: #fff;
-    font-family: 'Figtree', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    text-decoration: underline;
-    padding: 0;
-    cursor: pointer;
-  }
-  /* Desktop: nav sits at the fixed top, so the banner pushes it (and
-     everything measured relative to it) down by its own 40px height. Each
-     of these has an explicit mobile-scoped counterpart in the media query
-     below with matching specificity — without it, these same rules (via
-     #app/#details-panel ID selectors) would win on mobile too and fight
-     with that layout's own top:auto/bottom-bar positioning. */
-  body.sync-banner-visible .top-nav-wrap{ top: 40px; }
-  body.sync-banner-visible #app,
-  body.sync-banner-visible .song-app,
-  body.sync-banner-visible .page-content{
-    padding-top: calc(var(--desktop-nav-height) + 40px + 24px);
-  }
-  body.sync-banner-visible #details-panel{
-    top: calc(var(--desktop-nav-height) + 40px);
-    min-height: calc(100vh - var(--desktop-nav-height) - 40px);
-    max-height: calc(100vh - var(--desktop-nav-height) - 40px);
-  }
-  body.sync-banner-visible #restaurant-details-panel{
-    top: calc(var(--desktop-nav-height) + 40px);
-    min-height: calc(100vh - var(--desktop-nav-height) - 40px);
-    max-height: calc(100vh - var(--desktop-nav-height) - 40px);
-  }
   .top-nav-settings-btn .top-nav-label{ display: none; } /* bare icon on desktop, matching the reference — mobile re-shows this label */
 
   .top-page{ display: none; }
@@ -966,17 +906,6 @@
     flex-wrap: wrap;
   }
 
-  .sync-row{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 16px;
-    color: var(--chalk-dim);
-    font-size: 13px;
-    flex-wrap: wrap;
-  }
-
   .lastfm-block{ margin-top: 16px; }
   .lastfm-row{
     display: flex;
@@ -1346,6 +1275,19 @@
     font-weight: 800;
     padding: 3px 8px;
     border-radius: 999px;
+  }
+  .restaurant-gold-card-tier{
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    font-family: 'Figtree', sans-serif;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
   .restaurant-gold-card-overlay{
     position: absolute;
@@ -2246,30 +2188,6 @@
       padding-top: 24px;
       padding-bottom: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom, 0px) + 20px);
     }
-
-    /* Mobile counterparts of the desktop sync-banner rules above — same
-       selectors (body.sync-banner-visible + the same targets), so identical
-       specificity means source order correctly lets these win here. Mobile
-       nav stays at the bottom regardless of the banner (top:auto overrides
-       the desktop rule's top:40px); content and the full-screen details
-       panel just need the banner's 40px added to their existing mobile
-       values, with no desktop nav height involved. */
-    body.sync-banner-visible .top-nav-wrap{ top: auto; }
-    body.sync-banner-visible #app,
-    body.sync-banner-visible .song-app,
-    body.sync-banner-visible .page-content{
-      padding-top: calc(24px + 40px);
-    }
-    body.sync-banner-visible #details-panel{
-      top: 40px;
-      min-height: calc(100vh - 40px);
-      max-height: calc(100vh - 40px);
-    }
-    body.sync-banner-visible #restaurant-details-panel{
-      top: 40px;
-      min-height: calc(100vh - 40px);
-      max-height: calc(100vh - 40px);
-    }
   }
 </style>
 <script type="module">
@@ -2314,10 +2232,6 @@
 </script>
 </head>
 <body>
-
-<div class="sync-reconnect-banner" id="sync-reconnect-banner">
-  ⚠️ Sync folder needs reconnecting — <button class="sync-reconnect-btn sync-banner-link" type="button">Reconnect</button>
-</div>
 
 <div id="page-shell">
 <div id="main-content">
@@ -2486,12 +2400,6 @@
         <div class="tier-preview-bar" id="tier-preview-bar"></div>
         <div id="tiers-editor-body"></div>
         <p class="tiers-note">Boundaries apply to whatever's currently shown above — live estimate or final ranking.</p>
-      </div>
-
-      <div class="sync-row" style="display:none;">
-        <span class="sync-status-text">Folder sync: not connected</span>
-        <button class="btn-ghost sync-connect-btn" type="button">Connect Synced Folder</button>
-        <button class="btn-ghost sync-reconnect-btn" type="button" style="display:none;">Reconnect</button>
       </div>
 
       <div class="results-actions">
@@ -2724,12 +2632,6 @@
           <span>Have a progress file from another session?</span>
           <button class="btn-ghost" id="import-btn">Import Progress (.json)</button>
           <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
-        </div>
-
-        <div class="sync-row" style="display:none;">
-          <span class="sync-status-text">Folder sync: not connected</span>
-          <button class="btn-ghost sync-connect-btn" type="button">Connect Synced Folder</button>
-          <button class="btn-ghost sync-reconnect-btn" type="button" style="display:none;">Reconnect</button>
         </div>
 
         <div class="lastfm-block">
@@ -2985,7 +2887,6 @@
   const reorderSaveBtn = document.getElementById('reorder-save-btn');
   const reorderCancelBtn = document.getElementById('reorder-cancel-btn');
 
-  const syncReconnectBanner = document.getElementById('sync-reconnect-banner');
   const firebaseStatusText = document.getElementById('firebase-status-text');
   const firebaseSigninBtn = document.getElementById('firebase-signin-btn');
   const firebaseSignoutBtn = document.getElementById('firebase-signout-btn');
@@ -3196,10 +3097,12 @@
   // ---------- IN-APP AUTOSAVE (window.storage) ----------
   const STORAGE_KEY = 'ranker-progress';
 
+  let lastSavedAt = null;
   async function saveProgress(){
+    lastSavedAt = new Date().toISOString();
     try{
       await window.storage.set(STORAGE_KEY, JSON.stringify({
-        items, history, isComplete, finalRanking, loadingDock, savedAt: new Date().toISOString()
+        items, history, isComplete, finalRanking, loadingDock, savedAt: lastSavedAt
       }), false);
     }catch(e){ /* best effort — export/import still works if this fails */ }
     scheduleSyncWrite();
@@ -3209,221 +3112,18 @@
     try{ await window.storage.delete(STORAGE_KEY, false); }catch(e){ /* nothing to clear */ }
   }
 
-  // ============================================================
-  // FOLDER SYNC
-  // ------------------------------------------------------------
-  // Optional, standalone-only: lets the person point this app at a real
-  // folder on disk (e.g. one Dropbox syncs) via the File System Access API.
-  // Every autosave also writes a full snapshot — including art — into a
-  // fixed filename there; Dropbox's own client carries that file to other
-  // machines. On load, whichever copy (local IndexedDB vs. the synced file)
-  // has the newer "savedAt" timestamp wins, so opening this on a second
-  // device naturally picks up whatever was last changed on the first.
-  //
-  // Chrome/Edge only (the API doesn't exist in Firefox or Safari), and only
-  // offered when IS_STANDALONE — inside the Claude artifact runtime this
-  // isn't relevant, and the directory handle can't be stored in the real
-  // artifact storage anyway (it only accepts JSON-serializable text).
-  const SYNC_HANDLE_KEY = 'sync-dir-handle';
-  const SYNC_FILE_NAME = 'pairwise-ranker-sync.json';
-  const SYNC_SUPPORTED = IS_STANDALONE && ('showDirectoryPicker' in window);
-  let syncDirHandle = null;
-  let syncStatus = 'disconnected'; // 'disconnected' | 'connected' | 'needs-permission'
-  let syncWriteTimer = null;
-
-  function updateSyncUI(){
-    document.querySelectorAll('.sync-row').forEach(el => {
-      el.style.display = SYNC_SUPPORTED ? 'flex' : 'none';
-    });
-    if (!SYNC_SUPPORTED) return;
-    let text, showConnect, showReconnect;
-    if (syncStatus === 'connected'){
-      text = '🔄 Synced to folder'; showConnect = false; showReconnect = false;
-    } else if (syncStatus === 'needs-permission'){
-      text = '⚠️ Sync folder needs reconnecting'; showConnect = false; showReconnect = true;
-    } else {
-      text = 'Folder sync: not connected'; showConnect = true; showReconnect = false;
-    }
-    document.querySelectorAll('.sync-status-text').forEach(el => { el.textContent = text; });
-    document.querySelectorAll('.sync-connect-btn').forEach(el => { el.style.display = showConnect ? 'inline-block' : 'none'; });
-    document.querySelectorAll('.sync-reconnect-btn').forEach(el => { el.style.display = showReconnect ? 'inline-block' : 'none'; });
-    syncReconnectBanner.classList.toggle('show', showReconnect);
-    document.body.classList.toggle('sync-banner-visible', showReconnect);
-  }
-
-  async function loadSyncHandle(){
-    if (!SYNC_SUPPORTED) return;
-    try{
-      const res = await window.storage.get(SYNC_HANDLE_KEY, false);
-      if (res && res.value){
-        syncDirHandle = res.value;
-        const perm = await syncDirHandle.queryPermission({ mode: 'readwrite' });
-        syncStatus = perm === 'granted' ? 'connected' : 'needs-permission';
-      }
-    }catch(e){ /* no folder connected yet */ }
-    updateSyncUI();
-  }
-
-  async function connectSyncFolder(){
-    if (!SYNC_SUPPORTED) return;
-    try{
-      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-      syncDirHandle = handle;
-      syncStatus = 'connected';
-      await window.storage.set(SYNC_HANDLE_KEY, handle, false);
-      updateSyncUI();
-      showToast('Connected to synced folder');
-      await loadOrSeedSyncFile();
-    }catch(e){
-      if (e && e.name !== 'AbortError') showToast('Could not connect to that folder');
-    }
-  }
-
-  async function reconnectSyncPermission(){
-    if (!syncDirHandle) return;
-    try{
-      const perm = await syncDirHandle.requestPermission({ mode: 'readwrite' });
-      if (perm === 'granted'){
-        syncStatus = 'connected';
-        showToast('Reconnected');
-        updateSyncUI();
-        await loadOrSeedSyncFile();
-      } else {
-        showToast('Permission not granted');
-      }
-    }catch(e){
-      showToast('Could not reconnect');
-    }
-  }
-
-  // Covers both sync paths from every existing call site — folder sync and
-  // Firebase sync are independent (either, both, or neither can be active),
-  // but anything that changed data wants to try both, so this stays the one
-  // function every part of the app already calls after a change rather than
-  // needing every one of those call sites to know about Firebase too.
-  function scheduleSyncWrite(){
-    if (syncStatus === 'connected'){
-      clearTimeout(syncWriteTimer);
-      syncWriteTimer = setTimeout(writeSyncFile, 600);
-    }
-    scheduleFirestoreWrite(); // no-op internally when not signed in
-  }
-
-  async function writeSyncFile(){
-    if (syncStatus !== 'connected' || !syncDirHandle) return;
-    try{
-      const artKeys = Array.from(new Set([...items, ...loadingDock]));
-      const art = {};
-      await Promise.all(artKeys.map(async (raw) => {
-        if (artCache[raw]){ art[raw] = artCache[raw]; return; }
-        try{
-          const res = await window.storage.get(artKeyFor(raw), false);
-          if (res && res.value) art[raw] = res.value;
-        }catch(e){ /* no art for this item */ }
-      }));
-      const payload = JSON.stringify({
-        items, history, isComplete, finalRanking, loadingDock, art,
-        tierBoundaries, tierBoundariesTotal, savedAt: new Date().toISOString(),
-        // Songs and Restaurants travel in the same file (one folder
-        // connection covers all three), but each keeps its own savedAt —
-        // otherwise an edit in one domain bumping this file's write time
-        // could make a genuinely newer local edit in a different domain,
-        // on another device, look stale by comparison, and silently lose it
-        // on the next sync-wins merge.
-        songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt,
-        restaurantRows, restaurantSavedAt: restaurantLastSavedAt
-      });
-      const fileHandle = await syncDirHandle.getFileHandle(SYNC_FILE_NAME, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(payload);
-      await writable.close();
-    }catch(e){
-      // Best effort — permission may have lapsed since last check; the next
-      // reconnect click (surfaced via updateSyncUI on the next load) covers it.
-    }
-  }
-
-  async function readSyncFile(){
-    if (!syncDirHandle) return null;
-    let text;
-    try{
-      const perm = await syncDirHandle.queryPermission({ mode: 'read' });
-      if (perm !== 'granted') return null;
-      const fileHandle = await syncDirHandle.getFileHandle(SYNC_FILE_NAME, { create: false });
-      const file = await fileHandle.getFile();
-      text = await file.text();
-    }catch(e){
-      return null; // no file there yet — completely normal for a first-ever connection
-    }
-    try{
-      return JSON.parse(text);
-    }catch(parseErr){
-      // The file exists but isn't valid JSON — worth surfacing rather than
-      // silently falling back, since that usually means an interrupted
-      // write or a Dropbox sync conflict actually damaged the file.
-      showToast("⚠️ Synced file isn't readable — check Dropbox's Version History to restore it");
-      return null;
-    }
-  }
-
-  // Connecting or regaining permission always reads what's already in the
-  // folder FIRST. Blindly writing here was the original bug: a fresh browser
-  // with nothing loaded yet would silently overwrite good synced data with
-  // an empty snapshot the moment you connected.
-  async function loadOrSeedSyncFile(){
-    const existing = await readSyncFile();
-    const hasExistingAlbumSync = existing && Array.isArray(existing.items) && existing.items.length >= 2;
-    const hasCurrentAlbumData = Array.isArray(items) && items.length >= 2;
-    const hasExistingSongSync = existing && Array.isArray(existing.songItems) && existing.songItems.length >= 2;
-    const hasCurrentSongData = Array.isArray(songItems) && songItems.length >= 2;
-    const hasExistingRestaurantSync = existing && Array.isArray(existing.restaurantRows) && existing.restaurantRows.length >= 1;
-    const hasCurrentRestaurantData = Array.isArray(restaurantRows) && restaurantRows.length >= 1;
-    const hasExistingSync = hasExistingAlbumSync || hasExistingSongSync || hasExistingRestaurantSync;
-    const hasCurrentData = hasCurrentAlbumData || hasCurrentSongData || hasCurrentRestaurantData;
-
-    const applyExisting = () => {
-      if (hasExistingAlbumSync) resumeFromData(existing);
-      if (hasExistingSongSync) resumeSongDataFromSync({ songItems: existing.songItems, songHistory: existing.songHistory, songIsComplete: existing.songIsComplete, songFinalRanking: existing.songFinalRanking });
-      if (hasExistingRestaurantSync){
-        restaurantRows = existing.restaurantRows;
-        renderRestaurantsPage();
-      }
-    };
-
-    if (hasExistingSync && hasCurrentData){
-      const parts = [];
-      if (hasExistingAlbumSync) parts.push(existing.items.length + ' albums');
-      if (hasExistingSongSync) parts.push(existing.songItems.length + ' songs');
-      if (hasExistingRestaurantSync) parts.push(existing.restaurantRows.length + ' restaurants');
-      showConfirmModal(
-        'Load synced data?',
-        'This folder already has saved data (' + parts.join(', ') + '). Load it here, replacing what\'s currently open? Choose Cancel to leave what\'s open here alone — it just won\'t overwrite the synced file until you make a change here.',
-        applyExisting
-      );
-    } else if (hasExistingSync){
-      showToast('Found existing synced data — loading it');
-      applyExisting();
-    } else {
-      writeSyncFile();
-    }
-  }
-
-  document.querySelectorAll('.sync-connect-btn').forEach(el => el.addEventListener('click', connectSyncFolder));
-  document.querySelectorAll('.sync-reconnect-btn').forEach(el => el.addEventListener('click', reconnectSyncPermission));
-  updateSyncUI(); // sets correct show/hide immediately; loadSyncHandle() below fills in the actual status text once it resolves
-
   // ---------- FIREBASE SYNC (Auth + Firestore) ----------
-  // A second, independent sync path alongside the folder sync above — either,
-  // both, or neither can be active. Kept alongside rather than replacing the
-  // folder sync outright: this is new, untested against your real Firebase
-  // project (I can't reach your actual account from here), so having the
-  // working folder sync still available as a fallback if anything's off
-  // seemed safer than removing it in the same change.
+  // The sole sync mechanism now — this used to run alongside a folder-based
+  // sync (via the File System Access API, pointed at a Dropbox-synced
+  // folder), which was removed once this proved out: it solves the same
+  // cross-device problem without the recurring "permission lapsed,
+  // reconnect the folder" friction that motivated moving to Firebase in
+  // the first place.
   //
-  // The synced document is one JSON string field — same shape as the folder
-  // sync's own file — deliberately, so all the existing resume/merge logic
-  // (resumeFromData, resumeSongDataFromSync, the newest-wins comparison in
-  // checkSavedProgress) works unchanged; only the transport differs.
+  // The synced document is one JSON string field, matching the old synced
+  // file's own shape — deliberately, so the existing resume/merge logic
+  // (resumeFromData, resumeSongDataFromSync) still works unchanged; only
+  // the transport changed.
   //
   // Firestore documents cap out at 1MB. With album art still stored as
   // base64 here, a large collection can exceed that easily — moving art to
@@ -3475,7 +3175,10 @@
     try{ await fb.signOut(fb.auth); }catch(e){ /* best effort */ }
   }
 
-  function scheduleFirestoreWrite(){
+  // Renamed from scheduleFirestoreWrite now that Firebase is the only sync
+  // path — every save function throughout the app already calls this exact
+  // name (it used to also trigger a folder-sync write alongside this).
+  function scheduleSyncWrite(){
     if (!firebaseUser) return;
     clearTimeout(firestoreWriteTimer);
     firestoreWriteTimer = setTimeout(writeFirestoreData, 600);
@@ -3525,45 +3228,48 @@
     }
   }
 
-  // Mirrors loadOrSeedSyncFile's exact logic — reads what's already there
-  // first, never blindly overwrites good synced data with an empty local
-  // session the moment you sign in.
+  // Runs on every page load (Firebase's signed-in session persists across
+  // reloads, unlike the old folder-sync connection which only ever asked
+  // once at the moment of deliberately connecting) — so unlike that one-
+  // time flow, this can't interrupt with a confirmation every single time
+  // without becoming constant nagging over nothing. Instead it compares
+  // timestamps per domain and silently applies whichever side is newer,
+  // the same "newest wins" principle checkSavedProgress already uses for
+  // local-vs-synced-file. Ends by pushing a write so Firestore catches up
+  // on anything local was ahead on — safe even when nothing was ahead,
+  // since writing back identical data is a harmless no-op.
   async function loadOrSeedFirestoreData(){
     const existing = await readFirestoreData();
-    const hasExistingAlbumSync = existing && Array.isArray(existing.items) && existing.items.length >= 2;
-    const hasCurrentAlbumData = Array.isArray(items) && items.length >= 2;
-    const hasExistingSongSync = existing && Array.isArray(existing.songItems) && existing.songItems.length >= 2;
-    const hasCurrentSongData = Array.isArray(songItems) && songItems.length >= 2;
-    const hasExistingRestaurantSync = existing && Array.isArray(existing.restaurantRows) && existing.restaurantRows.length >= 1;
-    const hasCurrentRestaurantData = Array.isArray(restaurantRows) && restaurantRows.length >= 1;
-    const hasExistingSync = hasExistingAlbumSync || hasExistingSongSync || hasExistingRestaurantSync;
-    const hasCurrentData = hasCurrentAlbumData || hasCurrentSongData || hasCurrentRestaurantData;
+    if (!existing){
+      writeFirestoreData(); // nothing in Firestore yet — seed it with what's here
+      return;
+    }
 
-    const applyExisting = () => {
-      if (hasExistingAlbumSync) resumeFromData(existing);
-      if (hasExistingSongSync) resumeSongDataFromSync({ songItems: existing.songItems, songHistory: existing.songHistory, songIsComplete: existing.songIsComplete, songFinalRanking: existing.songFinalRanking });
-      if (hasExistingRestaurantSync){
+    if (Array.isArray(existing.items) && existing.items.length >= 2){
+      const remoteTime = new Date(existing.savedAt || 0).getTime();
+      const localTime = new Date(lastSavedAt || 0).getTime();
+      if (remoteTime > localTime) resumeFromData(existing);
+    }
+    if (Array.isArray(existing.songItems) && existing.songItems.length >= 2){
+      const remoteTime = new Date(existing.songSavedAt || 0).getTime();
+      const localTime = new Date(songLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        resumeSongDataFromSync({ songItems: existing.songItems, songHistory: existing.songHistory, songIsComplete: existing.songIsComplete, songFinalRanking: existing.songFinalRanking });
+      }
+    }
+    if (Array.isArray(existing.restaurantRows) && existing.restaurantRows.length >= 1){
+      const remoteTime = new Date(existing.restaurantSavedAt || 0).getTime();
+      const localTime = new Date(restaurantLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
         restaurantRows = existing.restaurantRows;
         renderRestaurantsPage();
       }
-    };
-
-    if (hasExistingSync && hasCurrentData){
-      const parts = [];
-      if (hasExistingAlbumSync) parts.push(existing.items.length + ' albums');
-      if (hasExistingSongSync) parts.push(existing.songItems.length + ' songs');
-      if (hasExistingRestaurantSync) parts.push(existing.restaurantRows.length + ' restaurants');
-      showConfirmModal(
-        'Load synced data from Firebase?',
-        'Your Firebase account already has saved data (' + parts.join(', ') + '). Load it here, replacing what\'s currently open? Choose Cancel to leave what\'s open here alone.',
-        applyExisting
-      );
-    } else if (hasExistingSync){
-      showToast('Found existing Firebase data — loading it');
-      applyExisting();
-    } else {
-      writeFirestoreData();
     }
+
+    const hasCurrentData = (Array.isArray(items) && items.length >= 2)
+      || (Array.isArray(songItems) && songItems.length >= 2)
+      || (Array.isArray(restaurantRows) && restaurantRows.length >= 1);
+    if (hasCurrentData) writeFirestoreData();
   }
 
   function initFirebaseSync(){
@@ -3589,90 +3295,48 @@
   }
 
   async function checkSavedProgress(){
-    await loadSyncHandle();
-
     let localParsed = null;
     try{
       const res = await window.storage.get(STORAGE_KEY, false);
       if (res && res.value) localParsed = JSON.parse(res.value);
     }catch(e){ /* no local save */ }
 
-    let syncParsed = null;
-    if (syncStatus === 'connected'){
-      syncParsed = await readSyncFile();
-    }
-
-    let parsed = null;
-    if (localParsed && syncParsed){
-      const localTime = new Date(localParsed.savedAt || 0).getTime();
-      const syncTime = new Date(syncParsed.savedAt || 0).getTime();
-      parsed = syncTime > localTime ? syncParsed : localParsed;
-    } else {
-      parsed = localParsed || syncParsed;
-    }
-
-    if (parsed && Array.isArray(parsed.items) && parsed.items.length >= 2){
-      resumeFromData(parsed);
-      const dockCount = Array.isArray(parsed.loadingDock) ? parsed.loadingDock.length : 0;
+    if (localParsed && Array.isArray(localParsed.items) && localParsed.items.length >= 2){
+      resumeFromData(localParsed);
+      lastSavedAt = localParsed.savedAt || null;
+      const dockCount = Array.isArray(localParsed.loadingDock) ? localParsed.loadingDock.length : 0;
       const dockNote = dockCount ? ', ' + dockCount + ' in the Loading Dock' : '';
-      if (parsed.isComplete && Array.isArray(parsed.finalRanking)){
-        showToast('Resumed — ' + parsed.finalRanking.length + ' items, ranking complete' + dockNote);
+      if (localParsed.isComplete && Array.isArray(localParsed.finalRanking)){
+        showToast('Resumed — ' + localParsed.finalRanking.length + ' items, ranking complete' + dockNote);
       } else {
-        const est = estimateComparisons(parsed.items.length);
-        const historyLen = Array.isArray(parsed.history) ? parsed.history.length : 0;
-        showToast('Resumed — ' + parsed.items.length + ' items, ' + historyLen + ' of ~' + est + ' duels done' + dockNote);
+        const est = estimateComparisons(localParsed.items.length);
+        const historyLen = Array.isArray(localParsed.history) ? localParsed.history.length : 0;
+        showToast('Resumed — ' + localParsed.items.length + ' items, ' + historyLen + ' of ~' + est + ' duels done' + dockNote);
       }
     }
 
-    // Songs has its own local key (so "Start Over" on one doesn't wipe the
-    // other) but shares the same sync file — compared here against that
-    // file's own songSavedAt, independent of whatever the album side's
-    // timestamp happens to be.
+    // Songs has its own local key so "Start Over" on one doesn't wipe the other.
     let localSongParsed = null;
     try{
       const res = await window.storage.get(SONG_STORAGE_KEY, false);
       if (res && res.value) localSongParsed = JSON.parse(res.value);
     }catch(e){ /* no local song save */ }
 
-    const syncSongParsed = (syncParsed && Array.isArray(syncParsed.songItems))
-      ? { songItems: syncParsed.songItems, songHistory: syncParsed.songHistory, songIsComplete: syncParsed.songIsComplete, songFinalRanking: syncParsed.songFinalRanking, savedAt: syncParsed.songSavedAt }
-      : null;
-
-    let songParsed = null;
-    if (localSongParsed && syncSongParsed){
-      const localTime = new Date(localSongParsed.savedAt || 0).getTime();
-      const syncTime = new Date(syncSongParsed.savedAt || 0).getTime();
-      songParsed = syncTime > localTime ? syncSongParsed : localSongParsed;
-    } else {
-      songParsed = localSongParsed || syncSongParsed;
+    if (localSongParsed && Array.isArray(localSongParsed.songItems) && localSongParsed.songItems.length >= 2){
+      resumeSongDataFromSync(localSongParsed);
+      songLastSavedAt = localSongParsed.savedAt || null;
     }
 
-    if (songParsed && Array.isArray(songParsed.songItems) && songParsed.songItems.length >= 2){
-      resumeSongDataFromSync(songParsed);
-    }
-
-    // Same independent-local-key, independent-timestamp pattern as Songs.
+    // Same independent-local-key pattern as Songs.
     let localRestaurantParsed = null;
     try{
       const res = await window.storage.get(RESTAURANT_STORAGE_KEY, false);
       if (res && res.value) localRestaurantParsed = JSON.parse(res.value);
     }catch(e){ /* no local restaurant save */ }
 
-    const syncRestaurantParsed = (syncParsed && Array.isArray(syncParsed.restaurantRows))
-      ? { restaurantRows: syncParsed.restaurantRows, savedAt: syncParsed.restaurantSavedAt }
-      : null;
-
-    let restaurantParsed = null;
-    if (localRestaurantParsed && syncRestaurantParsed){
-      const localTime = new Date(localRestaurantParsed.savedAt || 0).getTime();
-      const syncTime = new Date(syncRestaurantParsed.savedAt || 0).getTime();
-      restaurantParsed = syncTime > localTime ? syncRestaurantParsed : localRestaurantParsed;
-    } else {
-      restaurantParsed = localRestaurantParsed || syncRestaurantParsed;
-    }
-
-    if (restaurantParsed && Array.isArray(restaurantParsed.restaurantRows) && restaurantParsed.restaurantRows.length){
-      restaurantRows = restaurantParsed.restaurantRows;
+    if (localRestaurantParsed && Array.isArray(localRestaurantParsed.restaurantRows) && localRestaurantParsed.restaurantRows.length){
+      restaurantRows = localRestaurantParsed.restaurantRows;
+      restaurantLastSavedAt = localRestaurantParsed.savedAt || null;
     }
 
     resolveLocalDataReady(); // albums, songs, and restaurants have all finished loading — safe for Firebase sync to compare/write now
@@ -3843,7 +3507,18 @@
       method: 'POST',
       body: formData
     });
-    if (!res.ok) throw new Error('Cloudinary upload failed (' + res.status + ')');
+    if (!res.ok){
+      // Cloudinary's error responses include a specific, human-readable
+      // reason in the body (e.g. "Upload preset not found", a file-size or
+      // format restriction, etc.) — the bare HTTP status alone hides
+      // exactly the detail needed to actually diagnose a failure.
+      let detail = '';
+      try{
+        const errBody = await res.json();
+        detail = (errBody && errBody.error && errBody.error.message) || '';
+      }catch(parseErr){ /* body wasn't JSON — fall back to just the status */ }
+      throw new Error('Cloudinary upload failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
+    }
     const data = await res.json();
     return data.secure_url;
   }
@@ -3862,7 +3537,8 @@
       try{
         return await uploadToCloudinary(file, folder);
       }catch(e){
-        showToast("Couldn't upload to Cloudinary — saving locally instead");
+        console.error('Cloudinary upload failed:', e);
+        showToast("Couldn't upload to Cloudinary (" + e.message + ") — saving locally instead");
       }
     }
     try{
@@ -7285,13 +6961,20 @@
       const rank = idx + 1;
       const tier = restaurantTierBoundaries ? getRestaurantTierForRank(rank, restaurantTierBoundaries) : null;
 
-      if (tier && tier.key === 'gold'){
+      // Photo cards now go by rank position (top 20), not tier membership —
+      // a restaurant can be here without being Gold, so its actual tier (if
+      // any) needs its own badge now rather than being implied by section.
+      if (rank <= 20){
         const goldStars = restaurantStarsCount(r);
         const goldStarsText = goldStars > 0 ? '⭐'.repeat(goldStars) : '';
         const meta = [goldStarsText, r.location].filter(Boolean).join(' • ');
+        const tierBadgeHtml = tier
+          ? '<span class="restaurant-gold-card-tier" style="background:' + hexToRgba(tier.color, 0.85) + '; color:' + (tier.key === 'gold' ? 'var(--ink)' : '#fff') + ';">' + tier.name + '</span>'
+          : '';
         goldCards.push(
           '<div class="restaurant-gold-card" data-restaurant-index="' + idx + '">' +
             '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+            tierBadgeHtml +
             (r.coverPhoto
               ? '<img class="art-img" src="' + escapeAttr(r.coverPhoto) + '" alt="">'
               : '<span class="art-drop-hint">📷</span>') +
