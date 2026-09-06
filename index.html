@@ -357,10 +357,11 @@
   }
   /* Full-width, landscape — same drop-zone interaction as the main cover
      photo (tap when empty to browse, drag-drop always works, tap when set
-     opens the shared gallery rather than a single-image view). */
+     opens the shared gallery rather than a single-image view). 4:3 rather
+     than 16:9 — noticeably larger/taller while staying landscape. */
   .restaurant-course-photo-drop{
     width: 100%;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 4 / 3;
     cursor: pointer;
     background: var(--bg-3, var(--bg-2));
     position: relative;
@@ -376,6 +377,42 @@
     font-size: 28px;
     opacity: 0.35;
   }
+  /* Small overlay controls for multi-photo courses — a counter (bottom-left)
+     when more than one photo exists, and an explicit "add another" button
+     (bottom-right) so adding more doesn't rely on remembering that drag-drop
+     appends rather than replaces. */
+  .restaurant-course-photo-count{
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 1;
+    background: rgba(15,33,36,0.72);
+    color: #fff;
+    font-family: 'Figtree', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+  }
+  .restaurant-course-photo-add-btn{
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    z-index: 1;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(15,33,36,0.72);
+    color: #fff;
+    border: none;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .restaurant-course-photo-add-btn:hover{ background: var(--amber); color: var(--ink); }
   .restaurant-course-card-body{
     display: flex;
     align-items: flex-start;
@@ -392,6 +429,9 @@
     padding-top: 6px;
     flex-shrink: 0;
   }
+  /* Height is now set directly via JS (autoGrowTextarea) as content changes,
+     rather than relying on manual dragging or an internal scrollbar —
+     resize:none since a fixed manual handle would fight with that. */
   .restaurant-course-text{
     flex: 1;
     min-width: 0;
@@ -401,7 +441,8 @@
     font-family: 'Figtree', sans-serif;
     font-size: 13px;
     line-height: 1.5;
-    resize: vertical;
+    resize: none;
+    overflow: hidden;
     min-height: 48px;
     padding: 4px 0;
   }
@@ -616,6 +657,20 @@
     font-size: 14px;
   }
   .restaurant-edit-input:focus{ outline: none; border-color: var(--amber); }
+  /* The native date-picker calendar icon defaults to a dark color, which is
+     nearly invisible against this app's dark input backgrounds — this is
+     exactly why it worked on mobile (the OS-level picker doesn't depend on
+     this icon at all) but appeared to not exist on desktop (the icon was
+     there, just invisible). invert(1) flips it to light, then the hue-
+     rotate/saturate nudge it toward the app's amber rather than plain white.
+     Chromium/WebKit-only, but this app's own date input is functional
+     without it regardless — this is a visibility fix, not new functionality. */
+  input[type="date"].restaurant-edit-input::-webkit-calendar-picker-indicator{
+    filter: invert(1);
+    cursor: pointer;
+    opacity: 0.75;
+  }
+  input[type="date"].restaurant-edit-input::-webkit-calendar-picker-indicator:hover{ opacity: 1; }
   .restaurant-edit-actions{
     display: flex;
     gap: 10px;
@@ -1350,6 +1405,10 @@
   .art-drop.has-art{ border-style: solid; border-color: var(--panel-line); }
   .art-drop-hint{ font-size: 20px; opacity: 0.4; }
   .art-img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Songs display the matching album's art read-only — no upload/drag-drop,
+     since art belongs to the album, not the song. */
+  .song-art-readonly{ cursor: default; }
+  .song-art-readonly:hover{ border-color: var(--panel-line); }
 
   /* ---------- VIEW TOGGLE ---------- */
   .view-toggle{
@@ -2452,7 +2511,7 @@
 
     <section class="screen" id="song-screen-ranking">
 
-      <div class="tab-switcher">
+      <div class="tab-switcher" id="song-tab-switcher">
         <button class="tab-btn active" id="song-tab-btn-duels" type="button">Duels</button>
         <button class="tab-btn" id="song-tab-btn-results" type="button">Song Rankings<span class="live-dot" id="song-live-dot"></span></button>
       </div>
@@ -2506,7 +2565,49 @@
           </div>
         </div>
 
+        <div class="filters-group">
+          <div class="filter-wrap">
+            <input type="text" class="filter-input artist-filter-input" id="song-artist-filter-input" list="song-artist-filter-datalist" placeholder="All Artists" autocomplete="off">
+            <datalist id="song-artist-filter-datalist"></datalist>
+            <button class="filter-clear" id="song-artist-filter-clear" type="button" title="Clear artist filter" style="display:none;">✕</button>
+          </div>
+          <div class="filter-wrap">
+            <input type="text" class="filter-input grouping-filter-input" id="song-grouping-filter-input" list="song-grouping-filter-datalist" placeholder="All Groupings" autocomplete="off">
+            <datalist id="song-grouping-filter-datalist"></datalist>
+            <button class="filter-clear" id="song-grouping-filter-clear" type="button" title="Clear grouping filter" style="display:none;">✕</button>
+          </div>
+        </div>
+
         <ol class="results-list" id="song-results-list"></ol>
+
+        <div class="insights-section" id="song-insights-section">
+          <p class="eyebrow">Insights</p>
+
+          <div class="insights-block" id="song-artist-block">
+            <p class="insights-block-title">By Artist — Most Songs</p>
+            <div class="artist-list" id="song-artist-list"></div>
+          </div>
+
+          <div class="insights-block" id="song-artist-rated-block">
+            <p class="insights-block-title">By Artist — Highest Rated</p>
+            <div class="artist-list" id="song-artist-list-rated"></div>
+          </div>
+
+          <div class="insights-block" id="song-grouping-block">
+            <p class="insights-block-title">By Grouping — Most Songs</p>
+            <div class="artist-list" id="song-grouping-list"></div>
+          </div>
+
+          <div class="insights-block" id="song-grouping-rated-block">
+            <p class="insights-block-title">By Grouping — Highest Rated</p>
+            <div class="artist-list" id="song-grouping-list-rated"></div>
+          </div>
+
+          <div class="insights-block" id="song-year-block">
+            <p class="insights-block-title">By Year</p>
+            <div class="artist-list" id="song-year-list"></div>
+          </div>
+        </div>
 
         <div class="results-actions">
           <button class="btn-primary" id="song-copy-btn">Copy Ranking</button>
@@ -2957,6 +3058,7 @@
 
   const songTabBtnDuels = document.getElementById('song-tab-btn-duels');
   const songTabBtnResults = document.getElementById('song-tab-btn-results');
+  const songTabSwitcher = document.getElementById('song-tab-switcher');
   const songLiveDot = document.getElementById('song-live-dot');
   const songTabDuels = document.getElementById('song-tab-duels');
   const songTabResults = document.getElementById('song-tab-results');
@@ -2981,6 +3083,26 @@
   const songReorderSaveBtn = document.getElementById('song-reorder-save-btn');
   const songReorderCancelBtn = document.getElementById('song-reorder-cancel-btn');
   const songResultsList = document.getElementById('song-results-list');
+
+  const songArtistFilterInput = document.getElementById('song-artist-filter-input');
+  const songArtistFilterDatalist = document.getElementById('song-artist-filter-datalist');
+  const songArtistFilterClear = document.getElementById('song-artist-filter-clear');
+  const songGroupingFilterInput = document.getElementById('song-grouping-filter-input');
+  const songGroupingFilterDatalist = document.getElementById('song-grouping-filter-datalist');
+  const songGroupingFilterClear = document.getElementById('song-grouping-filter-clear');
+
+  const songInsightsSection = document.getElementById('song-insights-section');
+  const songArtistBlock = document.getElementById('song-artist-block');
+  const songArtistList = document.getElementById('song-artist-list');
+  const songArtistRatedBlock = document.getElementById('song-artist-rated-block');
+  const songArtistListRated = document.getElementById('song-artist-list-rated');
+  const songGroupingBlock = document.getElementById('song-grouping-block');
+  const songGroupingList = document.getElementById('song-grouping-list');
+  const songGroupingRatedBlock = document.getElementById('song-grouping-rated-block');
+  const songGroupingListRated = document.getElementById('song-grouping-list-rated');
+  const songYearBlock = document.getElementById('song-year-block');
+  const songYearList = document.getElementById('song-year-list');
+
 
   const songCopyBtn = document.getElementById('song-copy-btn');
   const songDownloadBtn = document.getElementById('song-download-btn');
@@ -3427,6 +3549,15 @@
     return escapeHtml(str).replace(/"/g, '&quot;');
   }
 
+  // Resets to 'auto' first so shrinking (e.g. deleting text) is picked up
+  // correctly — scrollHeight alone only ever reports the larger of the two
+  // during a shrink, since the old inline height is still in effect when
+  // it's read.
+  function autoGrowTextarea(el){
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
   // ---------- ALBUM ART ----------
   // Stored one image per key in window.storage, keyed by a short hash of the
   // item's raw text (storage keys can't contain spaces/slashes/quotes, which
@@ -3726,6 +3857,7 @@
     }));
     renderResultsTab();
     renderDockTab();
+    renderSongResultsTab(); // songs display the same albums' art, keyed the same way
   }
 
   async function handleArtFile(raw, file){
@@ -4470,14 +4602,32 @@
   // include one) — this looks it up from a matching album already ranked in
   // the Albums tab, reusing the same diacritic-aware matching used for
   // MusicBee album lookups. Returns '' if no match, rather than guessing.
+  // Returns the actual matched album "raw" string (e.g. "Artist - Album
+  // (Year)") from the album ranking, or null — needed for art lookup, since
+  // art is keyed by that exact string. findAlbumYearForSong below reuses
+  // this rather than duplicating the same match logic.
+  function findAlbumRawForSong(p){
+    if (!p || !p.artist || !p.album) return null;
+    const target = albumMatchKey(p.artist, p.album);
+    return finalRanking.find(raw => {
+      const ap = parseEntry(raw);
+      return ap.artist && albumMatchKey(ap.artist, ap.album) === target;
+    }) || null;
+  }
+
   function findAlbumYearForSong(artist, album){
-    if (!artist || !album) return '';
-    const target = albumMatchKey(artist, album);
-    const match = finalRanking.find(raw => {
-      const p = parseEntry(raw);
-      return p.artist && albumMatchKey(p.artist, p.album) === target;
-    });
-    return match ? (parseEntry(match).year || '') : '';
+    const raw = findAlbumRawForSong({ artist, album });
+    return raw ? (parseEntry(raw).year || '') : '';
+  }
+
+  // Read-only — unlike artDropZoneHtml, there's no upload/drag-drop here.
+  // Art belongs to the album; a song just displays whatever's already set
+  // there, if the song's album happens to match one in the album ranking.
+  function songArtHtml(albumRaw){
+    const art = albumRaw ? artCache[albumRaw] : null;
+    const cls = 'art-drop song-art-readonly' + (art ? ' has-art' : '');
+    const inner = art ? '<img class="art-img" src="' + art + '" alt="" draggable="false">' : '<span class="art-drop-hint">🎵</span>';
+    return '<div class="' + cls + '">' + inner + '</div>';
   }
 
   function songMetaLine(p){
@@ -4675,13 +4825,222 @@
   // ---------- SONG RESULTS (list view only — no grid/tier/art/filters) ----------
   let songDisplayedRanking = [];
 
+  // ---------- SONG FILTERS (Artist / Grouping — no Year filter, unlike Albums) ----------
+  let activeSongArtistFilter = '';
+  let activeSongGroupingFilter = '';
+
+  function renderSongArtistFilterOptions(list){
+    const artists = Array.from(new Set(list.map(raw => parseSongEntry(raw).artist).filter(Boolean))).sort();
+    songArtistFilterDatalist.innerHTML = artists.map(a => '<option value="' + escapeAttr(a) + '">').join('');
+    if (!artists.includes(activeSongArtistFilter)) activeSongArtistFilter = '';
+    songArtistFilterInput.value = activeSongArtistFilter;
+    songArtistFilterClear.style.display = activeSongArtistFilter ? 'flex' : 'none';
+  }
+
+  function renderSongGroupingFilterOptions(list){
+    const groupings = Array.from(new Set(list.map(raw => {
+      const p = parseSongEntry(raw);
+      return p.artist ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
+    }).filter(Boolean))).sort();
+    songGroupingFilterDatalist.innerHTML = groupings.map(g => '<option value="' + escapeAttr(g) + '">').join('');
+    if (!groupings.includes(activeSongGroupingFilter)) activeSongGroupingFilter = '';
+    songGroupingFilterInput.value = activeSongGroupingFilter;
+    songGroupingFilterClear.style.display = activeSongGroupingFilter ? 'flex' : 'none';
+  }
+
+  function filterSongsByArtistAndScroll(artistName){
+    activeSongArtistFilter = artistName;
+    renderSongResultsTab();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function filterSongsByGroupingAndScroll(groupingName){
+    activeSongGroupingFilter = groupingName;
+    renderSongResultsTab();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  songArtistFilterInput.addEventListener('input', () => {
+    const val = songArtistFilterInput.value.trim();
+    if (!val){
+      if (activeSongArtistFilter){ activeSongArtistFilter = ''; renderSongResultsTab(); }
+      return;
+    }
+    const known = Array.from(songArtistFilterDatalist.options).map(o => o.value);
+    if (known.includes(val) && val !== activeSongArtistFilter){
+      activeSongArtistFilter = val;
+      renderSongResultsTab();
+    }
+  });
+  songArtistFilterClear.addEventListener('click', () => {
+    songArtistFilterInput.value = '';
+    activeSongArtistFilter = '';
+    renderSongResultsTab();
+  });
+
+  songGroupingFilterInput.addEventListener('input', () => {
+    const val = songGroupingFilterInput.value.trim();
+    if (!val){
+      if (activeSongGroupingFilter){ activeSongGroupingFilter = ''; renderSongResultsTab(); }
+      return;
+    }
+    const known = Array.from(songGroupingFilterDatalist.options).map(o => o.value);
+    if (known.includes(val) && val !== activeSongGroupingFilter){
+      activeSongGroupingFilter = val;
+      renderSongResultsTab();
+    }
+  });
+  songGroupingFilterClear.addEventListener('click', () => {
+    songGroupingFilterInput.value = '';
+    activeSongGroupingFilter = '';
+    renderSongResultsTab();
+  });
+
+  // ---------- SONG INSIGHTS ---------- 
+  // Same shape and formula (albumPoints — purely mathematical, not actually
+  // album-specific) as Albums' own stats, just keyed by parseSongEntry's
+  // artist/title/album instead of parseEntry's artist/album/year, and using
+  // findAlbumYearForSong for the Year breakdown since songs have no year of
+  // their own. Reuses Albums' renderStatList/renderYearList directly —
+  // those are already generic (container/data/callback driven), no
+  // song-specific version needed. No tiers, no points-algo toggle here —
+  // songs use the same global pointsAlgorithm Albums' own toggle controls.
+  function computeSongArtistStats(sorted){
+    const map = {};
+    sorted.forEach((raw, idx) => {
+      const p = parseSongEntry(raw);
+      if (!p.artist) return;
+      const rank = idx + 1;
+      if (!map[p.artist]) map[p.artist] = { count: 0, sum: 0, best: Infinity, points: 0 };
+      map[p.artist].count++;
+      map[p.artist].sum += rank;
+      map[p.artist].best = Math.min(map[p.artist].best, rank);
+      map[p.artist].points += albumPoints(rank);
+    });
+    return Object.entries(map)
+      .map(([name, d]) => ({ name, count: d.count, avg: d.sum / d.count, best: d.best, points: d.points }))
+      .sort((a, b) => a.avg - b.avg);
+  }
+
+  function computeSongGroupingStats(sorted){
+    const map = {};
+    sorted.forEach((raw, idx) => {
+      const p = parseSongEntry(raw);
+      if (!p.artist) return;
+      const grouping = findMusicbeeGroupingForAlbum(p.artist, p.album);
+      if (!grouping) return;
+      const rank = idx + 1;
+      if (!map[grouping]) map[grouping] = { count: 0, sum: 0, best: Infinity, points: 0 };
+      map[grouping].count++;
+      map[grouping].sum += rank;
+      map[grouping].best = Math.min(map[grouping].best, rank);
+      map[grouping].points += albumPoints(rank);
+    });
+    return Object.entries(map)
+      .map(([name, d]) => ({ name, count: d.count, avg: d.sum / d.count, best: d.best, points: d.points }))
+      .sort((a, b) => a.avg - b.avg);
+  }
+
+  function computeSongYearStats(sorted){
+    const map = {};
+    sorted.forEach((raw, idx) => {
+      const p = parseSongEntry(raw);
+      const year = p.artist ? findAlbumYearForSong(p.artist, p.album) : '';
+      if (!year) return;
+      const y = Number(year);
+      if (!map[y]) map[y] = { count: 0, sum: 0 };
+      map[y].count++;
+      map[y].sum += (idx + 1);
+    });
+    return Object.entries(map)
+      .map(([year, d]) => ({ year: Number(year), count: d.count, avg: d.sum / d.count }))
+      .sort((a, b) => a.year - b.year);
+  }
+
+  function renderSongInsights(sorted){
+    const artistStats = computeSongArtistStats(sorted);
+    const groupingStats = computeSongGroupingStats(sorted);
+    const yearStats = computeSongYearStats(sorted);
+
+    if (!artistStats.length && !groupingStats.length && !yearStats.length){
+      songInsightsSection.style.display = 'none';
+      return;
+    }
+    songInsightsSection.style.display = 'block';
+
+    if (artistStats.length){
+      const byCount = artistStats.slice().sort((a, b) => b.count - a.count || a.avg - b.avg);
+      renderStatList(songArtistList, byCount, 'count', 20, 'artists', filterSongsByArtistAndScroll);
+      songArtistBlock.style.display = 'block';
+    } else {
+      songArtistBlock.style.display = 'none';
+    }
+
+    if (artistStats.length){
+      const byPoints = artistStats.slice().sort((a, b) => b.points - a.points);
+      renderStatList(songArtistListRated, byPoints, 'points', 20, 'artists', filterSongsByArtistAndScroll);
+      songArtistRatedBlock.style.display = 'block';
+    } else {
+      songArtistRatedBlock.style.display = 'none';
+    }
+
+    if (groupingStats.length){
+      const byCount = groupingStats.slice().sort((a, b) => b.count - a.count || a.avg - b.avg);
+      renderStatList(songGroupingList, byCount, 'count', 20, 'groupings', filterSongsByGroupingAndScroll);
+      songGroupingBlock.style.display = 'block';
+    } else {
+      songGroupingBlock.style.display = 'none';
+    }
+    if (groupingStats.length){
+      const byPoints = groupingStats.slice().sort((a, b) => b.points - a.points);
+      renderStatList(songGroupingListRated, byPoints, 'points', 20, 'groupings', filterSongsByGroupingAndScroll);
+      songGroupingRatedBlock.style.display = 'block';
+    } else {
+      songGroupingRatedBlock.style.display = 'none';
+    }
+
+    if (yearStats.length){
+      renderSongYearList(songYearList, yearStats);
+      songYearBlock.style.display = 'block';
+    } else {
+      songYearBlock.style.display = 'none';
+    }
+  }
+
+  // Separate from Albums' renderYearList only because its row-click calls
+  // filterByYearAndScroll (Albums' own year filter) — Songs has no Year
+  // filter at all, so its equivalent just doesn't wire a click handler.
+  function renderSongYearList(container, yearStats){
+    const maxCount = Math.max(...yearStats.map(y => y.count));
+    container.innerHTML = yearStats.map(y => {
+      const pct = Math.max(6, Math.round((y.count / maxCount) * 100));
+      return (
+        '<div class="artist-row" style="cursor:default;">' +
+          '<span class="artist-rank year-label">' + y.year + '</span>' +
+          '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+          '<span class="artist-count">' + y.count + ' song' + (y.count === 1 ? '' : 's') + '</span>' +
+          '<span class="artist-avg">avg ' + y.avg.toFixed(1) + '</span>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+
   function renderSongResultsTab(){
     songDisplayedRanking = songIsComplete ? songFinalRanking : computeSongLiveEstimate();
+    loadArtForItems(songDisplayedRanking.map(raw => findAlbumRawForSong(parseSongEntry(raw))).filter(Boolean));
+    renderSongArtistFilterOptions(songDisplayedRanking);
+    renderSongGroupingFilterOptions(songDisplayedRanking);
 
+    // Once complete, Duels hides (see updateSongTabVisibility) and there's
+    // nothing left to switch between — a single un-switchable tab button
+    // serves no purpose, so the whole switcher hides too and results show
+    // directly. Matches Albums' own maintenance-mode wording once its Duels
+    // tab is hidden — no "head-to-head picks" language left to give context.
+    songTabSwitcher.style.display = songIsComplete ? 'none' : 'flex';
     if (songIsComplete){
       songLiveDot.style.display = 'none';
-      songResultsSub.innerHTML = '<span class="status-pill final">Final Ranking ✓</span> Settled over ' +
-        songHistory.length + ' head-to-head pick' + (songHistory.length === 1 ? '' : 's') + '.';
+      songResultsSub.innerHTML = '<span class="status-pill final">Ranked ✓</span> ' +
+        songItems.length + ' song' + (songItems.length === 1 ? '' : 's') + '.';
     } else if (songHistory.length === 0){
       songLiveDot.style.display = 'inline-block';
       songResultsSub.innerHTML = '<span class="status-pill live">Live Estimate</span> Make a few picks to see standings take shape.';
@@ -4702,6 +5061,10 @@
 
     songResultsList.innerHTML = '';
     songDisplayedRanking.forEach((raw, idx) => {
+      const p = songEditMode ? null : parseSongEntry(raw);
+      const itemGrouping = (!songEditMode && p.artist) ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
+      if (!songEditMode && ((activeSongArtistFilter && p.artist !== activeSongArtistFilter) || (activeSongGroupingFilter && itemGrouping !== activeSongGroupingFilter))) return;
+
       const li = document.createElement('li');
       if (idx === 0 && songIsComplete && !songEditMode) li.classList.add('top');
 
@@ -4709,19 +5072,21 @@
         ? '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">'
         : '<span class="rank-num">' + (idx + 1) + '</span>';
 
-      let middleHtml, rightHtml;
+      let middleHtml, rightHtml, artHtml = '';
       if (songEditMode){
         li.dataset.original = raw;
         middleHtml = '<input type="text" class="rank-edit-input" value="' + escapeAttr(raw) + '">';
         rightHtml = '<button class="row-remove-btn" type="button" title="Remove this item">✕</button>';
       } else {
-        const p = parseSongEntry(raw);
+        artHtml = songArtHtml(findAlbumRawForSong(p));
         middleHtml = p.artist
           ? '<span class="rank-album">' + escapeHtml(p.title) + '</span>' +
             '<span class="rank-meta">' + songMetaLine(p) + '</span>'
           : '<span class="rank-album">' + escapeHtml(raw) + '</span>';
 
-        const dragHandleHtml = songIsComplete
+        const groupingChipHtml = itemGrouping ? '<span class="grouping-chip">' + escapeHtml(itemGrouping) + '</span>' : '';
+        const showDragHandle = songIsComplete && !activeSongArtistFilter && !activeSongGroupingFilter;
+        const dragHandleHtml = showDragHandle
           ? '<span class="row-drag-handle" title="Drag to reorder">' +
               '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" draggable="false">' +
                 '<circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>' +
@@ -4730,10 +5095,10 @@
               '</svg>' +
             '</span>'
           : '';
-        rightHtml = dragHandleHtml;
+        rightHtml = groupingChipHtml + dragHandleHtml;
       }
 
-      li.innerHTML = numHtml + '<span class="rank-item">' + middleHtml + '</span>' + rightHtml;
+      li.innerHTML = artHtml + numHtml + '<span class="rank-item">' + middleHtml + '</span>' + rightHtml;
       songResultsList.appendChild(li);
 
       makeSongRowDraggable(li, raw);
@@ -4741,6 +5106,8 @@
         li.querySelector('.row-remove-btn').addEventListener('click', () => requestRemoveSongEditRow(li));
       }
     });
+
+    renderSongInsights(songDisplayedRanking);
   }
 
   function commitSongDragOrder(){
@@ -6710,7 +7077,9 @@
     const visits = ensureRestaurantVisits(r);
     visits.forEach(visit => {
       (visit.courses || []).forEach(course => {
-        if (course.photo === url) course.photo = null;
+        const photos = ensureCoursePhotosArray(course);
+        const i = photos.indexOf(url);
+        if (i !== -1) photos.splice(i, 1);
       });
       if (visit.photos){
         visit.photos = visit.photos.filter(p => p !== url);
@@ -7232,6 +7601,18 @@
     return r.visits;
   }
 
+  // Courses used to hold a single "photo" string; now they hold a "photos"
+  // array. Converts in place the first time a course is touched after this
+  // change — idempotent, and persisted via whatever save already wraps the
+  // caller, same pattern as ensureRestaurantVisits' own migration.
+  function ensureCoursePhotosArray(course){
+    if (!course.photos){
+      course.photos = course.photo ? [course.photo] : [];
+      delete course.photo;
+    }
+    return course.photos;
+  }
+
   function sortedRestaurantVisits(r){
     const visits = ensureRestaurantVisits(r);
     return visits.slice().sort((a, b) => {
@@ -7280,7 +7661,9 @@
     if (r.coverPhoto) photos.push(r.coverPhoto);
     visits.forEach(visit => {
       (visit.courses || []).forEach(course => {
-        if (course.photo && course.photo !== r.coverPhoto) photos.push(course.photo);
+        ensureCoursePhotosArray(course).forEach(url => {
+          if (url && url !== r.coverPhoto) photos.push(url);
+        });
       });
       (visit.photos || []).forEach(url => {
         if (url && url !== r.coverPhoto) photos.push(url);
@@ -7436,20 +7819,27 @@
   function renderRestaurantCoursesContentHtml(visit){
     const courses = visit.courses || [];
     const listHtml = courses.length
-      ? courses.map((course, i) =>
-          '<div class="restaurant-course-card">' +
-            '<div class="restaurant-course-photo-drop art-drop" data-course-photo-index="' + i + '"' +
-              (course.photo ? ' title="Click to view in the gallery, or drag an image here to replace it"' : ' title="Drag an image here, or click to browse"') + '>' +
-              (course.photo ? '<img class="art-img" src="' + escapeAttr(course.photo) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
-            '</div>' +
-            '<div class="restaurant-course-card-body">' +
-              '<span class="restaurant-course-num">' + (i + 1) + '</span>' +
-              '<textarea class="restaurant-course-text" data-course-index="' + i + '" placeholder="Course name, notes...">' + escapeHtml(course.text || '') + '</textarea>' +
-              restaurantCourseScoreSelectHtml(course, i) +
-              '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
-            '</div>' +
-          '</div>'
-        ).join('')
+      ? courses.map((course, i) => {
+          const photos = ensureCoursePhotosArray(course);
+          const firstPhoto = photos[0];
+          const countBadgeHtml = photos.length > 1 ? '<span class="restaurant-course-photo-count">' + photos.length + ' photos</span>' : '';
+          return (
+            '<div class="restaurant-course-card">' +
+              '<div class="restaurant-course-photo-drop art-drop" data-course-photo-index="' + i + '"' +
+                (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
+                (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
+                countBadgeHtml +
+                '<button class="restaurant-course-photo-add-btn" type="button" data-add-photo-course-index="' + i + '" title="Add another photo">+</button>' +
+              '</div>' +
+              '<div class="restaurant-course-card-body">' +
+                '<span class="restaurant-course-num">' + (i + 1) + '</span>' +
+                '<textarea class="restaurant-course-text" data-course-index="' + i + '" placeholder="Course name, notes...">' + escapeHtml(course.text || '') + '</textarea>' +
+                restaurantCourseScoreSelectHtml(course, i) +
+                '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('')
       : '<p class="restaurant-course-empty">No courses added yet.</p>';
 
     const otherPhotos = visit.photos || [];
@@ -7752,11 +8142,21 @@
     restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-btn').addEventListener('click', enterVisitEditMode);
 
     // Course photo drop zones — each tap-to-browse/drag-drop uploads (via
-    // Cloudinary when configured, else base64) directly onto that course;
-    // once a photo exists, tapping it opens the same shared gallery every
-    // other restaurant photo uses, positioned at that exact photo.
+    // Cloudinary when configured, else base64) and appends to that course's
+    // photos array; a course can hold any number of photos now, not just
+    // one. Once at least one photo exists, tapping the image itself opens
+    // the same shared gallery every other restaurant photo uses, positioned
+    // at that course's first photo — the explicit "+" button is what adds
+    // more from here, rather than tapping the image doing double duty.
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-drop').forEach(el => {
       const i = Number(el.dataset.coursePhotoIndex);
+      const addPhotoToCourse = (url) => {
+        if (!url) return;
+        updateOpenRestaurant(rest => {
+          const course = getActiveVisit(rest).courses[i];
+          ensureCoursePhotosArray(course).push(url);
+        });
+      };
       el.addEventListener('dragover', (e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
@@ -7768,24 +8168,40 @@
         e.preventDefault();
         el.classList.remove('drag-over');
         const file = e.dataTransfer.files && e.dataTransfer.files[0];
-        const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses');
-        if (url) updateOpenRestaurant(rest => { getActiveVisit(rest).courses[i].photo = url; });
+        addPhotoToCourse(await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses'));
       });
-      el.addEventListener('click', () => {
-        const course = activeVisit.courses[i];
-        if (course.photo){
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.restaurant-course-photo-add-btn')) return; // handled separately below
+        const photos = ensureCoursePhotosArray(activeVisit.courses[i]);
+        if (photos.length){
           const allPhotos = gatherAllRestaurantPhotos(r);
-          openPhotoLightbox(allPhotos, allPhotos.indexOf(course.photo), { restaurantIndex: openRestaurantIndex });
+          openPhotoLightbox(allPhotos, allPhotos.indexOf(photos[0]), { restaurantIndex: openRestaurantIndex });
         } else {
           const input = document.createElement('input');
           input.type = 'file';
           input.accept = 'image/*';
           input.addEventListener('change', async () => {
-            const url = await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses');
-            if (url) updateOpenRestaurant(rest => { getActiveVisit(rest).courses[i].photo = url; });
+            addPhotoToCourse(await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses'));
           });
           input.click();
         }
+      });
+    });
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-add-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // don't also trigger the photo-drop's own click (which would open the gallery instead)
+        const i = Number(btn.dataset.addPhotoCourseIndex);
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.addEventListener('change', async () => {
+          const url = await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses');
+          if (url) updateOpenRestaurant(rest => {
+            const course = getActiveVisit(rest).courses[i];
+            ensureCoursePhotosArray(course).push(url);
+          });
+        });
+        input.click();
       });
     });
 
@@ -7854,6 +8270,8 @@
       });
     }
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text').forEach(textarea => {
+      autoGrowTextarea(textarea); // sizes existing content correctly on render, not just as you type
+      textarea.addEventListener('input', () => autoGrowTextarea(textarea));
       // Saves on blur rather than every keystroke — avoids a storage write
       // per character while still capturing edits promptly once you move on.
       // Quiet (no re-render) — see saveOpenRestaurantQuietly's own comment
