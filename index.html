@@ -1899,6 +1899,29 @@
   .lightbox-cover-toggle-btn.show{ display: block; }
   .lightbox-cover-toggle-btn.is-cover{ background: var(--amber); color: var(--ink); }
 
+  /* Same gating as the cover-toggle button — only appears in restaurant
+     gallery mode, since that's the only current caller with anything
+     meaningful for it to delete from. */
+  .lightbox-delete-btn{
+    display: none;
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(15,33,36,0.72);
+    color: #fff;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 301;
+    align-items: center;
+    justify-content: center;
+  }
+  .lightbox-delete-btn.show{ display: flex; }
+  .lightbox-delete-btn:hover{ background: var(--brick); }
+
   /* ---------- INSIGHTS ---------- */
   .insights-section{
     display: none;
@@ -2759,6 +2782,7 @@
   <button class="lightbox-nav-btn lightbox-next-btn" id="lightbox-next-btn" type="button" title="Next">›</button>
   <span class="lightbox-counter" id="lightbox-counter"></span>
   <button class="lightbox-cover-toggle-btn" id="lightbox-cover-toggle-btn" type="button"></button>
+  <button class="lightbox-delete-btn" id="lightbox-delete-btn" type="button" title="Delete this photo">🗑️</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -2968,6 +2992,7 @@
   const lightboxNextBtn = document.getElementById('lightbox-next-btn');
   const lightboxCounter = document.getElementById('lightbox-counter');
   const lightboxCoverToggleBtn = document.getElementById('lightbox-cover-toggle-btn');
+  const lightboxDeleteBtn = document.getElementById('lightbox-delete-btn');
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
   const topNavAlbumsBtn = document.getElementById('top-nav-albums-btn');
@@ -3997,16 +4022,17 @@
     artLightboxImg.src = src;
     artLightboxOverlay.classList.remove('multi');
     lightboxCoverToggleBtn.classList.remove('show');
+    lightboxDeleteBtn.classList.remove('show');
     artLightboxOverlay.classList.add('show');
   }
 
   // Multi-photo mode (restaurant galleries) — same overlay, same "click
   // anywhere closes" behavior, plus prev/next arrows and a counter that the
   // single-image mode never shows. Navigation wraps around at both ends.
-  // coverContext (optional) adds the "set as cover" toggle — every current
-  // caller is a restaurant gallery, so it's always passed there, but stays
-  // optional here in case a future multi-photo use of this lightbox has no
-  // cover concept at all.
+  // coverContext (optional) adds the "set as cover" toggle and the delete
+  // button — every current caller is a restaurant gallery, so it's always
+  // passed there, but stays optional here in case a future multi-photo use
+  // of this lightbox has no cover/delete concept at all.
   function openPhotoLightbox(photos, startIndex, coverContext){
     if (!photos || !photos.length) return;
     lightboxPhotos = photos;
@@ -4016,6 +4042,7 @@
     artLightboxOverlay.classList.add('multi');
     artLightboxOverlay.classList.add('show');
     lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
+    lightboxDeleteBtn.classList.toggle('show', !!lightboxCoverContext);
     updateLightboxCounter();
     updateLightboxCoverToggle();
   }
@@ -4046,14 +4073,15 @@
     artLightboxOverlay.classList.remove('show');
     artLightboxOverlay.classList.remove('multi');
     lightboxCoverToggleBtn.classList.remove('show');
+    lightboxDeleteBtn.classList.remove('show');
     artLightboxImg.src = '';
     lightboxPhotos = null;
     lightboxCoverContext = null;
   }
   artLightboxOverlay.addEventListener('click', closeArtLightbox);
-  // Arrows (and the cover toggle) need to stop the click from reaching the
-  // overlay's own close handler — otherwise using them would also close
-  // the lightbox.
+  // Arrows (and the cover toggle / delete button) need to stop the click
+  // from reaching the overlay's own close handler — otherwise using them
+  // would also close the lightbox.
   lightboxPrevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(-1); });
   lightboxNextBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(1); });
   lightboxCoverToggleBtn.addEventListener('click', (e) => {
@@ -4067,6 +4095,26 @@
     // one, never a "previous" one to fall back to.
     const newCover = r.coverPhoto === currentUrl ? '' : currentUrl;
     setRestaurantCoverPhoto(idx, newCover);
+    updateLightboxCoverToggle();
+  });
+  lightboxDeleteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!lightboxCoverContext || !lightboxPhotos || !lightboxPhotos.length) return;
+    const idx = lightboxCoverContext.restaurantIndex;
+    const url = lightboxPhotos[lightboxIndex];
+    deleteRestaurantPhoto(idx, url);
+    showToast('Photo deleted');
+
+    const r = restaurantRows[idx];
+    const refreshedPhotos = r ? gatherAllRestaurantPhotos(r) : [];
+    if (!refreshedPhotos.length){
+      closeArtLightbox(); // that was the only photo left
+      return;
+    }
+    lightboxPhotos = refreshedPhotos;
+    lightboxIndex = Math.min(lightboxIndex, refreshedPhotos.length - 1);
+    artLightboxImg.src = refreshedPhotos[lightboxIndex];
+    updateLightboxCounter();
     updateLightboxCoverToggle();
   });
 
@@ -6756,6 +6804,30 @@
   function setRestaurantCoverPhoto(index, dataUrl){
     if (!restaurantRows[index]) return;
     restaurantRows[index].coverPhoto = dataUrl;
+    saveRestaurantProgress();
+    renderRestaurantsPage();
+    if (openRestaurantIndex === index) renderRestaurantDetailsContent();
+  }
+
+  // A single photo URL can be referenced from more than one place at once —
+  // a course's photo that was also picked as the cover, for instance —
+  // since setting a cover just copies the URL rather than moving it. This
+  // clears the URL from every course, every visit's general photos, and the
+  // cover itself, wherever it happens to match, so nothing is left pointing
+  // at a photo that's supposedly been deleted.
+  function deleteRestaurantPhoto(index, url){
+    const r = restaurantRows[index];
+    if (!r || !url) return;
+    const visits = ensureRestaurantVisits(r);
+    visits.forEach(visit => {
+      (visit.courses || []).forEach(course => {
+        if (course.photo === url) course.photo = null;
+      });
+      if (visit.photos){
+        visit.photos = visit.photos.filter(p => p !== url);
+      }
+    });
+    if (r.coverPhoto === url) r.coverPhoto = '';
     saveRestaurantProgress();
     renderRestaurantsPage();
     if (openRestaurantIndex === index) renderRestaurantDetailsContent();
