@@ -271,7 +271,7 @@
 
   .restaurant-photo-grid{
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
     gap: 8px;
   }
   .restaurant-photo-thumb{
@@ -5716,6 +5716,7 @@
       }
       if (parsed && Array.isArray(parsed.items) && parsed.items.length >= 2){
         resumeFromData(parsed);
+        saveProgress(); // persist the import itself — resumeFromData only updates in-memory state, and without this the import is lost on refresh and never reaches Firestore
       } else {
         showToast("That file doesn't look like a valid progress export");
       }
@@ -6985,6 +6986,7 @@
         return;
       }
       resumeSongDataFromSync(parsed);
+      saveSongProgress(); // persist the import itself — see the albums import handler's identical comment
       showToast('Song progress imported — ' + parsed.songItems.length + ' songs');
     };
     reader.onerror = () => showToast('Could not read that file');
@@ -7108,6 +7110,15 @@
     if (openRestaurantIndex === index) renderRestaurantDetailsContent();
   }
 
+  // There's no direct-upload path for covers anymore — a cover is either
+  // explicitly picked via the gallery's "set as cover" toggle, or, absent
+  // that, defaults to the first photo added via a course or More Photos.
+  // gatherAllRestaurantPhotos already puts an explicit r.coverPhoto first
+  // when one is set, so its own first entry is exactly this either way.
+  function getEffectiveRestaurantCover(r){
+    return gatherAllRestaurantPhotos(r)[0] || '';
+  }
+
   // A single photo URL can be referenced from more than one place at once —
   // a course's photo that was also picked as the cover, for instance —
   // since setting a cover just copies the URL rather than moving it. This
@@ -7123,10 +7134,6 @@
         const photos = ensureCoursePhotosArray(course);
         const i = photos.indexOf(url);
         if (i !== -1) photos.splice(i, 1);
-        if (course.drinkPairing && course.drinkPairing.photos){
-          const pi = course.drinkPairing.photos.indexOf(url);
-          if (pi !== -1) course.drinkPairing.photos.splice(pi, 1);
-        }
       });
       if (visit.photos){
         visit.photos = visit.photos.filter(p => p !== url);
@@ -7138,59 +7145,20 @@
     if (openRestaurantIndex === index) renderRestaurantDetailsContent();
   }
 
-  async function handleRestaurantCoverPhotoFile(index, file){
-    const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCovers');
-    if (url) setRestaurantCoverPhoto(index, url);
-  }
-
-  // Grid card — drag-and-drop only, same reasoning as Albums' grid cards:
-  // the whole card is already a click target for opening details, so click-
-  // to-browse would conflict with that rather than complement it.
-  function wireRestaurantCoverPhotoDragOnly(el, index){
-    el.addEventListener('dragover', (e) => {
-      if (!e.dataTransfer.types.includes('Files')) return;
-      e.preventDefault();
-      el.classList.add('drag-over');
-    });
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-    el.addEventListener('drop', (e) => {
-      if (!e.dataTransfer.types.includes('Files')) return;
-      e.preventDefault();
-      el.classList.remove('drag-over');
-      const file = e.dataTransfer.files && e.dataTransfer.files[0];
-      handleRestaurantCoverPhotoFile(index, file);
-    });
-  }
-
-  // Details panel's own cover photo drop zone — click opens the lightbox if
-  // a photo is already set (drag-and-drop still replaces it either way), or
-  // a file picker if not, same conditional-click pattern as Albums' art.
+  // The cover is purely display + click-to-gallery now — no upload path
+  // exists for it at all (see getEffectiveRestaurantCover's own comment).
+  // Clicking always opens the gallery at the effective cover; from there,
+  // the "set as cover" toggle on any photo is the only way to change it.
+  // When there are no photos anywhere yet, there's nothing to open, so the
+  // click does nothing — matching the empty placeholder having nothing to
+  // show either.
   function wireRestaurantCoverPhotoDropZone(el, r, index){
-    el.addEventListener('dragover', (e) => {
-      if (!e.dataTransfer.types.includes('Files')) return;
-      e.preventDefault();
-      el.classList.add('drag-over');
-    });
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-    el.addEventListener('drop', (e) => {
-      if (!e.dataTransfer.types.includes('Files')) return;
-      e.preventDefault();
-      el.classList.remove('drag-over');
-      const file = e.dataTransfer.files && e.dataTransfer.files[0];
-      handleRestaurantCoverPhotoFile(index, file);
-    });
     el.addEventListener('click', () => {
-      if (r.coverPhoto){
-        const allPhotos = gatherAllRestaurantPhotos(r);
-        const startIndex = allPhotos.indexOf(r.coverPhoto);
-        openPhotoLightbox(allPhotos, startIndex === -1 ? 0 : startIndex, { restaurantIndex: index });
-      } else {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.addEventListener('change', () => handleRestaurantCoverPhotoFile(index, input.files[0]));
-        input.click();
-      }
+      const allPhotos = gatherAllRestaurantPhotos(r);
+      if (!allPhotos.length) return;
+      const effectiveCover = getEffectiveRestaurantCover(r);
+      const startIndex = allPhotos.indexOf(effectiveCover);
+      openPhotoLightbox(allPhotos, startIndex === -1 ? 0 : startIndex, { restaurantIndex: index });
     });
   }
 
@@ -7522,12 +7490,13 @@
         const tierBadgeHtml = tier
           ? '<span class="restaurant-gold-card-tier" style="background:' + hexToRgba(tier.color, 0.85) + '; color:' + (tier.key === 'gold' ? 'var(--ink)' : '#fff') + ';">' + tier.name + '</span>'
           : '';
+        const effectiveCover = getEffectiveRestaurantCover(r);
         goldCards.push(
           '<div class="restaurant-gold-card" data-restaurant-index="' + idx + '">' +
             '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
             tierBadgeHtml +
-            (r.coverPhoto
-              ? '<img class="art-img" src="' + escapeAttr(r.coverPhoto) + '" alt="">'
+            (effectiveCover
+              ? '<img class="art-img" src="' + escapeAttr(effectiveCover) + '" alt="">'
               : '<span class="art-drop-hint">📷</span>') +
             '<div class="restaurant-gold-card-overlay">' +
               '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
@@ -7601,7 +7570,6 @@
     Array.from(restaurantGoldGridEl.children).forEach(card => {
       const idx = Number(card.dataset.restaurantIndex);
       card.addEventListener('click', () => openRestaurantDetailsPanel(idx));
-      wireRestaurantCoverPhotoDragOnly(card, idx);
     });
     Array.from(restaurantListEl.children).forEach(li => {
       const idx = Number(li.dataset.restaurantIndex);
@@ -7711,11 +7679,6 @@
         ensureCoursePhotosArray(course).forEach(url => {
           if (url && url !== r.coverPhoto) photos.push(url);
         });
-        if (course.drinkPairing){
-          (course.drinkPairing.photos || []).forEach(url => {
-            if (url && url !== r.coverPhoto) photos.push(url);
-          });
-        }
       });
       (visit.photos || []).forEach(url => {
         if (url && url !== r.coverPhoto) photos.push(url);
@@ -7819,6 +7782,7 @@
     mutatorFn(r);
     saveRestaurantProgress();
     renderRestaurantDetailsContent();
+    renderRestaurantsPage(); // the grid card's cover can default to a course photo now, so it can change here too — not just via an explicit cover set
   }
 
   // Same, but skips the re-render — for edits where the DOM already shows
@@ -7876,19 +7840,10 @@
   function renderDrinkPairingCardHtml(course, courseIndex){
     const pairing = course.drinkPairing;
     if (!pairing) return '';
-    if (!pairing.photos) pairing.photos = [];
-    const firstPhoto = pairing.photos[0];
-    const countBadgeHtml = pairing.photos.length > 1 ? '<span class="restaurant-course-photo-count">' + pairing.photos.length + ' photos</span>' : '';
     return (
       '<div class="restaurant-drink-pairing-wrap">' +
         '<div class="restaurant-drink-pairing-connector"></div>' +
         '<div class="restaurant-course-card restaurant-drink-pairing-card">' +
-          '<div class="restaurant-course-photo-drop" data-pairing-photo-index="' + courseIndex + '"' +
-            (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
-            (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">🍷</span>') +
-            countBadgeHtml +
-            '<button class="restaurant-course-photo-add-btn" type="button" data-add-pairing-photo-index="' + courseIndex + '" title="Add another photo">+</button>' +
-          '</div>' +
           '<div class="restaurant-course-card-body">' +
             '<span class="restaurant-course-num" title="Drink pairing">🍷</span>' +
             '<textarea class="restaurant-course-text" data-pairing-index="' + courseIndex + '" placeholder="Drink, notes...">' + escapeHtml(pairing.text || '') + '</textarea>' +
@@ -7943,7 +7898,7 @@
       '<div class="restaurant-course-list">' + listHtml + '</div>' +
       '<button class="btn-ghost" id="restaurant-course-add-btn" type="button">+ Add Course</button>' +
       '<div class="restaurant-other-photos-section">' +
-        '<span class="restaurant-other-photos-label">Other Photos (menu, sign, etc.)</span>' +
+        '<span class="restaurant-other-photos-label">More Photos</span>' +
         '<div class="restaurant-photo-grid">' +
           otherPhotosGridHtml +
           '<div class="restaurant-photo-add-tile" id="restaurant-other-photo-add-tile" title="Drag an image here, or click to browse">+</div>' +
@@ -8167,10 +8122,11 @@
           '</div>'
         );
 
+    const effectiveCover = getEffectiveRestaurantCover(r);
     restaurantDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
-        '<div class="art-drop restaurant-cover-drop"' + (r.coverPhoto ? ' title="Click to open the photo gallery, or drag an image here to replace the cover"' : ' title="Drag an image here, or click to browse"') + '>' +
-          (r.coverPhoto ? '<img class="art-img" src="' + escapeAttr(r.coverPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
+        '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to open the photo gallery"' : ' title="Add photos via a course or More Photos below"') + '>' +
+          (effectiveCover ? '<img class="art-img" src="' + escapeAttr(effectiveCover) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
         '</div>' +
         (r.website ? '<button class="details-website-btn" type="button" title="Visit website">🌐</button>' : '') +
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
@@ -8398,67 +8354,8 @@
       btn.addEventListener('click', () => {
         const i = Number(btn.dataset.addPairingIndex);
         updateOpenRestaurant(rest => {
-          getActiveVisit(rest).courses[i].drinkPairing = { text: '', score: null, photos: [] };
+          getActiveVisit(rest).courses[i].drinkPairing = { text: '', score: null };
         });
-      });
-    });
-    restaurantDetailsPanelInner.querySelectorAll('[data-pairing-photo-index]').forEach(el => {
-      const i = Number(el.dataset.pairingPhotoIndex);
-      const addPhotoToPairing = (url) => {
-        if (!url) return;
-        updateOpenRestaurant(rest => {
-          const pairing = getActiveVisit(rest).courses[i].drinkPairing;
-          if (!pairing.photos) pairing.photos = [];
-          pairing.photos.push(url);
-        });
-      };
-      el.addEventListener('dragover', (e) => {
-        if (!e.dataTransfer.types.includes('Files')) return;
-        e.preventDefault();
-        el.classList.add('drag-over');
-      });
-      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-      el.addEventListener('drop', async (e) => {
-        if (!e.dataTransfer.types.includes('Files')) return;
-        e.preventDefault();
-        el.classList.remove('drag-over');
-        const file = e.dataTransfer.files && e.dataTransfer.files[0];
-        addPhotoToPairing(await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses'));
-      });
-      el.addEventListener('click', (e) => {
-        if (e.target.closest('.restaurant-course-photo-add-btn')) return; // handled separately below
-        const pairing = activeVisit.courses[i].drinkPairing;
-        const photos = pairing.photos || [];
-        if (photos.length){
-          const allPhotos = gatherAllRestaurantPhotos(r);
-          openPhotoLightbox(allPhotos, allPhotos.indexOf(photos[0]), { restaurantIndex: openRestaurantIndex });
-        } else {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = 'image/*';
-          input.addEventListener('change', async () => {
-            addPhotoToPairing(await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses'));
-          });
-          input.click();
-        }
-      });
-    });
-    restaurantDetailsPanelInner.querySelectorAll('[data-add-pairing-photo-index]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const i = Number(btn.dataset.addPairingPhotoIndex);
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.addEventListener('change', async () => {
-          const url = await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses');
-          if (url) updateOpenRestaurant(rest => {
-            const pairing = getActiveVisit(rest).courses[i].drinkPairing;
-            if (!pairing.photos) pairing.photos = [];
-            pairing.photos.push(url);
-          });
-        });
-        input.click();
       });
     });
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-text[data-pairing-index]').forEach(textarea => {
@@ -8526,10 +8423,12 @@
       const restoredParts = [];
       if (Array.isArray(parsed.items) && parsed.items.length >= 2){
         resumeFromData(parsed);
+        saveProgress(); // persist the import itself — see the individual album import handler's identical comment
         restoredParts.push(parsed.items.length + ' album' + (parsed.items.length === 1 ? '' : 's'));
       }
       if (Array.isArray(parsed.songItems) && parsed.songItems.length >= 2){
         resumeSongDataFromSync(parsed);
+        saveSongProgress(); // same fix, for songs
         restoredParts.push(parsed.songItems.length + ' song' + (parsed.songItems.length === 1 ? '' : 's'));
       }
       if (Array.isArray(parsed.restaurantRows) && parsed.restaurantRows.length){
