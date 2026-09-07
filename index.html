@@ -7763,6 +7763,100 @@
     return course.photos;
   }
 
+  // Parses filenames like "20250811_073318.jpg" (a common phone-camera
+  // convention: YYYYMMDD_HHMMSS) into a date key for grouping into visits
+  // and a full timestamp for ordering courses within one. Returns null for
+  // anything that doesn't match, or that matches the shape but isn't
+  // actually a valid date (e.g. month 13) — JS's Date constructor silently
+  // rolls those over into a different date rather than rejecting them, so
+  // this explicitly checks the constructed date's components match what
+  // was parsed, rather than trusting the constructor alone.
+  function parsePhotoFilenameDateTime(filename){
+    const match = filename.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+    if (!match) return null;
+    const [, year, month, day, hour, minute, second] = match.map(Number);
+    const timestamp = new Date(year, month - 1, day, hour, minute, second);
+    if (timestamp.getFullYear() !== year || timestamp.getMonth() !== month - 1 || timestamp.getDate() !== day){
+      return null;
+    }
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateKey = year + '-' + pad(month) + '-' + pad(day);
+    return { dateKey, timestamp };
+  }
+
+  // Groups by date into one new visit each, one course per photo ordered
+  // earliest-to-latest within that visit — always creates new visits rather
+  // than merging into an existing same-date one, since guessing which
+  // existing visit (if any) a bulk batch belongs to is more likely to
+  // surprise than help; reorganizing after the fact is straightforward.
+  // Uploads sequentially, not in parallel — same reasoning as the existing
+  // Cloudinary art migration: safer against rate limits for a large batch,
+  // even though slower, and each failure (handled by uploadRestaurantPhoto's
+  // own base64 fallback) doesn't stop the rest of the batch.
+  async function handleRestaurantBulkPhotoImport(index, files){
+    const fileArray = Array.from(files);
+    const parsed = [];
+    let skippedCount = 0;
+    fileArray.forEach(file => {
+      const info = parsePhotoFilenameDateTime(file.name);
+      if (info) parsed.push({ file, ...info });
+      else skippedCount++;
+    });
+
+    if (!parsed.length){
+      showToast("None of those filenames matched the expected format, e.g. 20250811_073318.jpg");
+      return;
+    }
+
+    const groups = {};
+    parsed.forEach(p => {
+      if (!groups[p.dateKey]) groups[p.dateKey] = [];
+      groups[p.dateKey].push(p);
+    });
+    Object.values(groups).forEach(group => group.sort((a, b) => a.timestamp - b.timestamp));
+    const dateKeys = Object.keys(groups).sort();
+
+    const btn = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-btn');
+    const originalBtnText = btn ? btn.textContent : '';
+    if (btn) btn.disabled = true;
+    let uploadedCount = 0;
+
+    for (const dateKey of dateKeys){
+      const group = groups[dateKey];
+      const courses = [];
+      for (const item of group){
+        if (btn) btn.textContent = 'Importing… ' + (uploadedCount + 1) + ' / ' + parsed.length;
+        const url = await uploadRestaurantPhoto(item.file, 'RankHeaven/RestaurantCourses');
+        const timeLabel = item.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        courses.push({ text: timeLabel, score: null, photos: url ? [url] : [] });
+        uploadedCount++;
+      }
+      const r = restaurantRows[index];
+      if (!r) break; // restaurant got deleted mid-import — stop rather than writing into nothing
+      const visits = ensureRestaurantVisits(r);
+      visits.push({
+        id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2),
+        date: dateKey,
+        notes: '',
+        courses,
+        photos: []
+      });
+    }
+
+    if (btn){
+      btn.disabled = false;
+      btn.textContent = originalBtnText;
+    }
+    saveRestaurantProgress();
+    renderRestaurantsPage();
+    if (openRestaurantIndex === index) renderRestaurantDetailsContent();
+
+    const summary = 'Created ' + dateKeys.length + ' visit' + (dateKeys.length === 1 ? '' : 's') +
+      ' from ' + parsed.length + ' photo' + (parsed.length === 1 ? '' : 's') +
+      (skippedCount ? (' — ' + skippedCount + ' skipped (unrecognized filename)') : '');
+    showToast(summary);
+  }
+
   function sortedRestaurantVisits(r){
     const visits = ensureRestaurantVisits(r);
     return visits.slice().sort((a, b) => {
@@ -8244,6 +8338,8 @@
           '<div class="restaurant-visits-header">' +
             renderRestaurantVisitTabsHtml(sortedVisits, activeVisit) +
             '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
+            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">📷 Bulk Import Photos</button>' +
+            '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
           '</div>' +
           '<div class="restaurant-visit-content">' +
             renderRestaurantVisitMetaHtml(activeVisit) +
@@ -8254,6 +8350,8 @@
           '<div class="restaurant-visits-header">' +
             '<p class="restaurant-course-empty" style="margin:0;">No visits logged yet.</p>' +
             '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
+            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">📷 Bulk Import Photos</button>' +
+            '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
           '</div>'
         );
 
@@ -8302,6 +8400,15 @@
     // Visit tabs / dropdown / add wiring
     const visitAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-add-btn');
     if (visitAddBtn) visitAddBtn.addEventListener('click', addRestaurantVisit);
+    const bulkImportBtn = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-btn');
+    const bulkImportFile = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-file');
+    if (bulkImportBtn && bulkImportFile){
+      bulkImportBtn.addEventListener('click', () => bulkImportFile.click());
+      bulkImportFile.addEventListener('change', () => {
+        if (bulkImportFile.files.length) handleRestaurantBulkPhotoImport(openRestaurantIndex, bulkImportFile.files);
+        bulkImportFile.value = '';
+      });
+    }
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-visit-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => switchActiveVisit(btn.dataset.visitId));
     });
