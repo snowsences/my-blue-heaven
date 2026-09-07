@@ -1023,6 +1023,22 @@
     font-size: 13px;
     flex-wrap: wrap;
   }
+  .guest-view-toggle-label{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--chalk);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .guest-view-toggle-label input[type="checkbox"]{
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--amber);
+  }
   .dock-import-row{
     display: flex;
     align-items: center;
@@ -2372,6 +2388,65 @@
       padding-bottom: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom, 0px) + 20px);
     }
   }
+
+  /* ---------- GUEST VIEW ---------- */
+  /* See applyGuestViewMode's own comment for the full reasoning — this is
+     the visual half (hiding nav tabs, rank/score/tier indicators, and every
+     editing affordance); the data-safety half lives in the shared mutation
+     functions in JS, since a hidden button doesn't stop a still-listening
+     drop zone. Order in the list/grid is untouched — that's the ranking
+     Guest View still shows, just without the numbers/tiers that spell it
+     out explicitly. */
+  body.guest-view-active #top-nav-albums-btn,
+  body.guest-view-active #top-nav-songs-btn{ display: none; }
+
+  /* Rank/score/tier indicators — restaurant grid + list */
+  body.guest-view-active .restaurant-gold-card-rank,
+  body.guest-view-active .restaurant-gold-card-tier,
+  body.guest-view-active #restaurant-list .rank-num,
+  body.guest-view-active .restaurant-scores-line,
+  body.guest-view-active .tier-chip,
+  body.guest-view-active .tiers-panel,
+  body.guest-view-active .restaurant-heading-actions .btn-ghost[id="restaurant-rearrange-btn"]{ display: none; }
+  /* The tier-driven colored left border on list rows is itself a score
+     indicator (color maps directly to tier) — cleared the same way a tier
+     chip is hidden, rather than leaving a colorless assumption in place. */
+  body.guest-view-active #restaurant-list li{ border-left: none !important; }
+
+  /* Every editing affordance: new/rearrange/edit restaurant, visits,
+     courses, pairings, photos (add/remove/replace), and the bulk importer.
+     Viewing (tabs, dropdown, gallery navigation) is untouched — only
+     controls that create, remove, or modify something are hidden. */
+  body.guest-view-active #restaurant-new-btn,
+  body.guest-view-active #restaurant-rearrange-btn,
+  body.guest-view-active .details-edit-btn,
+  body.guest-view-active .restaurant-visit-add-btn,
+  body.guest-view-active .restaurant-bulk-import-btn,
+  body.guest-view-active #restaurant-visit-edit-btn,
+  body.guest-view-active .restaurant-course-add-btn,
+  body.guest-view-active .restaurant-course-remove-btn,
+  body.guest-view-active .restaurant-course-pairing-btn,
+  body.guest-view-active .restaurant-course-photo-add-btn,
+  body.guest-view-active .restaurant-photo-add-tile,
+  body.guest-view-active .restaurant-photo-remove-btn,
+  body.guest-view-active .lightbox-cover-toggle-btn,
+  body.guest-view-active .lightbox-delete-btn{ display: none !important; }
+  /* Course/pairing text and score selects, and the cover/course/pairing
+     photo drop zones themselves — read-only, not just their buttons hidden.
+     pointer-events:none stops both click-to-upload and drag-drop; the
+     inputs are also genuinely disabled so no stray keystroke could edit
+     text even if focus landed there some other way. */
+  body.guest-view-active .restaurant-course-text,
+  body.guest-view-active .restaurant-score-select{ pointer-events: none; }
+  /* Both drop zones keep pointer-events so clicking still opens the
+     gallery to VIEW existing photos (a read action) — the actual upload
+     paths (click-when-empty, drag-drop) are blocked precisely in JS instead
+     of here, since a single click handler on each serves both behaviors
+     and CSS can't distinguish between them. */
+  body.guest-view-active .restaurant-cover-drop,
+  body.guest-view-active .restaurant-course-photo-drop{ cursor: default; }
+  body.guest-view-active .restaurant-cover-drop img,
+  body.guest-view-active .restaurant-course-photo-drop img{ cursor: pointer; }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
@@ -2789,6 +2864,17 @@
     <div class="page-content">
       <p class="eyebrow">Settings</p>
       <h1>Settings</h1>
+
+      <div class="settings-section">
+        <h2 class="settings-section-title">Guest View</h2>
+        <div class="import-row">
+          <span>Hides Albums &amp; Songs, strips restaurant rankings/scores down to order-only, and disables all editing — for sharing this device or account with a guest</span>
+          <label class="guest-view-toggle-label">
+            <input type="checkbox" id="guest-view-toggle">
+            Enable Guest View
+          </label>
+        </div>
+      </div>
 
       <div class="settings-section">
         <h2 class="settings-section-title">Full Backup</h2>
@@ -3262,6 +3348,49 @@
   let lastfmUsername = '';
   const lastfmCache = {}; // "artist|||album" -> parsed result object, or null for "not found" — in-memory only, resets each session
   let lastfmRequestId = 0; // bumped on every new fetch; a resolving fetch discards itself if a newer one has since started
+
+  // ---------- GUEST VIEW ----------
+  // A read-only, no-scores mode meant for sharing this device/account with
+  // someone else — hides Albums/Songs entirely (Restaurants + Settings
+  // only), strips rank numbers/scores/tier badges from restaurants (order
+  // alone still reflects the ranking), and blocks editing. Driven by one
+  // body class so CSS handles the visual hiding in one place rather than
+  // scattering conditionals through every render function; actual data
+  // safety is separately enforced in the shared mutation functions
+  // (updateOpenRestaurant, saveOpenRestaurantQuietly, deleteRestaurantPhoto,
+  // setRestaurantCoverPhoto) themselves, since hiding a button doesn't stop
+  // e.g. a drag-drop onto a still-listening drop zone.
+  const GUEST_VIEW_STORAGE_KEY = 'guest-view-enabled';
+  let guestViewEnabled = false;
+
+  async function loadGuestViewSetting(){
+    try{
+      const res = await window.storage.get(GUEST_VIEW_STORAGE_KEY, false);
+      guestViewEnabled = !!(res && res.value === 'true');
+    }catch(e){ guestViewEnabled = false; }
+    applyGuestViewMode();
+  }
+
+  async function saveGuestViewSetting(){
+    try{ await window.storage.set(GUEST_VIEW_STORAGE_KEY, String(guestViewEnabled), false); }catch(e){ /* best effort */ }
+  }
+
+  function applyGuestViewMode(){
+    document.body.classList.toggle('guest-view-active', guestViewEnabled);
+    const guestViewToggle = document.getElementById('guest-view-toggle');
+    if (guestViewToggle) guestViewToggle.checked = guestViewEnabled;
+    if (guestViewEnabled){
+      // Albums/Songs aren't just visually hidden — if either is the
+      // currently active page when this turns on, jump to Restaurants so
+      // there's nothing left showing that Guest View is supposed to hide.
+      const activeTopPage = document.querySelector('.top-page.active');
+      if (activeTopPage && (activeTopPage.id === 'page-albums' || activeTopPage.id === 'page-songs')){
+        switchTopPage('restaurants');
+      }
+    }
+    renderRestaurantsPage();
+    if (openRestaurantIndex !== null) renderRestaurantDetailsContent();
+  }
 
   let loadingDock = []; // raw items marked "need to listen again" — parked outside the main ranking entirely
 
@@ -3884,6 +4013,15 @@
       showToast("Couldn't read that image");
       return null;
     }
+  }
+
+  const guestViewToggleEl = document.getElementById('guest-view-toggle');
+  if (guestViewToggleEl){
+    guestViewToggleEl.addEventListener('change', () => {
+      guestViewEnabled = guestViewToggleEl.checked;
+      saveGuestViewSetting();
+      applyGuestViewMode();
+    });
   }
 
   cloudinaryMigrateBtn.addEventListener('click', async () => {
@@ -7238,6 +7376,7 @@
   // click-to-browse when empty and opens the lightbox once a photo exists,
   // exactly like Albums' details-panel art.
   function setRestaurantCoverPhoto(index, dataUrl){
+    if (guestViewEnabled) return;
     if (!restaurantRows[index]) return;
     restaurantRows[index].coverPhoto = dataUrl;
     saveRestaurantProgress();
@@ -7261,6 +7400,7 @@
   // cover itself, wherever it happens to match, so nothing is left pointing
   // at a photo that's supposedly been deleted.
   function deleteRestaurantPhoto(index, url){
+    if (guestViewEnabled) return;
     const r = restaurantRows[index];
     if (!r || !url) return;
     const visits = ensureRestaurantVisits(r);
@@ -8006,6 +8146,7 @@
   // behind it (so e.g. a course count or photo would stay in sync if the
   // list ever shows one).
   function updateOpenRestaurant(mutatorFn){
+    if (guestViewEnabled) return;
     if (openRestaurantIndex === null) return;
     const r = restaurantRows[openRestaurantIndex];
     mutatorFn(r);
@@ -8024,6 +8165,7 @@
   // element that no longer exists, silently doing nothing, and needing a
   // second click on the (now real) button to actually register.
   function saveOpenRestaurantQuietly(mutatorFn){
+    if (guestViewEnabled) return;
     if (openRestaurantIndex === null) return;
     const r = restaurantRows[openRestaurantIndex];
     mutatorFn(r);
@@ -8463,7 +8605,7 @@
         if (photos.length){
           const allPhotos = gatherAllRestaurantPhotos(r);
           openPhotoLightbox(allPhotos, allPhotos.indexOf(photos[0]), { restaurantIndex: openRestaurantIndex });
-        } else {
+        } else if (!guestViewEnabled){
           const input = document.createElement('input');
           input.type = 'file';
           input.accept = 'image/*';
@@ -8497,13 +8639,32 @@
     // opening the same shared gallery on click.
     const otherPhotoAddTile = restaurantDetailsPanelInner.querySelector('#restaurant-other-photo-add-tile');
     if (otherPhotoAddTile){
-      const addOtherPhotoFile = async (file) => {
-        const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantVisitPhotos');
-        if (url) updateOpenRestaurant(rest => {
-          const visit = getActiveVisit(rest);
-          if (!visit.photos) visit.photos = [];
-          visit.photos.push(url);
-        });
+      // Sequential, not parallel — same reasoning as the bulk visit import
+      // and the Cloudinary art migration: safer against rate limits for a
+      // handful of photos at once, and each upload failure (handled by
+      // uploadRestaurantPhoto's own base64 fallback) doesn't block the rest.
+      const addOtherPhotoFiles = async (files) => {
+        const fileArray = Array.from(files || []).filter(f => f);
+        if (!fileArray.length) return;
+        const originalText = otherPhotoAddTile.textContent;
+        const uploadedUrls = [];
+        for (let i = 0; i < fileArray.length; i++){
+          if (fileArray.length > 1) otherPhotoAddTile.textContent = (i + 1) + '/' + fileArray.length;
+          const url = await uploadRestaurantPhoto(fileArray[i], 'RankHeaven/RestaurantVisitPhotos');
+          if (url) uploadedUrls.push(url);
+        }
+        otherPhotoAddTile.textContent = originalText;
+        // One single update at the end, not one per photo — updateOpenRestaurant
+        // re-renders the whole panel each time, which would otherwise replace
+        // this tile with a fresh DOM node mid-loop and silently stop the
+        // progress text above from updating on the (now-detached) original.
+        if (uploadedUrls.length){
+          updateOpenRestaurant(rest => {
+            const visit = getActiveVisit(rest);
+            if (!visit.photos) visit.photos = [];
+            visit.photos.push(...uploadedUrls);
+          });
+        }
       };
       otherPhotoAddTile.addEventListener('dragover', (e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
@@ -8515,13 +8676,14 @@
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
         otherPhotoAddTile.classList.remove('drag-over');
-        addOtherPhotoFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+        addOtherPhotoFiles(e.dataTransfer.files);
       });
       otherPhotoAddTile.addEventListener('click', () => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
-        input.addEventListener('change', () => addOtherPhotoFile(input.files[0]));
+        input.multiple = true;
+        input.addEventListener('change', () => addOtherPhotoFiles(input.files));
         input.click();
       });
     }
@@ -8693,6 +8855,7 @@
   updateCount();
   loadLastfmConfig();
   loadMusicbeeLibrary();
+  loadGuestViewSetting();
   loadPointsAlgorithm().then(checkSavedProgress);
 })();
 </script>
