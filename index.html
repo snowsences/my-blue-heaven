@@ -1755,7 +1755,13 @@
     flex-wrap: wrap;
     margin-bottom: 16px;
     position: sticky;
-    top: 12px;
+    /* The fixed desktop nav (64px tall, z-index 100) sits on top of the
+       same space a plain top:12px would stick to — this clears it,
+       stopping just below the nav instead of hidden underneath it. Only
+       relevant on desktop, where the nav is fixed to the top at all; the
+       mobile override further down (where the nav moves to the bottom
+       instead) reverts this back to a plain 12px. */
+    top: calc(var(--desktop-nav-height) + 12px);
     z-index: 10;
     background: var(--panel);
     border: 1px solid var(--panel-line);
@@ -1770,6 +1776,28 @@
     flex-wrap: wrap;
   }
   .reorder-hint{ font-size: 12px; color: var(--chalk-dim); }
+
+  /* Songs' own explicit copy of .reorder-bar's sticky rule, rather than
+     relying on the shared class alone — Songs' content sits in a genuinely
+     different container tree than Albums' (outside #page-shell entirely,
+     in its own #page-songs), so this removes any doubt about whether some
+     subtle difference between those two trees could affect the shared
+     rule's behavior for one but not the other. */
+  #song-reorder-bar{
+    display: none;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    position: sticky;
+    top: calc(var(--desktop-nav-height) + 12px); /* see .reorder-bar's identical comment above */
+    z-index: 10;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 999px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+  }
 
   .rank-edit-input{
     flex: 1;
@@ -2211,6 +2239,11 @@
        this guards against any stray horizontal scroll on the shell itself.
     */
     #page-shell{ overflow-x: hidden; }
+    /* The nav moves to the bottom on mobile (further down this block) — the
+       top of the viewport is clear here, unlike on desktop, so this reverts
+       both reorder bars back to a plain 12px rather than clearing a fixed
+       top nav that isn't there. */
+    .reorder-bar, #song-reorder-bar{ top: 12px; }
     #details-panel{
       position: fixed;
       inset: 0;
