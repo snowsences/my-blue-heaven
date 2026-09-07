@@ -2447,6 +2447,13 @@
   body.guest-view-active .restaurant-course-photo-drop{ cursor: default; }
   body.guest-view-active .restaurant-cover-drop img,
   body.guest-view-active .restaurant-course-photo-drop img{ cursor: pointer; }
+
+  /* One specific, hard-coded Google account (see LOCKED_GUEST_EMAIL) — on
+     top of everything guest-view-active already hides (this account always
+     has that set too, forced on sign-in), this additionally removes their
+     only path to the Settings tab, where the Guest View toggle itself
+     lives — so there's no way for this account to ever turn it back off. */
+  body.locked-guest-account #top-nav-settings-btn{ display: none; }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
@@ -3368,6 +3375,12 @@
       const res = await window.storage.get(GUEST_VIEW_STORAGE_KEY, false);
       guestViewEnabled = !!(res && res.value === 'true');
     }catch(e){ guestViewEnabled = false; }
+    // The locked guest account's forced-on state always wins over whatever
+    // happens to be in local storage — this and the auth callback that sets
+    // isLockedGuestAccount are both async and race against each other, so
+    // whichever finishes last has to independently re-assert this rather
+    // than risk one silently overwriting the other.
+    if (isLockedGuestAccount) guestViewEnabled = true;
     applyGuestViewMode();
   }
 
@@ -3667,12 +3680,36 @@
     if (hasCurrentData) writeFirestoreData();
   }
 
+  // This specific Google account is permanently locked into Guest View —
+  // no toggle, no Settings tab, no way back. Distinct from the general
+  // Guest View toggle above (which the owner can freely flip on/off): this
+  // check overrides that entirely for one hard-coded account, regardless of
+  // whatever this device's own local Guest View setting happens to be.
+  const LOCKED_GUEST_EMAIL = 'meganec96@gmail.com';
+  let isLockedGuestAccount = false;
+
   function initFirebaseSync(){
     const fb = window.__firebase;
     if (!fb) return;
     fb.onAuthStateChanged(fb.auth, async (user) => {
       firebaseUser = user;
       updateFirebaseUI();
+      isLockedGuestAccount = !!(user && user.email === LOCKED_GUEST_EMAIL);
+      document.body.classList.toggle('locked-guest-account', isLockedGuestAccount);
+      if (isLockedGuestAccount){
+        // Sets state and the body class directly, WITHOUT calling
+        // applyGuestViewMode's full re-render — this callback can fire
+        // before restaurantRows' own declaration has executed later in the
+        // script (a real crash caught in testing), so it can't safely call
+        // renderRestaurantsPage this early. The normal startup flow
+        // (checkSavedProgress, or whenever Restaurants is first opened)
+        // renders correctly regardless, since guestViewEnabled is already
+        // true by the time any of that actually runs.
+        guestViewEnabled = true;
+        document.body.classList.add('guest-view-active');
+        const guestViewToggle = document.getElementById('guest-view-toggle');
+        if (guestViewToggle) guestViewToggle.checked = true;
+      }
       if (user){
         await localDataReadyPromise; // see this promise's own comment — avoids racing checkSavedProgress
         await loadOrSeedFirestoreData();
@@ -5543,6 +5580,10 @@
   // it (its own internal state, screen, and scroll position are untouched
   // underneath), and closes the details panel since it's Albums-specific.
   function switchTopPage(page){
+    // Defense in depth alongside the CSS-hidden Settings button itself —
+    // this account never lands on Settings regardless of how 'settings'
+    // got passed in.
+    if (isLockedGuestAccount && page === 'settings') page = 'restaurants';
     const showAlbums = page === 'albums';
     const showSongs = page === 'songs';
     const showRestaurants = page === 'restaurants';
