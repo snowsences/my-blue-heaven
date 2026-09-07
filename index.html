@@ -234,6 +234,32 @@
     z-index: 2;
   }
   .details-close-btn:hover{ background: var(--brick); color: #fff; }
+  /* Mobile-only paging between albums, since that's specifically where the
+     list isn't visible alongside the tray to tap a different one directly —
+     on desktop the list is right there, so these stay hidden. Wraps around
+     at the ends rather than stopping, matching the photo lightbox's own
+     nav-arrow convention elsewhere in this app. */
+  .details-panel-nav-btn{
+    display: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(15,33,36,0.72);
+    color: #fff;
+    border: none;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+  .details-panel-nav-btn:hover{ background: var(--brick); color: #fff; }
+  .details-panel-prev-btn{ left: 12px; }
+  .details-panel-next-btn{ right: 12px; }
   .details-art-wrap .art-drop{
     width: 100%;
     height: auto;
@@ -2202,6 +2228,11 @@
       visibility: visible;
     }
     .details-panel-inner{ width: 100%; }
+    /* This is specifically the width where the list isn't visible alongside
+       the tray (see this block's own comment above) — the whole reason
+       paging between albums via these buttons is useful here and not on
+       desktop, where the list is right there to tap a different one. */
+    .details-panel-nav-btn{ display: flex; }
 
     #restaurant-details-panel{
       position: fixed;
@@ -3418,16 +3449,33 @@
       return;
     }
 
+    // Applying newer remote data has to persist to local storage AND update
+    // the local *Timestamp variable to match — not just update in-memory
+    // state. Without this, the moment this device reloads again (even
+    // before Firestore sync re-runs), checkSavedProgress reads local
+    // storage first and reverts straight back to the stale copy — and
+    // worse, this function's own unconditional push below would then write
+    // that stale timestamp back over Firestore's genuinely newer one,
+    // corrupting the one signal every other device relies on to know which
+    // copy is actually current. This is almost certainly why a device with
+    // an old, partial local copy can make a fully-synced ranking appear to
+    // "reset" after a refresh.
     if (Array.isArray(existing.items) && existing.items.length >= 2){
       const remoteTime = new Date(existing.savedAt || 0).getTime();
       const localTime = new Date(lastSavedAt || 0).getTime();
-      if (remoteTime > localTime) resumeFromData(existing);
+      if (remoteTime > localTime){
+        resumeFromData(existing);
+        lastSavedAt = existing.savedAt || null;
+        try{ await window.storage.set(STORAGE_KEY, JSON.stringify({ items, history, isComplete, finalRanking, loadingDock, savedAt: lastSavedAt }), false); }catch(e){ /* best effort */ }
+      }
     }
     if (Array.isArray(existing.songItems) && existing.songItems.length >= 2){
       const remoteTime = new Date(existing.songSavedAt || 0).getTime();
       const localTime = new Date(songLastSavedAt || 0).getTime();
       if (remoteTime > localTime){
         resumeSongDataFromSync({ songItems: existing.songItems, songHistory: existing.songHistory, songIsComplete: existing.songIsComplete, songFinalRanking: existing.songFinalRanking });
+        songLastSavedAt = existing.songSavedAt || null;
+        try{ await window.storage.set(SONG_STORAGE_KEY, JSON.stringify({ songItems, songHistory, songIsComplete, songFinalRanking, savedAt: songLastSavedAt }), false); }catch(e){ /* best effort */ }
       }
     }
     if (Array.isArray(existing.restaurantRows) && existing.restaurantRows.length >= 1){
@@ -3435,6 +3483,8 @@
       const localTime = new Date(restaurantLastSavedAt || 0).getTime();
       if (remoteTime > localTime){
         restaurantRows = existing.restaurantRows;
+        restaurantLastSavedAt = existing.restaurantSavedAt || null;
+        try{ await window.storage.set(RESTAURANT_STORAGE_KEY, JSON.stringify({ restaurantRows, savedAt: restaurantLastSavedAt }), false); }catch(e){ /* best effort */ }
         renderRestaurantsPage();
       }
     }
@@ -5289,6 +5339,34 @@
     renderResultsTab();
   }
 
+  // Mirrors the exact filter condition used in renderResultsTab's own grid
+  // and list render loops — kept as its own function rather than reusing
+  // rendered DOM order, since paging needs this independent of which view
+  // (grid or list) is currently showing, or whether the panel is even open.
+  function getVisibleAlbumRanking(){
+    const activeYearFilter = editMode ? '' : yearFilter;
+    const activeArtistFilter = editMode ? '' : artistFilter;
+    const activeGroupingFilter = editMode ? '' : groupingFilter;
+    return displayedRanking.filter(item => {
+      const p = parseEntry(item);
+      const itemGrouping = p.artist ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
+      return !((activeYearFilter && p.year !== activeYearFilter) || (activeArtistFilter && p.artist !== activeArtistFilter) || (activeGroupingFilter && itemGrouping !== activeGroupingFilter));
+    });
+  }
+
+  // Mobile-only paging between albums (see the paging buttons' own CSS
+  // comment for why). Wraps at the ends — same convention as the photo
+  // lightbox's own prev/next, rather than stopping and disabling at the
+  // first/last item.
+  function navigateDetailsPanel(direction){
+    const visible = getVisibleAlbumRanking();
+    if (visible.length < 2) return;
+    const currentIndex = visible.indexOf(selectedItem);
+    if (currentIndex === -1) return;
+    const newIndex = (currentIndex + direction + visible.length) % visible.length;
+    openDetailsPanel(visible[newIndex]);
+  }
+
   // Top-level navigation (Albums / Settings), independent of anything
   // happening inside either page — switching away from Albums just hides
   // it (its own internal state, screen, and scroll position are untouched
@@ -5376,9 +5454,13 @@
     }
 
     const hasArt = !!artCache[item];
+    const visibleForPaging = getVisibleAlbumRanking();
+    const showPagingBtns = visibleForPaging.length > 1 && visibleForPaging.includes(item);
     detailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
         artDropZoneHtml(item, 'details-art') +
+        (showPagingBtns ? '<button class="details-panel-nav-btn details-panel-prev-btn" type="button" title="Previous">‹</button>' : '') +
+        (showPagingBtns ? '<button class="details-panel-nav-btn details-panel-next-btn" type="button" title="Next">›</button>' : '') +
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
       '</div>' +
       '<div class="details-content">' +
@@ -5395,6 +5477,10 @@
       '</div>';
 
     detailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeDetailsPanel);
+    const detailsPrevBtn = detailsPanelInner.querySelector('.details-panel-prev-btn');
+    const detailsNextBtn = detailsPanelInner.querySelector('.details-panel-next-btn');
+    if (detailsPrevBtn) detailsPrevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateDetailsPanel(-1); });
+    if (detailsNextBtn) detailsNextBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateDetailsPanel(1); });
     // When art already exists, clicking it opens the lightbox instead of the
     // file picker — disableClickToBrowse=true skips wiring that click (drag
     // ­-and-drop replace still works either way), and a separate click
