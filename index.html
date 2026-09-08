@@ -29,6 +29,7 @@
     --amber: #E8A33D;
     --amber-dark: #C6821F;
     --brick: #C8593F;
+    --green: #5FBF77;
     --radius: 18px;
     --desktop-nav-height: 64px;
   }
@@ -580,6 +581,14 @@
     font-size: 18px;
     font-weight: 700;
     color: var(--amber);
+    line-height: 1;
+    padding: 4px 6px;
+  }
+  .restaurant-score-price-value{
+    font-family: 'Figtree', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
     line-height: 1;
     padding: 4px 6px;
   }
@@ -1388,13 +1397,13 @@
   .restaurant-gold-grid{
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 12px;
+    gap: 2px;
     margin-bottom: 28px;
   }
   .restaurant-gold-card{
     position: relative;
     aspect-ratio: 1 / 1;
-    border-radius: 10px;
+    border-radius: 4px;
     overflow: hidden;
     cursor: pointer;
     background: var(--bg-2);
@@ -8337,6 +8346,12 @@
           '<span class="restaurant-score-label">Total</span>' +
           '<span class="restaurant-score-total-value" id="restaurant-score-total-value"></span>' +
         '</div>' +
+        (r.price ? (
+          '<div class="restaurant-score-block">' +
+            '<span class="restaurant-score-label">Price</span>' +
+            '<span class="restaurant-score-price-value">' + escapeHtml(r.price) + '</span>' +
+          '</div>'
+        ) : '') +
       '</div>'
     );
   }
@@ -8510,6 +8525,10 @@
     const rank = openRestaurantIndex + 1;
     const starsCount = restaurantStarsCount(r);
     const starsHtml = starsCount > 0 ? ' <span class="restaurant-stars">' + '⭐'.repeat(starsCount) + '</span>' : '';
+    const { visits: visitCount } = parseRestaurantNotes(r.notes);
+    const visitsHtml = visitCount >= 2
+      ? ' <span class="restaurant-visits" title="Visited ' + visitCount + ' times">×' + visitCount + '</span>'
+      : '';
     const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
 
     const sortedVisits = sortedRestaurantVisits(r);
@@ -8549,7 +8568,7 @@
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
       '</div>' +
       '<div class="details-content" style="padding-top:20px;">' +
-        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + starsHtml + '</h2>' +
+        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
         (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
         renderRestaurantScoresRowHtml(r) +
       '</div>' +
