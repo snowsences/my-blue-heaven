@@ -483,31 +483,6 @@
     justify-content: center;
   }
   .restaurant-course-photo-add-btn:hover{ background: var(--amber); color: var(--ink); }
-  /* Favorite toggle — same size/shape/inset convention as the add-photo
-     button above (26px circle, 8px inset), just top-right instead of
-     bottom-right. Unfilled (☆) at 60% white when not favorited, filled (★)
-     yellow when it is — matches the ☆/★ pattern already used for the
-     gallery's own cover-photo toggle elsewhere in this app. */
-  .restaurant-course-favorite-btn{
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 1;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: rgba(15,33,36,0.72);
-    border: none;
-    font-size: 15px;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255,255,255,0.6);
-  }
-  .restaurant-course-favorite-btn:hover{ background: rgba(15,33,36,0.9); }
-  .restaurant-course-favorite-btn.is-favorite{ color: #FFD700; }
   .restaurant-course-card-body{
     display: flex;
     align-items: flex-start;
@@ -1939,8 +1914,8 @@
   }
   .row-remove-btn:hover{ background: var(--brick); color: #fff; }
   /* Dishes' edit-mode equivalent of .row-remove-btn — same size/shape, but
-     a star (removing simply unfavorites the underlying course, never
-     deletes anything) rather than an X. */
+     a star (removing simply clears the course's score below 12/10, so it
+     drops out of Dishes — never deletes anything) rather than an X. */
   .dish-unfavorite-btn{
     width: 26px;
     height: 26px;
@@ -2542,7 +2517,6 @@
   body.guest-view-active .restaurant-course-remove-btn,
   body.guest-view-active .restaurant-course-pairing-btn,
   body.guest-view-active .restaurant-course-photo-add-btn,
-  body.guest-view-active .restaurant-course-favorite-btn,
   body.guest-view-active .restaurant-photo-add-tile,
   body.guest-view-active .restaurant-photo-remove-btn,
   body.guest-view-active .lightbox-cover-toggle-btn,
@@ -2990,12 +2964,12 @@
         <div class="reorder-edit-controls" id="dish-reorder-edit-controls">
           <button class="btn-primary" id="dish-reorder-save-btn" type="button">Save Changes</button>
           <button class="btn-ghost" id="dish-reorder-cancel-btn" type="button">Cancel</button>
-          <span class="reorder-hint">Type a position number to reorder, edit comments, or tap the star to unfavorite.</span>
+          <span class="reorder-hint">Type a position number to reorder, edit comments, or tap the star to remove.</span>
         </div>
       </div>
 
       <ol class="results-list grid-mode" id="dish-results-list"></ol>
-      <p class="restaurant-course-empty" id="dish-empty-message" style="display:none;">No favorited dishes yet — star a course from a restaurant's details tray to add it here.</p>
+      <p class="restaurant-course-empty" id="dish-empty-message" style="display:none;">No dishes yet — score a course 12/10 from a restaurant's details tray to add it here.</p>
     </div>
   </div>
 
@@ -8039,11 +8013,11 @@
   }
 
   // ---------- DISHES ----------
-  // A dish is simply a favorited course — nothing here has its own copy of
-  // the photo/text/score; all of that is read live from the actual course
-  // object living inside its restaurant's visit, so editing it from either
-  // Dishes or Restaurants stays in sync automatically. The only thing that
-  // belongs to Dishes itself is the manual display order.
+  // A dish is simply a course scored 12/10 — nothing here has its own copy
+  // of the photo/text/score; all of that is read live from the actual
+  // course object living inside its restaurant's visit, so editing it from
+  // either Dishes or Restaurants stays in sync automatically. The only
+  // thing that belongs to Dishes itself is the manual display order.
   const DISH_STORAGE_KEY = 'dish-order';
   let dishOrder = []; // array of course ids, in manually-set display order
   let dishEditMode = false;
@@ -8056,13 +8030,17 @@
     return course.id;
   }
 
+  // A "dish" is any course scored the maximum 12/10 — no separate favorite
+  // flag; scoring is already how a course's quality gets recorded, so
+  // reusing that as the Dishes criterion means there's nothing new to keep
+  // in sync. Select values are always strings, hence '12' not 12.
   function getAllFavoritedDishes(){
     const dishes = [];
     restaurantRows.forEach((r, restaurantIndex) => {
       const visits = ensureRestaurantVisits(r);
       visits.forEach(visit => {
         (visit.courses || []).forEach((course, courseIndex) => {
-          if (course.favorite){
+          if (course.score === '12'){
             dishes.push({ id: ensureCourseId(course), course, restaurant: r, restaurantIndex, visit, courseIndex });
           }
         });
@@ -8071,10 +8049,10 @@
     return dishes;
   }
 
-  // Layers the manual order on top of whatever's currently favorited —
-  // newly-favorited dishes not yet in dishOrder are appended at the end;
-  // dishOrder entries for since-unfavorited courses are just skipped, not
-  // actively pruned from storage (harmless leftovers, cheaper than
+  // Layers the manual order on top of whatever's currently scored 12/10 —
+  // newly-qualifying dishes not yet in dishOrder are appended at the end;
+  // dishOrder entries for courses that no longer qualify are just skipped,
+  // not actively pruned from storage (harmless leftovers, cheaper than
   // rewriting dishOrder on every render to drop a few stale ids).
   function getOrderedDishes(){
     const all = getAllFavoritedDishes();
@@ -8142,7 +8120,7 @@
         li.dataset.dishId = d.id;
         const numHtml = '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">';
         const textHtml = '<input type="text" class="rank-edit-input" value="' + escapeAttr(d.course.text || '') + '">';
-        const starHtml = '<button class="dish-unfavorite-btn" type="button" title="Remove from favorites">★</button>';
+        const starHtml = '<button class="dish-unfavorite-btn" type="button" title="Remove from Dishes">★</button>';
         li.innerHTML = dishPhotoHtml(d.course) + numHtml + '<span class="rank-item">' + textHtml + '</span>' + starHtml;
         dishResultsList.appendChild(li);
         li.querySelector('.dish-unfavorite-btn').addEventListener('click', () => li.remove());
@@ -8226,15 +8204,17 @@
     });
     // Present when edit mode opened, but no longer among the rows — that's
     // exactly the "starred off" case (the row was removed, not the course).
+    // Clears the score itself, since that's what determines Dishes
+    // membership now — there's no separate flag to toggle off anymore.
     Object.keys(dishEditModeSnapshot).forEach(id => {
       if (!stillPresentIds.has(id)){
-        dishEditModeSnapshot[id].course.favorite = false;
+        dishEditModeSnapshot[id].course.score = null;
       }
     });
     dishOrder = newOrder;
     dishEditMode = false;
     saveDishOrder();
-    saveRestaurantProgress(); // persists the comment edits and unfavorite flags, which live on the actual restaurant/course data
+    saveRestaurantProgress(); // persists the comment edits and score changes, which live on the actual restaurant/course data
     renderDishesPage();
     renderRestaurantsPage(); // reflects any unfavorite in the restaurant grid/list too
     if (openRestaurantIndex !== null) renderRestaurantDetailsContent(); // and in an open details tray, if one of its courses was unfavorited
@@ -8578,14 +8558,12 @@
           const pairingBtnHtml = course.drinkPairing
             ? ''
             : '<button class="restaurant-course-pairing-btn" type="button" data-add-pairing-index="' + i + '" title="Add a drink pairing">🍷</button>';
-          const favoriteBtnHtml = '<button class="restaurant-course-favorite-btn' + (course.favorite ? ' is-favorite' : '') + '" type="button" data-favorite-course-index="' + i + '" title="' + (course.favorite ? 'Remove from favorites' : 'Add to favorites') + '">' + (course.favorite ? '★' : '☆') + '</button>';
           return (
             '<div class="restaurant-course-card">' +
               '<div class="restaurant-course-photo-drop" data-course-photo-index="' + i + '"' +
                 (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
                 (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
                 countBadgeHtml +
-                favoriteBtnHtml +
                 '<button class="restaurant-course-photo-add-btn" type="button" data-add-photo-course-index="' + i + '" title="Add another photo">+</button>' +
               '</div>' +
               '<div class="restaurant-course-card-body">' +
@@ -8967,7 +8945,6 @@
       });
       el.addEventListener('click', (e) => {
         if (e.target.closest('.restaurant-course-photo-add-btn')) return; // handled separately below
-        if (e.target.closest('.restaurant-course-favorite-btn')) return; // handled separately below
         const photos = ensureCoursePhotosArray(activeVisit.courses[i]);
         if (photos.length){
           const allPhotos = gatherAllRestaurantPhotos(r);
@@ -9005,21 +8982,6 @@
           }
         });
         input.click();
-      });
-    });
-    // Quiet update (direct DOM toggle, no full re-render) — same reasoning
-    // as the score select's own handler: the click itself already shows the
-    // new state correctly, so rebuilding the panel would serve no purpose.
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-favorite-btn[data-favorite-course-index]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation(); // don't also trigger the photo-drop's own click
-        if (guestViewEnabled) return;
-        const i = Number(btn.dataset.favoriteCourseIndex);
-        const newState = !activeVisit.courses[i].favorite;
-        btn.classList.toggle('is-favorite', newState);
-        btn.textContent = newState ? '★' : '☆';
-        btn.title = newState ? 'Remove from favorites' : 'Add to favorites';
-        saveOpenRestaurantQuietly(rest => { getActiveVisit(rest).courses[i].favorite = newState; });
       });
     });
 
