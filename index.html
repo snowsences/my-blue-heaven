@@ -483,6 +483,31 @@
     justify-content: center;
   }
   .restaurant-course-photo-add-btn:hover{ background: var(--amber); color: var(--ink); }
+  /* Favorite toggle — same size/shape/inset convention as the add-photo
+     button above (26px circle, 8px inset), just top-right instead of
+     bottom-right. Unfilled (☆) at 60% white when not favorited, filled (★)
+     yellow when it is — matches the ☆/★ pattern already used for the
+     gallery's own cover-photo toggle elsewhere in this app. */
+  .restaurant-course-favorite-btn{
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(15,33,36,0.72);
+    border: none;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.6);
+  }
+  .restaurant-course-favorite-btn:hover{ background: rgba(15,33,36,0.9); }
+  .restaurant-course-favorite-btn.is-favorite{ color: #FFD700; }
   .restaurant-course-card-body{
     display: flex;
     align-items: flex-start;
@@ -1025,28 +1050,55 @@
   .import-row{
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 10px;
     margin-top: 16px;
     color: var(--chalk-dim);
     font-size: 13px;
     flex-wrap: wrap;
   }
-  .guest-view-toggle-label{
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--chalk);
-    font-size: 14px;
-    font-weight: 600;
+  .toggle-switch{
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
     cursor: pointer;
-    white-space: nowrap;
+    flex-shrink: 0;
   }
-  .guest-view-toggle-label input[type="checkbox"]{
+  .toggle-switch input{
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .toggle-switch-track{
+    position: absolute;
+    inset: 0;
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+    border-radius: 999px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .toggle-switch-track::before{
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
     width: 18px;
     height: 18px;
-    cursor: pointer;
-    accent-color: var(--amber);
+    background: var(--chalk-dim);
+    border-radius: 50%;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  .toggle-switch input:checked + .toggle-switch-track{
+    background: var(--amber-dark);
+    border-color: var(--amber);
+  }
+  .toggle-switch input:checked + .toggle-switch-track::before{
+    transform: translateX(20px);
+    background: var(--amber);
   }
   .dock-import-row{
     display: flex;
@@ -1060,7 +1112,7 @@
   .lastfm-row{
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 10px;
     color: var(--chalk-dim);
     font-size: 13px;
@@ -1314,6 +1366,15 @@
     padding: 3px 8px;
     border-radius: 999px;
     white-space: nowrap;
+    flex-shrink: 0;
+  }
+  /* Restaurants list row's tier indicator — same fill as .tier-chip, just a
+     plain circle with no text, matching that chip's approximate height. */
+  .restaurant-tier-dot{
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
     flex-shrink: 0;
   }
   .restaurant-name-row{
@@ -1573,7 +1634,7 @@
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background: var(--bg-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23F1ECDE' stroke-opacity='0.65' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    background: var(--bg-2);
     color: var(--chalk);
     border: 1px solid var(--panel-line);
     border-radius: 999px;
@@ -1584,12 +1645,15 @@
   }
   .filter-input::placeholder{ color: var(--chalk-dim); font-weight: 500; }
   .filter-input:focus{ outline: none; border-color: var(--amber); }
-  .filter-input:not(:placeholder-shown){ background-image: none; } /* clear (X) button occupies this same corner once there's a value */
   .filter-input::-webkit-calendar-picker-indicator{
-    display: none; /* Chrome's own hover-revealed datalist arrow — separate from, and redundant with, the custom one above */
+    display: none; /* Chrome's own hover-revealed datalist arrow */
     opacity: 0;
     pointer-events: none;
   }
+  /* 12px gap between the search bar and the restaurants themselves below it
+     — scoped to this page specifically, not the shared .filters-group used
+     on Albums/Songs too. */
+  #page-restaurants .filters-group{ margin-bottom: 12px; }
   .year-filter-input{ width: 120px; }
   .artist-filter-input{ width: 160px; }
   .grouping-filter-input{ width: 140px; }
@@ -1790,7 +1854,7 @@
     z-index: 10;
     background: var(--panel);
     border: 1px solid var(--panel-line);
-    border-radius: 999px;
+    border-radius: 8px;
     padding: 12px 16px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.28);
   }
@@ -1819,7 +1883,27 @@
     z-index: 10;
     background: var(--panel);
     border: 1px solid var(--panel-line);
-    border-radius: 999px;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+  }
+
+  /* Dishes' own copy too, same reasoning as Songs' above — its page also
+     sits outside #page-shell in its own container. Always visible (no
+     display:none base) since Dishes has no isComplete-style gate — the
+     grid and toolbar are always there, nothing to complete first. */
+  #dish-reorder-bar{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    position: sticky;
+    top: calc(var(--desktop-nav-height) + 12px);
+    z-index: 10;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
     padding: 12px 16px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.28);
   }
@@ -1854,6 +1938,26 @@
     transition: background 0.12s ease, color 0.12s ease;
   }
   .row-remove-btn:hover{ background: var(--brick); color: #fff; }
+  /* Dishes' edit-mode equivalent of .row-remove-btn — same size/shape, but
+     a star (removing simply unfavorites the underlying course, never
+     deletes anything) rather than an X. */
+  .dish-unfavorite-btn{
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(255,215,0,0.14);
+    color: #FFD700;
+    border: none;
+    padding: 0;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .dish-unfavorite-btn:hover{ background: #FFD700; color: var(--ink); }
 
   .row-relisten-btn{
     width: 26px;
@@ -2407,7 +2511,8 @@
      Guest View still shows, just without the numbers/tiers that spell it
      out explicitly. */
   body.guest-view-active #top-nav-albums-btn,
-  body.guest-view-active #top-nav-songs-btn{ display: none; }
+  body.guest-view-active #top-nav-songs-btn,
+  body.guest-view-active #top-nav-dishes-btn{ display: none; }
 
   /* Rank/score/tier indicators — restaurant grid + list */
   body.guest-view-active .restaurant-gold-card-rank,
@@ -2415,6 +2520,7 @@
   body.guest-view-active #restaurant-list .rank-num,
   body.guest-view-active .restaurant-scores-line,
   body.guest-view-active .tier-chip,
+  body.guest-view-active .restaurant-tier-dot,
   body.guest-view-active .tiers-panel,
   body.guest-view-active .restaurant-heading-actions .btn-ghost[id="restaurant-rearrange-btn"]{ display: none; }
   /* The tier-driven colored left border on list rows is itself a score
@@ -2436,6 +2542,7 @@
   body.guest-view-active .restaurant-course-remove-btn,
   body.guest-view-active .restaurant-course-pairing-btn,
   body.guest-view-active .restaurant-course-photo-add-btn,
+  body.guest-view-active .restaurant-course-favorite-btn,
   body.guest-view-active .restaurant-photo-add-tile,
   body.guest-view-active .restaurant-photo-remove-btn,
   body.guest-view-active .lightbox-cover-toggle-btn,
@@ -2517,6 +2624,7 @@
         <button class="top-nav-btn active" id="top-nav-albums-btn" type="button"><span class="top-nav-icon">💿</span><span class="top-nav-label">Albums</span></button>
         <button class="top-nav-btn" id="top-nav-songs-btn" type="button"><span class="top-nav-icon">🎵</span><span class="top-nav-label">Songs</span></button>
         <button class="top-nav-btn" id="top-nav-restaurants-btn" type="button"><span class="top-nav-icon">🍴</span><span class="top-nav-label">Restaurants</span></button>
+        <button class="top-nav-btn" id="top-nav-dishes-btn" type="button"><span class="top-nav-icon">🍽️</span><span class="top-nav-label">Dishes</span></button>
       </div>
       <button class="top-nav-settings-btn" id="top-nav-settings-btn" type="button" title="Settings"><span class="top-nav-icon">⚙️</span><span class="top-nav-label">Settings</span></button>
     </div>
@@ -2590,7 +2698,6 @@
     </div>
 
     <div class="tab-panel" id="tab-results">
-      <p class="eyebrow">Standings</p>
       <h1 id="results-heading">Your Album Rankings</h1>
       <p class="sub" id="results-sub"></p>
 
@@ -2765,7 +2872,6 @@
       </div>
 
       <div class="tab-panel" id="song-tab-results">
-        <p class="eyebrow">Standings</p>
         <h1>Your Song Rankings</h1>
         <p class="sub" id="song-results-sub"></p>
 
@@ -2840,7 +2946,6 @@
 
   <div id="page-restaurants" class="top-page">
     <div class="page-content">
-      <p class="eyebrow">Restaurants</p>
       <div class="page-heading-row">
         <h1>Restaurant List</h1>
         <div class="restaurant-heading-actions">
@@ -2876,18 +2981,35 @@
     </div>
   </div>
 
+  <div id="page-dishes" class="top-page">
+    <div class="page-content">
+      <h1>Dishes</h1>
+
+      <div class="reorder-bar" id="dish-reorder-bar" style="display:flex;">
+        <button class="btn-ghost" id="dish-reorder-toggle-btn" type="button">Edit</button>
+        <div class="reorder-edit-controls" id="dish-reorder-edit-controls">
+          <button class="btn-primary" id="dish-reorder-save-btn" type="button">Save Changes</button>
+          <button class="btn-ghost" id="dish-reorder-cancel-btn" type="button">Cancel</button>
+          <span class="reorder-hint">Type a position number to reorder, edit comments, or tap the star to unfavorite.</span>
+        </div>
+      </div>
+
+      <ol class="results-list grid-mode" id="dish-results-list"></ol>
+      <p class="restaurant-course-empty" id="dish-empty-message" style="display:none;">No favorited dishes yet — star a course from a restaurant's details tray to add it here.</p>
+    </div>
+  </div>
+
   <div id="page-settings" class="top-page">
     <div class="page-content">
-      <p class="eyebrow">Settings</p>
       <h1>Settings</h1>
 
       <div class="settings-section">
         <h2 class="settings-section-title">Guest View</h2>
         <div class="import-row">
           <span>Hides Albums &amp; Songs, strips restaurant rankings/scores down to order-only, and disables all editing — for sharing this device or account with a guest</span>
-          <label class="guest-view-toggle-label">
+          <label class="toggle-switch" title="Enable Guest View">
             <input type="checkbox" id="guest-view-toggle">
-            Enable Guest View
+            <span class="toggle-switch-track"></span>
           </label>
         </div>
       </div>
@@ -2934,26 +3056,10 @@
             <a class="lastfm-help-link" href="https://cloudinary.com/documentation/upload_images#unsigned_upload" target="_blank" rel="noopener noreferrer">How to create an unsigned preset →</a>
           </div>
         </div>
-        <div class="import-row" id="cloudinary-migrate-row" style="display:none;">
-          <span id="cloudinary-migrate-status">Move existing album art from local storage to Cloudinary</span>
-          <button class="btn-ghost" id="cloudinary-migrate-btn" type="button">Migrate Art to Cloudinary</button>
-        </div>
       </div>
 
       <div class="settings-section">
         <h2 class="settings-section-title">Album Ranker Settings</h2>
-
-        <div class="import-row">
-          <span>Already have a ranked list?</span>
-          <button class="btn-ghost" id="import-list-btn-home" type="button">Import List (.txt/.xlsx)</button>
-          <input type="file" id="import-list-file-home" accept=".txt,.xlsx" style="display:none;">
-        </div>
-
-        <div class="import-row">
-          <span>Have a progress file from another session?</span>
-          <button class="btn-ghost" id="import-btn">Import Progress (.json)</button>
-          <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
-        </div>
 
         <div class="lastfm-block">
           <div class="lastfm-row">
@@ -2967,16 +3073,6 @@
             <button class="btn-primary" id="lastfm-save-btn" type="button">Save</button>
             <a class="lastfm-help-link" href="https://www.last.fm/api/account/create" target="_blank" rel="noopener noreferrer">Get a free API key →</a>
           </div>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="settings-section-title">Song Ranker Settings</h2>
-
-        <div class="import-row">
-          <span>Have a song progress file from another session?</span>
-          <button class="btn-ghost" id="song-import-btn">Import Progress (.json)</button>
-          <input type="file" id="song-import-file" accept="application/json,.json" style="display:none;">
         </div>
       </div>
 
@@ -3218,9 +3314,6 @@
   const cloudinaryCloudnameInput = document.getElementById('cloudinary-cloudname-input');
   const cloudinaryPresetInput = document.getElementById('cloudinary-preset-input');
   const cloudinarySaveBtn = document.getElementById('cloudinary-save-btn');
-  const cloudinaryMigrateRow = document.getElementById('cloudinary-migrate-row');
-  const cloudinaryMigrateStatus = document.getElementById('cloudinary-migrate-status');
-  const cloudinaryMigrateBtn = document.getElementById('cloudinary-migrate-btn');
   const modalOverlay = document.getElementById('modal-overlay');
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
@@ -3253,6 +3346,15 @@
   const pageSongs = document.getElementById('page-songs');
   const topNavRestaurantsBtn = document.getElementById('top-nav-restaurants-btn');
   const pageRestaurants = document.getElementById('page-restaurants');
+  const topNavDishesBtn = document.getElementById('top-nav-dishes-btn');
+  const pageDishes = document.getElementById('page-dishes');
+  const dishReorderBar = document.getElementById('dish-reorder-bar');
+  const dishReorderToggleBtn = document.getElementById('dish-reorder-toggle-btn');
+  const dishReorderEditControls = document.getElementById('dish-reorder-edit-controls');
+  const dishReorderSaveBtn = document.getElementById('dish-reorder-save-btn');
+  const dishReorderCancelBtn = document.getElementById('dish-reorder-cancel-btn');
+  const dishResultsList = document.getElementById('dish-results-list');
+  const dishEmptyMessage = document.getElementById('dish-empty-message');
   const restaurantListEl = document.getElementById('restaurant-list');
   const restaurantGoldGridEl = document.getElementById('restaurant-gold-grid');
   const restaurantNewBtn = document.getElementById('restaurant-new-btn');
@@ -3406,7 +3508,7 @@
       // currently active page when this turns on, jump to Restaurants so
       // there's nothing left showing that Guest View is supposed to hide.
       const activeTopPage = document.querySelector('.top-page.active');
-      if (activeTopPage && (activeTopPage.id === 'page-albums' || activeTopPage.id === 'page-songs')){
+      if (activeTopPage && (activeTopPage.id === 'page-albums' || activeTopPage.id === 'page-songs' || activeTopPage.id === 'page-dishes')){
         switchTopPage('restaurants');
       }
     }
@@ -3914,12 +4016,10 @@
       cloudinaryConnectBtn.style.display = 'none';
       cloudinaryDisconnectBtn.style.display = 'inline-block';
       cloudinaryForm.style.display = 'none';
-      cloudinaryMigrateRow.style.display = 'flex';
     } else {
       cloudinaryStatusText.textContent = 'Cloudinary: not connected';
       cloudinaryConnectBtn.style.display = 'inline-block';
       cloudinaryDisconnectBtn.style.display = 'none';
-      cloudinaryMigrateRow.style.display = 'none';
     }
   }
 
@@ -4069,40 +4169,6 @@
       applyGuestViewMode();
     });
   }
-
-  cloudinaryMigrateBtn.addEventListener('click', async () => {
-    if (!cloudinaryConfig) return;
-    const allRaws = Array.from(new Set([...items, ...loadingDock]));
-    const toMigrate = [];
-    for (const raw of allRaws){
-      let val = artCache[raw];
-      if (val === undefined){
-        try{
-          const res = await window.storage.get(artKeyFor(raw), false);
-          val = (res && res.value) ? res.value : null;
-        }catch(e){ val = null; }
-      }
-      if (val && val.indexOf('data:') === 0) toMigrate.push({ raw, dataUrl: val }); // already-migrated (a URL, not data:) items are skipped
-    }
-    if (!toMigrate.length){ showToast('No local art left to migrate'); return; }
-
-    cloudinaryMigrateBtn.disabled = true;
-    let done = 0;
-    // Sequential, not parallel — safer against Cloudinary rate limits for a
-    // large collection, though slower. Each failure is skipped (left as
-    // base64 for now) rather than stopping the whole batch.
-    for (const { raw, dataUrl } of toMigrate){
-      try{
-        const blob = await (await fetch(dataUrl)).blob();
-        const url = await uploadToCloudinary(blob);
-        await setArtForItem(raw, url);
-      }catch(e){ /* best effort — this one stays as base64, move on */ }
-      done++;
-      cloudinaryMigrateStatus.textContent = 'Migrating… ' + done + ' / ' + toMigrate.length;
-    }
-    cloudinaryMigrateBtn.disabled = false;
-    cloudinaryMigrateStatus.textContent = 'Migrated ' + done + ' of ' + toMigrate.length + ' images to Cloudinary';
-  });
 
   loadCloudinaryConfig();
 
@@ -4319,6 +4385,14 @@
   // would also close the lightbox.
   lightboxPrevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(-1); });
   lightboxNextBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(1); });
+  // Single-image mode also has lightboxPhotos === null, so navigateLightbox's
+  // own early-return already makes this a no-op there — no need to guard on
+  // 'multi' here too.
+  document.addEventListener('keydown', (e) => {
+    if (!artLightboxOverlay.classList.contains('show')) return;
+    if (e.key === 'ArrowLeft') navigateLightbox(-1);
+    else if (e.key === 'ArrowRight') navigateLightbox(1);
+  });
   lightboxCoverToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (!lightboxCoverContext) return;
@@ -5365,8 +5439,7 @@
     songTabSwitcher.style.display = songIsComplete ? 'none' : 'flex';
     if (songIsComplete){
       songLiveDot.style.display = 'none';
-      songResultsSub.innerHTML = '<span class="status-pill final">Ranked ✓</span> ' +
-        songItems.length + ' song' + (songItems.length === 1 ? '' : 's') + '.';
+      songResultsSub.innerHTML = '';
     } else if (songHistory.length === 0){
       songLiveDot.style.display = 'inline-block';
       songResultsSub.innerHTML = '<span class="status-pill live">Live Estimate</span> Make a few picks to see standings take shape.';
@@ -5596,14 +5669,17 @@
     const showAlbums = page === 'albums';
     const showSongs = page === 'songs';
     const showRestaurants = page === 'restaurants';
+    const showDishes = page === 'dishes';
     const showSettings = page === 'settings';
     pageAlbums.classList.toggle('active', showAlbums);
     pageSongs.classList.toggle('active', showSongs);
     pageRestaurants.classList.toggle('active', showRestaurants);
+    pageDishes.classList.toggle('active', showDishes);
     pageSettings.classList.toggle('active', showSettings);
     topNavAlbumsBtn.classList.toggle('active', showAlbums);
     topNavSongsBtn.classList.toggle('active', showSongs);
     topNavRestaurantsBtn.classList.toggle('active', showRestaurants);
+    topNavDishesBtn.classList.toggle('active', showDishes);
     topNavSettingsBtn.classList.toggle('active', showSettings);
     if (!showAlbums && selectedItem){
       closeDetailsPanel();
@@ -5617,10 +5693,14 @@
     if (showRestaurants){
       renderRestaurantsPage();
     }
+    if (showDishes){
+      renderDishesPage();
+    }
   }
   topNavAlbumsBtn.addEventListener('click', () => switchTopPage('albums'));
   topNavSongsBtn.addEventListener('click', () => switchTopPage('songs'));
   topNavRestaurantsBtn.addEventListener('click', () => switchTopPage('restaurants'));
+  topNavDishesBtn.addEventListener('click', () => switchTopPage('dishes'));
   topNavSettingsBtn.addEventListener('click', () => switchTopPage('settings'));
 
   // Click anywhere outside the panel closes it — except on a grid card or
@@ -6023,30 +6103,32 @@
     switchTab(parsed.isComplete ? 'results' : 'duels');
   }
 
-  importBtn.addEventListener('click', () => importFile.click());
+  if (importBtn && importFile){
+    importBtn.addEventListener('click', () => importFile.click());
 
-  importFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      let parsed;
-      try{
-        parsed = JSON.parse(evt.target.result);
-      }catch(err){
-        showToast("That file's JSON is malformed — if it came from a synced folder, check Dropbox's Version History to restore an earlier copy");
-        return;
-      }
-      if (parsed && Array.isArray(parsed.items) && parsed.items.length >= 2){
-        resumeFromData(parsed);
-        saveProgress(); // persist the import itself — resumeFromData only updates in-memory state, and without this the import is lost on refresh and never reaches Firestore
-      } else {
-        showToast("That file doesn't look like a valid progress export");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  });
+    importFile.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        let parsed;
+        try{
+          parsed = JSON.parse(evt.target.result);
+        }catch(err){
+          showToast("That file's JSON is malformed — if it came from a synced folder, check Dropbox's Version History to restore an earlier copy");
+          return;
+        }
+        if (parsed && Array.isArray(parsed.items) && parsed.items.length >= 2){
+          resumeFromData(parsed);
+          saveProgress(); // persist the import itself — resumeFromData only updates in-memory state, and without this the import is lost on refresh and never reaches Firestore
+        } else {
+          showToast("That file doesn't look like a valid progress export");
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+  }
 
   exportBtn.addEventListener('click', async () => {
     const artKeys = Array.from(new Set([...items, ...loadingDock]));
@@ -6191,11 +6273,13 @@
   // Same import, available directly from the home screen — a fresh install
   // has no saved progress and no existing list, so the Results tab (where
   // this used to live exclusively) isn't reachable yet to get to it.
-  importListBtnHome.addEventListener('click', () => importListFileHome.click());
-  importListFileHome.addEventListener('change', (e) => {
-    handleListImportFile(e.target.files[0]);
-    e.target.value = '';
-  });
+  if (importListBtnHome && importListFileHome){
+    importListBtnHome.addEventListener('click', () => importListFileHome.click());
+    importListFileHome.addEventListener('change', (e) => {
+      handleListImportFile(e.target.files[0]);
+      e.target.value = '';
+    });
+  }
 
   // ---------- DOCK-ONLY IMPORT ----------
   // Separate from the full-list import above: this merges into whatever's
@@ -6371,8 +6455,7 @@
       // Maintenance mode: no duel language at all, since there's no visible
       // Duels tab to give "head-to-head picks" any context.
       liveDot.style.display = 'none';
-      resultsSub.innerHTML = '<span class="status-pill final">Ranked ✓</span> ' +
-        items.length + ' album' + (items.length === 1 ? '' : 's') + '.';
+      resultsSub.innerHTML = '';
     } else if (isComplete){
       liveDot.style.display = 'none';
       resultsSub.innerHTML = '<span class="status-pill final">Final Ranking ✓</span> Settled over ' +
@@ -7296,26 +7379,28 @@
   songItemInput.addEventListener('input', updateSongCount);
 
   // Import Song Progress (.json) — Settings tab, mirrors Albums' equivalent.
-  songImportBtn.addEventListener('click', () => songImportFile.click());
-  songImportFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      let parsed;
-      try{ parsed = JSON.parse(reader.result); }catch(err){ showToast('Could not read that file'); return; }
-      if (!parsed || !Array.isArray(parsed.songItems) || parsed.songItems.length < 2){
-        showToast("That file doesn't look like a song progress export");
-        return;
-      }
-      resumeSongDataFromSync(parsed);
-      saveSongProgress(); // persist the import itself — see the albums import handler's identical comment
-      showToast('Song progress imported — ' + parsed.songItems.length + ' songs');
-    };
-    reader.onerror = () => showToast('Could not read that file');
-    reader.readAsText(file);
-    e.target.value = '';
-  });
+  if (songImportBtn && songImportFile){
+    songImportBtn.addEventListener('click', () => songImportFile.click());
+    songImportFile.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        let parsed;
+        try{ parsed = JSON.parse(reader.result); }catch(err){ showToast('Could not read that file'); return; }
+        if (!parsed || !Array.isArray(parsed.songItems) || parsed.songItems.length < 2){
+          showToast("That file doesn't look like a song progress export");
+          return;
+        }
+        resumeSongDataFromSync(parsed);
+        saveSongProgress(); // persist the import itself — see the albums import handler's identical comment
+        showToast('Song progress imported — ' + parsed.songItems.length + ' songs');
+      };
+      reader.onerror = () => showToast('Could not read that file');
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+  }
 
   // Shared by sync-file loading, JSON import, and startup resume.
   function resumeSongDataFromSync(parsed){
@@ -7859,7 +7944,7 @@
       let borderAttr = '';
       if (tier){
         borderAttr = ' style="border-left:4px solid ' + tier.color + ';"';
-        tierChipHtml = '<span class="tier-chip" style="background:' + hexToRgba(tier.color, 0.18) + '; color:' + tier.color + ';">' + tier.name + '</span>';
+        tierChipHtml = '<span class="restaurant-tier-dot" style="background:' + hexToRgba(tier.color, 0.18) + ';" title="' + escapeAttr(tier.name) + '"></span>';
       }
 
       listRows.push(
@@ -7952,6 +8037,213 @@
     }
     return course.photos;
   }
+
+  // ---------- DISHES ----------
+  // A dish is simply a favorited course — nothing here has its own copy of
+  // the photo/text/score; all of that is read live from the actual course
+  // object living inside its restaurant's visit, so editing it from either
+  // Dishes or Restaurants stays in sync automatically. The only thing that
+  // belongs to Dishes itself is the manual display order.
+  const DISH_STORAGE_KEY = 'dish-order';
+  let dishOrder = []; // array of course ids, in manually-set display order
+  let dishEditMode = false;
+
+  // Stable id, independent of the course's own index within its visit
+  // (which shifts if courses are reordered/removed there) — dishOrder
+  // references courses by this, not by position.
+  function ensureCourseId(course){
+    if (!course.id) course.id = 'dish' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    return course.id;
+  }
+
+  function getAllFavoritedDishes(){
+    const dishes = [];
+    restaurantRows.forEach((r, restaurantIndex) => {
+      const visits = ensureRestaurantVisits(r);
+      visits.forEach(visit => {
+        (visit.courses || []).forEach((course, courseIndex) => {
+          if (course.favorite){
+            dishes.push({ id: ensureCourseId(course), course, restaurant: r, restaurantIndex, visit, courseIndex });
+          }
+        });
+      });
+    });
+    return dishes;
+  }
+
+  // Layers the manual order on top of whatever's currently favorited —
+  // newly-favorited dishes not yet in dishOrder are appended at the end;
+  // dishOrder entries for since-unfavorited courses are just skipped, not
+  // actively pruned from storage (harmless leftovers, cheaper than
+  // rewriting dishOrder on every render to drop a few stale ids).
+  function getOrderedDishes(){
+    const all = getAllFavoritedDishes();
+    const byId = {};
+    all.forEach(d => { byId[d.id] = d; });
+    const ordered = [];
+    const seen = new Set();
+    dishOrder.forEach(id => {
+      if (byId[id] && !seen.has(id)){
+        ordered.push(byId[id]);
+        seen.add(id);
+      }
+    });
+    all.forEach(d => {
+      if (!seen.has(d.id)){
+        ordered.push(d);
+        seen.add(d.id);
+      }
+    });
+    return ordered;
+  }
+
+  async function loadDishOrder(){
+    try{
+      const res = await window.storage.get(DISH_STORAGE_KEY, false);
+      dishOrder = (res && res.value) ? JSON.parse(res.value) : [];
+    }catch(e){ dishOrder = []; }
+  }
+
+  function saveDishOrder(){
+    try{ window.storage.set(DISH_STORAGE_KEY, JSON.stringify(dishOrder), false); }catch(e){ /* best effort */ }
+  }
+
+  function dishPhotoHtml(course){
+    const photo = (course.photos && course.photos[0]) || null;
+    return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(photo) + '" alt="">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+  }
+
+  let dishDragSourceId = null;
+  let dishDragSourceEl = null;
+  // Snapshot of which dishes were present when edit mode was entered — Save
+  // compares this against whatever rows are still in the DOM to detect
+  // which were starred off (removed from the DOM, not deleted outright),
+  // so those can be actually unfavorited on the real course data.
+  let dishEditModeSnapshot = null;
+
+  function renderDishesPage(){
+    const dishes = getOrderedDishes();
+    const hasAny = dishes.length > 0;
+    dishEmptyMessage.style.display = hasAny ? 'none' : 'block';
+    dishResultsList.style.display = hasAny ? '' : 'none';
+    dishReorderBar.style.display = hasAny ? 'flex' : 'none';
+
+    dishReorderToggleBtn.style.display = dishEditMode ? 'none' : 'inline-block';
+    dishReorderEditControls.style.display = dishEditMode ? 'flex' : 'none';
+    dishResultsList.classList.toggle('grid-mode', !dishEditMode);
+    dishResultsList.innerHTML = '';
+
+    if (dishEditMode){
+      dishEditModeSnapshot = {};
+      dishes.forEach(d => { dishEditModeSnapshot[d.id] = d; });
+
+      dishes.forEach((d, idx) => {
+        const li = document.createElement('li');
+        li.dataset.dishId = d.id;
+        const numHtml = '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">';
+        const textHtml = '<input type="text" class="rank-edit-input" value="' + escapeAttr(d.course.text || '') + '">';
+        const starHtml = '<button class="dish-unfavorite-btn" type="button" title="Remove from favorites">★</button>';
+        li.innerHTML = dishPhotoHtml(d.course) + numHtml + '<span class="rank-item">' + textHtml + '</span>' + starHtml;
+        dishResultsList.appendChild(li);
+        li.querySelector('.dish-unfavorite-btn').addEventListener('click', () => li.remove());
+      });
+    } else {
+      dishes.forEach((d, idx) => {
+        const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
+        const card = document.createElement('div');
+        card.className = 'grid-card';
+        card.dataset.dishId = d.id;
+        card.title = d.course.text || d.restaurant.name || '';
+        card.innerHTML = '<span class="grid-card-rank">#' + (idx + 1) + '</span>' +
+          '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+        dishResultsList.appendChild(card);
+        makeDishDraggable(card, d.id);
+        card.addEventListener('click', () => {
+          const photos = d.course.photos || [];
+          if (photos.length) openPhotoLightbox(photos, 0, null);
+        });
+      });
+    }
+  }
+
+  // Mirrors makeRowDraggable/commitDragOrder from Albums, adapted for
+  // Dishes' own id-based order rather than a raw-string array.
+  function makeDishDraggable(el, id){
+    if (dishEditMode) return;
+    el.setAttribute('draggable', 'true');
+    el.addEventListener('dragstart', () => {
+      dishDragSourceId = id;
+      dishDragSourceEl = el;
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', commitDishDragOrder);
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!dishDragSourceEl || dishDragSourceEl === el || !el.parentNode) return;
+      if (isBeforeInDom(dishDragSourceEl, el)){
+        el.parentNode.insertBefore(dishDragSourceEl, el.nextSibling);
+      } else {
+        el.parentNode.insertBefore(dishDragSourceEl, el);
+      }
+    });
+    el.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  function commitDishDragOrder(){
+    if (dishDragSourceEl) dishDragSourceEl.classList.remove('dragging');
+    dishDragSourceId = null;
+    dishDragSourceEl = null;
+    dishOrder = Array.from(dishResultsList.children).map(el => el.dataset.dishId).filter(Boolean);
+    saveDishOrder();
+    renderDishesPage();
+  }
+
+  function toggleDishEditMode(){
+    dishEditMode = true;
+    renderDishesPage();
+  }
+
+  function cancelDishEditMode(){
+    dishEditMode = false;
+    renderDishesPage();
+  }
+
+  // Position/comment edits and unfavoriting only touch the real data here,
+  // on Save — same "nothing touches truth until Save" philosophy as
+  // Albums' own edit mode, so Cancel can simply discard by re-rendering.
+  function saveDishChanges(){
+    const rows = dishResultsList.querySelectorAll('li');
+    const newOrder = [];
+    const stillPresentIds = new Set();
+    rows.forEach(li => {
+      const id = li.dataset.dishId;
+      const dish = dishEditModeSnapshot[id];
+      if (!dish) return;
+      stillPresentIds.add(id);
+      newOrder.push(id);
+      const textInput = li.querySelector('.rank-edit-input');
+      if (textInput) dish.course.text = textInput.value;
+    });
+    // Present when edit mode opened, but no longer among the rows — that's
+    // exactly the "starred off" case (the row was removed, not the course).
+    Object.keys(dishEditModeSnapshot).forEach(id => {
+      if (!stillPresentIds.has(id)){
+        dishEditModeSnapshot[id].course.favorite = false;
+      }
+    });
+    dishOrder = newOrder;
+    dishEditMode = false;
+    saveDishOrder();
+    saveRestaurantProgress(); // persists the comment edits and unfavorite flags, which live on the actual restaurant/course data
+    renderDishesPage();
+    renderRestaurantsPage(); // reflects any unfavorite in the restaurant grid/list too
+    if (openRestaurantIndex !== null) renderRestaurantDetailsContent(); // and in an open details tray, if one of its courses was unfavorited
+    showToast('Changes saved');
+  }
+
+  dishReorderToggleBtn.addEventListener('click', toggleDishEditMode);
+  dishReorderSaveBtn.addEventListener('click', saveDishChanges);
+  dishReorderCancelBtn.addEventListener('click', cancelDishEditMode);
 
   // Parses filenames like "20250811_073318.jpg" (a common phone-camera
   // convention: YYYYMMDD_HHMMSS) into a date key for grouping into visits
@@ -8286,12 +8578,14 @@
           const pairingBtnHtml = course.drinkPairing
             ? ''
             : '<button class="restaurant-course-pairing-btn" type="button" data-add-pairing-index="' + i + '" title="Add a drink pairing">🍷</button>';
+          const favoriteBtnHtml = '<button class="restaurant-course-favorite-btn' + (course.favorite ? ' is-favorite' : '') + '" type="button" data-favorite-course-index="' + i + '" title="' + (course.favorite ? 'Remove from favorites' : 'Add to favorites') + '">' + (course.favorite ? '★' : '☆') + '</button>';
           return (
             '<div class="restaurant-course-card">' +
               '<div class="restaurant-course-photo-drop" data-course-photo-index="' + i + '"' +
                 (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
                 (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
                 countBadgeHtml +
+                favoriteBtnHtml +
                 '<button class="restaurant-course-photo-add-btn" type="button" data-add-photo-course-index="' + i + '" title="Add another photo">+</button>' +
               '</div>' +
               '<div class="restaurant-course-card-body">' +
@@ -8639,12 +8933,25 @@
     // more from here, rather than tapping the image doing double duty.
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-drop[data-course-photo-index]').forEach(el => {
       const i = Number(el.dataset.coursePhotoIndex);
-      const addPhotoToCourse = (url) => {
-        if (!url) return;
-        updateOpenRestaurant(rest => {
-          const course = getActiveVisit(rest).courses[i];
-          ensureCoursePhotosArray(course).push(url);
-        });
+      // Multiple files at once, sequentially (same reasoning as the bulk
+      // visit importer and Cloudinary migration — safer against rate
+      // limits), with a single update appending all of them together
+      // rather than one updateOpenRestaurant call per file, which would
+      // otherwise re-render the panel mid-loop.
+      const addPhotosToCourse = async (files) => {
+        const fileArray = Array.from(files || []).filter(f => f);
+        if (!fileArray.length) return;
+        const uploadedUrls = [];
+        for (const file of fileArray){
+          const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses');
+          if (url) uploadedUrls.push(url);
+        }
+        if (uploadedUrls.length){
+          updateOpenRestaurant(rest => {
+            const course = getActiveVisit(rest).courses[i];
+            ensureCoursePhotosArray(course).push(...uploadedUrls);
+          });
+        }
       };
       el.addEventListener('dragover', (e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
@@ -8652,15 +8959,15 @@
         el.classList.add('drag-over');
       });
       el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-      el.addEventListener('drop', async (e) => {
+      el.addEventListener('drop', (e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
         el.classList.remove('drag-over');
-        const file = e.dataTransfer.files && e.dataTransfer.files[0];
-        addPhotoToCourse(await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses'));
+        addPhotosToCourse(e.dataTransfer.files);
       });
       el.addEventListener('click', (e) => {
         if (e.target.closest('.restaurant-course-photo-add-btn')) return; // handled separately below
+        if (e.target.closest('.restaurant-course-favorite-btn')) return; // handled separately below
         const photos = ensureCoursePhotosArray(activeVisit.courses[i]);
         if (photos.length){
           const allPhotos = gatherAllRestaurantPhotos(r);
@@ -8669,9 +8976,8 @@
           const input = document.createElement('input');
           input.type = 'file';
           input.accept = 'image/*';
-          input.addEventListener('change', async () => {
-            addPhotoToCourse(await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses'));
-          });
+          input.multiple = true;
+          input.addEventListener('change', () => addPhotosToCourse(input.files));
           input.click();
         }
       });
@@ -8683,14 +8989,37 @@
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
+        input.multiple = true;
         input.addEventListener('change', async () => {
-          const url = await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses');
-          if (url) updateOpenRestaurant(rest => {
-            const course = getActiveVisit(rest).courses[i];
-            ensureCoursePhotosArray(course).push(url);
-          });
+          const fileArray = Array.from(input.files || []);
+          const uploadedUrls = [];
+          for (const file of fileArray){
+            const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses');
+            if (url) uploadedUrls.push(url);
+          }
+          if (uploadedUrls.length){
+            updateOpenRestaurant(rest => {
+              const course = getActiveVisit(rest).courses[i];
+              ensureCoursePhotosArray(course).push(...uploadedUrls);
+            });
+          }
         });
         input.click();
+      });
+    });
+    // Quiet update (direct DOM toggle, no full re-render) — same reasoning
+    // as the score select's own handler: the click itself already shows the
+    // new state correctly, so rebuilding the panel would serve no purpose.
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-favorite-btn[data-favorite-course-index]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // don't also trigger the photo-drop's own click
+        if (guestViewEnabled) return;
+        const i = Number(btn.dataset.favoriteCourseIndex);
+        const newState = !activeVisit.courses[i].favorite;
+        btn.classList.toggle('is-favorite', newState);
+        btn.textContent = newState ? '★' : '☆';
+        btn.title = newState ? 'Remove from favorites' : 'Add to favorites';
+        saveOpenRestaurantQuietly(rest => { getActiveVisit(rest).courses[i].favorite = newState; });
       });
     });
 
@@ -8916,6 +9245,7 @@
   loadLastfmConfig();
   loadMusicbeeLibrary();
   loadGuestViewSetting();
+  loadDishOrder();
   loadPointsAlgorithm().then(checkSavedProgress);
 })();
 </script>
