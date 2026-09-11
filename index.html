@@ -1362,6 +1362,19 @@
     text-align: center;
   }
   .rank-num-input:focus{ outline: none; border-color: var(--amber); }
+  /* Dishes only — shown between the photo and description in list view, and
+     between the position number and comment field in edit mode. Same
+     visual weight as .rank-meta (a subtle, secondary label) since it's
+     context, not the main content of the row. */
+  .dish-restaurant-name-readonly{
+    font-size: 13px;
+    color: var(--chalk-dim);
+    flex-shrink: 0;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .tier-chip{
     display: inline-block;
@@ -2133,6 +2146,54 @@
   }
   .art-lightbox-overlay.multi .lightbox-counter{ display: block; }
 
+  /* Only shown when the current photo's entry carries a caption (Dishes'
+     cross-gallery) — plain restaurant-gallery photos have none, so this
+     stays hidden for those exactly like the cover-toggle/delete buttons do.
+     Positioned just above the counter (24px + ~30px for the counter's own
+     height/padding, plus a small gap). Wraps rather than truncates, since
+     restaurant name + description together can run long. */
+  .lightbox-caption{
+    display: none;
+    position: fixed;
+    bottom: 58px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(15,33,36,0.72);
+    padding: 6px 16px;
+    border-radius: 14px;
+    z-index: 301;
+    max-width: min(600px, 80vw);
+    text-align: center;
+    line-height: 1.4;
+  }
+  .lightbox-caption.show{ display: block; }
+
+  /* Same gating pattern as the cover-toggle/delete buttons — only shows
+     when the current photo's entry carries a goToContext (Dishes' own
+     entries), never for plain restaurant-gallery photos. Top-right,
+     mirroring the cover-toggle's top-center position. */
+  .lightbox-goto-btn{
+    display: none;
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(15,33,36,0.72);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    z-index: 301;
+    align-items: center;
+    justify-content: center;
+  }
+  .lightbox-goto-btn:hover{ background: var(--amber); color: var(--ink); }
+  .lightbox-goto-btn.show{ display: flex; }
+
   /* Only appears when the gallery was opened with a cover-toggle context
      (i.e. always, for the restaurant gallery — this lightbox has no other
      multi-photo caller) — gated by its own "show" class rather than just
@@ -2476,7 +2537,7 @@
       gap: 0;
     }
     .top-nav-brand{ display: none; }
-    .top-nav{ display: contents; }
+    .top-nav:not(.guest-top-nav){ display: contents; }
     .top-nav-btn, .top-nav-settings-btn{
       flex: 1;
       display: flex;
@@ -2522,6 +2583,19 @@
      at all here. */
   body.guest-view-active .top-nav-inner > .top-nav:not(.guest-top-nav){ display: none; }
   body.guest-view-active .guest-top-nav{ display: flex; }
+  /* On mobile the tab bar relies on every direct child of .top-nav-inner
+     being an equal-width flex item — .top-nav itself normally becomes
+     display:contents there for exactly that reason (see the mobile media
+     query). The rule above sets display:flex unconditionally (all screen
+     sizes), which is correct on desktop but would make the guest nav a
+     small nested flex row squeezed into part of the bar on mobile instead
+     of two proper full-width tab items — this overrides it back to
+     contents specifically at mobile widths, matching the normal nav's own
+     mobile treatment. Same selector/specificity as the rule above, so this
+     wins there purely by coming later in the file. */
+  @media (max-width: 768px){
+    body.guest-view-active .guest-top-nav{ display: contents; }
+  }
   body.guest-view-active #food-sub-tabs,
   body.guest-view-active #food-sub-tabs-2,
   body.guest-view-active #nature-sub-tabs-hikes,
@@ -2645,7 +2719,7 @@
            than showing the normal grouped nav with items hidden inside it.
            Flat (no grouping/sub-tabs) since there's only the two. -->
       <div class="top-nav guest-top-nav" id="guest-top-nav">
-        <button class="top-nav-btn active" id="guest-nav-restaurants-btn" type="button"><span class="top-nav-icon">🍴</span><span class="top-nav-label">Restaurants</span></button>
+        <button class="top-nav-btn active" id="guest-nav-restaurants-btn" type="button"><span class="top-nav-icon">👨‍🍳</span><span class="top-nav-label">Restaurants</span></button>
         <button class="top-nav-btn" id="guest-nav-hikes-btn" type="button"><span class="top-nav-icon">🏕️</span><span class="top-nav-label">Hikes</span></button>
       </div>
       <button class="top-nav-settings-btn" id="top-nav-settings-btn" type="button" title="Settings"><span class="top-nav-icon">⚙️</span><span class="top-nav-label">Settings</span></button>
@@ -2980,7 +3054,7 @@
     <div class="page-content">
       <div class="page-heading-row">
         <div class="group-sub-tabs" id="food-sub-tabs">
-          <button class="group-sub-tab-btn active" id="food-subtab-restaurants-btn" type="button"><span class="group-sub-tab-icon">🍴</span>Restaurants</button>
+          <button class="group-sub-tab-btn active" id="food-subtab-restaurants-btn" type="button"><span class="group-sub-tab-icon">👨‍🍳</span>Restaurants</button>
           <button class="group-sub-tab-btn" id="food-subtab-dishes-btn" type="button"><span class="group-sub-tab-icon">🍽️</span>Dishes</button>
         </div>
         <div class="restaurant-heading-actions">
@@ -3019,7 +3093,7 @@
   <div id="page-dishes" class="top-page">
     <div class="page-content">
       <div class="group-sub-tabs" id="food-sub-tabs-2">
-        <button class="group-sub-tab-btn" id="food-subtab-restaurants-btn-2" type="button"><span class="group-sub-tab-icon">🍴</span>Restaurants</button>
+        <button class="group-sub-tab-btn" id="food-subtab-restaurants-btn-2" type="button"><span class="group-sub-tab-icon">👨‍🍳</span>Restaurants</button>
         <button class="group-sub-tab-btn active" id="food-subtab-dishes-btn-2" type="button"><span class="group-sub-tab-icon">🍽️</span>Dishes</button>
       </div>
 
@@ -3029,6 +3103,24 @@
           <button class="btn-primary" id="dish-reorder-save-btn" type="button">Save Changes</button>
           <button class="btn-ghost" id="dish-reorder-cancel-btn" type="button">Cancel</button>
           <span class="reorder-hint">Type a position number to reorder, edit comments, or tap the star to remove.</span>
+        </div>
+      </div>
+
+      <div class="results-controls" id="dish-results-controls">
+        <div class="view-toggle" id="dish-view-toggle">
+          <button class="view-toggle-btn" id="dish-view-list-btn" type="button">List</button>
+          <button class="view-toggle-btn active" id="dish-view-grid-btn" type="button">Grid</button>
+        </div>
+        <div class="filters-group">
+          <div class="filter-wrap">
+            <input type="text" class="filter-input dish-restaurant-filter-input" id="dish-restaurant-filter-input" list="dish-restaurant-filter-datalist" placeholder="All Restaurants" autocomplete="off">
+            <datalist id="dish-restaurant-filter-datalist"></datalist>
+            <button class="filter-clear" id="dish-restaurant-filter-clear" type="button" title="Clear restaurant filter" style="display:none;">✕</button>
+          </div>
+          <div class="filter-wrap">
+            <input type="text" class="filter-input dish-description-filter-input" id="dish-description-filter-input" placeholder="Filter" autocomplete="off">
+            <button class="filter-clear" id="dish-description-filter-clear" type="button" title="Clear filter" style="display:none;">✕</button>
+          </div>
         </div>
       </div>
 
@@ -3226,9 +3318,13 @@
   <button class="lightbox-nav-btn lightbox-prev-btn" id="lightbox-prev-btn" type="button" title="Previous">‹</button>
   <img class="art-lightbox-img" id="art-lightbox-img" src="" alt="">
   <button class="lightbox-nav-btn lightbox-next-btn" id="lightbox-next-btn" type="button" title="Next">›</button>
+  <span class="lightbox-caption" id="lightbox-caption"></span>
   <span class="lightbox-counter" id="lightbox-counter"></span>
   <button class="lightbox-cover-toggle-btn" id="lightbox-cover-toggle-btn" type="button"></button>
   <button class="lightbox-delete-btn" id="lightbox-delete-btn" type="button" title="Delete this photo">🗑️</button>
+  <button class="lightbox-goto-btn" id="lightbox-goto-btn" type="button" title="Go to restaurant">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+  </button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -3509,6 +3605,17 @@
   const dishReorderCancelBtn = document.getElementById('dish-reorder-cancel-btn');
   const dishResultsList = document.getElementById('dish-results-list');
   const dishEmptyMessage = document.getElementById('dish-empty-message');
+  const dishViewToggle = document.getElementById('dish-view-toggle');
+  const dishViewListBtn = document.getElementById('dish-view-list-btn');
+  const dishViewGridBtn = document.getElementById('dish-view-grid-btn');
+  const dishResultsControls = document.getElementById('dish-results-controls');
+  const dishRestaurantFilterInput = document.getElementById('dish-restaurant-filter-input');
+  const dishRestaurantFilterDatalist = document.getElementById('dish-restaurant-filter-datalist');
+  const dishRestaurantFilterClear = document.getElementById('dish-restaurant-filter-clear');
+  const dishDescriptionFilterInput = document.getElementById('dish-description-filter-input');
+  const dishDescriptionFilterClear = document.getElementById('dish-description-filter-clear');
+  const lightboxCaption = document.getElementById('lightbox-caption');
+  const lightboxGotoBtn = document.getElementById('lightbox-goto-btn');
   const restaurantListEl = document.getElementById('restaurant-list');
   const restaurantGoldGridEl = document.getElementById('restaurant-gold-grid');
   const restaurantNewBtn = document.getElementById('restaurant-new-btn');
@@ -4546,9 +4653,18 @@
   // Only ever opened for art that already exists (see the details panel
   // render below) — a single click anywhere in the overlay, image included,
   // closes it again.
-  let lightboxPhotos = null; // array of URLs when in gallery mode, else null
+  let lightboxPhotos = null; // array of URLs (restaurant galleries) OR {url, caption, goToContext, dishId} entries (Dishes' cross-gallery) when in gallery mode, else null
   let lightboxIndex = 0;
   let lightboxCoverContext = null; // { restaurantIndex } when opened from a restaurant gallery, else null
+
+  // lightboxPhotos entries can be a plain URL string (every existing
+  // caller — restaurant galleries, album art) or a richer object (Dishes'
+  // cross-gallery, which needs a caption and go-to context per photo that
+  // a plain string has nowhere to carry). This is the one place that
+  // difference gets resolved back down to a plain URL.
+  function lightboxEntryUrl(entry){
+    return (entry && typeof entry === 'object') ? entry.url : entry;
+  }
 
   function openArtLightbox(src){
     lightboxPhotos = null;
@@ -4557,28 +4673,32 @@
     artLightboxOverlay.classList.remove('multi');
     lightboxCoverToggleBtn.classList.remove('show');
     lightboxDeleteBtn.classList.remove('show');
+    lightboxCaption.classList.remove('show');
+    lightboxGotoBtn.classList.remove('show');
     artLightboxOverlay.classList.add('show');
   }
 
-  // Multi-photo mode (restaurant galleries) — same overlay, same "click
-  // anywhere closes" behavior, plus prev/next arrows and a counter that the
-  // single-image mode never shows. Navigation wraps around at both ends.
-  // coverContext (optional) adds the "set as cover" toggle and the delete
-  // button — every current caller is a restaurant gallery, so it's always
-  // passed there, but stays optional here in case a future multi-photo use
-  // of this lightbox has no cover/delete concept at all.
+  // Multi-photo mode (restaurant galleries, Dishes' cross-gallery) — same
+  // overlay, same "click anywhere closes" behavior, plus prev/next arrows
+  // and a counter that the single-image mode never shows. Navigation wraps
+  // around at both ends. coverContext (optional) adds the "set as cover"
+  // toggle and the delete button — every current caller passing this is a
+  // restaurant gallery; Dishes' own calls always pass null here, since
+  // "set as cover" / "delete" don't apply to browsing dishes.
   function openPhotoLightbox(photos, startIndex, coverContext){
     if (!photos || !photos.length) return;
     lightboxPhotos = photos;
     lightboxIndex = startIndex;
     lightboxCoverContext = coverContext || null;
-    artLightboxImg.src = cloudinaryThumbUrl(photos[lightboxIndex], 1600);
+    artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(photos[lightboxIndex]), 1600);
     artLightboxOverlay.classList.add('multi');
     artLightboxOverlay.classList.add('show');
     lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
     lightboxDeleteBtn.classList.toggle('show', !!lightboxCoverContext);
     updateLightboxCounter();
     updateLightboxCoverToggle();
+    updateLightboxCaption();
+    updateLightboxGotoBtn();
   }
 
   function updateLightboxCounter(){
@@ -4590,17 +4710,42 @@
     if (!lightboxCoverContext) return;
     const r = restaurantRows[lightboxCoverContext.restaurantIndex];
     if (!r) return;
-    const isCover = r.coverPhoto === lightboxPhotos[lightboxIndex];
+    const isCover = r.coverPhoto === lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
     lightboxCoverToggleBtn.textContent = isCover ? '★ Cover photo' : '☆ Set as cover';
     lightboxCoverToggleBtn.classList.toggle('is-cover', isCover);
+  }
+
+  // Only ever set on Dishes' own entries — a plain-string entry (every
+  // other caller) has no .caption, so this correctly stays hidden there.
+  function updateLightboxCaption(){
+    if (!lightboxPhotos){ lightboxCaption.classList.remove('show'); return; }
+    const entry = lightboxPhotos[lightboxIndex];
+    const caption = (entry && typeof entry === 'object') ? entry.caption : null;
+    if (caption){
+      lightboxCaption.textContent = caption;
+      lightboxCaption.classList.add('show');
+    } else {
+      lightboxCaption.classList.remove('show');
+    }
+  }
+
+  // Same reasoning as updateLightboxCaption — only Dishes' entries carry a
+  // goToContext at all.
+  function updateLightboxGotoBtn(){
+    if (!lightboxPhotos){ lightboxGotoBtn.classList.remove('show'); return; }
+    const entry = lightboxPhotos[lightboxIndex];
+    const goToContext = (entry && typeof entry === 'object') ? entry.goToContext : null;
+    lightboxGotoBtn.classList.toggle('show', !!goToContext);
   }
 
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
-    artLightboxImg.src = cloudinaryThumbUrl(lightboxPhotos[lightboxIndex], 1600);
+    artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(lightboxPhotos[lightboxIndex]), 1600);
     updateLightboxCounter();
     updateLightboxCoverToggle();
+    updateLightboxCaption();
+    updateLightboxGotoBtn();
   }
 
   function closeArtLightbox(){
@@ -4608,6 +4753,8 @@
     artLightboxOverlay.classList.remove('multi');
     lightboxCoverToggleBtn.classList.remove('show');
     lightboxDeleteBtn.classList.remove('show');
+    lightboxCaption.classList.remove('show');
+    lightboxGotoBtn.classList.remove('show');
     artLightboxImg.src = '';
     lightboxPhotos = null;
     lightboxCoverContext = null;
@@ -4632,7 +4779,7 @@
     const idx = lightboxCoverContext.restaurantIndex;
     const r = restaurantRows[idx];
     if (!r) return;
-    const currentUrl = lightboxPhotos[lightboxIndex];
+    const currentUrl = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
     // Toggling off just clears the cover entirely — there's always at most
     // one, never a "previous" one to fall back to.
     const newCover = r.coverPhoto === currentUrl ? '' : currentUrl;
@@ -4643,7 +4790,7 @@
     e.stopPropagation();
     if (!lightboxCoverContext || !lightboxPhotos || !lightboxPhotos.length) return;
     const idx = lightboxCoverContext.restaurantIndex;
-    const url = lightboxPhotos[lightboxIndex];
+    const url = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
     deleteRestaurantPhoto(idx, url);
     showToast('Photo deleted');
 
@@ -4659,6 +4806,28 @@
     updateLightboxCounter();
     updateLightboxCoverToggle();
   });
+  lightboxGotoBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!lightboxPhotos) return;
+    const entry = lightboxPhotos[lightboxIndex];
+    const goToContext = (entry && typeof entry === 'object') ? entry.goToContext : null;
+    if (!goToContext) return;
+    goToDishSource(goToContext.restaurantIndex, goToContext.visitId);
+  });
+
+  // Jumps from a dish's photo in the lightbox to that exact dish's source —
+  // the Restaurants page, that specific restaurant's details tray open, and
+  // the correct Visit tab active within it (restaurantActiveVisitId is a
+  // single shared variable that getActiveVisit reads for whichever
+  // restaurant is currently open, so setting it here before opening the
+  // panel is what actually makes the right visit tab active).
+  function goToDishSource(restaurantIndex, visitId){
+    closeArtLightbox();
+    switchTopGroup('food');
+    switchFoodSubPage('restaurants');
+    restaurantActiveVisitId = visitId;
+    openRestaurantDetailsPanel(restaurantIndex);
+  }
 
   // Matches the classic Wikipedia search-results URL shape, e.g.
   // https://en.wikipedia.org/w/index.php?search=muse+origin+of+symmetry&title=Special:Search&ns0=1
@@ -5260,6 +5429,13 @@
     const art = albumRaw ? artCache[albumRaw] : null;
     const cls = 'art-drop song-art-readonly' + (art ? ' has-art' : '');
     const inner = art ? '<img class="art-img" src="' + cloudinaryThumbUrl(art, 120) + '" alt="" draggable="false" loading="lazy">' : '<span class="art-drop-hint">🎵</span>';
+    return '<div class="' + cls + '">' + inner + '</div>';
+  }
+
+  // Builds the "Artist · Album · Year" line shown under a song's title —
+  // pulls the year via findAlbumYearForSong, same album-matching logic
+  // songArtHtml uses to find that song's art.
+  function songMetaLine(p){
     const parts = [];
     if (p.artist) parts.push(p.artist);
     if (p.album) parts.push(p.album);
@@ -8348,6 +8524,9 @@
   const DISH_STORAGE_KEY = 'dish-order';
   let dishOrder = []; // array of course ids, in manually-set display order
   let dishEditMode = false;
+  let dishViewMode = 'grid'; // 'list' | 'grid' — forced to a read-only row layout whenever dishEditMode is true, same convention as Albums' resultsViewMode
+  let dishRestaurantFilter = '';
+  let dishDescriptionFilter = '';
 
   // Stable id, independent of the course's own index within its visit
   // (which shifts if courses are reordered/removed there) — dishOrder
@@ -8418,6 +8597,44 @@
     return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(photo, 120)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
   }
 
+  // Datalist built from the full, unfiltered dish list — same convention as
+  // Albums' Year/Artist/Grouping filters, so the available options don't
+  // shift depending on what the description filter currently narrows.
+  function renderDishRestaurantFilterOptions(dishes){
+    const names = Array.from(new Set(dishes.map(d => d.restaurant.name).filter(Boolean))).sort();
+    dishRestaurantFilterDatalist.innerHTML = names.map(n => '<option value="' + escapeAttr(n) + '">').join('');
+    if (!names.includes(dishRestaurantFilter)) dishRestaurantFilter = '';
+    dishRestaurantFilterInput.value = dishRestaurantFilter;
+    dishRestaurantFilterClear.style.display = dishRestaurantFilter ? 'flex' : 'none';
+  }
+
+  // Every photo across every given dish, flattened into one ordered list
+  // for the lightbox — each photo carries the SAME caption/goToContext as
+  // its sibling photos from the same dish, since the caption describes the
+  // dish, not the individual photo. dishId lets the click handler find
+  // exactly where a specific dish's photos start in this flattened list.
+  function buildDishesLightboxEntries(dishes){
+    const entries = [];
+    dishes.forEach(d => {
+      const photos = d.course.photos || [];
+      const caption = d.course.text
+        ? ((d.restaurant.name || 'Unknown restaurant') + ': ' + d.course.text)
+        : (d.restaurant.name || 'Unknown restaurant');
+      const goToContext = { restaurantIndex: d.restaurantIndex, visitId: d.visit.id };
+      photos.forEach(url => {
+        entries.push({ url, caption, goToContext, dishId: d.id });
+      });
+    });
+    return entries;
+  }
+
+  function openDishLightbox(d, visibleDishes){
+    const entries = buildDishesLightboxEntries(visibleDishes);
+    const startIndex = entries.findIndex(e => e.dishId === d.id);
+    if (startIndex === -1) return; // this dish has no photos
+    openPhotoLightbox(entries, startIndex, null);
+  }
+
   let dishDragSourceId = null;
   let dishDragSourceEl = null;
   // Snapshot of which dishes were present when edit mode was entered — Save
@@ -8427,15 +8644,33 @@
   let dishEditModeSnapshot = null;
 
   function renderDishesPage(){
-    const dishes = getOrderedDishes();
-    const hasAny = dishes.length > 0;
+    const allDishes = getOrderedDishes();
+    const hasAny = allDishes.length > 0;
     dishEmptyMessage.style.display = hasAny ? 'none' : 'block';
     dishResultsList.style.display = hasAny ? '' : 'none';
     dishReorderBar.style.display = hasAny ? 'flex' : 'none';
 
     dishReorderToggleBtn.style.display = dishEditMode ? 'none' : 'inline-block';
     dishReorderEditControls.style.display = dishEditMode ? 'flex' : 'none';
-    dishResultsList.classList.toggle('grid-mode', !dishEditMode);
+
+    renderDishRestaurantFilterOptions(allDishes);
+    // Edit mode always shows the full, unfiltered list — same reasoning as
+    // Albums' own edit mode: filtering while position/text fields are live
+    // risks Save silently dropping whatever's currently filtered out.
+    dishResultsControls.style.display = dishEditMode ? 'none' : 'flex';
+    const activeRestaurantFilter = dishEditMode ? '' : dishRestaurantFilter;
+    const activeDescriptionFilter = dishEditMode ? '' : dishDescriptionFilter.trim().toLowerCase();
+    const dishes = dishEditMode ? allDishes : allDishes.filter(d => {
+      if (activeRestaurantFilter && d.restaurant.name !== activeRestaurantFilter) return false;
+      if (activeDescriptionFilter && !(d.course.text || '').toLowerCase().includes(activeDescriptionFilter)) return false;
+      return true;
+    });
+
+    const showGrid = !dishEditMode && dishViewMode === 'grid';
+    dishViewToggle.style.display = dishEditMode ? 'none' : 'inline-flex';
+    dishViewListBtn.classList.toggle('active', !showGrid);
+    dishViewGridBtn.classList.toggle('active', showGrid);
+    dishResultsList.classList.toggle('grid-mode', showGrid);
     dishResultsList.innerHTML = '';
 
     if (dishEditMode){
@@ -8446,13 +8681,14 @@
         const li = document.createElement('li');
         li.dataset.dishId = d.id;
         const numHtml = '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">';
+        const restaurantNameHtml = '<span class="dish-restaurant-name-readonly">' + escapeHtml(d.restaurant.name || '') + '</span>';
         const textHtml = '<input type="text" class="rank-edit-input" value="' + escapeAttr(d.course.text || '') + '">';
         const starHtml = '<button class="dish-unfavorite-btn" type="button" title="Remove from Dishes">★</button>';
-        li.innerHTML = dishPhotoHtml(d.course) + numHtml + '<span class="rank-item">' + textHtml + '</span>' + starHtml;
+        li.innerHTML = dishPhotoHtml(d.course) + numHtml + restaurantNameHtml + '<span class="rank-item">' + textHtml + '</span>' + starHtml;
         dishResultsList.appendChild(li);
         li.querySelector('.dish-unfavorite-btn').addEventListener('click', () => li.remove());
       });
-    } else {
+    } else if (showGrid){
       dishes.forEach((d, idx) => {
         const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
         const card = document.createElement('div');
@@ -8463,10 +8699,27 @@
           '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 500)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
         dishResultsList.appendChild(card);
         makeDishDraggable(card, d.id);
-        card.addEventListener('click', () => {
-          const photos = d.course.photos || [];
-          if (photos.length) openPhotoLightbox(photos, 0, null);
-        });
+        card.addEventListener('click', () => openDishLightbox(d, dishes));
+      });
+    } else {
+      // Read-only list view — Photo, Restaurant Name, Description, nothing
+      // editable. Same row shape as edit mode (photo, then the restaurant
+      // name label, then the main text) just with plain static text instead
+      // of inputs, and no position number or star since there's nothing to
+      // act on here — that's what Edit mode is for.
+      dishes.forEach((d) => {
+        const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
+        const li = document.createElement('li');
+        li.dataset.dishId = d.id;
+        li.innerHTML = dishPhotoHtml(d.course) +
+          '<span class="dish-restaurant-name-readonly">' + escapeHtml(d.restaurant.name || '') + '</span>' +
+          '<span class="rank-item">' + escapeHtml(d.course.text || '') + '</span>';
+        if (firstPhoto){
+          li.addEventListener('click', () => openDishLightbox(d, dishes));
+        } else {
+          li.style.cursor = 'default';
+        }
+        dishResultsList.appendChild(li);
       });
     }
   }
@@ -8551,6 +8804,47 @@
   dishReorderToggleBtn.addEventListener('click', toggleDishEditMode);
   dishReorderSaveBtn.addEventListener('click', saveDishChanges);
   dishReorderCancelBtn.addEventListener('click', cancelDishEditMode);
+
+  function switchDishView(mode){
+    dishViewMode = mode;
+    renderDishesPage();
+  }
+  dishViewListBtn.addEventListener('click', () => switchDishView('list'));
+  dishViewGridBtn.addEventListener('click', () => switchDishView('grid'));
+
+  dishRestaurantFilterInput.addEventListener('input', () => {
+    const val = dishRestaurantFilterInput.value.trim();
+    if (!val){
+      if (dishRestaurantFilter){ dishRestaurantFilter = ''; renderDishesPage(); }
+      return;
+    }
+    // Same convention as Albums' filters — only actually applies once it's
+    // an exact match (a picked datalist suggestion, or a fully-typed
+    // correct name), so a partial in-progress string never flashes an
+    // empty/wrong result.
+    const known = Array.from(dishRestaurantFilterDatalist.options).map(o => o.value);
+    if (known.includes(val) && val !== dishRestaurantFilter){
+      dishRestaurantFilter = val;
+      renderDishesPage();
+    }
+  });
+  dishRestaurantFilterClear.addEventListener('click', () => {
+    dishRestaurantFilterInput.value = '';
+    dishRestaurantFilter = '';
+    renderDishesPage();
+  });
+
+  dishDescriptionFilterInput.addEventListener('input', () => {
+    dishDescriptionFilter = dishDescriptionFilterInput.value;
+    dishDescriptionFilterClear.style.display = dishDescriptionFilter.trim() ? 'flex' : 'none';
+    renderDishesPage();
+  });
+  dishDescriptionFilterClear.addEventListener('click', () => {
+    dishDescriptionFilterInput.value = '';
+    dishDescriptionFilter = '';
+    dishDescriptionFilterClear.style.display = 'none';
+    renderDishesPage();
+  });
 
   // Parses filenames like "20250811_073318.jpg" (a common phone-camera
   // convention: YYYYMMDD_HHMMSS) into a date key for grouping into visits
