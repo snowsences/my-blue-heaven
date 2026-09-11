@@ -111,6 +111,7 @@
     border-bottom-color: var(--amber);
   }
   .top-nav-icon{ font-size: 16px; line-height: 1; flex-shrink: 0; }
+  .guest-top-nav{ display: none; }
   .top-nav-settings-btn{
     display: flex;
     align-items: center;
@@ -920,6 +921,35 @@
     line-height: 1.02;
     margin: 0 0 14px;
   }
+  /* Top-level group's sub-tabs (e.g. Albums/Songs under Music) — replaces
+     an H1 in visual weight/position, but as clickable tabs. Sits above
+     everything else on the page, including (for Albums/Songs specifically)
+     the existing Duels/Rankings tab-switcher beneath it — two distinct
+     levels of hierarchy, so styled distinctly from .tab-switcher/.tab-btn
+     rather than reusing them. */
+  .group-sub-tabs{
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    margin: 0 0 20px;
+    flex-wrap: wrap;
+  }
+  .group-sub-tab-btn{
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'Figtree', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    font-size: clamp(26px, 4.5vw, 40px);
+    line-height: 1.02;
+    color: var(--chalk-dim);
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  .group-sub-tab-btn .group-sub-tab-icon{ font-size: 0.7em; margin-right: 6px; }
+  .group-sub-tab-btn:hover{ color: var(--chalk); }
+  .group-sub-tab-btn.active{ color: var(--chalk); font-weight: 700; }
   .page-heading-row{
     display: flex;
     align-items: center;
@@ -1479,13 +1509,9 @@
     top: 8px;
     right: 8px;
     z-index: 1;
-    font-family: 'Figtree', sans-serif;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 3px 8px;
-    border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
   }
   .restaurant-gold-card-overlay{
     position: absolute;
@@ -2484,10 +2510,23 @@
      functions in JS, since a hidden button doesn't stop a still-listening
      drop zone. Order in the list/grid is untouched — that's the ranking
      Guest View still shows, just without the numbers/tiers that spell it
-     out explicitly. */
-  body.guest-view-active #top-nav-albums-btn,
-  body.guest-view-active #top-nav-songs-btn,
-  body.guest-view-active #top-nav-dishes-btn{ display: none; }
+     out explicitly.
+     Spec is "Restaurants and Hikes only" — rather than showing the normal
+     grouped nav with everything else hidden inside it, the whole thing
+     swaps for a dedicated, flat 2-tab bar (#guest-top-nav) built for
+     exactly this. That also means the sub-navs embedded in the Restaurants
+     and Hikes pages themselves (Food's own Restaurants/Dishes switcher,
+     Nature's own Hikes/Roads/Parks switcher) hide too, since they'd
+     otherwise offer a second, redundant way to reach the same two pages
+     while also exposing Dishes/Roads/Parks, which shouldn't be reachable
+     at all here. */
+  body.guest-view-active .top-nav-inner > .top-nav:not(.guest-top-nav){ display: none; }
+  body.guest-view-active .guest-top-nav{ display: flex; }
+  body.guest-view-active #food-sub-tabs,
+  body.guest-view-active #food-sub-tabs-2,
+  body.guest-view-active #nature-sub-tabs-hikes,
+  body.guest-view-active #nature-sub-tabs-roads,
+  body.guest-view-active #nature-sub-tabs-parks{ display: none; }
 
   /* Rank/score/tier indicators — restaurant grid + list */
   body.guest-view-active .restaurant-gold-card-rank,
@@ -2595,10 +2634,18 @@
     <div class="top-nav-inner">
       <span class="top-nav-brand">My Blue Heaven</span>
       <div class="top-nav">
-        <button class="top-nav-btn active" id="top-nav-albums-btn" type="button"><span class="top-nav-icon">💿</span><span class="top-nav-label">Albums</span></button>
-        <button class="top-nav-btn" id="top-nav-songs-btn" type="button"><span class="top-nav-icon">🎵</span><span class="top-nav-label">Songs</span></button>
-        <button class="top-nav-btn" id="top-nav-restaurants-btn" type="button"><span class="top-nav-icon">🍴</span><span class="top-nav-label">Restaurants</span></button>
-        <button class="top-nav-btn" id="top-nav-dishes-btn" type="button"><span class="top-nav-icon">🍽️</span><span class="top-nav-label">Dishes</span></button>
+        <button class="top-nav-btn active" id="top-nav-music-btn" type="button"><span class="top-nav-icon">🎧</span><span class="top-nav-label">Music</span></button>
+        <button class="top-nav-btn" id="top-nav-food-btn" type="button"><span class="top-nav-icon">🍅</span><span class="top-nav-label">Food</span></button>
+        <button class="top-nav-btn" id="top-nav-nature-btn" type="button"><span class="top-nav-icon">🏔️</span><span class="top-nav-label">Nature</span></button>
+        <button class="top-nav-btn" id="top-nav-art-btn" type="button"><span class="top-nav-icon">🎭</span><span class="top-nav-label">Art</span></button>
+      </div>
+      <!-- Dedicated to Guest View — hidden entirely otherwise (see the
+           body.guest-view-active rules), shown in place of .top-nav rather
+           than showing the normal grouped nav with items hidden inside it.
+           Flat (no grouping/sub-tabs) since there's only the two. -->
+      <div class="top-nav guest-top-nav" id="guest-top-nav">
+        <button class="top-nav-btn active" id="guest-nav-restaurants-btn" type="button"><span class="top-nav-icon">🍴</span><span class="top-nav-label">Restaurants</span></button>
+        <button class="top-nav-btn" id="guest-nav-hikes-btn" type="button"><span class="top-nav-icon">🏕️</span><span class="top-nav-label">Hikes</span></button>
       </div>
       <button class="top-nav-settings-btn" id="top-nav-settings-btn" type="button" title="Settings"><span class="top-nav-icon">⚙️</span><span class="top-nav-label">Settings</span></button>
     </div>
@@ -2606,6 +2653,11 @@
 
   <div id="page-albums" class="top-page active">
   <div id="app">
+
+  <div class="group-sub-tabs" id="music-sub-tabs">
+    <button class="group-sub-tab-btn active" id="music-subtab-albums-btn" type="button"><span class="group-sub-tab-icon">💿</span>Albums</button>
+    <button class="group-sub-tab-btn" id="music-subtab-songs-btn" type="button"><span class="group-sub-tab-icon">🎵</span>Songs</button>
+  </div>
 
   <!-- SCREEN 1: INPUT -->
   <section class="screen active" id="screen-input">
@@ -2787,6 +2839,11 @@
   <div id="page-songs" class="top-page">
   <div class="song-app">
 
+  <div class="group-sub-tabs" id="music-sub-tabs-songs">
+    <button class="group-sub-tab-btn" id="music-subtab-albums-btn-2" type="button"><span class="group-sub-tab-icon">💿</span>Albums</button>
+    <button class="group-sub-tab-btn active" id="music-subtab-songs-btn-2" type="button"><span class="group-sub-tab-icon">🎵</span>Songs</button>
+  </div>
+
     <section class="screen active" id="song-screen-input">
       <p class="eyebrow">Songs</p>
       <h1>Rank your loved songs,<br>one duel at a time.</h1>
@@ -2921,7 +2978,10 @@
   <div id="page-restaurants" class="top-page">
     <div class="page-content">
       <div class="page-heading-row">
-        <h1>Restaurant List</h1>
+        <div class="group-sub-tabs" id="food-sub-tabs">
+          <button class="group-sub-tab-btn active" id="food-subtab-restaurants-btn" type="button"><span class="group-sub-tab-icon">🍴</span>Restaurants</button>
+          <button class="group-sub-tab-btn" id="food-subtab-dishes-btn" type="button"><span class="group-sub-tab-icon">🍽️</span>Dishes</button>
+        </div>
         <div class="restaurant-heading-actions">
           <button class="btn-ghost" id="restaurant-rearrange-btn" type="button">Rearrange</button>
           <button class="btn-primary" id="restaurant-rearrange-save-btn" type="button" style="display:none;">Save Order</button>
@@ -2957,7 +3017,10 @@
 
   <div id="page-dishes" class="top-page">
     <div class="page-content">
-      <h1>Dishes</h1>
+      <div class="group-sub-tabs" id="food-sub-tabs-2">
+        <button class="group-sub-tab-btn" id="food-subtab-restaurants-btn-2" type="button"><span class="group-sub-tab-icon">🍴</span>Restaurants</button>
+        <button class="group-sub-tab-btn active" id="food-subtab-dishes-btn-2" type="button"><span class="group-sub-tab-icon">🍽️</span>Dishes</button>
+      </div>
 
       <div class="reorder-bar" id="dish-reorder-bar" style="display:flex;">
         <button class="btn-ghost" id="dish-reorder-toggle-btn" type="button">Edit</button>
@@ -2970,6 +3033,76 @@
 
       <ol class="results-list grid-mode" id="dish-results-list"></ol>
       <p class="restaurant-course-empty" id="dish-empty-message" style="display:none;">No dishes yet — score a course 12/10 from a restaurant's details tray to add it here.</p>
+    </div>
+  </div>
+
+  <!-- Nature and Art are placeholders — each sub-page is empty for now,
+       to be defined later. Structure mirrors Music/Food: each sub-page is
+       its own top-level .top-page div with its own copy of the group's
+       sub-nav, only one of which is ever visible at a time. -->
+  <div id="page-hikes" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="nature-sub-tabs-hikes">
+        <button class="group-sub-tab-btn active" id="nature-subtab-hikes-btn" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-roads-btn" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-parks-btn" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-roads" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="nature-sub-tabs-roads">
+        <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-2" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+        <button class="group-sub-tab-btn active" id="nature-subtab-roads-btn-2" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-parks-btn-2" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-parks" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="nature-sub-tabs-parks">
+        <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-3" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-roads-btn-3" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+        <button class="group-sub-tab-btn active" id="nature-subtab-parks-btn-3" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-books" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="art-sub-tabs-books">
+        <button class="group-sub-tab-btn active" id="art-subtab-books-btn" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+        <button class="group-sub-tab-btn" id="art-subtab-movies-btn" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+        <button class="group-sub-tab-btn" id="art-subtab-games-btn" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-movies" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="art-sub-tabs-movies">
+        <button class="group-sub-tab-btn" id="art-subtab-books-btn-2" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+        <button class="group-sub-tab-btn active" id="art-subtab-movies-btn-2" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+        <button class="group-sub-tab-btn" id="art-subtab-games-btn-2" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-games" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="art-sub-tabs-games">
+        <button class="group-sub-tab-btn" id="art-subtab-books-btn-3" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+        <button class="group-sub-tab-btn" id="art-subtab-movies-btn-3" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+        <button class="group-sub-tab-btn active" id="art-subtab-games-btn-3" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
     </div>
   </div>
 
@@ -3025,9 +3158,8 @@
           </div>
           <div class="lastfm-form" id="cloudinary-form" style="display:none;">
             <input type="text" id="cloudinary-cloudname-input" placeholder="Cloud name" autocomplete="off">
-            <input type="text" id="cloudinary-preset-input" placeholder="Unsigned upload preset" autocomplete="off">
+            <input type="text" id="cloudinary-worker-url-input" placeholder="Signing Worker URL (https://...workers.dev)" autocomplete="off">
             <button class="btn-primary" id="cloudinary-save-btn" type="button">Save</button>
-            <a class="lastfm-help-link" href="https://cloudinary.com/documentation/upload_images#unsigned_upload" target="_blank" rel="noopener noreferrer">How to create an unsigned preset →</a>
           </div>
         </div>
       </div>
@@ -3286,7 +3418,7 @@
   const cloudinaryDisconnectBtn = document.getElementById('cloudinary-disconnect-btn');
   const cloudinaryForm = document.getElementById('cloudinary-form');
   const cloudinaryCloudnameInput = document.getElementById('cloudinary-cloudname-input');
-  const cloudinaryPresetInput = document.getElementById('cloudinary-preset-input');
+  const cloudinaryWorkerUrlInput = document.getElementById('cloudinary-worker-url-input');
   const cloudinarySaveBtn = document.getElementById('cloudinary-save-btn');
   const modalOverlay = document.getElementById('modal-overlay');
   const modalTitle = document.getElementById('modal-title');
@@ -3304,7 +3436,6 @@
   const lightboxDeleteBtn = document.getElementById('lightbox-delete-btn');
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
-  const topNavAlbumsBtn = document.getElementById('top-nav-albums-btn');
   const topNavSettingsBtn = document.getElementById('top-nav-settings-btn');
   const lastfmStatusText = document.getElementById('lastfm-status-text');
   const lastfmConnectBtn = document.getElementById('lastfm-connect-btn');
@@ -3316,12 +3447,60 @@
   const musicbeeStatusText = document.getElementById('musicbee-status-text');
   const musicbeeImportBtn = document.getElementById('musicbee-import-btn');
   const musicbeeImportFile = document.getElementById('musicbee-import-file');
-  const topNavSongsBtn = document.getElementById('top-nav-songs-btn');
   const pageSongs = document.getElementById('page-songs');
-  const topNavRestaurantsBtn = document.getElementById('top-nav-restaurants-btn');
   const pageRestaurants = document.getElementById('page-restaurants');
-  const topNavDishesBtn = document.getElementById('top-nav-dishes-btn');
   const pageDishes = document.getElementById('page-dishes');
+  const pageHikes = document.getElementById('page-hikes');
+  const pageRoads = document.getElementById('page-roads');
+  const pageParks = document.getElementById('page-parks');
+  const pageBooks = document.getElementById('page-books');
+  const pageMovies = document.getElementById('page-movies');
+  const pageGames = document.getElementById('page-games');
+
+  // ---------- TOP-LEVEL NAV: groups (Music/Food/Nature/Art/Settings), each
+  // containing their own sub-tabs. See switchTopGroup/switchXSubPage further
+  // down for how these fit together. ----------
+  const topNavMusicBtn = document.getElementById('top-nav-music-btn');
+  const guestNavRestaurantsBtn = document.getElementById('guest-nav-restaurants-btn');
+  const guestNavHikesBtn = document.getElementById('guest-nav-hikes-btn');
+  const topNavFoodBtn = document.getElementById('top-nav-food-btn');
+  const topNavNatureBtn = document.getElementById('top-nav-nature-btn');
+  const topNavArtBtn = document.getElementById('top-nav-art-btn');
+  let activeTopGroup = 'music';
+  let activeMusicSubPage = 'albums';
+  let activeFoodSubPage = 'restaurants';
+  let activeNatureSubPage = 'hikes';
+  let activeArtSubPage = 'books';
+
+  // Each sub-tab has 2 or 3 copies — one per sub-page in its group, since
+  // only one sub-page is ever visible at a time (see this file's HTML).
+  const musicSubtabAlbumsBtn = document.getElementById('music-subtab-albums-btn');
+  const musicSubtabAlbumsBtn2 = document.getElementById('music-subtab-albums-btn-2');
+  const musicSubtabSongsBtn = document.getElementById('music-subtab-songs-btn');
+  const musicSubtabSongsBtn2 = document.getElementById('music-subtab-songs-btn-2');
+  const foodSubtabRestaurantsBtn = document.getElementById('food-subtab-restaurants-btn');
+  const foodSubtabRestaurantsBtn2 = document.getElementById('food-subtab-restaurants-btn-2');
+  const foodSubtabDishesBtn = document.getElementById('food-subtab-dishes-btn');
+  const foodSubtabDishesBtn2 = document.getElementById('food-subtab-dishes-btn-2');
+  const natureSubtabHikesBtn = document.getElementById('nature-subtab-hikes-btn');
+  const natureSubtabHikesBtn2 = document.getElementById('nature-subtab-hikes-btn-2');
+  const natureSubtabHikesBtn3 = document.getElementById('nature-subtab-hikes-btn-3');
+  const natureSubtabRoadsBtn = document.getElementById('nature-subtab-roads-btn');
+  const natureSubtabRoadsBtn2 = document.getElementById('nature-subtab-roads-btn-2');
+  const natureSubtabRoadsBtn3 = document.getElementById('nature-subtab-roads-btn-3');
+  const natureSubtabParksBtn = document.getElementById('nature-subtab-parks-btn');
+  const natureSubtabParksBtn2 = document.getElementById('nature-subtab-parks-btn-2');
+  const natureSubtabParksBtn3 = document.getElementById('nature-subtab-parks-btn-3');
+  const artSubtabBooksBtn = document.getElementById('art-subtab-books-btn');
+  const artSubtabBooksBtn2 = document.getElementById('art-subtab-books-btn-2');
+  const artSubtabBooksBtn3 = document.getElementById('art-subtab-books-btn-3');
+  const artSubtabMoviesBtn = document.getElementById('art-subtab-movies-btn');
+  const artSubtabMoviesBtn2 = document.getElementById('art-subtab-movies-btn-2');
+  const artSubtabMoviesBtn3 = document.getElementById('art-subtab-movies-btn-3');
+  const artSubtabGamesBtn = document.getElementById('art-subtab-games-btn');
+  const artSubtabGamesBtn2 = document.getElementById('art-subtab-games-btn-2');
+  const artSubtabGamesBtn3 = document.getElementById('art-subtab-games-btn-3');
+
   const dishReorderBar = document.getElementById('dish-reorder-bar');
   const dishReorderToggleBtn = document.getElementById('dish-reorder-toggle-btn');
   const dishReorderEditControls = document.getElementById('dish-reorder-edit-controls');
@@ -3478,12 +3657,15 @@
     const guestViewToggle = document.getElementById('guest-view-toggle');
     if (guestViewToggle) guestViewToggle.checked = guestViewEnabled;
     if (guestViewEnabled){
-      // Albums/Songs aren't just visually hidden — if either is the
-      // currently active page when this turns on, jump to Restaurants so
+      // Anything outside Restaurants/Hikes/Settings is hidden — if the
+      // currently active page is one of those, jump to Restaurants so
       // there's nothing left showing that Guest View is supposed to hide.
+      // Uses switchGuestPage rather than switchTopPage directly so the
+      // dedicated guest nav's own button states correctly update too, not
+      // just which page div is visible.
       const activeTopPage = document.querySelector('.top-page.active');
-      if (activeTopPage && (activeTopPage.id === 'page-albums' || activeTopPage.id === 'page-songs' || activeTopPage.id === 'page-dishes')){
-        switchTopPage('restaurants');
+      if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes' && activeTopPage.id !== 'page-settings'){
+        switchGuestPage('restaurants');
       }
     }
     renderRestaurantsPage();
@@ -3977,15 +4159,16 @@
   // ---------- CLOUDINARY (album art hosting) ----------
   // Optional — when configured, new art uploads go to Cloudinary instead of
   // being stored as base64 locally, and the "Migrate" button below moves
-  // existing base64 art over too. Uses an unsigned upload preset (configured
-  // in your Cloudinary dashboard), the only kind of upload safe to do from
-  // public client-side code — it can't expose your account secret the way a
-  // signed upload would need to.
+  // existing base64 art over too. Uses a SIGNED upload: a Cloudflare Worker
+  // (deployed separately — see cloudinary-sign-worker.js) holds the actual
+  // Cloudinary API secret and hands back a short-lived signature+timestamp
+  // per upload. The app itself never sees or stores the secret — only the
+  // cloud name and the worker's URL, both safe to keep client-side.
   const CLOUDINARY_CONFIG_KEY = 'cloudinary-config';
-  let cloudinaryConfig = null; // { cloudName, uploadPreset } once connected, else null
+  let cloudinaryConfig = null; // { cloudName, workerUrl } once connected, else null
 
   function updateCloudinaryUI(){
-    if (cloudinaryConfig && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset){
+    if (cloudinaryConfig && cloudinaryConfig.cloudName && cloudinaryConfig.workerUrl){
       cloudinaryStatusText.textContent = '✅ Connected: ' + cloudinaryConfig.cloudName;
       cloudinaryConnectBtn.style.display = 'none';
       cloudinaryDisconnectBtn.style.display = 'inline-block';
@@ -4019,9 +4202,9 @@
 
   cloudinarySaveBtn.addEventListener('click', async () => {
     const cloudName = cloudinaryCloudnameInput.value.trim();
-    const uploadPreset = cloudinaryPresetInput.value.trim();
-    if (!cloudName || !uploadPreset){ showToast('Enter both a cloud name and an upload preset'); return; }
-    cloudinaryConfig = { cloudName, uploadPreset };
+    const workerUrl = cloudinaryWorkerUrlInput.value.trim();
+    if (!cloudName || !workerUrl){ showToast('Enter both a cloud name and your signing Worker URL'); return; }
+    cloudinaryConfig = { cloudName, workerUrl };
     try{ await window.storage.set(CLOUDINARY_CONFIG_KEY, cloudinaryConfig, false); }catch(e){ /* best effort */ }
     updateCloudinaryUI();
     showToast('Cloudinary connected');
@@ -4084,11 +4267,32 @@
 
   async function uploadToCloudinary(fileOrBlob, folder){
     if (!cloudinaryConfig) throw new Error('Cloudinary not configured');
+    const targetFolder = folder || 'RankHeaven/AlbumArt';
     const uploadable = await compressImageForCloudinary(fileOrBlob);
+
+    let signData;
+    try{
+      const signRes = await fetch(cloudinaryConfig.workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: targetFolder })
+      });
+      if (!signRes.ok){
+        let detail = '';
+        try{ const errBody = await signRes.json(); detail = errBody && errBody.error; }catch(e){ /* not JSON */ }
+        throw new Error('Signing request failed (' + signRes.status + ')' + (detail ? ': ' + detail : ''));
+      }
+      signData = await signRes.json();
+    }catch(e){
+      throw new Error('Could not reach the signing Worker: ' + e.message);
+    }
+
     const formData = new FormData();
     formData.append('file', uploadable);
-    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-    formData.append('folder', folder || 'RankHeaven/AlbumArt');
+    formData.append('folder', targetFolder);
+    formData.append('timestamp', signData.timestamp);
+    formData.append('signature', signData.signature);
+    formData.append('api_key', signData.apiKey);
     const res = await fetch('https://api.cloudinary.com/v1_1/' + cloudinaryConfig.cloudName + '/image/upload', {
       method: 'POST',
       body: formData
@@ -5635,47 +5839,119 @@
   // happening inside either page — switching away from Albums just hides
   // it (its own internal state, screen, and scroll position are untouched
   // underneath), and closes the details panel since it's Albums-specific.
+  // Handles which .top-page div is visible, plus the side effects tied to
+  // that specific page (closing an open details panel when navigating away,
+  // triggering that page's own render). Nav button / sub-tab button states
+  // are handled separately by switchTopGroup and the switchXSubPage
+  // functions below, which both call this — this function itself no longer
+  // touches any button's .active class, since with sub-tabs now nested two
+  // levels deep under a top-level group, a single flat set of "which nav
+  // button is active" toggles doesn't apply the same way it used to.
   function switchTopPage(page){
     // Defense in depth alongside the CSS-hidden Settings button itself —
     // this account never lands on Settings regardless of how 'settings'
     // got passed in.
     if (isLockedGuestAccount && page === 'settings') page = 'restaurants';
-    const showAlbums = page === 'albums';
-    const showSongs = page === 'songs';
-    const showRestaurants = page === 'restaurants';
-    const showDishes = page === 'dishes';
-    const showSettings = page === 'settings';
-    pageAlbums.classList.toggle('active', showAlbums);
-    pageSongs.classList.toggle('active', showSongs);
-    pageRestaurants.classList.toggle('active', showRestaurants);
-    pageDishes.classList.toggle('active', showDishes);
-    pageSettings.classList.toggle('active', showSettings);
-    topNavAlbumsBtn.classList.toggle('active', showAlbums);
-    topNavSongsBtn.classList.toggle('active', showSongs);
-    topNavRestaurantsBtn.classList.toggle('active', showRestaurants);
-    topNavDishesBtn.classList.toggle('active', showDishes);
-    topNavSettingsBtn.classList.toggle('active', showSettings);
-    if (!showAlbums && selectedItem){
+    const pages = {
+      albums: pageAlbums, songs: pageSongs, restaurants: pageRestaurants, dishes: pageDishes,
+      hikes: pageHikes, roads: pageRoads, parks: pageParks,
+      books: pageBooks, movies: pageMovies, games: pageGames,
+      settings: pageSettings
+    };
+    Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
+
+    if (page !== 'albums' && selectedItem){
       closeDetailsPanel();
     }
-    if (!showRestaurants && openRestaurantIndex !== null){
+    if (page !== 'restaurants' && openRestaurantIndex !== null){
       closeRestaurantDetailsPanel();
     }
-    if (showSongs){
+    if (page === 'songs'){
       renderSongsPage();
     }
-    if (showRestaurants){
+    if (page === 'restaurants'){
       renderRestaurantsPage();
     }
-    if (showDishes){
+    if (page === 'dishes'){
       renderDishesPage();
     }
   }
-  topNavAlbumsBtn.addEventListener('click', () => switchTopPage('albums'));
-  topNavSongsBtn.addEventListener('click', () => switchTopPage('songs'));
-  topNavRestaurantsBtn.addEventListener('click', () => switchTopPage('restaurants'));
-  topNavDishesBtn.addEventListener('click', () => switchTopPage('dishes'));
-  topNavSettingsBtn.addEventListener('click', () => switchTopPage('settings'));
+
+  // The dedicated guest nav is flat (just Restaurants/Hikes, no grouping),
+  // so this is simpler than switchTopGroup/switchXSubPage — just toggles
+  // the two buttons and delegates straight to switchTopPage.
+  function switchGuestPage(page){
+    guestNavRestaurantsBtn.classList.toggle('active', page === 'restaurants');
+    guestNavHikesBtn.classList.toggle('active', page === 'hikes');
+    switchTopPage(page);
+  }
+  guestNavRestaurantsBtn.addEventListener('click', () => switchGuestPage('restaurants'));
+  guestNavHikesBtn.addEventListener('click', () => switchGuestPage('hikes'));
+
+  // Top-level group switch — updates which of the 4 group nav buttons (plus
+  // Settings, which isn't really a "group" but lives in this same row) is
+  // active, then shows whatever sub-page was last active within that group
+  // (defaulting to each group's first sub-page the very first time).
+  function switchTopGroup(group){
+    activeTopGroup = group;
+    topNavMusicBtn.classList.toggle('active', group === 'music');
+    topNavFoodBtn.classList.toggle('active', group === 'food');
+    topNavNatureBtn.classList.toggle('active', group === 'nature');
+    topNavArtBtn.classList.toggle('active', group === 'art');
+    topNavSettingsBtn.classList.toggle('active', group === 'settings');
+    if (group === 'music') switchTopPage(activeMusicSubPage);
+    else if (group === 'food') switchTopPage(activeFoodSubPage);
+    else if (group === 'nature') switchTopPage(activeNatureSubPage);
+    else if (group === 'art') switchTopPage(activeArtSubPage);
+    else if (group === 'settings') switchTopPage('settings');
+  }
+
+  // Each of these toggles both copies of its group's sub-nav (one lives on
+  // each sub-page, since only one sub-page is ever visible at a time — see
+  // this file's HTML for why) before delegating to switchTopPage.
+  function switchMusicSubPage(page){
+    activeMusicSubPage = page;
+    [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2].forEach(b => b.classList.toggle('active', page === 'albums'));
+    [musicSubtabSongsBtn, musicSubtabSongsBtn2].forEach(b => b.classList.toggle('active', page === 'songs'));
+    switchTopPage(page);
+  }
+  function switchFoodSubPage(page){
+    activeFoodSubPage = page;
+    [foodSubtabRestaurantsBtn, foodSubtabRestaurantsBtn2].forEach(b => b.classList.toggle('active', page === 'restaurants'));
+    [foodSubtabDishesBtn, foodSubtabDishesBtn2].forEach(b => b.classList.toggle('active', page === 'dishes'));
+    switchTopPage(page);
+  }
+  function switchNatureSubPage(page){
+    activeNatureSubPage = page;
+    [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3].forEach(b => b.classList.toggle('active', page === 'hikes'));
+    [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3].forEach(b => b.classList.toggle('active', page === 'roads'));
+    [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3].forEach(b => b.classList.toggle('active', page === 'parks'));
+    switchTopPage(page);
+  }
+  function switchArtSubPage(page){
+    activeArtSubPage = page;
+    [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3].forEach(b => b.classList.toggle('active', page === 'books'));
+    [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3].forEach(b => b.classList.toggle('active', page === 'movies'));
+    [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3].forEach(b => b.classList.toggle('active', page === 'games'));
+    switchTopPage(page);
+  }
+
+  topNavMusicBtn.addEventListener('click', () => switchTopGroup('music'));
+  topNavFoodBtn.addEventListener('click', () => switchTopGroup('food'));
+  topNavNatureBtn.addEventListener('click', () => switchTopGroup('nature'));
+  topNavArtBtn.addEventListener('click', () => switchTopGroup('art'));
+  topNavSettingsBtn.addEventListener('click', () => switchTopGroup('settings'));
+
+  [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('albums')));
+  [musicSubtabSongsBtn, musicSubtabSongsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('songs')));
+  [foodSubtabRestaurantsBtn, foodSubtabRestaurantsBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('restaurants')));
+  [foodSubtabDishesBtn, foodSubtabDishesBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('dishes')));
+  [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
+  [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('roads')));
+  [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('parks')));
+  [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('books')));
+  [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('movies')));
+  [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('games')));
 
   // Click anywhere outside the panel closes it — except on a grid card or
   // list row, which have their own click-to-open handling that should just
@@ -7872,7 +8148,7 @@
         const goldStarsText = goldStars > 0 ? '⭐'.repeat(goldStars) : '';
         const meta = [goldStarsText, r.location].filter(Boolean).join(' • ');
         const tierBadgeHtml = tier
-          ? '<span class="restaurant-gold-card-tier" style="background:' + hexToRgba(tier.color, 0.85) + '; color:' + (tier.key === 'gold' ? 'var(--ink)' : '#fff') + ';">' + tier.name + '</span>'
+          ? '<span class="restaurant-gold-card-tier" style="background:' + hexToRgba(tier.color, 0.85) + ';" title="' + escapeAttr(tier.name) + '"></span>'
           : '';
         const effectiveCover = getEffectiveRestaurantCover(r);
         goldCards.push(
