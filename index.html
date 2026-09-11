@@ -213,6 +213,23 @@
   #restaurant-details-panel.open{
     width: 600px;
   }
+  #hike-details-panel{
+    width: 0;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: var(--desktop-nav-height);
+    min-height: calc(100vh - var(--desktop-nav-height));
+    max-height: calc(100vh - var(--desktop-nav-height));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+  }
+  #hike-details-panel.open{
+    width: 600px;
+  }
   .restaurant-details-panel-inner{
     width: 600px;
   }
@@ -2624,6 +2641,9 @@
      Viewing (tabs, dropdown, gallery navigation) is untouched — only
      controls that create, remove, or modify something are hidden. */
   body.guest-view-active #restaurant-tiers-panel{ display: none; }
+  body.guest-view-active #hike-new-btn,
+  body.guest-view-active #hike-rearrange-btn,
+  body.guest-view-active #hike-date-edit-btn,
   body.guest-view-active #restaurant-new-btn,
   body.guest-view-active #restaurant-rearrange-btn,
   body.guest-view-active .details-edit-btn,
@@ -3138,12 +3158,29 @@
        sub-nav, only one of which is ever visible at a time. -->
   <div id="page-hikes" class="top-page">
     <div class="page-content">
-      <div class="group-sub-tabs" id="nature-sub-tabs-hikes">
-        <button class="group-sub-tab-btn active" id="nature-subtab-hikes-btn" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
-        <button class="group-sub-tab-btn" id="nature-subtab-roads-btn" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
-        <button class="group-sub-tab-btn" id="nature-subtab-parks-btn" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="nature-sub-tabs-hikes">
+          <button class="group-sub-tab-btn active" id="nature-subtab-hikes-btn" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-roads-btn" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-parks-btn" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+        </div>
+        <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="hike-rearrange-btn" type="button">Rearrange</button>
+          <button class="btn-primary" id="hike-rearrange-save-btn" type="button" style="display:none;">Save Order</button>
+          <button class="btn-ghost" id="hike-rearrange-cancel-btn" type="button" style="display:none;">Cancel</button>
+          <button class="btn-primary" id="hike-new-btn" type="button">+ New Hike</button>
+        </div>
       </div>
-      <p class="footer-note">Coming soon.</p>
+
+      <div class="filters-group">
+        <div class="filter-wrap">
+          <input type="text" class="filter-input hike-search-filter-input" id="hike-search-filter-input" placeholder="Search name, park, state, or country..." autocomplete="off">
+          <button class="filter-clear" id="hike-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
+        </div>
+      </div>
+
+      <div class="restaurant-gold-grid" id="hike-gold-grid"></div>
+      <ol class="results-list" id="hike-list"></ol>
     </div>
   </div>
 
@@ -3300,6 +3337,10 @@
 
 <aside id="restaurant-details-panel">
   <div class="restaurant-details-panel-inner" id="restaurant-details-panel-inner"></div>
+</aside>
+
+<aside id="hike-details-panel">
+  <div class="restaurant-details-panel-inner" id="hike-details-panel-inner"></div>
 </aside>
 
 </div>
@@ -3636,6 +3677,16 @@
   const restaurantTiersEditorBody = document.getElementById('restaurant-tiers-editor-body');
   const restaurantDetailsPanel = document.getElementById('restaurant-details-panel');
   const restaurantDetailsPanelInner = document.getElementById('restaurant-details-panel-inner');
+  const hikeDetailsPanel = document.getElementById('hike-details-panel');
+  const hikeDetailsPanelInner = document.getElementById('hike-details-panel-inner');
+  const hikeGoldGridEl = document.getElementById('hike-gold-grid');
+  const hikeList = document.getElementById('hike-list');
+  const hikeRearrangeBtn = document.getElementById('hike-rearrange-btn');
+  const hikeRearrangeSaveBtn = document.getElementById('hike-rearrange-save-btn');
+  const hikeRearrangeCancelBtn = document.getElementById('hike-rearrange-cancel-btn');
+  const hikeNewBtn = document.getElementById('hike-new-btn');
+  const hikeSearchFilterInput = document.getElementById('hike-search-filter-input');
+  const hikeSearchFilterClear = document.getElementById('hike-search-filter-clear');
   const exportAllBtn = document.getElementById('export-all-btn');
   const importAllBtn = document.getElementById('import-all-btn');
   const importAllFile = document.getElementById('import-all-file');
@@ -6096,6 +6147,9 @@
     if (page !== 'restaurants' && openRestaurantIndex !== null){
       closeRestaurantDetailsPanel();
     }
+    if (page !== 'hikes' && openHikeIndex !== null){
+      closeHikeDetailsPanel();
+    }
     if (page === 'songs'){
       renderSongsPage();
     }
@@ -6104,6 +6158,9 @@
     }
     if (page === 'dishes'){
       renderDishesPage();
+    }
+    if (page === 'hikes'){
+      renderHikesPage();
     }
   }
 
@@ -8518,6 +8575,809 @@
     return course.photos;
   }
 
+  // ---------- HIKES ----------
+  const HIKE_STORAGE_KEY = 'hike-list';
+  const HIKE_SCENERY_SCORES = [12, 11, 10, 9, 8];
+  const HIKE_DIFFICULTIES = ['Easy', 'Moderate', 'Hard'];
+  const US_STATES = ['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming'];
+  const CA_PROVINCES = ['Alberta','British Columbia','Manitoba','New Brunswick','Newfoundland and Labrador','Northwest Territories','Nova Scotia','Nunavut','Ontario','Prince Edward Island','Quebec','Saskatchewan','Yukon'];
+
+  let hikeRows = [];
+  let hikeLastSavedAt = null;
+  let openHikeIndex = null;
+  let newHikeDraft = null;
+  let hikeEditMode = false;
+  let hikeActiveDateId = null;
+  let hikeDateEditMode = false;
+  let hikeRearrangeMode = false;
+  let hikeSearchFilter = '';
+
+  async function loadHikeProgress(){
+    try{
+      const res = await window.storage.get(HIKE_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        hikeRows = Array.isArray(parsed.hikeRows) ? parsed.hikeRows : [];
+        hikeLastSavedAt = parsed.savedAt || null;
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+
+  function saveHikeProgress(){
+    hikeLastSavedAt = new Date().toISOString();
+    try{ window.storage.set(HIKE_STORAGE_KEY, JSON.stringify({ hikeRows, savedAt: hikeLastSavedAt }), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  function isUSCountry(country){
+    const c = (country || '').trim().toLowerCase();
+    return c === 'united states' || c === 'usa' || c === 'us' || c === 'united states of america';
+  }
+  function isCanadaCountry(country){
+    return (country || '').trim().toLowerCase() === 'canada';
+  }
+
+  function ensureHikeDates(h){
+    if (!h.dates) h.dates = [];
+    return h.dates;
+  }
+
+  function sortedHikeDates(h){
+    return ensureHikeDates(h).slice().sort((a, b) => {
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.localeCompare(a.date);
+    });
+  }
+
+  // Same fallback convention as getActiveVisit — falls back to the newest
+  // date if the remembered id no longer exists (e.g. that date was deleted).
+  function getActiveHikeDate(h){
+    const dates = ensureHikeDates(h);
+    if (!dates.length) return null;
+    const found = dates.find(d => d.id === hikeActiveDateId);
+    if (found) return found;
+    return sortedHikeDates(h)[0];
+  }
+
+  function hikeTotal(h){
+    const a = h.bestScenery ? Number(h.bestScenery) : null;
+    const b = h.amountOfScenery ? Number(h.amountOfScenery) : null;
+    return (a !== null && b !== null && !isNaN(a) && !isNaN(b)) ? a + b : null;
+  }
+
+  // Unlike Restaurants (purely manual order), Hikes sort automatically by
+  // total score — hikeRows' own array order only matters as the tie-break
+  // baseline for equal (or absent) totals, via a stable sort. Rearrange
+  // mode lets the user drag within this sorted view; saving it simply
+  // overwrites hikeRows with the new order, which then continues to serve
+  // as the tie-break baseline going forward.
+  function getOrderedHikes(){
+    return hikeRows
+      .map((h, i) => ({ h, i }))
+      .sort((x, y) => {
+        const tx = hikeTotal(x.h), ty = hikeTotal(y.h);
+        if (tx === null && ty === null) return x.i - y.i;
+        if (tx === null) return 1;
+        if (ty === null) return -1;
+        if (ty !== tx) return ty - tx;
+        return x.i - y.i;
+      })
+      .map(x => x.h);
+  }
+
+  function gatherAllHikePhotos(h){
+    const all = [];
+    if (h.coverPhoto) all.push(h.coverPhoto);
+    sortedHikeDates(h).forEach(d => {
+      (d.photos || []).forEach(p => {
+        const url = p && p.url;
+        if (url && all.indexOf(url) === -1) all.push(url);
+      });
+    });
+    return all;
+  }
+
+  function getEffectiveHikeCover(h){
+    return h.coverPhoto || gatherAllHikePhotos(h)[0] || '';
+  }
+
+  function hikeMatchesSearch(h, query){
+    const q = query.toLowerCase();
+    return (h.name || '').toLowerCase().includes(q)
+      || (h.city || '').toLowerCase().includes(q)
+      || (h.state || '').toLowerCase().includes(q)
+      || (h.country || '').toLowerCase().includes(q);
+  }
+
+  function formatHikeDate(dateStr){
+    if (!dateStr) return 'No date set';
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function openHikeDetailsPanel(index){
+    openHikeIndex = index;
+    newHikeDraft = null;
+    hikeEditMode = false;
+    hikeDateEditMode = false;
+    hikeActiveDateId = null;
+    hikeDetailsPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+    renderHikeDetailsContent();
+  }
+
+  function openNewHikeForm(){
+    openHikeIndex = null;
+    newHikeDraft = { name: '', city: '', state: '', country: '', distance: '', elevation: '', difficulty: '', allTrailsUrl: '' };
+    hikeDetailsPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+    renderHikeDetailsContent();
+  }
+
+  function closeHikeDetailsPanel(){
+    openHikeIndex = null;
+    newHikeDraft = null;
+    hikeEditMode = false;
+    hikeDetailsPanel.classList.remove('open');
+    document.body.classList.remove('details-open-lock');
+  }
+
+  function enterHikeEditMode(){
+    hikeEditMode = true;
+    renderHikeDetailsContent();
+  }
+
+  function cancelHikeEdit(){
+    if (newHikeDraft){
+      closeHikeDetailsPanel();
+      return;
+    }
+    hikeEditMode = false;
+    renderHikeDetailsContent();
+  }
+
+  function saveHikeEditForm(){
+    if (guestViewEnabled) return;
+    const name = hikeDetailsPanelInner.querySelector('#hike-edit-name').value.trim();
+    const city = hikeDetailsPanelInner.querySelector('#hike-edit-city').value.trim();
+    const country = hikeDetailsPanelInner.querySelector('#hike-edit-country').value.trim();
+    const stateInput = hikeDetailsPanelInner.querySelector('#hike-edit-state');
+    const state = stateInput ? stateInput.value.trim() : '';
+    const distance = hikeDetailsPanelInner.querySelector('#hike-edit-distance').value.trim();
+    const elevation = hikeDetailsPanelInner.querySelector('#hike-edit-elevation').value.trim();
+    const difficulty = hikeDetailsPanelInner.querySelector('#hike-edit-difficulty').value;
+    const allTrailsUrl = hikeDetailsPanelInner.querySelector('#hike-edit-alltrails').value.trim();
+
+    if (!name){
+      showToast('Give it a name first');
+      return;
+    }
+
+    if (newHikeDraft){
+      hikeRows.push({
+        name, city, state, country, distance, elevation, difficulty, allTrailsUrl,
+        bestScenery: '', amountOfScenery: '', coverPhoto: '', dates: []
+      });
+      newHikeDraft = null;
+      openHikeIndex = hikeRows.length - 1;
+      saveHikeProgress();
+      renderHikesPage();
+      renderHikeDetailsContent();
+      showToast('Hike added');
+    } else if (openHikeIndex !== null){
+      hikeEditMode = false;
+      updateOpenHike(hike => {
+        hike.name = name;
+        hike.city = city;
+        hike.state = state;
+        hike.country = country;
+        hike.distance = distance;
+        hike.elevation = elevation;
+        hike.difficulty = difficulty;
+        hike.allTrailsUrl = allTrailsUrl;
+      });
+      renderHikesPage();
+    }
+  }
+
+  function updateOpenHike(mutatorFn){
+    if (guestViewEnabled) return;
+    if (openHikeIndex === null) return;
+    const h = hikeRows[openHikeIndex];
+    mutatorFn(h);
+    saveHikeProgress();
+    renderHikeDetailsContent();
+    renderHikesPage();
+  }
+
+  function saveOpenHikeQuietly(mutatorFn){
+    if (guestViewEnabled) return;
+    if (openHikeIndex === null) return;
+    const h = hikeRows[openHikeIndex];
+    mutatorFn(h);
+    saveHikeProgress();
+  }
+
+  function addHikeDate(){
+    if (openHikeIndex === null) return;
+    hikeDateEditMode = false;
+    updateOpenHike(hike => {
+      const dates = ensureHikeDates(hike);
+      const newDate = { id: 'hd' + Date.now().toString(36) + Math.random().toString(36).slice(2), date: '', notes: '', photos: [] };
+      dates.push(newDate);
+      hikeActiveDateId = newDate.id;
+      hikeDateEditMode = true;
+    });
+  }
+
+  function switchActiveHikeDate(dateId){
+    hikeActiveDateId = dateId;
+    hikeDateEditMode = false;
+    renderHikeDetailsContent();
+  }
+
+  function enterHikeDateEditMode(){
+    hikeDateEditMode = true;
+    renderHikeDetailsContent();
+  }
+
+  function cancelHikeDateEdit(){
+    hikeDateEditMode = false;
+    renderHikeDetailsContent();
+  }
+
+  function saveHikeDateEdit(){
+    const date = hikeDetailsPanelInner.querySelector('#hike-date-edit-date').value;
+    const notes = hikeDetailsPanelInner.querySelector('#hike-date-edit-notes').value.trim();
+    hikeDateEditMode = false;
+    updateOpenHike(hike => {
+      const d = getActiveHikeDate(hike);
+      if (d){
+        d.date = date;
+        d.notes = notes;
+      }
+    });
+  }
+
+  function deleteActiveHikeDate(){
+    showConfirmModal(
+      'Delete this date?',
+      "This removes its photos and notes too. This can't be undone.",
+      () => {
+        updateOpenHike(hike => {
+          const dates = ensureHikeDates(hike);
+          const idx = dates.findIndex(d => d.id === hikeActiveDateId);
+          if (idx !== -1) dates.splice(idx, 1);
+          hikeActiveDateId = null;
+          hikeDateEditMode = false;
+        });
+      }
+    );
+  }
+
+  function renderHikeDateTabsHtml(sortedDates, activeDate){
+    if (sortedDates.length > 5){
+      const options = sortedDates.map(d =>
+        '<option value="' + d.id + '"' + (d.id === activeDate.id ? ' selected' : '') + '>' + escapeHtml(formatHikeDate(d.date)) + '</option>'
+      ).join('');
+      return '<select class="restaurant-visit-select" id="hike-date-select">' + options + '</select>';
+    }
+    return '<div class="restaurant-visit-tabs">' + sortedDates.map(d =>
+      '<button class="restaurant-visit-tab-btn' + (d.id === activeDate.id ? ' active' : '') + '" data-date-id="' + d.id + '" type="button">' + escapeHtml(formatHikeDate(d.date)) + '</button>'
+    ).join('') + '</div>';
+  }
+
+  function renderHikeDateMetaHtml(d){
+    if (hikeDateEditMode){
+      return (
+        '<div class="restaurant-edit-form restaurant-visit-edit-form">' +
+          '<label class="restaurant-edit-label">Date</label>' +
+          '<input type="date" class="restaurant-edit-input" id="hike-date-edit-date" value="' + escapeAttr(d.date || '') + '">' +
+          '<label class="restaurant-edit-label">Notes</label>' +
+          '<textarea class="restaurant-edit-input restaurant-visit-edit-notes" id="hike-date-edit-notes" placeholder="Notes about this hike...">' + escapeHtml(d.notes || '') + '</textarea>' +
+          '<div class="restaurant-edit-actions">' +
+            '<button class="btn-primary" id="hike-date-save-btn" type="button">Save</button>' +
+            '<button class="btn-ghost" id="hike-date-cancel-btn" type="button">Cancel</button>' +
+            '<button class="btn-danger" id="hike-date-delete-btn" type="button">Delete Date</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+    return (
+      '<div class="restaurant-visit-meta-row">' +
+        '<span class="restaurant-visit-date-display">' + escapeHtml(formatHikeDate(d.date)) + '</span>' +
+        '<button class="btn-ghost" id="hike-date-edit-btn" type="button">Edit</button>' +
+      '</div>' +
+      (d.notes ? '<p class="restaurant-visit-notes-display">' + escapeHtml(d.notes) + '</p>' : '')
+    );
+  }
+
+  // Each date's own photo drop section — no "courses" concept needed here
+  // (unlike Restaurants' visits), just a direct photo grid, same shape as
+  // Restaurants' "More Photos" section. Photos are stored as {url} objects
+  // rather than plain strings specifically to leave room for a future
+  // per-photo flag (e.g. linking a photo to a planned Photos tab) without
+  // needing to restructure this array later — that flag would live
+  // alongside url on each entry, not on the date or the hike itself, since
+  // it was described as unrelated to the hike's own score.
+  function renderHikeDatePhotosContentHtml(d){
+    const photos = d.photos || [];
+    const gridHtml = photos.map((p, i) =>
+      '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 350)) + '" alt="" loading="lazy">' +
+        '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
+      '</div>'
+    ).join('');
+    return (
+      '<div class="restaurant-other-photos-section">' +
+        '<span class="restaurant-other-photos-label">Photos</span>' +
+        '<div class="restaurant-photo-grid">' +
+          gridHtml +
+          '<div class="restaurant-photo-add-tile" id="hike-date-photo-add-tile" title="Drag an image here, or click to browse">+</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderHikeScoresRowHtml(h){
+    return (
+      '<div class="restaurant-scores-row">' +
+        '<div class="restaurant-score-block">' +
+          '<span class="restaurant-score-label">Best Scenery</span>' +
+          buildScoreSelectHtml(HIKE_SCENERY_SCORES, h.bestScenery, 'id="hike-best-scenery-select"') +
+        '</div>' +
+        '<div class="restaurant-score-block">' +
+          '<span class="restaurant-score-label">Amount of Scenery</span>' +
+          buildScoreSelectHtml(HIKE_SCENERY_SCORES, h.amountOfScenery, 'id="hike-amount-scenery-select"') +
+        '</div>' +
+        '<div class="restaurant-score-block restaurant-score-total-block" id="hike-score-total-block" style="display:none;">' +
+          '<span class="restaurant-score-label">Total</span>' +
+          '<span class="restaurant-score-total-value" id="hike-score-total-value"></span>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function updateHikeScoreTotalDisplay(){
+    const a = hikeDetailsPanelInner.querySelector('#hike-best-scenery-select');
+    const b = hikeDetailsPanelInner.querySelector('#hike-amount-scenery-select');
+    const totalBlock = hikeDetailsPanelInner.querySelector('#hike-score-total-block');
+    const totalValueEl = hikeDetailsPanelInner.querySelector('#hike-score-total-value');
+    if (!a || !b || !totalBlock) return;
+    const av = a.value ? Number(a.value) : null;
+    const bv = b.value ? Number(b.value) : null;
+    if (av !== null && bv !== null && !isNaN(av) && !isNaN(bv)){
+      totalValueEl.textContent = av + bv;
+      totalBlock.style.display = '';
+    } else {
+      totalBlock.style.display = 'none';
+    }
+  }
+
+  function hikeStateOptionsHtml(country){
+    if (isUSCountry(country)) return US_STATES;
+    if (isCanadaCountry(country)) return CA_PROVINCES;
+    return null;
+  }
+
+  function renderHikeEditForm(){
+    const isNew = !!newHikeDraft;
+    const h = isNew ? newHikeDraft : hikeRows[openHikeIndex];
+    const stateOptions = hikeStateOptionsHtml(h.country);
+
+    hikeDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">' + (isNew ? 'New Hike' : 'Edit Hike') + '</h2>' +
+        '<div class="restaurant-edit-form">' +
+          '<label class="restaurant-edit-label">Name</label>' +
+          '<input type="text" class="restaurant-edit-input" id="hike-edit-name" value="' + escapeAttr(h.name || '') + '">' +
+          '<label class="restaurant-edit-label">City / Park</label>' +
+          '<input type="text" class="restaurant-edit-input" id="hike-edit-city" value="' + escapeAttr(h.city || '') + '">' +
+          '<label class="restaurant-edit-label">Country</label>' +
+          '<input type="text" class="restaurant-edit-input" id="hike-edit-country" list="hike-country-datalist" value="' + escapeAttr(h.country || '') + '">' +
+          '<datalist id="hike-country-datalist"><option value="United States"><option value="Canada"></datalist>' +
+          (stateOptions
+            ? ('<label class="restaurant-edit-label">' + (isCanadaCountry(h.country) ? 'Province' : 'State') + '</label>' +
+               '<input type="text" class="restaurant-edit-input" id="hike-edit-state" list="hike-state-datalist" value="' + escapeAttr(h.state || '') + '">' +
+               '<datalist id="hike-state-datalist">' + stateOptions.map(s => '<option value="' + escapeAttr(s) + '">').join('') + '</datalist>')
+            : '') +
+          '<label class="restaurant-edit-label">Distance (miles)</label>' +
+          '<input type="text" inputmode="decimal" class="restaurant-edit-input" id="hike-edit-distance" value="' + escapeAttr(h.distance || '') + '">' +
+          '<label class="restaurant-edit-label">Elevation Gain (feet)</label>' +
+          '<input type="text" inputmode="numeric" class="restaurant-edit-input" id="hike-edit-elevation" value="' + escapeAttr(h.elevation || '') + '">' +
+          '<label class="restaurant-edit-label">Difficulty</label>' +
+          '<select class="restaurant-edit-input" id="hike-edit-difficulty">' +
+            '<option value="">—</option>' +
+            HIKE_DIFFICULTIES.map(d => '<option value="' + d + '"' + (h.difficulty === d ? ' selected' : '') + '>' + d + '</option>').join('') +
+          '</select>' +
+          '<label class="restaurant-edit-label">AllTrails Link</label>' +
+          '<input type="text" class="restaurant-edit-input" id="hike-edit-alltrails" placeholder="alltrails.com/trail/..." value="' + escapeAttr(h.allTrailsUrl || '') + '">' +
+        '</div>' +
+        '<div class="restaurant-edit-actions">' +
+          '<button class="btn-primary" id="hike-edit-save-btn" type="button">Save</button>' +
+          '<button class="btn-ghost" id="hike-edit-cancel-btn" type="button">Cancel</button>' +
+        '</div>' +
+      '</div>';
+
+    hikeDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeHikeDetailsPanel);
+    hikeDetailsPanelInner.querySelector('#hike-edit-save-btn').addEventListener('click', saveHikeEditForm);
+    hikeDetailsPanelInner.querySelector('#hike-edit-cancel-btn').addEventListener('click', cancelHikeEdit);
+    // Re-renders the whole form on country change so the state/province
+    // field (and its datalist) can appear, disappear, or swap between US
+    // states and Canadian provinces — simplest correct approach given how
+    // much of the form's shape depends on this one field.
+    hikeDetailsPanelInner.querySelector('#hike-edit-country').addEventListener('input', (e) => {
+      h.country = e.target.value;
+      h.name = hikeDetailsPanelInner.querySelector('#hike-edit-name').value;
+      h.city = hikeDetailsPanelInner.querySelector('#hike-edit-city').value;
+      h.distance = hikeDetailsPanelInner.querySelector('#hike-edit-distance').value;
+      h.elevation = hikeDetailsPanelInner.querySelector('#hike-edit-elevation').value;
+      h.allTrailsUrl = hikeDetailsPanelInner.querySelector('#hike-edit-alltrails').value;
+      renderHikeEditForm();
+      hikeDetailsPanelInner.querySelector('#hike-edit-country').focus();
+    });
+  }
+
+  function renderHikeDetailsContent(){
+    if (newHikeDraft || hikeEditMode){
+      renderHikeEditForm();
+      return;
+    }
+    if (openHikeIndex === null) return;
+
+    const h = hikeRows[openHikeIndex];
+    const orderedHikes = getOrderedHikes();
+    const rank = orderedHikes.indexOf(h) + 1;
+    const metaParts = [h.city, h.state, h.country].filter(Boolean);
+    const meta = metaParts.join(' • ');
+    const statParts = [];
+    if (h.distance) statParts.push(h.distance + ' mi');
+    if (h.elevation) statParts.push(h.elevation + ' ft gain');
+    if (h.difficulty) statParts.push(h.difficulty);
+    const statLine = statParts.join(' • ');
+
+    const sortedDates = sortedHikeDates(h);
+    const activeDate = getActiveHikeDate(h);
+    if (activeDate) hikeActiveDateId = activeDate.id;
+
+    const datesSectionHtml = sortedDates.length
+      ? (
+          '<div class="restaurant-visits-header">' +
+            renderHikeDateTabsHtml(sortedDates, activeDate) +
+            '<button class="btn-ghost restaurant-visit-add-btn" id="hike-date-add-btn" type="button">+ New Date</button>' +
+          '</div>' +
+          '<div class="restaurant-visit-content">' +
+            renderHikeDateMetaHtml(activeDate) +
+            (hikeDateEditMode ? '' : renderHikeDatePhotosContentHtml(activeDate)) +
+          '</div>'
+        )
+      : (
+          '<div class="restaurant-visits-header">' +
+            '<p class="restaurant-course-empty" style="margin:0;">No dates logged yet.</p>' +
+            '<button class="btn-ghost restaurant-visit-add-btn" id="hike-date-add-btn" type="button">+ New Date</button>' +
+          '</div>'
+        );
+
+    const effectiveCover = getEffectiveHikeCover(h);
+    hikeDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to open the photo gallery"' : ' title="Add photos via a date below"') + '>' +
+          (effectiveCover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="">' : '<span class="art-drop-hint">🏔️</span>') +
+        '</div>' +
+        (h.allTrailsUrl ? '<button class="details-website-btn" type="button" title="Open on AllTrails">🥾</button>' : '') +
+        '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(h.name) + '</h2>' +
+        (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
+        (statLine ? '<p class="details-artist">' + escapeHtml(statLine) + '</p>' : '') +
+        renderHikeScoresRowHtml(h) +
+      '</div>' +
+      datesSectionHtml;
+
+    hikeDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeHikeDetailsPanel);
+    hikeDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', enterHikeEditMode);
+    wireHikeCoverPhotoDropZone(hikeDetailsPanelInner.querySelector('.restaurant-cover-drop'), h, openHikeIndex);
+    const allTrailsBtn = hikeDetailsPanelInner.querySelector('.details-website-btn');
+    if (allTrailsBtn){
+      allTrailsBtn.addEventListener('click', () => {
+        window.open(normalizeWebsiteUrl(h.allTrailsUrl), '_blank', 'noopener,noreferrer');
+      });
+    }
+
+    updateHikeScoreTotalDisplay();
+    const bestScenerySelect = hikeDetailsPanelInner.querySelector('#hike-best-scenery-select');
+    const amountScenerySelect = hikeDetailsPanelInner.querySelector('#hike-amount-scenery-select');
+    bestScenerySelect.addEventListener('change', () => {
+      bestScenerySelect.classList.toggle('has-score', !!bestScenerySelect.value);
+      saveOpenHikeQuietly(hike => { hike.bestScenery = bestScenerySelect.value; });
+      updateHikeScoreTotalDisplay();
+    });
+    amountScenerySelect.addEventListener('change', () => {
+      amountScenerySelect.classList.toggle('has-score', !!amountScenerySelect.value);
+      saveOpenHikeQuietly(hike => { hike.amountOfScenery = amountScenerySelect.value; });
+      updateHikeScoreTotalDisplay();
+    });
+    bestScenerySelect.classList.toggle('has-score', !!bestScenerySelect.value);
+    amountScenerySelect.classList.toggle('has-score', !!amountScenerySelect.value);
+    // Re-renders the whole panel (unlike the quiet score-select updates
+    // above) since a score change alone can shift this hike's rank display
+    // in the heading above — renderHikesPage keeps the grid/list behind it
+    // in sync the same way.
+    bestScenerySelect.addEventListener('change', renderHikesPage);
+    amountScenerySelect.addEventListener('change', renderHikesPage);
+
+    const dateAddBtn = hikeDetailsPanelInner.querySelector('#hike-date-add-btn');
+    if (dateAddBtn) dateAddBtn.addEventListener('click', addHikeDate);
+    hikeDetailsPanelInner.querySelectorAll('.restaurant-visit-tab-btn[data-date-id]').forEach(btn => {
+      btn.addEventListener('click', () => switchActiveHikeDate(btn.dataset.dateId));
+    });
+    const dateSelect = hikeDetailsPanelInner.querySelector('#hike-date-select');
+    if (dateSelect) dateSelect.addEventListener('change', () => switchActiveHikeDate(dateSelect.value));
+
+    if (hikeDateEditMode){
+      hikeDetailsPanelInner.querySelector('#hike-date-save-btn').addEventListener('click', saveHikeDateEdit);
+      hikeDetailsPanelInner.querySelector('#hike-date-cancel-btn').addEventListener('click', cancelHikeDateEdit);
+      hikeDetailsPanelInner.querySelector('#hike-date-delete-btn').addEventListener('click', deleteActiveHikeDate);
+    } else if (activeDate) {
+      const dateEditBtn = hikeDetailsPanelInner.querySelector('#hike-date-edit-btn');
+      if (dateEditBtn) dateEditBtn.addEventListener('click', enterHikeDateEditMode);
+
+      hikeDetailsPanelInner.querySelectorAll('.restaurant-photo-thumb').forEach(thumb => {
+        thumb.addEventListener('click', (e) => {
+          if (e.target.closest('.restaurant-photo-remove-btn')) return;
+          const url = ((activeDate.photos || [])[Number(thumb.dataset.photoIndex)] || {}).url;
+          const allPhotos = gatherAllHikePhotos(h);
+          openPhotoLightbox(allPhotos, allPhotos.indexOf(url), null);
+        });
+      });
+      hikeDetailsPanelInner.querySelectorAll('.restaurant-photo-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const i = Number(btn.dataset.removePhotoIndex);
+          updateOpenHike(hike => { getActiveHikeDate(hike).photos.splice(i, 1); });
+        });
+      });
+
+      const addTile = hikeDetailsPanelInner.querySelector('#hike-date-photo-add-tile');
+      if (addTile){
+        const addPhotoFiles = async (files) => {
+          const fileArray = Array.from(files || []).filter(f => f);
+          if (!fileArray.length) return;
+          const originalText = addTile.textContent;
+          const uploaded = [];
+          for (let i = 0; i < fileArray.length; i++){
+            if (fileArray.length > 1) addTile.textContent = (i + 1) + '/' + fileArray.length;
+            const url = await uploadRestaurantPhoto(fileArray[i], 'RankHeaven/HikePhotos');
+            if (url) uploaded.push({ url });
+          }
+          addTile.textContent = originalText;
+          if (uploaded.length){
+            updateOpenHike(hike => {
+              const d = getActiveHikeDate(hike);
+              if (!d.photos) d.photos = [];
+              d.photos.push(...uploaded);
+            });
+          }
+        };
+        addTile.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          addTile.classList.add('drag-over');
+        });
+        addTile.addEventListener('dragleave', () => addTile.classList.remove('drag-over'));
+        addTile.addEventListener('drop', (e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          addTile.classList.remove('drag-over');
+          addPhotoFiles(e.dataTransfer.files);
+        });
+        addTile.addEventListener('click', () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.multiple = true;
+          input.addEventListener('change', () => addPhotoFiles(input.files));
+          input.click();
+        });
+      }
+    }
+  }
+
+  // Mirrors wireRestaurantCoverPhotoDropZone — click opens the full gallery
+  // (all of this hike's photos), drag-drop sets a new explicit cover.
+  function wireHikeCoverPhotoDropZone(el, h, index){
+    el.addEventListener('click', () => {
+      const allPhotos = gatherAllHikePhotos(h);
+      if (!allPhotos.length) return;
+      openPhotoLightbox(allPhotos, 0, null);
+    });
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', async (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const url = await uploadRestaurantPhoto(file, 'RankHeaven/HikeCovers');
+      if (url){
+        updateOpenHike(hike => { hike.coverPhoto = url; });
+      }
+    });
+  }
+
+  function makeHikeRowDraggable(li){
+    li.setAttribute('draggable', 'true');
+    li.addEventListener('dragstart', () => {
+      hikeDragSourceEl = li;
+      li.classList.add('dragging');
+    });
+    li.addEventListener('dragend', () => { li.classList.remove('dragging'); hikeDragSourceEl = null; });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!hikeDragSourceEl || hikeDragSourceEl === li || !li.parentNode) return;
+      if (isBeforeInDom(hikeDragSourceEl, li)){
+        li.parentNode.insertBefore(hikeDragSourceEl, li.nextSibling);
+      } else {
+        li.parentNode.insertBefore(hikeDragSourceEl, li);
+      }
+    });
+    li.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+  let hikeDragSourceEl = null;
+
+  function toggleHikeRearrangeMode(){
+    hikeRearrangeMode = true;
+    renderHikesPage();
+  }
+
+  function cancelHikeRearrangeMode(){
+    hikeRearrangeMode = false;
+    renderHikesPage();
+  }
+
+  // The dragged DOM order (over getOrderedHikes' sorted view) becomes the
+  // new hikeRows array order — which then serves as the tie-break baseline
+  // for future sorts, exactly like getOrderedHikes' own comment describes.
+  function saveHikeRearrange(){
+    if (guestViewEnabled) return;
+    const newOrder = Array.from(hikeList.children).map(li => getOrderedHikes()[Number(li.dataset.originalIndex)]);
+    hikeRows = newOrder;
+    hikeRearrangeMode = false;
+    saveHikeProgress();
+    renderHikesPage();
+    showToast('Order saved');
+  }
+
+  function renderHikesPage(){
+    hikeRearrangeBtn.style.display = hikeRearrangeMode ? 'none' : 'inline-block';
+    hikeRearrangeSaveBtn.style.display = hikeRearrangeMode ? 'inline-block' : 'none';
+    hikeRearrangeCancelBtn.style.display = hikeRearrangeMode ? 'inline-block' : 'none';
+    hikeNewBtn.style.display = hikeRearrangeMode ? 'none' : 'inline-block';
+
+    if (!hikeRows.length){
+      hikeGoldGridEl.innerHTML = '';
+      hikeGoldGridEl.style.display = 'none';
+      hikeList.innerHTML = '<p class="details-future-note">No hikes yet — add one to get started.</p>';
+      return;
+    }
+
+    const ordered = getOrderedHikes();
+
+    if (hikeRearrangeMode){
+      hikeGoldGridEl.innerHTML = '';
+      hikeGoldGridEl.style.display = 'none';
+      hikeList.innerHTML = ordered.map((h, idx) => {
+        const meta = [h.city, h.state, h.country].filter(Boolean).join(' • ');
+        return (
+          '<li data-original-index="' + idx + '">' +
+            '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">' +
+            '<span class="rank-item">' +
+              '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(h.name) + '</span></span>' +
+              (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+            '</span>' +
+            '<span class="row-drag-handle" title="Drag to reorder">' +
+              '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" draggable="false">' +
+                '<circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>' +
+                '<circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/>' +
+                '<circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>' +
+              '</svg>' +
+            '</span>' +
+          '</li>'
+        );
+      }).join('');
+      Array.from(hikeList.children).forEach(li => makeHikeRowDraggable(li));
+      return;
+    }
+
+    const goldCards = [];
+    const listRows = [];
+
+    ordered.forEach((h, i) => {
+      const realIndex = hikeRows.indexOf(h);
+      if (hikeSearchFilter && !hikeMatchesSearch(h, hikeSearchFilter)) return;
+      const rank = i + 1;
+
+      if (rank <= 20){
+        const meta = [h.city, h.state].filter(Boolean).join(', ');
+        const effectiveCover = getEffectiveHikeCover(h);
+        goldCards.push(
+          '<div class="restaurant-gold-card" data-hike-index="' + realIndex + '">' +
+            '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+            (effectiveCover
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
+              : '<span class="art-drop-hint">🏔️</span>') +
+            '<div class="restaurant-gold-card-overlay">' +
+              '<div class="restaurant-gold-card-name">' + escapeHtml(h.name) + '</div>' +
+              (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
+            '</div>' +
+          '</div>'
+        );
+        return;
+      }
+
+      const meta = [h.city, h.state, h.country].filter(Boolean).join(' • ');
+      const statParts = [];
+      if (h.distance) statParts.push(h.distance + ' mi');
+      if (h.difficulty) statParts.push(h.difficulty);
+      const total = hikeTotal(h);
+      const scoreLineParts = statParts.map(s => '<span class="restaurant-score-part">' + escapeHtml(s) + '</span>');
+      if (total !== null) scoreLineParts.push('<span class="restaurant-total">' + total + '</span>');
+      const scoreLineHtml = scoreLineParts.length
+        ? '<span class="restaurant-scores-line">' + scoreLineParts.join('<span class="restaurant-score-sep">|</span>') + '</span>'
+        : '';
+
+      listRows.push(
+        '<li data-hike-index="' + realIndex + '">' +
+          '<span class="rank-num">' + rank + '</span>' +
+          '<span class="rank-item">' +
+            '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(h.name) + '</span></span>' +
+            (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+          '</span>' +
+          '<span class="restaurant-stats">' + scoreLineHtml + '</span>' +
+        '</li>'
+      );
+    });
+
+    hikeGoldGridEl.innerHTML = goldCards.join('');
+    hikeGoldGridEl.style.display = goldCards.length ? 'grid' : 'none';
+    hikeList.innerHTML = listRows.join('');
+
+    Array.from(hikeGoldGridEl.children).forEach(card => {
+      card.addEventListener('click', () => openHikeDetailsPanel(Number(card.dataset.hikeIndex)));
+    });
+    Array.from(hikeList.children).forEach(li => {
+      li.addEventListener('click', () => openHikeDetailsPanel(Number(li.dataset.hikeIndex)));
+    });
+  }
+
+  hikeNewBtn.addEventListener('click', openNewHikeForm);
+  hikeRearrangeBtn.addEventListener('click', toggleHikeRearrangeMode);
+  hikeRearrangeSaveBtn.addEventListener('click', saveHikeRearrange);
+  hikeRearrangeCancelBtn.addEventListener('click', cancelHikeRearrangeMode);
+  hikeSearchFilterInput.addEventListener('input', () => {
+    hikeSearchFilter = hikeSearchFilterInput.value.trim();
+    hikeSearchFilterClear.style.display = hikeSearchFilter ? 'flex' : 'none';
+    renderHikesPage();
+  });
+  hikeSearchFilterClear.addEventListener('click', () => {
+    hikeSearchFilterInput.value = '';
+    hikeSearchFilter = '';
+    hikeSearchFilterClear.style.display = 'none';
+    renderHikesPage();
+  });
+
   // ---------- DISHES ----------
   // A dish is simply a course scored 12/10 — nothing here has its own copy
   // of the photo/text/score; all of that is read live from the actual
@@ -9832,6 +10692,7 @@
   loadMusicbeeLibrary();
   loadGuestViewSetting();
   loadDishOrder();
+  loadHikeProgress();
   loadPointsAlgorithm().then(checkSavedProgress);
 })();
 </script>
