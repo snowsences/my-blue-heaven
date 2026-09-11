@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Blue Heaven</title>
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32-v2.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16-v2.png">
+<link rel="apple-touch-icon" href="apple-touch-icon-v2.png">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#142A2E">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -29,6 +29,7 @@
     --amber: #E8A33D;
     --amber-dark: #C6821F;
     --brick: #C8593F;
+    --green: #5FBF77;
     --radius: 18px;
     --desktop-nav-height: 64px;
   }
@@ -110,6 +111,7 @@
     border-bottom-color: var(--amber);
   }
   .top-nav-icon{ font-size: 16px; line-height: 1; flex-shrink: 0; }
+  .guest-top-nav{ display: none; }
   .top-nav-settings-btn{
     display: flex;
     align-items: center;
@@ -583,6 +585,14 @@
     line-height: 1;
     padding: 4px 6px;
   }
+  .restaurant-score-price-value{
+    font-family: 'Figtree', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    line-height: 1;
+    padding: 4px 6px;
+  }
 
   /* ---------- RESTAURANT VISITS ----------
      Top-level tabs (one per visit) sitting below the cover photo and
@@ -911,6 +921,35 @@
     line-height: 1.02;
     margin: 0 0 14px;
   }
+  /* Top-level group's sub-tabs (e.g. Albums/Songs under Music) — replaces
+     an H1 in visual weight/position, but as clickable tabs. Sits above
+     everything else on the page, including (for Albums/Songs specifically)
+     the existing Duels/Rankings tab-switcher beneath it — two distinct
+     levels of hierarchy, so styled distinctly from .tab-switcher/.tab-btn
+     rather than reusing them. */
+  .group-sub-tabs{
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    margin: 0 0 20px;
+    flex-wrap: wrap;
+  }
+  .group-sub-tab-btn{
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'Figtree', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    font-size: clamp(26px, 4.5vw, 40px);
+    line-height: 1.02;
+    color: var(--chalk-dim);
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  .group-sub-tab-btn .group-sub-tab-icon{ font-size: 0.7em; margin-right: 6px; }
+  .group-sub-tab-btn:hover{ color: var(--chalk); }
+  .group-sub-tab-btn.active{ color: var(--chalk); font-weight: 700; }
   .page-heading-row{
     display: flex;
     align-items: center;
@@ -1016,12 +1055,55 @@
   .import-row{
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 10px;
     margin-top: 16px;
     color: var(--chalk-dim);
     font-size: 13px;
     flex-wrap: wrap;
+  }
+  .toggle-switch{
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle-switch input{
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .toggle-switch-track{
+    position: absolute;
+    inset: 0;
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+    border-radius: 999px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .toggle-switch-track::before{
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: var(--chalk-dim);
+    border-radius: 50%;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  .toggle-switch input:checked + .toggle-switch-track{
+    background: var(--amber-dark);
+    border-color: var(--amber);
+  }
+  .toggle-switch input:checked + .toggle-switch-track::before{
+    transform: translateX(20px);
+    background: var(--amber);
   }
   .dock-import-row{
     display: flex;
@@ -1035,7 +1117,7 @@
   .lastfm-row{
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 10px;
     color: var(--chalk-dim);
     font-size: 13px;
@@ -1291,6 +1373,15 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
+  /* Restaurants list row's tier indicator — same fill as .tier-chip, just a
+     plain circle with no text, matching that chip's approximate height. */
+  .restaurant-tier-dot{
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
   .restaurant-name-row{
     display: flex;
     align-items: center;
@@ -1372,13 +1463,13 @@
   .restaurant-gold-grid{
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 12px;
+    gap: 2px;
     margin-bottom: 28px;
   }
   .restaurant-gold-card{
     position: relative;
     aspect-ratio: 1 / 1;
-    border-radius: 10px;
+    border-radius: 4px;
     overflow: hidden;
     cursor: pointer;
     background: var(--bg-2);
@@ -1418,13 +1509,9 @@
     top: 8px;
     right: 8px;
     z-index: 1;
-    font-family: 'Figtree', sans-serif;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 3px 8px;
-    border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
   }
   .restaurant-gold-card-overlay{
     position: absolute;
@@ -1548,7 +1635,7 @@
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background: var(--bg-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23F1ECDE' stroke-opacity='0.65' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    background: var(--bg-2);
     color: var(--chalk);
     border: 1px solid var(--panel-line);
     border-radius: 999px;
@@ -1559,12 +1646,15 @@
   }
   .filter-input::placeholder{ color: var(--chalk-dim); font-weight: 500; }
   .filter-input:focus{ outline: none; border-color: var(--amber); }
-  .filter-input:not(:placeholder-shown){ background-image: none; } /* clear (X) button occupies this same corner once there's a value */
   .filter-input::-webkit-calendar-picker-indicator{
-    display: none; /* Chrome's own hover-revealed datalist arrow — separate from, and redundant with, the custom one above */
+    display: none; /* Chrome's own hover-revealed datalist arrow */
     opacity: 0;
     pointer-events: none;
   }
+  /* 12px gap between the search bar and the restaurants themselves below it
+     — scoped to this page specifically, not the shared .filters-group used
+     on Albums/Songs too. */
+  #page-restaurants .filters-group{ margin-bottom: 12px; }
   .year-filter-input{ width: 120px; }
   .artist-filter-input{ width: 160px; }
   .grouping-filter-input{ width: 140px; }
@@ -1755,11 +1845,17 @@
     flex-wrap: wrap;
     margin-bottom: 16px;
     position: sticky;
-    top: 12px;
+    /* The fixed desktop nav (64px tall, z-index 100) sits on top of the
+       same space a plain top:12px would stick to — this clears it,
+       stopping just below the nav instead of hidden underneath it. Only
+       relevant on desktop, where the nav is fixed to the top at all; the
+       mobile override further down (where the nav moves to the bottom
+       instead) reverts this back to a plain 12px. */
+    top: calc(var(--desktop-nav-height) + 12px);
     z-index: 10;
     background: var(--panel);
     border: 1px solid var(--panel-line);
-    border-radius: 999px;
+    border-radius: 8px;
     padding: 12px 16px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.28);
   }
@@ -1784,11 +1880,31 @@
     flex-wrap: wrap;
     margin-bottom: 16px;
     position: sticky;
-    top: 12px;
+    top: calc(var(--desktop-nav-height) + 12px); /* see .reorder-bar's identical comment above */
     z-index: 10;
     background: var(--panel);
     border: 1px solid var(--panel-line);
-    border-radius: 999px;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+  }
+
+  /* Dishes' own copy too, same reasoning as Songs' above — its page also
+     sits outside #page-shell in its own container. Always visible (no
+     display:none base) since Dishes has no isComplete-style gate — the
+     grid and toolbar are always there, nothing to complete first. */
+  #dish-reorder-bar{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    position: sticky;
+    top: calc(var(--desktop-nav-height) + 12px);
+    z-index: 10;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
     padding: 12px 16px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.28);
   }
@@ -1823,6 +1939,26 @@
     transition: background 0.12s ease, color 0.12s ease;
   }
   .row-remove-btn:hover{ background: var(--brick); color: #fff; }
+  /* Dishes' edit-mode equivalent of .row-remove-btn — same size/shape, but
+     a star (removing simply clears the course's score below 12/10, so it
+     drops out of Dishes — never deletes anything) rather than an X. */
+  .dish-unfavorite-btn{
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(255,215,0,0.14);
+    color: #FFD700;
+    border: none;
+    padding: 0;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .dish-unfavorite-btn:hover{ background: #FFD700; color: var(--ink); }
 
   .row-relisten-btn{
     width: 26px;
@@ -2233,6 +2369,11 @@
        this guards against any stray horizontal scroll on the shell itself.
     */
     #page-shell{ overflow-x: hidden; }
+    /* The nav moves to the bottom on mobile (further down this block) — the
+       top of the viewport is clear here, unlike on desktop, so this reverts
+       both reorder bars back to a plain 12px rather than clearing a fixed
+       top nav that isn't there. */
+    .reorder-bar, #song-reorder-bar{ top: 12px; }
     #details-panel{
       position: fixed;
       inset: 0;
@@ -2361,6 +2502,88 @@
       padding-bottom: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom, 0px) + 20px);
     }
   }
+
+  /* ---------- GUEST VIEW ---------- */
+  /* See applyGuestViewMode's own comment for the full reasoning — this is
+     the visual half (hiding nav tabs, rank/score/tier indicators, and every
+     editing affordance); the data-safety half lives in the shared mutation
+     functions in JS, since a hidden button doesn't stop a still-listening
+     drop zone. Order in the list/grid is untouched — that's the ranking
+     Guest View still shows, just without the numbers/tiers that spell it
+     out explicitly.
+     Spec is "Restaurants and Hikes only" — rather than showing the normal
+     grouped nav with everything else hidden inside it, the whole thing
+     swaps for a dedicated, flat 2-tab bar (#guest-top-nav) built for
+     exactly this. That also means the sub-navs embedded in the Restaurants
+     and Hikes pages themselves (Food's own Restaurants/Dishes switcher,
+     Nature's own Hikes/Roads/Parks switcher) hide too, since they'd
+     otherwise offer a second, redundant way to reach the same two pages
+     while also exposing Dishes/Roads/Parks, which shouldn't be reachable
+     at all here. */
+  body.guest-view-active .top-nav-inner > .top-nav:not(.guest-top-nav){ display: none; }
+  body.guest-view-active .guest-top-nav{ display: flex; }
+  body.guest-view-active #food-sub-tabs,
+  body.guest-view-active #food-sub-tabs-2,
+  body.guest-view-active #nature-sub-tabs-hikes,
+  body.guest-view-active #nature-sub-tabs-roads,
+  body.guest-view-active #nature-sub-tabs-parks{ display: none; }
+
+  /* Rank/score/tier indicators — restaurant grid + list */
+  body.guest-view-active .restaurant-gold-card-rank,
+  body.guest-view-active .restaurant-gold-card-tier,
+  body.guest-view-active #restaurant-list .rank-num,
+  body.guest-view-active .restaurant-scores-line,
+  body.guest-view-active .tier-chip,
+  body.guest-view-active .restaurant-tier-dot,
+  body.guest-view-active .tiers-panel,
+  body.guest-view-active .restaurant-heading-actions .btn-ghost[id="restaurant-rearrange-btn"]{ display: none; }
+  /* The tier-driven colored left border on list rows is itself a score
+     indicator (color maps directly to tier) — cleared the same way a tier
+     chip is hidden, rather than leaving a colorless assumption in place. */
+  body.guest-view-active #restaurant-list li{ border-left: none !important; }
+
+  /* Every editing affordance: new/rearrange/edit restaurant, visits,
+     courses, pairings, photos (add/remove/replace), and the bulk importer.
+     Viewing (tabs, dropdown, gallery navigation) is untouched — only
+     controls that create, remove, or modify something are hidden. */
+  body.guest-view-active #restaurant-tiers-panel{ display: none; }
+  body.guest-view-active #restaurant-new-btn,
+  body.guest-view-active #restaurant-rearrange-btn,
+  body.guest-view-active .details-edit-btn,
+  body.guest-view-active .restaurant-visit-add-btn,
+  body.guest-view-active .restaurant-bulk-import-btn,
+  body.guest-view-active #restaurant-visit-edit-btn,
+  body.guest-view-active .restaurant-course-add-btn,
+  body.guest-view-active .restaurant-course-remove-btn,
+  body.guest-view-active .restaurant-course-pairing-btn,
+  body.guest-view-active .restaurant-course-photo-add-btn,
+  body.guest-view-active .restaurant-photo-add-tile,
+  body.guest-view-active .restaurant-photo-remove-btn,
+  body.guest-view-active .lightbox-cover-toggle-btn,
+  body.guest-view-active .lightbox-delete-btn{ display: none !important; }
+  /* Course/pairing text and score selects, and the cover/course/pairing
+     photo drop zones themselves — read-only, not just their buttons hidden.
+     pointer-events:none stops both click-to-upload and drag-drop; the
+     inputs are also genuinely disabled so no stray keystroke could edit
+     text even if focus landed there some other way. */
+  body.guest-view-active .restaurant-course-text,
+  body.guest-view-active .restaurant-score-select{ pointer-events: none; }
+  /* Both drop zones keep pointer-events so clicking still opens the
+     gallery to VIEW existing photos (a read action) — the actual upload
+     paths (click-when-empty, drag-drop) are blocked precisely in JS instead
+     of here, since a single click handler on each serves both behaviors
+     and CSS can't distinguish between them. */
+  body.guest-view-active .restaurant-cover-drop,
+  body.guest-view-active .restaurant-course-photo-drop{ cursor: default; }
+  body.guest-view-active .restaurant-cover-drop img,
+  body.guest-view-active .restaurant-course-photo-drop img{ cursor: pointer; }
+
+  /* One specific, hard-coded Google account (see LOCKED_GUEST_EMAIL) — on
+     top of everything guest-view-active already hides (this account always
+     has that set too, forced on sign-in), this additionally removes their
+     only path to the Settings tab, where the Guest View toggle itself
+     lives — so there's no way for this account to ever turn it back off. */
+  body.locked-guest-account #top-nav-settings-btn{ display: none; }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
@@ -2412,9 +2635,18 @@
     <div class="top-nav-inner">
       <span class="top-nav-brand">My Blue Heaven</span>
       <div class="top-nav">
-        <button class="top-nav-btn active" id="top-nav-albums-btn" type="button"><span class="top-nav-icon">💿</span><span class="top-nav-label">Albums</span></button>
-        <button class="top-nav-btn" id="top-nav-songs-btn" type="button"><span class="top-nav-icon">🎵</span><span class="top-nav-label">Songs</span></button>
-        <button class="top-nav-btn" id="top-nav-restaurants-btn" type="button"><span class="top-nav-icon">🍴</span><span class="top-nav-label">Restaurants</span></button>
+        <button class="top-nav-btn active" id="top-nav-music-btn" type="button"><span class="top-nav-icon">🎧</span><span class="top-nav-label">Music</span></button>
+        <button class="top-nav-btn" id="top-nav-food-btn" type="button"><span class="top-nav-icon">🍅</span><span class="top-nav-label">Food</span></button>
+        <button class="top-nav-btn" id="top-nav-nature-btn" type="button"><span class="top-nav-icon">🏔️</span><span class="top-nav-label">Nature</span></button>
+        <button class="top-nav-btn" id="top-nav-art-btn" type="button"><span class="top-nav-icon">🎭</span><span class="top-nav-label">Art</span></button>
+      </div>
+      <!-- Dedicated to Guest View — hidden entirely otherwise (see the
+           body.guest-view-active rules), shown in place of .top-nav rather
+           than showing the normal grouped nav with items hidden inside it.
+           Flat (no grouping/sub-tabs) since there's only the two. -->
+      <div class="top-nav guest-top-nav" id="guest-top-nav">
+        <button class="top-nav-btn active" id="guest-nav-restaurants-btn" type="button"><span class="top-nav-icon">🍴</span><span class="top-nav-label">Restaurants</span></button>
+        <button class="top-nav-btn" id="guest-nav-hikes-btn" type="button"><span class="top-nav-icon">🏕️</span><span class="top-nav-label">Hikes</span></button>
       </div>
       <button class="top-nav-settings-btn" id="top-nav-settings-btn" type="button" title="Settings"><span class="top-nav-icon">⚙️</span><span class="top-nav-label">Settings</span></button>
     </div>
@@ -2422,6 +2654,11 @@
 
   <div id="page-albums" class="top-page active">
   <div id="app">
+
+  <div class="group-sub-tabs" id="music-sub-tabs">
+    <button class="group-sub-tab-btn active" id="music-subtab-albums-btn" type="button"><span class="group-sub-tab-icon">💿</span>Albums</button>
+    <button class="group-sub-tab-btn" id="music-subtab-songs-btn" type="button"><span class="group-sub-tab-icon">🎵</span>Songs</button>
+  </div>
 
   <!-- SCREEN 1: INPUT -->
   <section class="screen active" id="screen-input">
@@ -2488,7 +2725,6 @@
     </div>
 
     <div class="tab-panel" id="tab-results">
-      <p class="eyebrow">Standings</p>
       <h1 id="results-heading">Your Album Rankings</h1>
       <p class="sub" id="results-sub"></p>
 
@@ -2604,6 +2840,11 @@
   <div id="page-songs" class="top-page">
   <div class="song-app">
 
+  <div class="group-sub-tabs" id="music-sub-tabs-songs">
+    <button class="group-sub-tab-btn" id="music-subtab-albums-btn-2" type="button"><span class="group-sub-tab-icon">💿</span>Albums</button>
+    <button class="group-sub-tab-btn active" id="music-subtab-songs-btn-2" type="button"><span class="group-sub-tab-icon">🎵</span>Songs</button>
+  </div>
+
     <section class="screen active" id="song-screen-input">
       <p class="eyebrow">Songs</p>
       <h1>Rank your loved songs,<br>one duel at a time.</h1>
@@ -2663,7 +2904,6 @@
       </div>
 
       <div class="tab-panel" id="song-tab-results">
-        <p class="eyebrow">Standings</p>
         <h1>Your Song Rankings</h1>
         <p class="sub" id="song-results-sub"></p>
 
@@ -2738,9 +2978,11 @@
 
   <div id="page-restaurants" class="top-page">
     <div class="page-content">
-      <p class="eyebrow">Restaurants</p>
       <div class="page-heading-row">
-        <h1>Restaurant List</h1>
+        <div class="group-sub-tabs" id="food-sub-tabs">
+          <button class="group-sub-tab-btn active" id="food-subtab-restaurants-btn" type="button"><span class="group-sub-tab-icon">🍴</span>Restaurants</button>
+          <button class="group-sub-tab-btn" id="food-subtab-dishes-btn" type="button"><span class="group-sub-tab-icon">🍽️</span>Dishes</button>
+        </div>
         <div class="restaurant-heading-actions">
           <button class="btn-ghost" id="restaurant-rearrange-btn" type="button">Rearrange</button>
           <button class="btn-primary" id="restaurant-rearrange-save-btn" type="button" style="display:none;">Save Order</button>
@@ -2774,10 +3016,111 @@
     </div>
   </div>
 
+  <div id="page-dishes" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="food-sub-tabs-2">
+        <button class="group-sub-tab-btn" id="food-subtab-restaurants-btn-2" type="button"><span class="group-sub-tab-icon">🍴</span>Restaurants</button>
+        <button class="group-sub-tab-btn active" id="food-subtab-dishes-btn-2" type="button"><span class="group-sub-tab-icon">🍽️</span>Dishes</button>
+      </div>
+
+      <div class="reorder-bar" id="dish-reorder-bar" style="display:flex;">
+        <button class="btn-ghost" id="dish-reorder-toggle-btn" type="button">Edit</button>
+        <div class="reorder-edit-controls" id="dish-reorder-edit-controls">
+          <button class="btn-primary" id="dish-reorder-save-btn" type="button">Save Changes</button>
+          <button class="btn-ghost" id="dish-reorder-cancel-btn" type="button">Cancel</button>
+          <span class="reorder-hint">Type a position number to reorder, edit comments, or tap the star to remove.</span>
+        </div>
+      </div>
+
+      <ol class="results-list grid-mode" id="dish-results-list"></ol>
+      <p class="restaurant-course-empty" id="dish-empty-message" style="display:none;">No dishes yet — score a course 12/10 from a restaurant's details tray to add it here.</p>
+    </div>
+  </div>
+
+  <!-- Nature and Art are placeholders — each sub-page is empty for now,
+       to be defined later. Structure mirrors Music/Food: each sub-page is
+       its own top-level .top-page div with its own copy of the group's
+       sub-nav, only one of which is ever visible at a time. -->
+  <div id="page-hikes" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="nature-sub-tabs-hikes">
+        <button class="group-sub-tab-btn active" id="nature-subtab-hikes-btn" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-roads-btn" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-parks-btn" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-roads" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="nature-sub-tabs-roads">
+        <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-2" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+        <button class="group-sub-tab-btn active" id="nature-subtab-roads-btn-2" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-parks-btn-2" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-parks" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="nature-sub-tabs-parks">
+        <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-3" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+        <button class="group-sub-tab-btn" id="nature-subtab-roads-btn-3" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+        <button class="group-sub-tab-btn active" id="nature-subtab-parks-btn-3" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-books" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="art-sub-tabs-books">
+        <button class="group-sub-tab-btn active" id="art-subtab-books-btn" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+        <button class="group-sub-tab-btn" id="art-subtab-movies-btn" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+        <button class="group-sub-tab-btn" id="art-subtab-games-btn" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-movies" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="art-sub-tabs-movies">
+        <button class="group-sub-tab-btn" id="art-subtab-books-btn-2" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+        <button class="group-sub-tab-btn active" id="art-subtab-movies-btn-2" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+        <button class="group-sub-tab-btn" id="art-subtab-games-btn-2" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-games" class="top-page">
+    <div class="page-content">
+      <div class="group-sub-tabs" id="art-sub-tabs-games">
+        <button class="group-sub-tab-btn" id="art-subtab-books-btn-3" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+        <button class="group-sub-tab-btn" id="art-subtab-movies-btn-3" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+        <button class="group-sub-tab-btn active" id="art-subtab-games-btn-3" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      </div>
+      <p class="footer-note">Coming soon.</p>
+    </div>
+  </div>
+
   <div id="page-settings" class="top-page">
     <div class="page-content">
-      <p class="eyebrow">Settings</p>
       <h1>Settings</h1>
+
+      <div class="settings-section">
+        <h2 class="settings-section-title">Guest View</h2>
+        <div class="import-row">
+          <span>Hides Albums &amp; Songs, strips restaurant rankings/scores down to order-only, and disables all editing — for sharing this device or account with a guest</span>
+          <label class="toggle-switch" title="Enable Guest View">
+            <input type="checkbox" id="guest-view-toggle">
+            <span class="toggle-switch-track"></span>
+          </label>
+        </div>
+      </div>
 
       <div class="settings-section">
         <h2 class="settings-section-title">Full Backup</h2>
@@ -2816,31 +3159,14 @@
           </div>
           <div class="lastfm-form" id="cloudinary-form" style="display:none;">
             <input type="text" id="cloudinary-cloudname-input" placeholder="Cloud name" autocomplete="off">
-            <input type="text" id="cloudinary-preset-input" placeholder="Unsigned upload preset" autocomplete="off">
+            <input type="text" id="cloudinary-worker-url-input" placeholder="Signing Worker URL (https://...workers.dev)" autocomplete="off">
             <button class="btn-primary" id="cloudinary-save-btn" type="button">Save</button>
-            <a class="lastfm-help-link" href="https://cloudinary.com/documentation/upload_images#unsigned_upload" target="_blank" rel="noopener noreferrer">How to create an unsigned preset →</a>
           </div>
-        </div>
-        <div class="import-row" id="cloudinary-migrate-row" style="display:none;">
-          <span id="cloudinary-migrate-status">Move existing album art from local storage to Cloudinary</span>
-          <button class="btn-ghost" id="cloudinary-migrate-btn" type="button">Migrate Art to Cloudinary</button>
         </div>
       </div>
 
       <div class="settings-section">
         <h2 class="settings-section-title">Album Ranker Settings</h2>
-
-        <div class="import-row">
-          <span>Already have a ranked list?</span>
-          <button class="btn-ghost" id="import-list-btn-home" type="button">Import List (.txt/.xlsx)</button>
-          <input type="file" id="import-list-file-home" accept=".txt,.xlsx" style="display:none;">
-        </div>
-
-        <div class="import-row">
-          <span>Have a progress file from another session?</span>
-          <button class="btn-ghost" id="import-btn">Import Progress (.json)</button>
-          <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
-        </div>
 
         <div class="lastfm-block">
           <div class="lastfm-row">
@@ -2854,16 +3180,6 @@
             <button class="btn-primary" id="lastfm-save-btn" type="button">Save</button>
             <a class="lastfm-help-link" href="https://www.last.fm/api/account/create" target="_blank" rel="noopener noreferrer">Get a free API key →</a>
           </div>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="settings-section-title">Song Ranker Settings</h2>
-
-        <div class="import-row">
-          <span>Have a song progress file from another session?</span>
-          <button class="btn-ghost" id="song-import-btn">Import Progress (.json)</button>
-          <input type="file" id="song-import-file" accept="application/json,.json" style="display:none;">
         </div>
       </div>
 
@@ -3103,11 +3419,8 @@
   const cloudinaryDisconnectBtn = document.getElementById('cloudinary-disconnect-btn');
   const cloudinaryForm = document.getElementById('cloudinary-form');
   const cloudinaryCloudnameInput = document.getElementById('cloudinary-cloudname-input');
-  const cloudinaryPresetInput = document.getElementById('cloudinary-preset-input');
+  const cloudinaryWorkerUrlInput = document.getElementById('cloudinary-worker-url-input');
   const cloudinarySaveBtn = document.getElementById('cloudinary-save-btn');
-  const cloudinaryMigrateRow = document.getElementById('cloudinary-migrate-row');
-  const cloudinaryMigrateStatus = document.getElementById('cloudinary-migrate-status');
-  const cloudinaryMigrateBtn = document.getElementById('cloudinary-migrate-btn');
   const modalOverlay = document.getElementById('modal-overlay');
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
@@ -3124,7 +3437,6 @@
   const lightboxDeleteBtn = document.getElementById('lightbox-delete-btn');
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
-  const topNavAlbumsBtn = document.getElementById('top-nav-albums-btn');
   const topNavSettingsBtn = document.getElementById('top-nav-settings-btn');
   const lastfmStatusText = document.getElementById('lastfm-status-text');
   const lastfmConnectBtn = document.getElementById('lastfm-connect-btn');
@@ -3136,10 +3448,67 @@
   const musicbeeStatusText = document.getElementById('musicbee-status-text');
   const musicbeeImportBtn = document.getElementById('musicbee-import-btn');
   const musicbeeImportFile = document.getElementById('musicbee-import-file');
-  const topNavSongsBtn = document.getElementById('top-nav-songs-btn');
   const pageSongs = document.getElementById('page-songs');
-  const topNavRestaurantsBtn = document.getElementById('top-nav-restaurants-btn');
   const pageRestaurants = document.getElementById('page-restaurants');
+  const pageDishes = document.getElementById('page-dishes');
+  const pageHikes = document.getElementById('page-hikes');
+  const pageRoads = document.getElementById('page-roads');
+  const pageParks = document.getElementById('page-parks');
+  const pageBooks = document.getElementById('page-books');
+  const pageMovies = document.getElementById('page-movies');
+  const pageGames = document.getElementById('page-games');
+
+  // ---------- TOP-LEVEL NAV: groups (Music/Food/Nature/Art/Settings), each
+  // containing their own sub-tabs. See switchTopGroup/switchXSubPage further
+  // down for how these fit together. ----------
+  const topNavMusicBtn = document.getElementById('top-nav-music-btn');
+  const guestNavRestaurantsBtn = document.getElementById('guest-nav-restaurants-btn');
+  const guestNavHikesBtn = document.getElementById('guest-nav-hikes-btn');
+  const topNavFoodBtn = document.getElementById('top-nav-food-btn');
+  const topNavNatureBtn = document.getElementById('top-nav-nature-btn');
+  const topNavArtBtn = document.getElementById('top-nav-art-btn');
+  let activeTopGroup = 'music';
+  let activeMusicSubPage = 'albums';
+  let activeFoodSubPage = 'restaurants';
+  let activeNatureSubPage = 'hikes';
+  let activeArtSubPage = 'books';
+
+  // Each sub-tab has 2 or 3 copies — one per sub-page in its group, since
+  // only one sub-page is ever visible at a time (see this file's HTML).
+  const musicSubtabAlbumsBtn = document.getElementById('music-subtab-albums-btn');
+  const musicSubtabAlbumsBtn2 = document.getElementById('music-subtab-albums-btn-2');
+  const musicSubtabSongsBtn = document.getElementById('music-subtab-songs-btn');
+  const musicSubtabSongsBtn2 = document.getElementById('music-subtab-songs-btn-2');
+  const foodSubtabRestaurantsBtn = document.getElementById('food-subtab-restaurants-btn');
+  const foodSubtabRestaurantsBtn2 = document.getElementById('food-subtab-restaurants-btn-2');
+  const foodSubtabDishesBtn = document.getElementById('food-subtab-dishes-btn');
+  const foodSubtabDishesBtn2 = document.getElementById('food-subtab-dishes-btn-2');
+  const natureSubtabHikesBtn = document.getElementById('nature-subtab-hikes-btn');
+  const natureSubtabHikesBtn2 = document.getElementById('nature-subtab-hikes-btn-2');
+  const natureSubtabHikesBtn3 = document.getElementById('nature-subtab-hikes-btn-3');
+  const natureSubtabRoadsBtn = document.getElementById('nature-subtab-roads-btn');
+  const natureSubtabRoadsBtn2 = document.getElementById('nature-subtab-roads-btn-2');
+  const natureSubtabRoadsBtn3 = document.getElementById('nature-subtab-roads-btn-3');
+  const natureSubtabParksBtn = document.getElementById('nature-subtab-parks-btn');
+  const natureSubtabParksBtn2 = document.getElementById('nature-subtab-parks-btn-2');
+  const natureSubtabParksBtn3 = document.getElementById('nature-subtab-parks-btn-3');
+  const artSubtabBooksBtn = document.getElementById('art-subtab-books-btn');
+  const artSubtabBooksBtn2 = document.getElementById('art-subtab-books-btn-2');
+  const artSubtabBooksBtn3 = document.getElementById('art-subtab-books-btn-3');
+  const artSubtabMoviesBtn = document.getElementById('art-subtab-movies-btn');
+  const artSubtabMoviesBtn2 = document.getElementById('art-subtab-movies-btn-2');
+  const artSubtabMoviesBtn3 = document.getElementById('art-subtab-movies-btn-3');
+  const artSubtabGamesBtn = document.getElementById('art-subtab-games-btn');
+  const artSubtabGamesBtn2 = document.getElementById('art-subtab-games-btn-2');
+  const artSubtabGamesBtn3 = document.getElementById('art-subtab-games-btn-3');
+
+  const dishReorderBar = document.getElementById('dish-reorder-bar');
+  const dishReorderToggleBtn = document.getElementById('dish-reorder-toggle-btn');
+  const dishReorderEditControls = document.getElementById('dish-reorder-edit-controls');
+  const dishReorderSaveBtn = document.getElementById('dish-reorder-save-btn');
+  const dishReorderCancelBtn = document.getElementById('dish-reorder-cancel-btn');
+  const dishResultsList = document.getElementById('dish-results-list');
+  const dishEmptyMessage = document.getElementById('dish-empty-message');
   const restaurantListEl = document.getElementById('restaurant-list');
   const restaurantGoldGridEl = document.getElementById('restaurant-gold-grid');
   const restaurantNewBtn = document.getElementById('restaurant-new-btn');
@@ -3251,6 +3620,58 @@
   let lastfmUsername = '';
   const lastfmCache = {}; // "artist|||album" -> parsed result object, or null for "not found" — in-memory only, resets each session
   let lastfmRequestId = 0; // bumped on every new fetch; a resolving fetch discards itself if a newer one has since started
+
+  // ---------- GUEST VIEW ----------
+  // A read-only, no-scores mode meant for sharing this device/account with
+  // someone else — hides Albums/Songs entirely (Restaurants + Settings
+  // only), strips rank numbers/scores/tier badges from restaurants (order
+  // alone still reflects the ranking), and blocks editing. Driven by one
+  // body class so CSS handles the visual hiding in one place rather than
+  // scattering conditionals through every render function; actual data
+  // safety is separately enforced in the shared mutation functions
+  // (updateOpenRestaurant, saveOpenRestaurantQuietly, deleteRestaurantPhoto,
+  // setRestaurantCoverPhoto) themselves, since hiding a button doesn't stop
+  // e.g. a drag-drop onto a still-listening drop zone.
+  const GUEST_VIEW_STORAGE_KEY = 'guest-view-enabled';
+  let guestViewEnabled = false;
+
+  async function loadGuestViewSetting(){
+    try{
+      const res = await window.storage.get(GUEST_VIEW_STORAGE_KEY, false);
+      guestViewEnabled = !!(res && res.value === 'true');
+    }catch(e){ guestViewEnabled = false; }
+    // The locked guest account's forced-on state always wins over whatever
+    // happens to be in local storage — this and the auth callback that sets
+    // isLockedGuestAccount are both async and race against each other, so
+    // whichever finishes last has to independently re-assert this rather
+    // than risk one silently overwriting the other.
+    if (isLockedGuestAccount) guestViewEnabled = true;
+    applyGuestViewMode();
+  }
+
+  async function saveGuestViewSetting(){
+    try{ await window.storage.set(GUEST_VIEW_STORAGE_KEY, String(guestViewEnabled), false); }catch(e){ /* best effort */ }
+  }
+
+  function applyGuestViewMode(){
+    document.body.classList.toggle('guest-view-active', guestViewEnabled);
+    const guestViewToggle = document.getElementById('guest-view-toggle');
+    if (guestViewToggle) guestViewToggle.checked = guestViewEnabled;
+    if (guestViewEnabled){
+      // Anything outside Restaurants/Hikes/Settings is hidden — if the
+      // currently active page is one of those, jump to Restaurants so
+      // there's nothing left showing that Guest View is supposed to hide.
+      // Uses switchGuestPage rather than switchTopPage directly so the
+      // dedicated guest nav's own button states correctly update too, not
+      // just which page div is visible.
+      const activeTopPage = document.querySelector('.top-page.active');
+      if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes' && activeTopPage.id !== 'page-settings'){
+        switchGuestPage('restaurants');
+      }
+    }
+    renderRestaurantsPage();
+    if (openRestaurantIndex !== null) renderRestaurantDetailsContent();
+  }
 
   let loadingDock = []; // raw items marked "need to listen again" — parked outside the main ranking entirely
 
@@ -3412,6 +3833,12 @@
   async function writeFirestoreData(){
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return;
+    // Hard guard, not just a UI-level restriction — this account must never
+    // write under any circumstance, including the read-fails/seed-write
+    // path in loadOrSeedFirestoreData below, which would otherwise risk
+    // overwriting the owner's real data with this account's own (empty)
+    // local state the moment its read comes up empty for any reason.
+    if (isLockedGuestAccount) return;
     try{
       const artKeys = Array.from(new Set([...items, ...loadingDock]));
       const art = {};
@@ -3442,7 +3869,14 @@
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return null;
     try{
-      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
+      // The locked guest account reads the OWNER's document, not its own —
+      // its own uid-keyed path has never had anything written to it (see
+      // the write guard above), so reading that would always come up
+      // empty. This is what actually lets it see the owner's data at all;
+      // it requires a matching Firestore security rule granting this
+      // specific read (see this session's chat for the exact rule).
+      const targetUid = isLockedGuestAccount ? OWNER_FIREBASE_UID : firebaseUser.uid;
+      const docRef = fb.doc(fb.db, 'users', targetUid, 'appData', 'main');
       const snap = await fb.getDoc(docRef);
       if (!snap.exists()) return null;
       const data = snap.data();
@@ -3527,21 +3961,68 @@
     if (hasCurrentData) writeFirestoreData();
   }
 
+  // This specific Google account is permanently locked into Guest View —
+  // no toggle, no Settings tab, no way back. Distinct from the general
+  // Guest View toggle above (which the owner can freely flip on/off): this
+  // check overrides that entirely for one hard-coded account, regardless of
+  // whatever this device's own local Guest View setting happens to be.
+  const LOCKED_GUEST_EMAIL = 'meganec96@gmail.com';
+  // Fill this in with the OWNER's own Firebase UID — found in the Firebase
+  // console under Authentication → Users, next to the owner's Google
+  // account. This is what lets the guest account read the owner's actual
+  // data instead of its own (empty) uid-keyed document — see
+  // readFirestoreData below, and the matching Firestore security rule this
+  // requires (see this session's chat for the exact rule to add).
+  const OWNER_FIREBASE_UID = 'YOUR_OWNER_UID_HERE';
+  let isLockedGuestAccount = false;
+
   function initFirebaseSync(){
     const fb = window.__firebase;
     if (!fb) return;
     fb.onAuthStateChanged(fb.auth, async (user) => {
       firebaseUser = user;
       updateFirebaseUI();
+      isLockedGuestAccount = !!(user && user.email === LOCKED_GUEST_EMAIL);
+      document.body.classList.toggle('locked-guest-account', isLockedGuestAccount);
+      if (isLockedGuestAccount){
+        // Sets state and the body class directly, WITHOUT calling
+        // applyGuestViewMode's full re-render — this callback can fire
+        // before restaurantRows' own declaration has executed later in the
+        // script (a real crash caught in testing), so it can't safely call
+        // renderRestaurantsPage this early. The normal startup flow
+        // (checkSavedProgress, or whenever Restaurants is first opened)
+        // renders correctly regardless, since guestViewEnabled is already
+        // true by the time any of that actually runs.
+        guestViewEnabled = true;
+        document.body.classList.add('guest-view-active');
+        const guestViewToggle = document.getElementById('guest-view-toggle');
+        if (guestViewToggle) guestViewToggle.checked = true;
+      }
       if (user){
         await localDataReadyPromise; // see this promise's own comment — avoids racing checkSavedProgress
+        if (isLockedGuestAccount){
+          // Unlike the general Guest View toggle (which the owner uses and
+          // needs Settings to turn back off), this account should never be
+          // allowed to land on Settings at all — redirect away immediately,
+          // now that it's actually safe to call switchGuestPage (which
+          // touches restaurantRows via renderRestaurantsPage).
+          const activeTopPage = document.querySelector('.top-page.active');
+          if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes'){
+            switchGuestPage('restaurants');
+          }
+        }
         await loadOrSeedFirestoreData();
-        // loadMusicbeeLibrary() is called fire-and-forget at script load and
-        // may not have finished yet — re-awaiting it here is harmless (it's
-        // idempotent) and guarantees musicbeeTracks is actually loaded
-        // before comparing it against Firestore's copy.
-        await loadMusicbeeLibrary();
-        await loadOrSeedMusicbeeFirestore();
+        if (!isLockedGuestAccount){
+          // MusicBee data is Albums-only, and Albums is entirely hidden for
+          // this account — nothing here would ever be shown to it, so
+          // there's no reason to read or seed-write it on their behalf.
+          // loadMusicbeeLibrary() is called fire-and-forget at script load
+          // and may not have finished yet — re-awaiting it here is harmless
+          // (it's idempotent) and guarantees musicbeeTracks is actually
+          // loaded before comparing it against Firestore's copy.
+          await loadMusicbeeLibrary();
+          await loadOrSeedMusicbeeFirestore();
+        }
       }
     });
     firebaseSigninBtn.addEventListener('click', firebaseSignIn);
@@ -3715,25 +4196,24 @@
   // ---------- CLOUDINARY (album art hosting) ----------
   // Optional — when configured, new art uploads go to Cloudinary instead of
   // being stored as base64 locally, and the "Migrate" button below moves
-  // existing base64 art over too. Uses an unsigned upload preset (configured
-  // in your Cloudinary dashboard), the only kind of upload safe to do from
-  // public client-side code — it can't expose your account secret the way a
-  // signed upload would need to.
+  // existing base64 art over too. Uses a SIGNED upload: a Cloudflare Worker
+  // (deployed separately — see cloudinary-sign-worker.js) holds the actual
+  // Cloudinary API secret and hands back a short-lived signature+timestamp
+  // per upload. The app itself never sees or stores the secret — only the
+  // cloud name and the worker's URL, both safe to keep client-side.
   const CLOUDINARY_CONFIG_KEY = 'cloudinary-config';
-  let cloudinaryConfig = null; // { cloudName, uploadPreset } once connected, else null
+  let cloudinaryConfig = null; // { cloudName, workerUrl } once connected, else null
 
   function updateCloudinaryUI(){
-    if (cloudinaryConfig && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset){
+    if (cloudinaryConfig && cloudinaryConfig.cloudName && cloudinaryConfig.workerUrl){
       cloudinaryStatusText.textContent = '✅ Connected: ' + cloudinaryConfig.cloudName;
       cloudinaryConnectBtn.style.display = 'none';
       cloudinaryDisconnectBtn.style.display = 'inline-block';
       cloudinaryForm.style.display = 'none';
-      cloudinaryMigrateRow.style.display = 'flex';
     } else {
       cloudinaryStatusText.textContent = 'Cloudinary: not connected';
       cloudinaryConnectBtn.style.display = 'inline-block';
       cloudinaryDisconnectBtn.style.display = 'none';
-      cloudinaryMigrateRow.style.display = 'none';
     }
   }
 
@@ -3759,9 +4239,9 @@
 
   cloudinarySaveBtn.addEventListener('click', async () => {
     const cloudName = cloudinaryCloudnameInput.value.trim();
-    const uploadPreset = cloudinaryPresetInput.value.trim();
-    if (!cloudName || !uploadPreset){ showToast('Enter both a cloud name and an upload preset'); return; }
-    cloudinaryConfig = { cloudName, uploadPreset };
+    const workerUrl = cloudinaryWorkerUrlInput.value.trim();
+    if (!cloudName || !workerUrl){ showToast('Enter both a cloud name and your signing Worker URL'); return; }
+    cloudinaryConfig = { cloudName, workerUrl };
     try{ await window.storage.set(CLOUDINARY_CONFIG_KEY, cloudinaryConfig, false); }catch(e){ /* best effort */ }
     updateCloudinaryUI();
     showToast('Cloudinary connected');
@@ -3824,11 +4304,32 @@
 
   async function uploadToCloudinary(fileOrBlob, folder){
     if (!cloudinaryConfig) throw new Error('Cloudinary not configured');
+    const targetFolder = folder || 'RankHeaven/AlbumArt';
     const uploadable = await compressImageForCloudinary(fileOrBlob);
+
+    let signData;
+    try{
+      const signRes = await fetch(cloudinaryConfig.workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: targetFolder })
+      });
+      if (!signRes.ok){
+        let detail = '';
+        try{ const errBody = await signRes.json(); detail = errBody && errBody.error; }catch(e){ /* not JSON */ }
+        throw new Error('Signing request failed (' + signRes.status + ')' + (detail ? ': ' + detail : ''));
+      }
+      signData = await signRes.json();
+    }catch(e){
+      throw new Error('Could not reach the signing Worker: ' + e.message);
+    }
+
     const formData = new FormData();
     formData.append('file', uploadable);
-    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-    formData.append('folder', folder || 'RankHeaven/AlbumArt');
+    formData.append('folder', targetFolder);
+    formData.append('timestamp', signData.timestamp);
+    formData.append('signature', signData.signature);
+    formData.append('api_key', signData.apiKey);
     const res = await fetch('https://api.cloudinary.com/v1_1/' + cloudinaryConfig.cloudName + '/image/upload', {
       method: 'POST',
       body: formData
@@ -3875,39 +4376,14 @@
     }
   }
 
-  cloudinaryMigrateBtn.addEventListener('click', async () => {
-    if (!cloudinaryConfig) return;
-    const allRaws = Array.from(new Set([...items, ...loadingDock]));
-    const toMigrate = [];
-    for (const raw of allRaws){
-      let val = artCache[raw];
-      if (val === undefined){
-        try{
-          const res = await window.storage.get(artKeyFor(raw), false);
-          val = (res && res.value) ? res.value : null;
-        }catch(e){ val = null; }
-      }
-      if (val && val.indexOf('data:') === 0) toMigrate.push({ raw, dataUrl: val }); // already-migrated (a URL, not data:) items are skipped
-    }
-    if (!toMigrate.length){ showToast('No local art left to migrate'); return; }
-
-    cloudinaryMigrateBtn.disabled = true;
-    let done = 0;
-    // Sequential, not parallel — safer against Cloudinary rate limits for a
-    // large collection, though slower. Each failure is skipped (left as
-    // base64 for now) rather than stopping the whole batch.
-    for (const { raw, dataUrl } of toMigrate){
-      try{
-        const blob = await (await fetch(dataUrl)).blob();
-        const url = await uploadToCloudinary(blob);
-        await setArtForItem(raw, url);
-      }catch(e){ /* best effort — this one stays as base64, move on */ }
-      done++;
-      cloudinaryMigrateStatus.textContent = 'Migrating… ' + done + ' / ' + toMigrate.length;
-    }
-    cloudinaryMigrateBtn.disabled = false;
-    cloudinaryMigrateStatus.textContent = 'Migrated ' + done + ' of ' + toMigrate.length + ' images to Cloudinary';
-  });
+  const guestViewToggleEl = document.getElementById('guest-view-toggle');
+  if (guestViewToggleEl){
+    guestViewToggleEl.addEventListener('change', () => {
+      guestViewEnabled = guestViewToggleEl.checked;
+      saveGuestViewSetting();
+      applyGuestViewMode();
+    });
+  }
 
   loadCloudinaryConfig();
 
@@ -4124,6 +4600,14 @@
   // would also close the lightbox.
   lightboxPrevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(-1); });
   lightboxNextBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateLightbox(1); });
+  // Single-image mode also has lightboxPhotos === null, so navigateLightbox's
+  // own early-return already makes this a no-op there — no need to guard on
+  // 'multi' here too.
+  document.addEventListener('keydown', (e) => {
+    if (!artLightboxOverlay.classList.contains('show')) return;
+    if (e.key === 'ArrowLeft') navigateLightbox(-1);
+    else if (e.key === 'ArrowRight') navigateLightbox(1);
+  });
   lightboxCoverToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (!lightboxCoverContext) return;
@@ -5170,8 +5654,7 @@
     songTabSwitcher.style.display = songIsComplete ? 'none' : 'flex';
     if (songIsComplete){
       songLiveDot.style.display = 'none';
-      songResultsSub.innerHTML = '<span class="status-pill final">Ranked ✓</span> ' +
-        songItems.length + ' song' + (songItems.length === 1 ? '' : 's') + '.';
+      songResultsSub.innerHTML = '';
     } else if (songHistory.length === 0){
       songLiveDot.style.display = 'inline-block';
       songResultsSub.innerHTML = '<span class="status-pill live">Live Estimate</span> Make a few picks to see standings take shape.';
@@ -5393,36 +5876,119 @@
   // happening inside either page — switching away from Albums just hides
   // it (its own internal state, screen, and scroll position are untouched
   // underneath), and closes the details panel since it's Albums-specific.
+  // Handles which .top-page div is visible, plus the side effects tied to
+  // that specific page (closing an open details panel when navigating away,
+  // triggering that page's own render). Nav button / sub-tab button states
+  // are handled separately by switchTopGroup and the switchXSubPage
+  // functions below, which both call this — this function itself no longer
+  // touches any button's .active class, since with sub-tabs now nested two
+  // levels deep under a top-level group, a single flat set of "which nav
+  // button is active" toggles doesn't apply the same way it used to.
   function switchTopPage(page){
-    const showAlbums = page === 'albums';
-    const showSongs = page === 'songs';
-    const showRestaurants = page === 'restaurants';
-    const showSettings = page === 'settings';
-    pageAlbums.classList.toggle('active', showAlbums);
-    pageSongs.classList.toggle('active', showSongs);
-    pageRestaurants.classList.toggle('active', showRestaurants);
-    pageSettings.classList.toggle('active', showSettings);
-    topNavAlbumsBtn.classList.toggle('active', showAlbums);
-    topNavSongsBtn.classList.toggle('active', showSongs);
-    topNavRestaurantsBtn.classList.toggle('active', showRestaurants);
-    topNavSettingsBtn.classList.toggle('active', showSettings);
-    if (!showAlbums && selectedItem){
+    // Defense in depth alongside the CSS-hidden Settings button itself —
+    // this account never lands on Settings regardless of how 'settings'
+    // got passed in.
+    if (isLockedGuestAccount && page === 'settings') page = 'restaurants';
+    const pages = {
+      albums: pageAlbums, songs: pageSongs, restaurants: pageRestaurants, dishes: pageDishes,
+      hikes: pageHikes, roads: pageRoads, parks: pageParks,
+      books: pageBooks, movies: pageMovies, games: pageGames,
+      settings: pageSettings
+    };
+    Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
+
+    if (page !== 'albums' && selectedItem){
       closeDetailsPanel();
     }
-    if (!showRestaurants && openRestaurantIndex !== null){
+    if (page !== 'restaurants' && openRestaurantIndex !== null){
       closeRestaurantDetailsPanel();
     }
-    if (showSongs){
+    if (page === 'songs'){
       renderSongsPage();
     }
-    if (showRestaurants){
+    if (page === 'restaurants'){
       renderRestaurantsPage();
     }
+    if (page === 'dishes'){
+      renderDishesPage();
+    }
   }
-  topNavAlbumsBtn.addEventListener('click', () => switchTopPage('albums'));
-  topNavSongsBtn.addEventListener('click', () => switchTopPage('songs'));
-  topNavRestaurantsBtn.addEventListener('click', () => switchTopPage('restaurants'));
-  topNavSettingsBtn.addEventListener('click', () => switchTopPage('settings'));
+
+  // The dedicated guest nav is flat (just Restaurants/Hikes, no grouping),
+  // so this is simpler than switchTopGroup/switchXSubPage — just toggles
+  // the two buttons and delegates straight to switchTopPage.
+  function switchGuestPage(page){
+    guestNavRestaurantsBtn.classList.toggle('active', page === 'restaurants');
+    guestNavHikesBtn.classList.toggle('active', page === 'hikes');
+    switchTopPage(page);
+  }
+  guestNavRestaurantsBtn.addEventListener('click', () => switchGuestPage('restaurants'));
+  guestNavHikesBtn.addEventListener('click', () => switchGuestPage('hikes'));
+
+  // Top-level group switch — updates which of the 4 group nav buttons (plus
+  // Settings, which isn't really a "group" but lives in this same row) is
+  // active, then shows whatever sub-page was last active within that group
+  // (defaulting to each group's first sub-page the very first time).
+  function switchTopGroup(group){
+    activeTopGroup = group;
+    topNavMusicBtn.classList.toggle('active', group === 'music');
+    topNavFoodBtn.classList.toggle('active', group === 'food');
+    topNavNatureBtn.classList.toggle('active', group === 'nature');
+    topNavArtBtn.classList.toggle('active', group === 'art');
+    topNavSettingsBtn.classList.toggle('active', group === 'settings');
+    if (group === 'music') switchTopPage(activeMusicSubPage);
+    else if (group === 'food') switchTopPage(activeFoodSubPage);
+    else if (group === 'nature') switchTopPage(activeNatureSubPage);
+    else if (group === 'art') switchTopPage(activeArtSubPage);
+    else if (group === 'settings') switchTopPage('settings');
+  }
+
+  // Each of these toggles both copies of its group's sub-nav (one lives on
+  // each sub-page, since only one sub-page is ever visible at a time — see
+  // this file's HTML for why) before delegating to switchTopPage.
+  function switchMusicSubPage(page){
+    activeMusicSubPage = page;
+    [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2].forEach(b => b.classList.toggle('active', page === 'albums'));
+    [musicSubtabSongsBtn, musicSubtabSongsBtn2].forEach(b => b.classList.toggle('active', page === 'songs'));
+    switchTopPage(page);
+  }
+  function switchFoodSubPage(page){
+    activeFoodSubPage = page;
+    [foodSubtabRestaurantsBtn, foodSubtabRestaurantsBtn2].forEach(b => b.classList.toggle('active', page === 'restaurants'));
+    [foodSubtabDishesBtn, foodSubtabDishesBtn2].forEach(b => b.classList.toggle('active', page === 'dishes'));
+    switchTopPage(page);
+  }
+  function switchNatureSubPage(page){
+    activeNatureSubPage = page;
+    [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3].forEach(b => b.classList.toggle('active', page === 'hikes'));
+    [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3].forEach(b => b.classList.toggle('active', page === 'roads'));
+    [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3].forEach(b => b.classList.toggle('active', page === 'parks'));
+    switchTopPage(page);
+  }
+  function switchArtSubPage(page){
+    activeArtSubPage = page;
+    [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3].forEach(b => b.classList.toggle('active', page === 'books'));
+    [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3].forEach(b => b.classList.toggle('active', page === 'movies'));
+    [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3].forEach(b => b.classList.toggle('active', page === 'games'));
+    switchTopPage(page);
+  }
+
+  topNavMusicBtn.addEventListener('click', () => switchTopGroup('music'));
+  topNavFoodBtn.addEventListener('click', () => switchTopGroup('food'));
+  topNavNatureBtn.addEventListener('click', () => switchTopGroup('nature'));
+  topNavArtBtn.addEventListener('click', () => switchTopGroup('art'));
+  topNavSettingsBtn.addEventListener('click', () => switchTopGroup('settings'));
+
+  [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('albums')));
+  [musicSubtabSongsBtn, musicSubtabSongsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('songs')));
+  [foodSubtabRestaurantsBtn, foodSubtabRestaurantsBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('restaurants')));
+  [foodSubtabDishesBtn, foodSubtabDishesBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('dishes')));
+  [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
+  [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('roads')));
+  [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('parks')));
+  [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('books')));
+  [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('movies')));
+  [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('games')));
 
   // Click anywhere outside the panel closes it — except on a grid card or
   // list row, which have their own click-to-open handling that should just
@@ -5824,30 +6390,32 @@
     switchTab(parsed.isComplete ? 'results' : 'duels');
   }
 
-  importBtn.addEventListener('click', () => importFile.click());
+  if (importBtn && importFile){
+    importBtn.addEventListener('click', () => importFile.click());
 
-  importFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      let parsed;
-      try{
-        parsed = JSON.parse(evt.target.result);
-      }catch(err){
-        showToast("That file's JSON is malformed — if it came from a synced folder, check Dropbox's Version History to restore an earlier copy");
-        return;
-      }
-      if (parsed && Array.isArray(parsed.items) && parsed.items.length >= 2){
-        resumeFromData(parsed);
-        saveProgress(); // persist the import itself — resumeFromData only updates in-memory state, and without this the import is lost on refresh and never reaches Firestore
-      } else {
-        showToast("That file doesn't look like a valid progress export");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  });
+    importFile.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        let parsed;
+        try{
+          parsed = JSON.parse(evt.target.result);
+        }catch(err){
+          showToast("That file's JSON is malformed — if it came from a synced folder, check Dropbox's Version History to restore an earlier copy");
+          return;
+        }
+        if (parsed && Array.isArray(parsed.items) && parsed.items.length >= 2){
+          resumeFromData(parsed);
+          saveProgress(); // persist the import itself — resumeFromData only updates in-memory state, and without this the import is lost on refresh and never reaches Firestore
+        } else {
+          showToast("That file doesn't look like a valid progress export");
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+  }
 
   exportBtn.addEventListener('click', async () => {
     const artKeys = Array.from(new Set([...items, ...loadingDock]));
@@ -5992,11 +6560,13 @@
   // Same import, available directly from the home screen — a fresh install
   // has no saved progress and no existing list, so the Results tab (where
   // this used to live exclusively) isn't reachable yet to get to it.
-  importListBtnHome.addEventListener('click', () => importListFileHome.click());
-  importListFileHome.addEventListener('change', (e) => {
-    handleListImportFile(e.target.files[0]);
-    e.target.value = '';
-  });
+  if (importListBtnHome && importListFileHome){
+    importListBtnHome.addEventListener('click', () => importListFileHome.click());
+    importListFileHome.addEventListener('change', (e) => {
+      handleListImportFile(e.target.files[0]);
+      e.target.value = '';
+    });
+  }
 
   // ---------- DOCK-ONLY IMPORT ----------
   // Separate from the full-list import above: this merges into whatever's
@@ -6172,8 +6742,7 @@
       // Maintenance mode: no duel language at all, since there's no visible
       // Duels tab to give "head-to-head picks" any context.
       liveDot.style.display = 'none';
-      resultsSub.innerHTML = '<span class="status-pill final">Ranked ✓</span> ' +
-        items.length + ' album' + (items.length === 1 ? '' : 's') + '.';
+      resultsSub.innerHTML = '';
     } else if (isComplete){
       liveDot.style.display = 'none';
       resultsSub.innerHTML = '<span class="status-pill final">Final Ranking ✓</span> Settled over ' +
@@ -7097,26 +7666,28 @@
   songItemInput.addEventListener('input', updateSongCount);
 
   // Import Song Progress (.json) — Settings tab, mirrors Albums' equivalent.
-  songImportBtn.addEventListener('click', () => songImportFile.click());
-  songImportFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      let parsed;
-      try{ parsed = JSON.parse(reader.result); }catch(err){ showToast('Could not read that file'); return; }
-      if (!parsed || !Array.isArray(parsed.songItems) || parsed.songItems.length < 2){
-        showToast("That file doesn't look like a song progress export");
-        return;
-      }
-      resumeSongDataFromSync(parsed);
-      saveSongProgress(); // persist the import itself — see the albums import handler's identical comment
-      showToast('Song progress imported — ' + parsed.songItems.length + ' songs');
-    };
-    reader.onerror = () => showToast('Could not read that file');
-    reader.readAsText(file);
-    e.target.value = '';
-  });
+  if (songImportBtn && songImportFile){
+    songImportBtn.addEventListener('click', () => songImportFile.click());
+    songImportFile.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        let parsed;
+        try{ parsed = JSON.parse(reader.result); }catch(err){ showToast('Could not read that file'); return; }
+        if (!parsed || !Array.isArray(parsed.songItems) || parsed.songItems.length < 2){
+          showToast("That file doesn't look like a song progress export");
+          return;
+        }
+        resumeSongDataFromSync(parsed);
+        saveSongProgress(); // persist the import itself — see the albums import handler's identical comment
+        showToast('Song progress imported — ' + parsed.songItems.length + ' songs');
+      };
+      reader.onerror = () => showToast('Could not read that file');
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+  }
 
   // Shared by sync-file loading, JSON import, and startup resume.
   function resumeSongDataFromSync(parsed){
@@ -7227,6 +7798,7 @@
   // click-to-browse when empty and opens the lightbox once a photo exists,
   // exactly like Albums' details-panel art.
   function setRestaurantCoverPhoto(index, dataUrl){
+    if (guestViewEnabled) return;
     if (!restaurantRows[index]) return;
     restaurantRows[index].coverPhoto = dataUrl;
     saveRestaurantProgress();
@@ -7250,6 +7822,7 @@
   // cover itself, wherever it happens to match, so nothing is left pointing
   // at a photo that's supposedly been deleted.
   function deleteRestaurantPhoto(index, url){
+    if (guestViewEnabled) return;
     const r = restaurantRows[index];
     if (!r || !url) return;
     const visits = ensureRestaurantVisits(r);
@@ -7612,7 +8185,7 @@
         const goldStarsText = goldStars > 0 ? '⭐'.repeat(goldStars) : '';
         const meta = [goldStarsText, r.location].filter(Boolean).join(' • ');
         const tierBadgeHtml = tier
-          ? '<span class="restaurant-gold-card-tier" style="background:' + hexToRgba(tier.color, 0.85) + '; color:' + (tier.key === 'gold' ? 'var(--ink)' : '#fff') + ';">' + tier.name + '</span>'
+          ? '<span class="restaurant-gold-card-tier" style="background:' + hexToRgba(tier.color, 0.85) + ';" title="' + escapeAttr(tier.name) + '"></span>'
           : '';
         const effectiveCover = getEffectiveRestaurantCover(r);
         goldCards.push(
@@ -7658,7 +8231,7 @@
       let borderAttr = '';
       if (tier){
         borderAttr = ' style="border-left:4px solid ' + tier.color + ';"';
-        tierChipHtml = '<span class="tier-chip" style="background:' + hexToRgba(tier.color, 0.18) + '; color:' + tier.color + ';">' + tier.name + '</span>';
+        tierChipHtml = '<span class="restaurant-tier-dot" style="background:' + hexToRgba(tier.color, 0.18) + ';" title="' + escapeAttr(tier.name) + '"></span>';
       }
 
       listRows.push(
@@ -7750,6 +8323,313 @@
       delete course.photo;
     }
     return course.photos;
+  }
+
+  // ---------- DISHES ----------
+  // A dish is simply a course scored 12/10 — nothing here has its own copy
+  // of the photo/text/score; all of that is read live from the actual
+  // course object living inside its restaurant's visit, so editing it from
+  // either Dishes or Restaurants stays in sync automatically. The only
+  // thing that belongs to Dishes itself is the manual display order.
+  const DISH_STORAGE_KEY = 'dish-order';
+  let dishOrder = []; // array of course ids, in manually-set display order
+  let dishEditMode = false;
+
+  // Stable id, independent of the course's own index within its visit
+  // (which shifts if courses are reordered/removed there) — dishOrder
+  // references courses by this, not by position.
+  function ensureCourseId(course){
+    if (!course.id) course.id = 'dish' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    return course.id;
+  }
+
+  // A "dish" is any course scored the maximum 12/10 — no separate favorite
+  // flag; scoring is already how a course's quality gets recorded, so
+  // reusing that as the Dishes criterion means there's nothing new to keep
+  // in sync. Select values are always strings, hence '12' not 12.
+  function getAllFavoritedDishes(){
+    const dishes = [];
+    restaurantRows.forEach((r, restaurantIndex) => {
+      const visits = ensureRestaurantVisits(r);
+      visits.forEach(visit => {
+        (visit.courses || []).forEach((course, courseIndex) => {
+          if (course.score === '12'){
+            dishes.push({ id: ensureCourseId(course), course, restaurant: r, restaurantIndex, visit, courseIndex });
+          }
+        });
+      });
+    });
+    return dishes;
+  }
+
+  // Layers the manual order on top of whatever's currently scored 12/10 —
+  // newly-qualifying dishes not yet in dishOrder are appended at the end;
+  // dishOrder entries for courses that no longer qualify are just skipped,
+  // not actively pruned from storage (harmless leftovers, cheaper than
+  // rewriting dishOrder on every render to drop a few stale ids).
+  function getOrderedDishes(){
+    const all = getAllFavoritedDishes();
+    const byId = {};
+    all.forEach(d => { byId[d.id] = d; });
+    const ordered = [];
+    const seen = new Set();
+    dishOrder.forEach(id => {
+      if (byId[id] && !seen.has(id)){
+        ordered.push(byId[id]);
+        seen.add(id);
+      }
+    });
+    all.forEach(d => {
+      if (!seen.has(d.id)){
+        ordered.push(d);
+        seen.add(d.id);
+      }
+    });
+    return ordered;
+  }
+
+  async function loadDishOrder(){
+    try{
+      const res = await window.storage.get(DISH_STORAGE_KEY, false);
+      dishOrder = (res && res.value) ? JSON.parse(res.value) : [];
+    }catch(e){ dishOrder = []; }
+  }
+
+  function saveDishOrder(){
+    try{ window.storage.set(DISH_STORAGE_KEY, JSON.stringify(dishOrder), false); }catch(e){ /* best effort */ }
+  }
+
+  function dishPhotoHtml(course){
+    const photo = (course.photos && course.photos[0]) || null;
+    return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(photo) + '" alt="">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+  }
+
+  let dishDragSourceId = null;
+  let dishDragSourceEl = null;
+  // Snapshot of which dishes were present when edit mode was entered — Save
+  // compares this against whatever rows are still in the DOM to detect
+  // which were starred off (removed from the DOM, not deleted outright),
+  // so those can be actually unfavorited on the real course data.
+  let dishEditModeSnapshot = null;
+
+  function renderDishesPage(){
+    const dishes = getOrderedDishes();
+    const hasAny = dishes.length > 0;
+    dishEmptyMessage.style.display = hasAny ? 'none' : 'block';
+    dishResultsList.style.display = hasAny ? '' : 'none';
+    dishReorderBar.style.display = hasAny ? 'flex' : 'none';
+
+    dishReorderToggleBtn.style.display = dishEditMode ? 'none' : 'inline-block';
+    dishReorderEditControls.style.display = dishEditMode ? 'flex' : 'none';
+    dishResultsList.classList.toggle('grid-mode', !dishEditMode);
+    dishResultsList.innerHTML = '';
+
+    if (dishEditMode){
+      dishEditModeSnapshot = {};
+      dishes.forEach(d => { dishEditModeSnapshot[d.id] = d; });
+
+      dishes.forEach((d, idx) => {
+        const li = document.createElement('li');
+        li.dataset.dishId = d.id;
+        const numHtml = '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">';
+        const textHtml = '<input type="text" class="rank-edit-input" value="' + escapeAttr(d.course.text || '') + '">';
+        const starHtml = '<button class="dish-unfavorite-btn" type="button" title="Remove from Dishes">★</button>';
+        li.innerHTML = dishPhotoHtml(d.course) + numHtml + '<span class="rank-item">' + textHtml + '</span>' + starHtml;
+        dishResultsList.appendChild(li);
+        li.querySelector('.dish-unfavorite-btn').addEventListener('click', () => li.remove());
+      });
+    } else {
+      dishes.forEach((d, idx) => {
+        const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
+        const card = document.createElement('div');
+        card.className = 'grid-card';
+        card.dataset.dishId = d.id;
+        card.title = d.course.text || d.restaurant.name || '';
+        card.innerHTML = '<span class="grid-card-rank">#' + (idx + 1) + '</span>' +
+          '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+        dishResultsList.appendChild(card);
+        makeDishDraggable(card, d.id);
+        card.addEventListener('click', () => {
+          const photos = d.course.photos || [];
+          if (photos.length) openPhotoLightbox(photos, 0, null);
+        });
+      });
+    }
+  }
+
+  // Mirrors makeRowDraggable/commitDragOrder from Albums, adapted for
+  // Dishes' own id-based order rather than a raw-string array.
+  function makeDishDraggable(el, id){
+    if (dishEditMode) return;
+    el.setAttribute('draggable', 'true');
+    el.addEventListener('dragstart', () => {
+      dishDragSourceId = id;
+      dishDragSourceEl = el;
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', commitDishDragOrder);
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!dishDragSourceEl || dishDragSourceEl === el || !el.parentNode) return;
+      if (isBeforeInDom(dishDragSourceEl, el)){
+        el.parentNode.insertBefore(dishDragSourceEl, el.nextSibling);
+      } else {
+        el.parentNode.insertBefore(dishDragSourceEl, el);
+      }
+    });
+    el.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  function commitDishDragOrder(){
+    if (dishDragSourceEl) dishDragSourceEl.classList.remove('dragging');
+    dishDragSourceId = null;
+    dishDragSourceEl = null;
+    dishOrder = Array.from(dishResultsList.children).map(el => el.dataset.dishId).filter(Boolean);
+    saveDishOrder();
+    renderDishesPage();
+  }
+
+  function toggleDishEditMode(){
+    dishEditMode = true;
+    renderDishesPage();
+  }
+
+  function cancelDishEditMode(){
+    dishEditMode = false;
+    renderDishesPage();
+  }
+
+  // Position/comment edits and unfavoriting only touch the real data here,
+  // on Save — same "nothing touches truth until Save" philosophy as
+  // Albums' own edit mode, so Cancel can simply discard by re-rendering.
+  function saveDishChanges(){
+    const rows = dishResultsList.querySelectorAll('li');
+    const newOrder = [];
+    const stillPresentIds = new Set();
+    rows.forEach(li => {
+      const id = li.dataset.dishId;
+      const dish = dishEditModeSnapshot[id];
+      if (!dish) return;
+      stillPresentIds.add(id);
+      newOrder.push(id);
+      const textInput = li.querySelector('.rank-edit-input');
+      if (textInput) dish.course.text = textInput.value;
+    });
+    // Present when edit mode opened, but no longer among the rows — that's
+    // exactly the "starred off" case (the row was removed, not the course).
+    // Clears the score itself, since that's what determines Dishes
+    // membership now — there's no separate flag to toggle off anymore.
+    Object.keys(dishEditModeSnapshot).forEach(id => {
+      if (!stillPresentIds.has(id)){
+        dishEditModeSnapshot[id].course.score = null;
+      }
+    });
+    dishOrder = newOrder;
+    dishEditMode = false;
+    saveDishOrder();
+    saveRestaurantProgress(); // persists the comment edits and score changes, which live on the actual restaurant/course data
+    renderDishesPage();
+    renderRestaurantsPage(); // reflects any unfavorite in the restaurant grid/list too
+    if (openRestaurantIndex !== null) renderRestaurantDetailsContent(); // and in an open details tray, if one of its courses was unfavorited
+    showToast('Changes saved');
+  }
+
+  dishReorderToggleBtn.addEventListener('click', toggleDishEditMode);
+  dishReorderSaveBtn.addEventListener('click', saveDishChanges);
+  dishReorderCancelBtn.addEventListener('click', cancelDishEditMode);
+
+  // Parses filenames like "20250811_073318.jpg" (a common phone-camera
+  // convention: YYYYMMDD_HHMMSS) into a date key for grouping into visits
+  // and a full timestamp for ordering courses within one. Returns null for
+  // anything that doesn't match, or that matches the shape but isn't
+  // actually a valid date (e.g. month 13) — JS's Date constructor silently
+  // rolls those over into a different date rather than rejecting them, so
+  // this explicitly checks the constructed date's components match what
+  // was parsed, rather than trusting the constructor alone.
+  function parsePhotoFilenameDateTime(filename){
+    const match = filename.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+    if (!match) return null;
+    const [, year, month, day, hour, minute, second] = match.map(Number);
+    const timestamp = new Date(year, month - 1, day, hour, minute, second);
+    if (timestamp.getFullYear() !== year || timestamp.getMonth() !== month - 1 || timestamp.getDate() !== day){
+      return null;
+    }
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateKey = year + '-' + pad(month) + '-' + pad(day);
+    return { dateKey, timestamp };
+  }
+
+  // Groups by date into one new visit each, one course per photo ordered
+  // earliest-to-latest within that visit — always creates new visits rather
+  // than merging into an existing same-date one, since guessing which
+  // existing visit (if any) a bulk batch belongs to is more likely to
+  // surprise than help; reorganizing after the fact is straightforward.
+  // Uploads sequentially, not in parallel — same reasoning as the existing
+  // Cloudinary art migration: safer against rate limits for a large batch,
+  // even though slower, and each failure (handled by uploadRestaurantPhoto's
+  // own base64 fallback) doesn't stop the rest of the batch.
+  async function handleRestaurantBulkPhotoImport(index, files){
+    const fileArray = Array.from(files);
+    const parsed = [];
+    let skippedCount = 0;
+    fileArray.forEach(file => {
+      const info = parsePhotoFilenameDateTime(file.name);
+      if (info) parsed.push({ file, ...info });
+      else skippedCount++;
+    });
+
+    if (!parsed.length){
+      showToast("None of those filenames matched the expected format, e.g. 20250811_073318.jpg");
+      return;
+    }
+
+    const groups = {};
+    parsed.forEach(p => {
+      if (!groups[p.dateKey]) groups[p.dateKey] = [];
+      groups[p.dateKey].push(p);
+    });
+    Object.values(groups).forEach(group => group.sort((a, b) => a.timestamp - b.timestamp));
+    const dateKeys = Object.keys(groups).sort();
+
+    const btn = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-btn');
+    const originalBtnText = btn ? btn.textContent : '';
+    if (btn) btn.disabled = true;
+    let uploadedCount = 0;
+
+    for (const dateKey of dateKeys){
+      const group = groups[dateKey];
+      const courses = [];
+      for (const item of group){
+        if (btn) btn.textContent = 'Importing… ' + (uploadedCount + 1) + ' / ' + parsed.length;
+        const url = await uploadRestaurantPhoto(item.file, 'RankHeaven/RestaurantCourses');
+        const timeLabel = item.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        courses.push({ text: timeLabel, score: null, photos: url ? [url] : [] });
+        uploadedCount++;
+      }
+      const r = restaurantRows[index];
+      if (!r) break; // restaurant got deleted mid-import — stop rather than writing into nothing
+      const visits = ensureRestaurantVisits(r);
+      visits.push({
+        id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2),
+        date: dateKey,
+        notes: '',
+        courses,
+        photos: []
+      });
+    }
+
+    if (btn){
+      btn.disabled = false;
+      btn.textContent = originalBtnText;
+    }
+    saveRestaurantProgress();
+    renderRestaurantsPage();
+    if (openRestaurantIndex === index) renderRestaurantDetailsContent();
+
+    const summary = 'Created ' + dateKeys.length + ' visit' + (dateKeys.length === 1 ? '' : 's') +
+      ' from ' + parsed.length + ' photo' + (parsed.length === 1 ? '' : 's') +
+      (skippedCount ? (' — ' + skippedCount + ' skipped (unrecognized filename)') : '');
+    showToast(summary);
   }
 
   function sortedRestaurantVisits(r){
@@ -7901,6 +8781,7 @@
   // behind it (so e.g. a course count or photo would stay in sync if the
   // list ever shows one).
   function updateOpenRestaurant(mutatorFn){
+    if (guestViewEnabled) return;
     if (openRestaurantIndex === null) return;
     const r = restaurantRows[openRestaurantIndex];
     mutatorFn(r);
@@ -7919,6 +8800,7 @@
   // element that no longer exists, silently doing nothing, and needing a
   // second click on the (now real) button to actually register.
   function saveOpenRestaurantQuietly(mutatorFn){
+    if (guestViewEnabled) return;
     if (openRestaurantIndex === null) return;
     const r = restaurantRows[openRestaurantIndex];
     mutatorFn(r);
@@ -8049,6 +8931,12 @@
           '<span class="restaurant-score-label">Total</span>' +
           '<span class="restaurant-score-total-value" id="restaurant-score-total-value"></span>' +
         '</div>' +
+        (r.price ? (
+          '<div class="restaurant-score-block">' +
+            '<span class="restaurant-score-label">Price</span>' +
+            '<span class="restaurant-score-price-value">' + escapeHtml(r.price) + '</span>' +
+          '</div>'
+        ) : '') +
       '</div>'
     );
   }
@@ -8222,6 +9110,10 @@
     const rank = openRestaurantIndex + 1;
     const starsCount = restaurantStarsCount(r);
     const starsHtml = starsCount > 0 ? ' <span class="restaurant-stars">' + '⭐'.repeat(starsCount) + '</span>' : '';
+    const { visits: visitCount } = parseRestaurantNotes(r.notes);
+    const visitsHtml = visitCount >= 2
+      ? ' <span class="restaurant-visits" title="Visited ' + visitCount + ' times">×' + visitCount + '</span>'
+      : '';
     const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
 
     const sortedVisits = sortedRestaurantVisits(r);
@@ -8233,6 +9125,8 @@
           '<div class="restaurant-visits-header">' +
             renderRestaurantVisitTabsHtml(sortedVisits, activeVisit) +
             '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
+            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">📷 Bulk Import Photos</button>' +
+            '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
           '</div>' +
           '<div class="restaurant-visit-content">' +
             renderRestaurantVisitMetaHtml(activeVisit) +
@@ -8243,6 +9137,8 @@
           '<div class="restaurant-visits-header">' +
             '<p class="restaurant-course-empty" style="margin:0;">No visits logged yet.</p>' +
             '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
+            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">📷 Bulk Import Photos</button>' +
+            '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
           '</div>'
         );
 
@@ -8257,7 +9153,7 @@
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
       '</div>' +
       '<div class="details-content" style="padding-top:20px;">' +
-        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + starsHtml + '</h2>' +
+        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
         (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
         renderRestaurantScoresRowHtml(r) +
       '</div>' +
@@ -8291,6 +9187,15 @@
     // Visit tabs / dropdown / add wiring
     const visitAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-add-btn');
     if (visitAddBtn) visitAddBtn.addEventListener('click', addRestaurantVisit);
+    const bulkImportBtn = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-btn');
+    const bulkImportFile = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-file');
+    if (bulkImportBtn && bulkImportFile){
+      bulkImportBtn.addEventListener('click', () => bulkImportFile.click());
+      bulkImportFile.addEventListener('change', () => {
+        if (bulkImportFile.files.length) handleRestaurantBulkPhotoImport(openRestaurantIndex, bulkImportFile.files);
+        bulkImportFile.value = '';
+      });
+    }
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-visit-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => switchActiveVisit(btn.dataset.visitId));
     });
@@ -8319,12 +9224,25 @@
     // more from here, rather than tapping the image doing double duty.
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-photo-drop[data-course-photo-index]').forEach(el => {
       const i = Number(el.dataset.coursePhotoIndex);
-      const addPhotoToCourse = (url) => {
-        if (!url) return;
-        updateOpenRestaurant(rest => {
-          const course = getActiveVisit(rest).courses[i];
-          ensureCoursePhotosArray(course).push(url);
-        });
+      // Multiple files at once, sequentially (same reasoning as the bulk
+      // visit importer and Cloudinary migration — safer against rate
+      // limits), with a single update appending all of them together
+      // rather than one updateOpenRestaurant call per file, which would
+      // otherwise re-render the panel mid-loop.
+      const addPhotosToCourse = async (files) => {
+        const fileArray = Array.from(files || []).filter(f => f);
+        if (!fileArray.length) return;
+        const uploadedUrls = [];
+        for (const file of fileArray){
+          const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses');
+          if (url) uploadedUrls.push(url);
+        }
+        if (uploadedUrls.length){
+          updateOpenRestaurant(rest => {
+            const course = getActiveVisit(rest).courses[i];
+            ensureCoursePhotosArray(course).push(...uploadedUrls);
+          });
+        }
       };
       el.addEventListener('dragover', (e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
@@ -8332,12 +9250,11 @@
         el.classList.add('drag-over');
       });
       el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-      el.addEventListener('drop', async (e) => {
+      el.addEventListener('drop', (e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
         el.classList.remove('drag-over');
-        const file = e.dataTransfer.files && e.dataTransfer.files[0];
-        addPhotoToCourse(await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses'));
+        addPhotosToCourse(e.dataTransfer.files);
       });
       el.addEventListener('click', (e) => {
         if (e.target.closest('.restaurant-course-photo-add-btn')) return; // handled separately below
@@ -8345,13 +9262,12 @@
         if (photos.length){
           const allPhotos = gatherAllRestaurantPhotos(r);
           openPhotoLightbox(allPhotos, allPhotos.indexOf(photos[0]), { restaurantIndex: openRestaurantIndex });
-        } else {
+        } else if (!guestViewEnabled){
           const input = document.createElement('input');
           input.type = 'file';
           input.accept = 'image/*';
-          input.addEventListener('change', async () => {
-            addPhotoToCourse(await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses'));
-          });
+          input.multiple = true;
+          input.addEventListener('change', () => addPhotosToCourse(input.files));
           input.click();
         }
       });
@@ -8363,12 +9279,20 @@
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
+        input.multiple = true;
         input.addEventListener('change', async () => {
-          const url = await uploadRestaurantPhoto(input.files[0], 'RankHeaven/RestaurantCourses');
-          if (url) updateOpenRestaurant(rest => {
-            const course = getActiveVisit(rest).courses[i];
-            ensureCoursePhotosArray(course).push(url);
-          });
+          const fileArray = Array.from(input.files || []);
+          const uploadedUrls = [];
+          for (const file of fileArray){
+            const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantCourses');
+            if (url) uploadedUrls.push(url);
+          }
+          if (uploadedUrls.length){
+            updateOpenRestaurant(rest => {
+              const course = getActiveVisit(rest).courses[i];
+              ensureCoursePhotosArray(course).push(...uploadedUrls);
+            });
+          }
         });
         input.click();
       });
@@ -8379,13 +9303,32 @@
     // opening the same shared gallery on click.
     const otherPhotoAddTile = restaurantDetailsPanelInner.querySelector('#restaurant-other-photo-add-tile');
     if (otherPhotoAddTile){
-      const addOtherPhotoFile = async (file) => {
-        const url = await uploadRestaurantPhoto(file, 'RankHeaven/RestaurantVisitPhotos');
-        if (url) updateOpenRestaurant(rest => {
-          const visit = getActiveVisit(rest);
-          if (!visit.photos) visit.photos = [];
-          visit.photos.push(url);
-        });
+      // Sequential, not parallel — same reasoning as the bulk visit import
+      // and the Cloudinary art migration: safer against rate limits for a
+      // handful of photos at once, and each upload failure (handled by
+      // uploadRestaurantPhoto's own base64 fallback) doesn't block the rest.
+      const addOtherPhotoFiles = async (files) => {
+        const fileArray = Array.from(files || []).filter(f => f);
+        if (!fileArray.length) return;
+        const originalText = otherPhotoAddTile.textContent;
+        const uploadedUrls = [];
+        for (let i = 0; i < fileArray.length; i++){
+          if (fileArray.length > 1) otherPhotoAddTile.textContent = (i + 1) + '/' + fileArray.length;
+          const url = await uploadRestaurantPhoto(fileArray[i], 'RankHeaven/RestaurantVisitPhotos');
+          if (url) uploadedUrls.push(url);
+        }
+        otherPhotoAddTile.textContent = originalText;
+        // One single update at the end, not one per photo — updateOpenRestaurant
+        // re-renders the whole panel each time, which would otherwise replace
+        // this tile with a fresh DOM node mid-loop and silently stop the
+        // progress text above from updating on the (now-detached) original.
+        if (uploadedUrls.length){
+          updateOpenRestaurant(rest => {
+            const visit = getActiveVisit(rest);
+            if (!visit.photos) visit.photos = [];
+            visit.photos.push(...uploadedUrls);
+          });
+        }
       };
       otherPhotoAddTile.addEventListener('dragover', (e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
@@ -8397,13 +9340,14 @@
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
         otherPhotoAddTile.classList.remove('drag-over');
-        addOtherPhotoFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+        addOtherPhotoFiles(e.dataTransfer.files);
       });
       otherPhotoAddTile.addEventListener('click', () => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
-        input.addEventListener('change', () => addOtherPhotoFile(input.files[0]));
+        input.multiple = true;
+        input.addEventListener('change', () => addOtherPhotoFiles(input.files));
         input.click();
       });
     }
@@ -8575,6 +9519,8 @@
   updateCount();
   loadLastfmConfig();
   loadMusicbeeLibrary();
+  loadGuestViewSetting();
+  loadDishOrder();
   loadPointsAlgorithm().then(checkSavedProgress);
 })();
 </script>

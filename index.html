@@ -4302,6 +4302,24 @@
     });
   }
 
+  // Requests a resized, auto-compressed, auto-formatted version of a photo
+  // via Cloudinary's URL-transformation syntax, rather than always loading
+  // the full original — the original itself is untouched, this only
+  // affects what gets fetched for THIS particular <img>. w_{width} caps the
+  // width (c_limit means it only ever shrinks, never upscales past the
+  // original), q_auto picks the lowest quality that still looks right, and
+  // f_auto serves WebP/AVIF to browsers that support it. Cloudinary
+  // generates and caches each distinct transformed size on first request —
+  // nothing needs pre-generating or storing separately.
+  // Base64 data URLs (the local fallback for when Cloudinary isn't
+  // configured, or an upload failed) have no separate "smaller version" to
+  // request — there's nothing to transform, so those pass through
+  // unchanged, exactly as before.
+  function cloudinaryThumbUrl(url, width){
+    if (!url || typeof url !== 'string' || url.indexOf('res.cloudinary.com') === -1) return url;
+    return url.replace('/upload/', '/upload/w_' + width + ',c_limit,q_auto,f_auto/');
+  }
+
   async function uploadToCloudinary(fileOrBlob, folder){
     if (!cloudinaryConfig) throw new Error('Cloudinary not configured');
     const targetFolder = folder || 'RankHeaven/AlbumArt';
@@ -4535,7 +4553,7 @@
   function openArtLightbox(src){
     lightboxPhotos = null;
     lightboxCoverContext = null;
-    artLightboxImg.src = src;
+    artLightboxImg.src = cloudinaryThumbUrl(src, 1600);
     artLightboxOverlay.classList.remove('multi');
     lightboxCoverToggleBtn.classList.remove('show');
     lightboxDeleteBtn.classList.remove('show');
@@ -4554,7 +4572,7 @@
     lightboxPhotos = photos;
     lightboxIndex = startIndex;
     lightboxCoverContext = coverContext || null;
-    artLightboxImg.src = photos[lightboxIndex];
+    artLightboxImg.src = cloudinaryThumbUrl(photos[lightboxIndex], 1600);
     artLightboxOverlay.classList.add('multi');
     artLightboxOverlay.classList.add('show');
     lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
@@ -4580,7 +4598,7 @@
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
-    artLightboxImg.src = lightboxPhotos[lightboxIndex];
+    artLightboxImg.src = cloudinaryThumbUrl(lightboxPhotos[lightboxIndex], 1600);
     updateLightboxCounter();
     updateLightboxCoverToggle();
   }
@@ -4637,7 +4655,7 @@
     }
     lightboxPhotos = refreshedPhotos;
     lightboxIndex = Math.min(lightboxIndex, refreshedPhotos.length - 1);
-    artLightboxImg.src = refreshedPhotos[lightboxIndex];
+    artLightboxImg.src = cloudinaryThumbUrl(refreshedPhotos[lightboxIndex], 1600);
     updateLightboxCounter();
     updateLightboxCoverToggle();
   });
@@ -5241,11 +5259,7 @@
   function songArtHtml(albumRaw){
     const art = albumRaw ? artCache[albumRaw] : null;
     const cls = 'art-drop song-art-readonly' + (art ? ' has-art' : '');
-    const inner = art ? '<img class="art-img" src="' + art + '" alt="" draggable="false">' : '<span class="art-drop-hint">🎵</span>';
-    return '<div class="' + cls + '">' + inner + '</div>';
-  }
-
-  function songMetaLine(p){
+    const inner = art ? '<img class="art-img" src="' + cloudinaryThumbUrl(art, 120) + '" alt="" draggable="false" loading="lazy">' : '<span class="art-drop-hint">🎵</span>';
     const parts = [];
     if (p.artist) parts.push(p.artist);
     if (p.album) parts.push(p.album);
@@ -5817,10 +5831,10 @@
   songReorderSaveBtn.addEventListener('click', saveSongReorder);
   songReorderCancelBtn.addEventListener('click', cancelSongReorder);
 
-  function artDropZoneHtml(raw, extraClass, skipTitle){
+  function artDropZoneHtml(raw, extraClass, skipTitle, width){
     const art = artCache[raw];
     const cls = 'art-drop' + (extraClass ? ' ' + extraClass : '') + (art ? ' has-art' : '');
-    const inner = art ? '<img class="art-img" src="' + art + '" alt="" draggable="false">' : '<span class="art-drop-hint">🎵</span>';
+    const inner = art ? '<img class="art-img" src="' + cloudinaryThumbUrl(art, width || 120) + '" alt="" draggable="false" loading="lazy">' : '<span class="art-drop-hint">🎵</span>';
     const titleAttr = skipTitle ? '' : ' title="Drag an image here, or click to browse"';
     return '<div class="' + cls + '"' + titleAttr + '>' + inner + '</div>';
   }
@@ -6046,7 +6060,7 @@
     const showPagingBtns = visibleForPaging.length > 1 && visibleForPaging.includes(item);
     detailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
-        artDropZoneHtml(item, 'details-art') +
+        artDropZoneHtml(item, 'details-art', false, 500) +
         (showPagingBtns ? '<button class="details-panel-nav-btn details-panel-prev-btn" type="button" title="Previous">‹</button>' : '') +
         (showPagingBtns ? '<button class="details-panel-nav-btn details-panel-next-btn" type="button" title="Next">›</button>' : '') +
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
@@ -6795,7 +6809,7 @@
         const card = document.createElement('div');
         card.className = 'grid-card' + (item === selectedItem ? ' selected' : '');
         card.title = p.artist ? (p.artist + ' - ' + p.album + (p.year ? ' (' + p.year + ')' : '')) : item;
-        card.innerHTML = '<span class="grid-card-rank">#' + (idx + 1) + '</span>' + artDropZoneHtml(item, null, true);
+        card.innerHTML = '<span class="grid-card-rank">#' + (idx + 1) + '</span>' + artDropZoneHtml(item, null, true, 500);
         resultsList.appendChild(card);
 
         wireArtDropZone(card.querySelector('.art-drop'), item, true); // true = drag-only, no click-to-browse
@@ -8193,7 +8207,7 @@
             '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
             tierBadgeHtml +
             (effectiveCover
-              ? '<img class="art-img" src="' + escapeAttr(effectiveCover) + '" alt="">'
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
               : '<span class="art-drop-hint">📷</span>') +
             '<div class="restaurant-gold-card-overlay">' +
               '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
@@ -8401,7 +8415,7 @@
 
   function dishPhotoHtml(course){
     const photo = (course.photos && course.photos[0]) || null;
-    return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(photo) + '" alt="">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+    return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(photo, 120)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
   }
 
   let dishDragSourceId = null;
@@ -8446,7 +8460,7 @@
         card.dataset.dishId = d.id;
         card.title = d.course.text || d.restaurant.name || '';
         card.innerHTML = '<span class="grid-card-rank">#' + (idx + 1) + '</span>' +
-          '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+          '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 500)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
         dishResultsList.appendChild(card);
         makeDishDraggable(card, d.id);
         card.addEventListener('click', () => {
@@ -8875,7 +8889,7 @@
             '<div class="restaurant-course-card">' +
               '<div class="restaurant-course-photo-drop" data-course-photo-index="' + i + '"' +
                 (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
-                (firstPhoto ? '<img class="art-img" src="' + escapeAttr(firstPhoto) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
+                (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 700)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">📷</span>') +
                 countBadgeHtml +
                 '<button class="restaurant-course-photo-add-btn" type="button" data-add-photo-course-index="' + i + '" title="Add another photo">+</button>' +
               '</div>' +
@@ -8895,7 +8909,7 @@
     const otherPhotos = visit.photos || [];
     const otherPhotosGridHtml = otherPhotos.map((url, i) =>
       '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
-        '<img src="' + escapeAttr(url) + '" alt="" loading="lazy">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(url, 350)) + '" alt="" loading="lazy">' +
         '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
       '</div>'
     ).join('');
@@ -9146,7 +9160,7 @@
     restaurantDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
         '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to open the photo gallery"' : ' title="Add photos via a course or More Photos below"') + '>' +
-          (effectiveCover ? '<img class="art-img" src="' + escapeAttr(effectiveCover) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
+          (effectiveCover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
         '</div>' +
         (r.website ? '<button class="details-website-btn" type="button" title="Visit website">🌐</button>' : '') +
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
