@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Blue Heaven</title>
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32-v2.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16-v2.png">
+<link rel="apple-touch-icon" href="apple-touch-icon-v2.png">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#142A2E">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2546,6 +2546,7 @@
      courses, pairings, photos (add/remove/replace), and the bulk importer.
      Viewing (tabs, dropdown, gallery navigation) is untouched — only
      controls that create, remove, or modify something are hidden. */
+  body.guest-view-active #restaurant-tiers-panel{ display: none; }
   body.guest-view-active #restaurant-new-btn,
   body.guest-view-active #restaurant-rearrange-btn,
   body.guest-view-active .details-edit-btn,
@@ -3832,6 +3833,12 @@
   async function writeFirestoreData(){
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return;
+    // Hard guard, not just a UI-level restriction — this account must never
+    // write under any circumstance, including the read-fails/seed-write
+    // path in loadOrSeedFirestoreData below, which would otherwise risk
+    // overwriting the owner's real data with this account's own (empty)
+    // local state the moment its read comes up empty for any reason.
+    if (isLockedGuestAccount) return;
     try{
       const artKeys = Array.from(new Set([...items, ...loadingDock]));
       const art = {};
@@ -3862,7 +3869,14 @@
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return null;
     try{
-      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
+      // The locked guest account reads the OWNER's document, not its own —
+      // its own uid-keyed path has never had anything written to it (see
+      // the write guard above), so reading that would always come up
+      // empty. This is what actually lets it see the owner's data at all;
+      // it requires a matching Firestore security rule granting this
+      // specific read (see this session's chat for the exact rule).
+      const targetUid = isLockedGuestAccount ? OWNER_FIREBASE_UID : firebaseUser.uid;
+      const docRef = fb.doc(fb.db, 'users', targetUid, 'appData', 'main');
       const snap = await fb.getDoc(docRef);
       if (!snap.exists()) return null;
       const data = snap.data();
@@ -3953,6 +3967,13 @@
   // check overrides that entirely for one hard-coded account, regardless of
   // whatever this device's own local Guest View setting happens to be.
   const LOCKED_GUEST_EMAIL = 'meganec96@gmail.com';
+  // Fill this in with the OWNER's own Firebase UID — found in the Firebase
+  // console under Authentication → Users, next to the owner's Google
+  // account. This is what lets the guest account read the owner's actual
+  // data instead of its own (empty) uid-keyed document — see
+  // readFirestoreData below, and the matching Firestore security rule this
+  // requires (see this session's chat for the exact rule to add).
+  const OWNER_FIREBASE_UID = 'YOUR_OWNER_UID_HERE';
   let isLockedGuestAccount = false;
 
   function initFirebaseSync(){
@@ -3979,13 +4000,29 @@
       }
       if (user){
         await localDataReadyPromise; // see this promise's own comment — avoids racing checkSavedProgress
+        if (isLockedGuestAccount){
+          // Unlike the general Guest View toggle (which the owner uses and
+          // needs Settings to turn back off), this account should never be
+          // allowed to land on Settings at all — redirect away immediately,
+          // now that it's actually safe to call switchGuestPage (which
+          // touches restaurantRows via renderRestaurantsPage).
+          const activeTopPage = document.querySelector('.top-page.active');
+          if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes'){
+            switchGuestPage('restaurants');
+          }
+        }
         await loadOrSeedFirestoreData();
-        // loadMusicbeeLibrary() is called fire-and-forget at script load and
-        // may not have finished yet — re-awaiting it here is harmless (it's
-        // idempotent) and guarantees musicbeeTracks is actually loaded
-        // before comparing it against Firestore's copy.
-        await loadMusicbeeLibrary();
-        await loadOrSeedMusicbeeFirestore();
+        if (!isLockedGuestAccount){
+          // MusicBee data is Albums-only, and Albums is entirely hidden for
+          // this account — nothing here would ever be shown to it, so
+          // there's no reason to read or seed-write it on their behalf.
+          // loadMusicbeeLibrary() is called fire-and-forget at script load
+          // and may not have finished yet — re-awaiting it here is harmless
+          // (it's idempotent) and guarantees musicbeeTracks is actually
+          // loaded before comparing it against Firestore's copy.
+          await loadMusicbeeLibrary();
+          await loadOrSeedMusicbeeFirestore();
+        }
       }
     });
     firebaseSigninBtn.addEventListener('click', firebaseSignIn);
