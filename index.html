@@ -621,6 +621,16 @@
     line-height: 1;
     padding: 4px 6px;
   }
+  .restaurant-score-total-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .restaurant-tie-move-btn{
+    padding: 4px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
   .restaurant-score-price-value{
     font-family: 'Figtree', sans-serif;
     font-size: 18px;
@@ -4567,6 +4577,17 @@
     return escapeHtml(str).replace(/"/g, '&quot;');
   }
 
+  function ordinal(n){
+    const rem100 = n % 100;
+    if (rem100 >= 11 && rem100 <= 13) return n + 'th';
+    switch (n % 10){
+      case 1: return n + 'st';
+      case 2: return n + 'nd';
+      case 3: return n + 'rd';
+      default: return n + 'th';
+    }
+  }
+
   // Resets to 'auto' first so shrinking (e.g. deleting text) is picked up
   // correctly — scrollHeight alone only ever reports the larger of the two
   // during a shrink, since the old inline height is still in effect when
@@ -8332,6 +8353,56 @@
     return gatherAllRestaurantPhotos(r)[0] || '';
   }
 
+  function restaurantTotal(r){
+    const a = r.bestFlavor ? Number(r.bestFlavor) : null;
+    const b = r.flavorVariety ? Number(r.flavorVariety) : null;
+    return (a !== null && b !== null && !isNaN(a) && !isNaN(b)) ? a + b : null;
+  }
+
+  // Restaurants are purely manually ordered — no auto-sort by score like
+  // Hikes/Roads/Games — so a tie in total score doesn't put two restaurants
+  // anywhere near each other unless the person drags them there themselves.
+  // This finds whether the restaurant at `index` sits apart from every other
+  // restaurant sharing its total, and if so, the position right after the
+  // last one in that tied group — "in position" here just means touching
+  // the group on either side, not any particular spot within it, since
+  // where it lands inside the tie is left entirely to manual reordering.
+  // Returns null when no button should show (no score, no ties elsewhere,
+  // or already adjacent to the tied group).
+  function getRestaurantTieMoveTarget(index){
+    const total = restaurantTotal(restaurantRows[index]);
+    if (total === null) return null;
+
+    const sameScoreIndices = [];
+    restaurantRows.forEach((r, i) => {
+      if (i !== index && restaurantTotal(r) === total) sameScoreIndices.push(i);
+    });
+    if (!sameScoreIndices.length) return null;
+
+    const adjacentBefore = index > 0 && restaurantTotal(restaurantRows[index - 1]) === total;
+    const adjacentAfter = index < restaurantRows.length - 1 && restaurantTotal(restaurantRows[index + 1]) === total;
+    if (adjacentBefore || adjacentAfter) return null;
+
+    const lastSameIndex = sameScoreIndices[sameScoreIndices.length - 1];
+    let targetIndex = lastSameIndex + 1;
+    if (index < targetIndex) targetIndex -= 1; // removing `index` first shifts everything after it down by one
+    return targetIndex;
+  }
+
+  function moveRestaurantToTiePosition(){
+    if (guestViewEnabled) return;
+    if (openRestaurantIndex === null) return;
+    const targetIndex = getRestaurantTieMoveTarget(openRestaurantIndex);
+    if (targetIndex === null) return;
+    const [r] = restaurantRows.splice(openRestaurantIndex, 1);
+    restaurantRows.splice(targetIndex, 0, r);
+    openRestaurantIndex = targetIndex;
+    saveRestaurantProgress();
+    renderRestaurantsPage();
+    renderRestaurantDetailsContent();
+    showToast('Moved to ' + ordinal(targetIndex + 1) + ' position');
+  }
+
   // A single photo URL can be referenced from more than one place at once —
   // a course's photo that was also picked as the cover, for instance —
   // since setting a cover just copies the URL rather than moving it. This
@@ -11476,7 +11547,10 @@
         '</div>' +
         '<div class="restaurant-score-block restaurant-score-total-block" id="restaurant-score-total-block" style="display:none;">' +
           '<span class="restaurant-score-label">Total</span>' +
-          '<span class="restaurant-score-total-value" id="restaurant-score-total-value"></span>' +
+          '<span class="restaurant-score-total-row">' +
+            '<span class="restaurant-score-total-value" id="restaurant-score-total-value"></span>' +
+            '<button class="btn-ghost restaurant-tie-move-btn" id="restaurant-tie-move-btn" type="button" style="display:none;"></button>' +
+          '</span>' +
         '</div>' +
         (r.price ? (
           '<div class="restaurant-score-block">' +
@@ -11496,6 +11570,7 @@
     const flavorVarietySelect = restaurantDetailsPanelInner.querySelector('#restaurant-flavor-variety-select');
     const totalBlock = restaurantDetailsPanelInner.querySelector('#restaurant-score-total-block');
     const totalValueEl = restaurantDetailsPanelInner.querySelector('#restaurant-score-total-value');
+    const tieMoveBtn = restaurantDetailsPanelInner.querySelector('#restaurant-tie-move-btn');
     if (!bestFlavorSelect || !flavorVarietySelect || !totalBlock) return;
     const a = bestFlavorSelect.value ? Number(bestFlavorSelect.value) : null;
     const b = flavorVarietySelect.value ? Number(flavorVarietySelect.value) : null;
@@ -11504,6 +11579,15 @@
       totalBlock.style.display = '';
     } else {
       totalBlock.style.display = 'none';
+    }
+    if (tieMoveBtn && openRestaurantIndex !== null){
+      const targetIndex = getRestaurantTieMoveTarget(openRestaurantIndex);
+      if (targetIndex === null){
+        tieMoveBtn.style.display = 'none';
+      } else {
+        tieMoveBtn.textContent = 'Move to ' + ordinal(targetIndex + 1) + ' Position';
+        tieMoveBtn.style.display = '';
+      }
     }
   }
 
@@ -11720,6 +11804,7 @@
     updateRestaurantScoreTotalDisplay();
     const bestFlavorSelect = restaurantDetailsPanelInner.querySelector('#restaurant-best-flavor-select');
     const flavorVarietySelect = restaurantDetailsPanelInner.querySelector('#restaurant-flavor-variety-select');
+    restaurantDetailsPanelInner.querySelector('#restaurant-tie-move-btn').addEventListener('click', moveRestaurantToTiePosition);
     bestFlavorSelect.addEventListener('change', () => {
       bestFlavorSelect.classList.toggle('has-score', !!bestFlavorSelect.value);
       saveOpenRestaurantQuietly(rest => { rest.bestFlavor = bestFlavorSelect.value; });
