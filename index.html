@@ -230,6 +230,23 @@
   #hike-details-panel.open{
     width: 600px;
   }
+  #road-details-panel{
+    width: 0;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: var(--desktop-nav-height);
+    min-height: calc(100vh - var(--desktop-nav-height));
+    max-height: calc(100vh - var(--desktop-nav-height));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+  }
+  #road-details-panel.open{
+    width: 600px;
+  }
   .restaurant-details-panel-inner{
     width: 600px;
   }
@@ -1508,6 +1525,65 @@
     border: 1px solid var(--panel-line);
   }
   .restaurant-gold-card.drag-over{ border-color: var(--amber); }
+  /* Books/Movies/Games use this alongside .restaurant-gold-grid/.restaurant-gold-card
+     — same grid mechanics, but a standard poster/cover aspect ratio (taller
+     than wide) instead of Restaurants/Hikes' square photos, and narrower
+     columns since a 260px-wide card at this aspect would be enormous. */
+  .media-poster-grid{
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .media-poster-grid .restaurant-gold-card{
+    aspect-ratio: 48 / 75;
+  }
+  /* Books/Movies/Games edit-mode rows — no details tray at all for these,
+     so every field (including the cover) has to be editable right here in
+     the row, unlike Restaurants/Hikes/Dishes which only need a rank number
+     and one text field since their real editing happens in a side panel. */
+  .media-edit-row{ align-items: flex-start !important; }
+  .media-edit-thumb{
+    width: 40px;
+    height: 62px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+    position: relative;
+  }
+  .media-edit-thumb img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+  .media-edit-thumb .art-drop-hint{ font-size: 16px; }
+  .media-edit-thumb.drag-over{ border-color: var(--amber); }
+  .media-edit-fields{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  .media-edit-fields input, .media-edit-fields select{
+    width: 100%;
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    font-size: 13px;
+  }
+  .media-edit-fields .media-edit-title{ font-size: 15px; font-weight: 600; }
+  .media-edit-secondary-row{ display: flex; gap: 6px; flex-wrap: wrap; }
+  .media-edit-secondary-row input{ flex: 1; min-width: 90px; width: auto; }
+  .media-edit-scores-row{ display: flex; gap: 6px; flex-wrap: wrap; }
+  .media-edit-scores-row label{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 10px;
+    color: var(--chalk-dim);
+    gap: 2px;
+  }
+  .media-edit-scores-row select{ width: 56px; }
   .restaurant-gold-card img{
     width: 100%;
     height: 100%;
@@ -2086,6 +2162,13 @@
     justify-content: flex-end;
     gap: 10px;
   }
+  #book-import-overlay .modal-box{ max-width: 560px; }
+  #book-import-textarea{
+    width: 100%;
+    resize: vertical;
+    font-family: 'Figtree', sans-serif;
+    margin-bottom: 16px;
+  }
   .btn-danger{
     background: var(--brick);
     color: var(--chalk);
@@ -2510,6 +2593,22 @@
       visibility: hidden;
     }
     #hike-details-panel.open{
+      width: 100%;
+      transform: translateX(0);
+      visibility: visible;
+    }
+    #road-details-panel{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      min-height: 100vh;
+      max-height: 100vh;
+      z-index: 200;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      visibility: hidden;
+    }
+    #road-details-panel.open{
       width: 100%;
       transform: translateX(0);
       visibility: visible;
@@ -3206,12 +3305,29 @@
 
   <div id="page-roads" class="top-page">
     <div class="page-content">
-      <div class="group-sub-tabs" id="nature-sub-tabs-roads">
-        <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-2" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
-        <button class="group-sub-tab-btn active" id="nature-subtab-roads-btn-2" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
-        <button class="group-sub-tab-btn" id="nature-subtab-photos-btn-2" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="nature-sub-tabs-roads">
+          <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-2" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+          <button class="group-sub-tab-btn active" id="nature-subtab-roads-btn-2" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-photos-btn-2" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
+        </div>
+        <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="road-rearrange-btn" type="button">Rearrange</button>
+          <button class="btn-primary" id="road-rearrange-save-btn" type="button" style="display:none;">Save Order</button>
+          <button class="btn-ghost" id="road-rearrange-cancel-btn" type="button" style="display:none;">Cancel</button>
+          <button class="btn-primary" id="road-new-btn" type="button">+ New Road</button>
+        </div>
       </div>
-      <p class="footer-note">Coming soon.</p>
+
+      <div class="filters-group">
+        <div class="filter-wrap">
+          <input type="text" class="filter-input road-search-filter-input" id="road-search-filter-input" placeholder="Search name, state, or country..." autocomplete="off">
+          <button class="filter-clear" id="road-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
+        </div>
+      </div>
+
+      <div class="restaurant-gold-grid" id="road-gold-grid"></div>
+      <ol class="results-list" id="road-list"></ol>
     </div>
   </div>
 
@@ -3235,34 +3351,112 @@
 
   <div id="page-books" class="top-page">
     <div class="page-content">
-      <div class="group-sub-tabs" id="art-sub-tabs-books">
-        <button class="group-sub-tab-btn active" id="art-subtab-books-btn" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
-        <button class="group-sub-tab-btn" id="art-subtab-movies-btn" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
-        <button class="group-sub-tab-btn" id="art-subtab-games-btn" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="art-sub-tabs-books">
+          <button class="group-sub-tab-btn active" id="art-subtab-books-btn" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+          <button class="group-sub-tab-btn" id="art-subtab-movies-btn" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+          <button class="group-sub-tab-btn" id="art-subtab-games-btn" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+        </div>
+        <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="book-edit-toggle-btn" type="button">Edit</button>
+          <div class="reorder-edit-controls" id="book-edit-controls" style="display:none;">
+            <button class="btn-primary" id="book-edit-save-btn" type="button">Save Changes</button>
+            <button class="btn-ghost" id="book-edit-cancel-btn" type="button">Cancel</button>
+            <button class="btn-ghost" id="book-edit-add-btn" type="button">+ Add Row</button>
+          </div>
+          <button class="btn-ghost" id="book-import-btn" type="button">Import</button>
+          <button class="btn-primary" id="book-add-btn" type="button">+ Add Book</button>
+        </div>
       </div>
-      <p class="footer-note">Coming soon.</p>
+
+      <div class="filters-group">
+        <div class="filter-wrap">
+          <input type="text" class="filter-input" id="book-search-filter-input" placeholder="Search title or author..." autocomplete="off">
+          <button class="filter-clear" id="book-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
+        </div>
+      </div>
+
+      <div class="restaurant-gold-grid media-poster-grid" id="book-gold-grid"></div>
+      <ol class="results-list" id="book-list"></ol>
+      <p class="restaurant-course-empty" id="book-empty-message" style="display:none;">No books yet — add one, or import your list.</p>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="book-import-overlay">
+    <div class="modal-box">
+      <h3 class="modal-title">Import Books</h3>
+      <p class="modal-body">One book per line, in the order you want them ranked (top of the list = #1). Format each line as:<br><code>Title | Author Lastname, Firstname | Series (optional)</code></p>
+      <textarea id="book-import-textarea" class="restaurant-edit-input" style="min-height:200px;" placeholder="Project Hail Mary | Weir, Andy&#10;The Fellowship of the Ring | Tolkien, J.R.R. | The Lord of the Rings"></textarea>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="book-import-cancel-btn" type="button">Cancel</button>
+        <button class="btn-primary" id="book-import-confirm-btn" type="button">Import</button>
+      </div>
     </div>
   </div>
 
   <div id="page-movies" class="top-page">
     <div class="page-content">
-      <div class="group-sub-tabs" id="art-sub-tabs-movies">
-        <button class="group-sub-tab-btn" id="art-subtab-books-btn-2" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
-        <button class="group-sub-tab-btn active" id="art-subtab-movies-btn-2" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
-        <button class="group-sub-tab-btn" id="art-subtab-games-btn-2" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="art-sub-tabs-movies">
+          <button class="group-sub-tab-btn" id="art-subtab-books-btn-2" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+          <button class="group-sub-tab-btn active" id="art-subtab-movies-btn-2" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+          <button class="group-sub-tab-btn" id="art-subtab-games-btn-2" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+        </div>
+        <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="movie-edit-toggle-btn" type="button">Edit</button>
+          <div class="reorder-edit-controls" id="movie-edit-controls" style="display:none;">
+            <button class="btn-primary" id="movie-edit-save-btn" type="button">Save Changes</button>
+            <button class="btn-ghost" id="movie-edit-cancel-btn" type="button">Cancel</button>
+            <button class="btn-ghost" id="movie-edit-add-btn" type="button">+ Add Row</button>
+          </div>
+          <button class="btn-primary" id="movie-add-btn" type="button">+ Add Movie</button>
+        </div>
       </div>
-      <p class="footer-note">Coming soon.</p>
+
+      <div class="filters-group">
+        <div class="filter-wrap">
+          <input type="text" class="filter-input" id="movie-search-filter-input" placeholder="Search title or director..." autocomplete="off">
+          <button class="filter-clear" id="movie-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
+        </div>
+      </div>
+
+      <div class="restaurant-gold-grid media-poster-grid" id="movie-gold-grid"></div>
+      <ol class="results-list" id="movie-list"></ol>
+      <p class="restaurant-course-empty" id="movie-empty-message" style="display:none;">No movies yet — add one to get started.</p>
     </div>
   </div>
 
   <div id="page-games" class="top-page">
     <div class="page-content">
-      <div class="group-sub-tabs" id="art-sub-tabs-games">
-        <button class="group-sub-tab-btn" id="art-subtab-books-btn-3" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
-        <button class="group-sub-tab-btn" id="art-subtab-movies-btn-3" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
-        <button class="group-sub-tab-btn active" id="art-subtab-games-btn-3" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="art-sub-tabs-games">
+          <button class="group-sub-tab-btn" id="art-subtab-books-btn-3" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+          <button class="group-sub-tab-btn" id="art-subtab-movies-btn-3" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+          <button class="group-sub-tab-btn active" id="art-subtab-games-btn-3" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+        </div>
+        <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="game-edit-toggle-btn" type="button">Edit</button>
+          <div class="reorder-edit-controls" id="game-edit-controls" style="display:none;">
+            <button class="btn-primary" id="game-edit-save-btn" type="button">Save Changes</button>
+            <button class="btn-ghost" id="game-edit-cancel-btn" type="button">Cancel</button>
+            <button class="btn-ghost" id="game-edit-add-btn" type="button">+ Add Row</button>
+          </div>
+          <button class="btn-ghost" id="game-import-btn" type="button">Import</button>
+          <input type="file" id="game-import-file" accept=".xlsx,.xls" style="display:none;">
+          <button class="btn-primary" id="game-add-btn" type="button">+ Add Game</button>
+        </div>
       </div>
-      <p class="footer-note">Coming soon.</p>
+
+      <div class="filters-group">
+        <div class="filter-wrap">
+          <input type="text" class="filter-input" id="game-search-filter-input" placeholder="Search title..." autocomplete="off">
+          <button class="filter-clear" id="game-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
+        </div>
+      </div>
+
+      <div class="restaurant-gold-grid media-poster-grid" id="game-gold-grid"></div>
+      <ol class="results-list" id="game-list"></ol>
+      <p class="restaurant-course-empty" id="game-empty-message" style="display:none;">No games yet — add one, or import your scores.</p>
     </div>
   </div>
 
@@ -3368,6 +3562,10 @@
 
 <aside id="hike-details-panel">
   <div class="restaurant-details-panel-inner" id="hike-details-panel-inner"></div>
+</aside>
+
+<aside id="road-details-panel">
+  <div class="restaurant-details-panel-inner" id="road-details-panel-inner"></div>
 </aside>
 
 </div>
@@ -3714,9 +3912,26 @@
   const hikeNewBtn = document.getElementById('hike-new-btn');
   const hikeSearchFilterInput = document.getElementById('hike-search-filter-input');
   const hikeSearchFilterClear = document.getElementById('hike-search-filter-clear');
+  const roadDetailsPanel = document.getElementById('road-details-panel');
+  const roadDetailsPanelInner = document.getElementById('road-details-panel-inner');
+  const roadGoldGridEl = document.getElementById('road-gold-grid');
+  const roadList = document.getElementById('road-list');
+  const roadRearrangeBtn = document.getElementById('road-rearrange-btn');
+  const roadRearrangeSaveBtn = document.getElementById('road-rearrange-save-btn');
+  const roadRearrangeCancelBtn = document.getElementById('road-rearrange-cancel-btn');
+  const roadNewBtn = document.getElementById('road-new-btn');
+  const roadSearchFilterInput = document.getElementById('road-search-filter-input');
+  const roadSearchFilterClear = document.getElementById('road-search-filter-clear');
   const photoGrid = document.getElementById('photo-grid');
   const photoEmptyMessage = document.getElementById('photo-empty-message');
   const photoAddBtn = document.getElementById('photo-add-btn');
+  const bookImportBtn = document.getElementById('book-import-btn');
+  const bookImportOverlay = document.getElementById('book-import-overlay');
+  const bookImportTextarea = document.getElementById('book-import-textarea');
+  const bookImportCancelBtn = document.getElementById('book-import-cancel-btn');
+  const bookImportConfirmBtn = document.getElementById('book-import-confirm-btn');
+  const gameImportBtn = document.getElementById('game-import-btn');
+  const gameImportFile = document.getElementById('game-import-file');
   const exportAllBtn = document.getElementById('export-all-btn');
   const importAllBtn = document.getElementById('import-all-btn');
   const importAllFile = document.getElementById('import-all-file');
@@ -6180,6 +6395,9 @@
     if (page !== 'hikes' && openHikeIndex !== null){
       closeHikeDetailsPanel();
     }
+    if (page !== 'roads' && openRoadIndex !== null){
+      closeRoadDetailsPanel();
+    }
     if (page === 'songs'){
       renderSongsPage();
     }
@@ -6192,8 +6410,20 @@
     if (page === 'hikes'){
       renderHikesPage();
     }
+    if (page === 'roads'){
+      renderRoadsPage();
+    }
     if (page === 'photos'){
       renderPhotosPage();
+    }
+    if (page === 'books'){
+      renderMediaPage('book');
+    }
+    if (page === 'movies'){
+      renderMediaPage('movie');
+    }
+    if (page === 'games'){
+      renderMediaPage('game');
     }
   }
 
@@ -6764,7 +6994,11 @@
   }
 
   function parseImportedXlsx(arrayBuffer){
-    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+    // Same fix as parseGameImportXlsx — {type:'array'} needs an actual
+    // Uint8Array, not a raw ArrayBuffer; without this it silently misparses
+    // in any real browser (Node's Buffer masks the bug locally, but no
+    // browser has that global).
+    const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
     const ranked = xlsxSheetToItems(wb.Sheets[wb.SheetNames[0]], true);
     const dockSheetName = wb.SheetNames.find(n => /loading dock/i.test(n));
     const dock = dockSheetName ? xlsxSheetToItems(wb.Sheets[dockSheetName], false) : [];
@@ -6860,7 +7094,7 @@
   // "Artist - Album (Year)" lines, or a full export file (it'll just use
   // the Loading Dock sheet/section from that and ignore the ranked part).
   function parseDockImportXlsx(arrayBuffer){
-    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+    const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
     const sheetName = wb.SheetNames.find(n => /loading dock/i.test(n)) || wb.SheetNames[0];
     return xlsxSheetToItems(wb.Sheets[sheetName], false);
   }
@@ -7883,7 +8117,7 @@
       let parsedList = [];
       try{
         if (isXlsx){
-          const wb = XLSX.read(reader.result, { type: 'array' });
+          const wb = XLSX.read(new Uint8Array(reader.result), { type: 'array' });
           const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
           parsedList = rows.map(row => {
             if (row.Artist && row.Title){
@@ -9427,6 +9661,566 @@
     renderHikesPage();
   });
 
+  // ---------- ROADS ----------
+  // Mirrors Hikes' architecture (details panel, gold-grid+list split,
+  // auto-sort by total with manual tie-break) but simpler: no dates concept
+  // at all — just one flat, bulk-uploadable photo grid on the road itself —
+  // and a shorter edit form (Name/Country/State only).
+  const ROAD_STORAGE_KEY = 'road-list';
+  const ROAD_DRIVING_SCORES = [10, 9, 8, 7, 6, 5, 4];
+  const ROAD_SCENERY_SCORES = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
+
+  let roadRows = [];
+  let openRoadIndex = null;
+  let newRoadDraft = null;
+  let roadEditMode = false;
+  let roadRearrangeMode = false;
+  let roadSearchFilter = '';
+
+  async function loadRoadProgress(){
+    try{
+      const res = await window.storage.get(ROAD_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        roadRows = Array.isArray(parsed.roadRows) ? parsed.roadRows : [];
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+
+  function saveRoadProgress(){
+    try{ window.storage.set(ROAD_STORAGE_KEY, JSON.stringify({ roadRows, savedAt: new Date().toISOString() }), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  function roadTotal(r){
+    const a = r.drivingScore ? Number(r.drivingScore) : null;
+    const b = r.sceneryScore ? Number(r.sceneryScore) : null;
+    return (a !== null && b !== null && !isNaN(a) && !isNaN(b)) ? a + b : null;
+  }
+
+  // Same auto-sort-with-manual-tie-break convention as getOrderedHikes.
+  function getOrderedRoads(){
+    return roadRows
+      .map((r, i) => ({ r, i }))
+      .sort((x, y) => {
+        const tx = roadTotal(x.r), ty = roadTotal(y.r);
+        if (tx === null && ty === null) return x.i - y.i;
+        if (tx === null) return 1;
+        if (ty === null) return -1;
+        if (ty !== tx) return ty - tx;
+        return x.i - y.i;
+      })
+      .map(x => x.r);
+  }
+
+  function gatherAllRoadPhotos(r){
+    const all = [];
+    if (r.coverPhoto) all.push(r.coverPhoto);
+    (r.photos || []).forEach(p => {
+      const url = p && p.url;
+      if (url && all.indexOf(url) === -1) all.push(url);
+    });
+    return all;
+  }
+
+  function getEffectiveRoadCover(r){
+    return r.coverPhoto || gatherAllRoadPhotos(r)[0] || '';
+  }
+
+  function roadMatchesSearch(r, query){
+    const q = query.toLowerCase();
+    return (r.name || '').toLowerCase().includes(q)
+      || (r.state || '').toLowerCase().includes(q)
+      || (r.country || '').toLowerCase().includes(q);
+  }
+
+  function openRoadDetailsPanel(index){
+    openRoadIndex = index;
+    newRoadDraft = null;
+    roadEditMode = false;
+    roadDetailsPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+    renderRoadDetailsContent();
+  }
+
+  function openNewRoadForm(){
+    openRoadIndex = null;
+    newRoadDraft = { name: '', state: '', country: '' };
+    roadDetailsPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+    renderRoadDetailsContent();
+  }
+
+  function closeRoadDetailsPanel(){
+    openRoadIndex = null;
+    newRoadDraft = null;
+    roadEditMode = false;
+    roadDetailsPanel.classList.remove('open');
+    document.body.classList.remove('details-open-lock');
+  }
+
+  function enterRoadEditMode(){
+    roadEditMode = true;
+    renderRoadDetailsContent();
+  }
+
+  function cancelRoadEdit(){
+    if (newRoadDraft){
+      closeRoadDetailsPanel();
+      return;
+    }
+    roadEditMode = false;
+    renderRoadDetailsContent();
+  }
+
+  function saveRoadEditForm(){
+    if (guestViewEnabled) return;
+    const name = roadDetailsPanelInner.querySelector('#road-edit-name').value.trim();
+    const country = roadDetailsPanelInner.querySelector('#road-edit-country').value.trim();
+    const stateInput = roadDetailsPanelInner.querySelector('#road-edit-state');
+    const state = stateInput ? stateInput.value.trim() : '';
+
+    if (!name){
+      showToast('Give it a name first');
+      return;
+    }
+
+    if (newRoadDraft){
+      roadRows.push({ name, state, country, drivingScore: '', sceneryScore: '', coverPhoto: '', photos: [] });
+      newRoadDraft = null;
+      openRoadIndex = roadRows.length - 1;
+      saveRoadProgress();
+      renderRoadsPage();
+      renderRoadDetailsContent();
+      showToast('Road added');
+    } else if (openRoadIndex !== null){
+      roadEditMode = false;
+      updateOpenRoad(road => {
+        road.name = name;
+        road.state = state;
+        road.country = country;
+      });
+      renderRoadsPage();
+    }
+  }
+
+  function updateOpenRoad(mutatorFn){
+    if (guestViewEnabled) return;
+    if (openRoadIndex === null) return;
+    const r = roadRows[openRoadIndex];
+    mutatorFn(r);
+    saveRoadProgress();
+    renderRoadDetailsContent();
+    renderRoadsPage();
+  }
+
+  function saveOpenRoadQuietly(mutatorFn){
+    if (guestViewEnabled) return;
+    if (openRoadIndex === null) return;
+    const r = roadRows[openRoadIndex];
+    mutatorFn(r);
+    saveRoadProgress();
+  }
+
+  function renderRoadScoresRowHtml(r){
+    return (
+      '<div class="restaurant-scores-row">' +
+        '<div class="restaurant-score-block">' +
+          '<span class="restaurant-score-label">Driving</span>' +
+          buildScoreSelectHtml(ROAD_DRIVING_SCORES, r.drivingScore, 'id="road-driving-select"') +
+        '</div>' +
+        '<div class="restaurant-score-block">' +
+          '<span class="restaurant-score-label">Scenery</span>' +
+          buildScoreSelectHtml(ROAD_SCENERY_SCORES, r.sceneryScore, 'id="road-scenery-select"') +
+        '</div>' +
+        '<div class="restaurant-score-block restaurant-score-total-block" id="road-score-total-block" style="display:none;">' +
+          '<span class="restaurant-score-label">Total</span>' +
+          '<span class="restaurant-score-total-value" id="road-score-total-value"></span>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function updateRoadScoreTotalDisplay(){
+    const a = roadDetailsPanelInner.querySelector('#road-driving-select');
+    const b = roadDetailsPanelInner.querySelector('#road-scenery-select');
+    const totalBlock = roadDetailsPanelInner.querySelector('#road-score-total-block');
+    const totalValueEl = roadDetailsPanelInner.querySelector('#road-score-total-value');
+    if (!a || !b || !totalBlock) return;
+    const av = a.value ? Number(a.value) : null;
+    const bv = b.value ? Number(b.value) : null;
+    if (av !== null && bv !== null && !isNaN(av) && !isNaN(bv)){
+      totalValueEl.textContent = av + bv;
+      totalBlock.style.display = '';
+    } else {
+      totalBlock.style.display = 'none';
+    }
+  }
+
+  // Reuses the same US/Canada state-vs-province logic Hikes already
+  // defined (isUSCountry/isCanadaCountry/US_STATES/CA_PROVINCES).
+  function roadStateOptionsHtml(country){
+    if (isUSCountry(country)) return US_STATES;
+    if (isCanadaCountry(country)) return CA_PROVINCES;
+    return null;
+  }
+
+  function renderRoadEditForm(){
+    const isNew = !!newRoadDraft;
+    const r = isNew ? newRoadDraft : roadRows[openRoadIndex];
+    const stateOptions = roadStateOptionsHtml(r.country);
+
+    roadDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">' + (isNew ? 'New Road' : 'Edit Road') + '</h2>' +
+        '<div class="restaurant-edit-form">' +
+          '<label class="restaurant-edit-label">Name</label>' +
+          '<input type="text" class="restaurant-edit-input" id="road-edit-name" value="' + escapeAttr(r.name || '') + '">' +
+          '<label class="restaurant-edit-label">Country</label>' +
+          '<input type="text" class="restaurant-edit-input" id="road-edit-country" list="road-country-datalist" value="' + escapeAttr(r.country || '') + '">' +
+          '<datalist id="road-country-datalist"><option value="United States"><option value="Canada"></datalist>' +
+          (stateOptions
+            ? ('<label class="restaurant-edit-label">' + (isCanadaCountry(r.country) ? 'Province' : 'State') + '</label>' +
+               '<input type="text" class="restaurant-edit-input" id="road-edit-state" list="road-state-datalist" value="' + escapeAttr(r.state || '') + '">' +
+               '<datalist id="road-state-datalist">' + stateOptions.map(s => '<option value="' + escapeAttr(s) + '">').join('') + '</datalist>')
+            : '') +
+        '</div>' +
+        '<div class="restaurant-edit-actions">' +
+          '<button class="btn-primary" id="road-edit-save-btn" type="button">Save</button>' +
+          '<button class="btn-ghost" id="road-edit-cancel-btn" type="button">Cancel</button>' +
+        '</div>' +
+      '</div>';
+
+    roadDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeRoadDetailsPanel);
+    roadDetailsPanelInner.querySelector('#road-edit-save-btn').addEventListener('click', saveRoadEditForm);
+    roadDetailsPanelInner.querySelector('#road-edit-cancel-btn').addEventListener('click', cancelRoadEdit);
+    // Same cursor-preserving fix as Hikes' own country field — only
+    // re-renders when the state/province requirement actually changes, and
+    // explicitly restores cursor position across that rebuild so typing
+    // never gets silently reversed.
+    let lastRoadCountryClassification = roadStateOptionsHtml(r.country) ? (isCanadaCountry(r.country) ? 'ca' : 'us') : null;
+    roadDetailsPanelInner.querySelector('#road-edit-country').addEventListener('input', (e) => {
+      r.country = e.target.value;
+      r.name = roadDetailsPanelInner.querySelector('#road-edit-name').value;
+
+      const newClassification = roadStateOptionsHtml(r.country) ? (isCanadaCountry(r.country) ? 'ca' : 'us') : null;
+      if (newClassification === lastRoadCountryClassification) return;
+      lastRoadCountryClassification = newClassification;
+
+      const cursorPos = e.target.selectionStart;
+      renderRoadEditForm();
+      const freshCountryInput = roadDetailsPanelInner.querySelector('#road-edit-country');
+      freshCountryInput.focus();
+      freshCountryInput.setSelectionRange(cursorPos, cursorPos);
+    });
+  }
+
+  // The bulk photo grid replacing Hikes' per-date photo sections — no dates
+  // concept at all here, just a direct add-many/remove-one grid on the road
+  // itself, reusing the exact same multi-file upload pattern Hikes' own
+  // per-date photo tile uses.
+  function renderRoadPhotosContentHtml(r){
+    const photos = r.photos || [];
+    const gridHtml = photos.map((p, i) =>
+      '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 350)) + '" alt="" loading="lazy">' +
+        '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
+      '</div>'
+    ).join('');
+    return (
+      '<div class="restaurant-other-photos-section">' +
+        '<span class="restaurant-other-photos-label">Photos</span>' +
+        '<div class="restaurant-photo-grid">' +
+          gridHtml +
+          '<div class="restaurant-photo-add-tile" id="road-photo-add-tile" title="Drag images here, or click to browse">+</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderRoadDetailsContent(){
+    if (newRoadDraft || roadEditMode){
+      renderRoadEditForm();
+      return;
+    }
+    if (openRoadIndex === null) return;
+
+    const r = roadRows[openRoadIndex];
+    const orderedRoads = getOrderedRoads();
+    const rank = orderedRoads.indexOf(r) + 1;
+    const meta = [r.state, r.country].filter(Boolean).join(' • ');
+    const effectiveCover = getEffectiveRoadCover(r);
+
+    roadDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to open the photo gallery"' : ' title="Add photos below"') + '>' +
+          (effectiveCover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="">' : '<span class="art-drop-hint">🏎️</span>') +
+        '</div>' +
+        '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + '</h2>' +
+        (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
+        renderRoadScoresRowHtml(r) +
+      '</div>' +
+      renderRoadPhotosContentHtml(r);
+
+    roadDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeRoadDetailsPanel);
+    roadDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', enterRoadEditMode);
+    wireRoadCoverPhotoDropZone(roadDetailsPanelInner.querySelector('.restaurant-cover-drop'), r);
+
+    updateRoadScoreTotalDisplay();
+    const drivingSelect = roadDetailsPanelInner.querySelector('#road-driving-select');
+    const scenerySelect = roadDetailsPanelInner.querySelector('#road-scenery-select');
+    drivingSelect.addEventListener('change', () => {
+      drivingSelect.classList.toggle('has-score', !!drivingSelect.value);
+      saveOpenRoadQuietly(road => { road.drivingScore = drivingSelect.value; });
+      updateRoadScoreTotalDisplay();
+    });
+    scenerySelect.addEventListener('change', () => {
+      scenerySelect.classList.toggle('has-score', !!scenerySelect.value);
+      saveOpenRoadQuietly(road => { road.sceneryScore = scenerySelect.value; });
+      updateRoadScoreTotalDisplay();
+    });
+    drivingSelect.classList.toggle('has-score', !!drivingSelect.value);
+    scenerySelect.classList.toggle('has-score', !!scenerySelect.value);
+    drivingSelect.addEventListener('change', renderRoadsPage);
+    scenerySelect.addEventListener('change', renderRoadsPage);
+
+    roadDetailsPanelInner.querySelectorAll('.restaurant-photo-thumb').forEach(thumb => {
+      thumb.addEventListener('click', (e) => {
+        if (e.target.closest('.restaurant-photo-remove-btn')) return;
+        const url = ((r.photos || [])[Number(thumb.dataset.photoIndex)] || {}).url;
+        const allPhotos = gatherAllRoadPhotos(r);
+        openPhotoLightbox(allPhotos, allPhotos.indexOf(url), null);
+      });
+    });
+    roadDetailsPanelInner.querySelectorAll('.restaurant-photo-remove-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = Number(btn.dataset.removePhotoIndex);
+        updateOpenRoad(road => { (road.photos || []).splice(i, 1); });
+      });
+    });
+
+    const addTile = roadDetailsPanelInner.querySelector('#road-photo-add-tile');
+    if (addTile){
+      const addPhotoFiles = async (files) => {
+        const fileArray = Array.from(files || []).filter(f => f);
+        if (!fileArray.length) return;
+        const originalText = addTile.textContent;
+        const uploaded = [];
+        for (let i = 0; i < fileArray.length; i++){
+          if (fileArray.length > 1) addTile.textContent = (i + 1) + '/' + fileArray.length;
+          const url = await uploadRestaurantPhoto(fileArray[i], 'RankHeaven/RoadPhotos');
+          if (url) uploaded.push({ url });
+        }
+        addTile.textContent = originalText;
+        if (uploaded.length){
+          updateOpenRoad(road => {
+            if (!road.photos) road.photos = [];
+            road.photos.push(...uploaded);
+          });
+        }
+      };
+      addTile.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        addTile.classList.add('drag-over');
+      });
+      addTile.addEventListener('dragleave', () => addTile.classList.remove('drag-over'));
+      addTile.addEventListener('drop', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        addTile.classList.remove('drag-over');
+        addPhotoFiles(e.dataTransfer.files);
+      });
+      addTile.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = true;
+        input.addEventListener('change', () => addPhotoFiles(input.files));
+        input.click();
+      });
+    }
+  }
+
+  function wireRoadCoverPhotoDropZone(el, r){
+    el.addEventListener('click', () => {
+      const allPhotos = gatherAllRoadPhotos(r);
+      if (!allPhotos.length) return;
+      openPhotoLightbox(allPhotos, 0, null);
+    });
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', async (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const url = await uploadRestaurantPhoto(file, 'RankHeaven/RoadCovers');
+      if (url){
+        updateOpenRoad(road => { road.coverPhoto = url; });
+      }
+    });
+  }
+
+  let roadDragSourceEl = null;
+  function makeRoadRowDraggable(li){
+    li.setAttribute('draggable', 'true');
+    li.addEventListener('dragstart', () => {
+      roadDragSourceEl = li;
+      li.classList.add('dragging');
+    });
+    li.addEventListener('dragend', () => { li.classList.remove('dragging'); roadDragSourceEl = null; });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!roadDragSourceEl || roadDragSourceEl === li || !li.parentNode) return;
+      if (isBeforeInDom(roadDragSourceEl, li)){
+        li.parentNode.insertBefore(roadDragSourceEl, li.nextSibling);
+      } else {
+        li.parentNode.insertBefore(roadDragSourceEl, li);
+      }
+    });
+    li.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  function toggleRoadRearrangeMode(){
+    roadRearrangeMode = true;
+    renderRoadsPage();
+  }
+  function cancelRoadRearrangeMode(){
+    roadRearrangeMode = false;
+    renderRoadsPage();
+  }
+  function saveRoadRearrange(){
+    if (guestViewEnabled) return;
+    const newOrder = Array.from(roadList.children).map(li => getOrderedRoads()[Number(li.dataset.originalIndex)]);
+    roadRows = newOrder;
+    roadRearrangeMode = false;
+    saveRoadProgress();
+    renderRoadsPage();
+    showToast('Order saved');
+  }
+
+  function renderRoadsPage(){
+    roadRearrangeBtn.style.display = roadRearrangeMode ? 'none' : 'inline-block';
+    roadRearrangeSaveBtn.style.display = roadRearrangeMode ? 'inline-block' : 'none';
+    roadRearrangeCancelBtn.style.display = roadRearrangeMode ? 'inline-block' : 'none';
+    roadNewBtn.style.display = roadRearrangeMode ? 'none' : 'inline-block';
+
+    if (!roadRows.length){
+      roadGoldGridEl.innerHTML = '';
+      roadGoldGridEl.style.display = 'none';
+      roadList.innerHTML = '<p class="details-future-note">No roads yet — add one to get started.</p>';
+      return;
+    }
+
+    const ordered = getOrderedRoads();
+
+    if (roadRearrangeMode){
+      roadGoldGridEl.innerHTML = '';
+      roadGoldGridEl.style.display = 'none';
+      roadList.innerHTML = ordered.map((r, idx) => {
+        const meta = [r.state, r.country].filter(Boolean).join(' • ');
+        return (
+          '<li data-original-index="' + idx + '">' +
+            '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">' +
+            '<span class="rank-item">' +
+              '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(r.name) + '</span></span>' +
+              (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+            '</span>' +
+            '<span class="row-drag-handle" title="Drag to reorder">' +
+              '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" draggable="false">' +
+                '<circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>' +
+                '<circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/>' +
+                '<circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>' +
+              '</svg>' +
+            '</span>' +
+          '</li>'
+        );
+      }).join('');
+      Array.from(roadList.children).forEach(li => makeRoadRowDraggable(li));
+      return;
+    }
+
+    const goldCards = [];
+    const listRows = [];
+
+    ordered.forEach((r, i) => {
+      const realIndex = roadRows.indexOf(r);
+      if (roadSearchFilter && !roadMatchesSearch(r, roadSearchFilter)) return;
+      const rank = i + 1;
+      const meta = [r.state, r.country].filter(Boolean).join(' • ');
+
+      if (rank <= 20){
+        const effectiveCover = getEffectiveRoadCover(r);
+        goldCards.push(
+          '<div class="restaurant-gold-card" data-road-index="' + realIndex + '">' +
+            '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+            (effectiveCover
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
+              : '<span class="art-drop-hint">🏎️</span>') +
+            '<div class="restaurant-gold-card-overlay">' +
+              '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
+              (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
+            '</div>' +
+          '</div>'
+        );
+        return;
+      }
+
+      const total = roadTotal(r);
+      listRows.push(
+        '<li data-road-index="' + realIndex + '">' +
+          '<span class="rank-num">' + rank + '</span>' +
+          '<span class="rank-item">' +
+            '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(r.name) + '</span></span>' +
+            (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+          '</span>' +
+          (total !== null ? '<span class="restaurant-total">' + total + '</span>' : '') +
+        '</li>'
+      );
+    });
+
+    roadGoldGridEl.innerHTML = goldCards.join('');
+    roadGoldGridEl.style.display = goldCards.length ? 'grid' : 'none';
+    roadList.innerHTML = listRows.join('');
+
+    Array.from(roadGoldGridEl.children).forEach(card => {
+      card.addEventListener('click', () => openRoadDetailsPanel(Number(card.dataset.roadIndex)));
+    });
+    Array.from(roadList.children).forEach(li => {
+      li.addEventListener('click', () => openRoadDetailsPanel(Number(li.dataset.roadIndex)));
+    });
+  }
+
+  roadNewBtn.addEventListener('click', openNewRoadForm);
+  roadRearrangeBtn.addEventListener('click', toggleRoadRearrangeMode);
+  roadRearrangeSaveBtn.addEventListener('click', saveRoadRearrange);
+  roadRearrangeCancelBtn.addEventListener('click', cancelRoadRearrangeMode);
+  roadSearchFilterInput.addEventListener('input', () => {
+    roadSearchFilter = roadSearchFilterInput.value.trim();
+    roadSearchFilterClear.style.display = roadSearchFilter ? 'flex' : 'none';
+    renderRoadsPage();
+  });
+  roadSearchFilterClear.addEventListener('click', () => {
+    roadSearchFilterInput.value = '';
+    roadSearchFilter = '';
+    roadSearchFilterClear.style.display = 'none';
+    renderRoadsPage();
+  });
+
   // ---------- PHOTOS ----------
   // Deliberately minimal — no data per photo, no details tray, no dedicated
   // edit/rearrange mode. Just an ordered list of {id, url}, reordered by
@@ -9523,6 +10317,441 @@
       }
     });
     input.click();
+  });
+
+  // ---------- MEDIA (Books / Movies / Games) ----------
+  // All three share the same shape: no details tray at all (unlike
+  // Restaurants/Hikes/Dishes), so every field — including the cover photo —
+  // has to be editable directly within Edit mode's rows, which double as
+  // both the add/remove/reorder UI (same as Albums' own edit mode) and the
+  // only place any field ever gets changed. One shared, parameterized
+  // implementation rather than three separate copies, since the only real
+  // differences between them are which fields exist and whether scoring
+  // applies at all.
+  const GAME_SCORES = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+  const MEDIA_CONFIGS = {
+    book: {
+      storageKey: 'book-list', storageField: 'bookRows', emptyIcon: '📖', hasScoring: false,
+      metaFn: (item) => [item.author, item.year].filter(Boolean).join(' • '),
+      matchFn: (item, q) => (item.title || '').toLowerCase().includes(q) || (item.author || '').toLowerCase().includes(q),
+    },
+    movie: {
+      storageKey: 'movie-list', storageField: 'movieRows', emptyIcon: '🍿', hasScoring: false,
+      metaFn: (item) => [item.director, item.year].filter(Boolean).join(' • '),
+      matchFn: (item, q) => (item.title || '').toLowerCase().includes(q) || (item.director || '').toLowerCase().includes(q),
+    },
+    game: {
+      storageKey: 'game-list', storageField: 'gameRows', emptyIcon: '🎮', hasScoring: true,
+      scoreFields: ['characters', 'world', 'story', 'gameplay', 'music', 'visuals'],
+      metaFn: (item) => item.year || '',
+      matchFn: (item, q) => (item.title || '').toLowerCase().includes(q),
+    },
+  };
+  const mediaState = {
+    book: { rows: [], editMode: false, searchFilter: '' },
+    movie: { rows: [], editMode: false, searchFilter: '' },
+    game: { rows: [], editMode: false, searchFilter: '' },
+  };
+
+  function genMediaId(salt){
+    return 'md' + Date.now().toString(36) + '-' + (salt || 0) + '-' + Math.random().toString(36).slice(2);
+  }
+
+  function getMediaDom(type){
+    return {
+      grid: document.getElementById(type + '-gold-grid'),
+      list: document.getElementById(type + '-list'),
+      empty: document.getElementById(type + '-empty-message'),
+      editToggleBtn: document.getElementById(type + '-edit-toggle-btn'),
+      editControls: document.getElementById(type + '-edit-controls'),
+      saveBtn: document.getElementById(type + '-edit-save-btn'),
+      cancelBtn: document.getElementById(type + '-edit-cancel-btn'),
+      addRowBtn: document.getElementById(type + '-edit-add-btn'),
+      addBtn: document.getElementById(type + '-add-btn'),
+      importBtn: document.getElementById(type + '-import-btn'), // null for Movies — no import for that type
+      searchInput: document.getElementById(type + '-search-filter-input'),
+      searchClear: document.getElementById(type + '-search-filter-clear'),
+    };
+  }
+  mediaState.book.dom = getMediaDom('book');
+  mediaState.movie.dom = getMediaDom('movie');
+  mediaState.game.dom = getMediaDom('game');
+
+  function mediaTotal(item, config){
+    if (!config.hasScoring) return null;
+    let sum = 0, count = 0;
+    config.scoreFields.forEach(f => {
+      const v = item[f] ? Number(item[f]) : null;
+      if (v !== null && !isNaN(v)){ sum += v; count++; }
+    });
+    return count === config.scoreFields.length ? sum : null;
+  }
+
+  // Books/Movies: purely manual order (identical to Restaurants). Games:
+  // auto-sorts by total, with the stored row order only mattering as a
+  // stable tie-break baseline — identical mechanism to getOrderedHikes.
+  function getOrderedMedia(type){
+    const config = MEDIA_CONFIGS[type];
+    const rows = mediaState[type].rows;
+    if (!config.hasScoring) return rows.slice();
+    return rows
+      .map((item, i) => ({ item, i }))
+      .sort((x, y) => {
+        const tx = mediaTotal(x.item, config), ty = mediaTotal(y.item, config);
+        if (tx === null && ty === null) return x.i - y.i;
+        if (tx === null) return 1;
+        if (ty === null) return -1;
+        if (ty !== tx) return ty - tx;
+        return x.i - y.i;
+      })
+      .map(x => x.item);
+  }
+
+  async function loadMediaProgress(type){
+    const config = MEDIA_CONFIGS[type];
+    try{
+      const res = await window.storage.get(config.storageKey, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        mediaState[type].rows = Array.isArray(parsed[config.storageField]) ? parsed[config.storageField] : [];
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+
+  function saveMediaProgress(type){
+    const config = MEDIA_CONFIGS[type];
+    const payload = { savedAt: new Date().toISOString() };
+    payload[config.storageField] = mediaState[type].rows;
+    try{ window.storage.set(config.storageKey, JSON.stringify(payload), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  // Cover upload lives directly on each edit-mode row's thumbnail, since
+  // there's no details tray to put it in instead. Mutates the item object
+  // in place — safe for both existing items (already referenced by
+  // mediaState[type].rows) and brand-new ones (referenced only by the row
+  // itself via li._mediaItem until Save commits it).
+  function wireMediaEditThumb(el, type, item){
+    const doUpload = async (file) => {
+      if (!file) return;
+      const url = await uploadRestaurantPhoto(file, 'RankHeaven/' + type.charAt(0).toUpperCase() + type.slice(1) + 'Covers');
+      if (url){
+        item.coverPhoto = url;
+        el.innerHTML = '<img src="' + escapeAttr(cloudinaryThumbUrl(url, 120)) + '" alt="">';
+      }
+    };
+    el.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.addEventListener('change', () => doUpload(input.files && input.files[0]));
+      input.click();
+    });
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      doUpload(e.dataTransfer.files[0]);
+    });
+  }
+
+  function buildMediaEditRow(type, item, idx){
+    const config = MEDIA_CONFIGS[type];
+    if (!item.id) item.id = genMediaId(idx);
+    const li = document.createElement('li');
+    li.className = 'media-edit-row';
+    li.dataset.mediaId = item.id;
+    li._mediaItem = item;
+
+    const thumbHtml =
+      '<div class="media-edit-thumb" title="Click or drag an image here">' +
+        (item.coverPhoto ? '<img src="' + escapeAttr(cloudinaryThumbUrl(item.coverPhoto, 120)) + '" alt="">' : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
+      '</div>';
+    const numHtml = '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">';
+
+    let fieldsHtml = '<input type="text" class="media-edit-title" data-field="title" placeholder="Title" value="' + escapeAttr(item.title || '') + '">';
+    fieldsHtml += '<div class="media-edit-secondary-row">';
+    if (type === 'book'){
+      fieldsHtml += '<input type="text" data-field="author" placeholder="Author" value="' + escapeAttr(item.author || '') + '">';
+      fieldsHtml += '<input type="text" data-field="series" placeholder="Series" value="' + escapeAttr(item.series || '') + '">';
+      fieldsHtml += '<input type="text" data-field="year" placeholder="Year" value="' + escapeAttr(item.year || '') + '">';
+    } else if (type === 'movie'){
+      fieldsHtml += '<input type="text" data-field="director" placeholder="Director" value="' + escapeAttr(item.director || '') + '">';
+      fieldsHtml += '<input type="text" data-field="year" placeholder="Year" value="' + escapeAttr(item.year || '') + '">';
+    } else if (type === 'game'){
+      fieldsHtml += '<input type="text" data-field="year" placeholder="Year" value="' + escapeAttr(item.year || '') + '">';
+    }
+    fieldsHtml += '</div>';
+    if (config.hasScoring){
+      fieldsHtml += '<div class="media-edit-scores-row">';
+      config.scoreFields.forEach(f => {
+        const label = f.charAt(0).toUpperCase() + f.slice(1);
+        fieldsHtml += '<label>' + label + buildScoreSelectHtml(GAME_SCORES, item[f], 'data-field="' + f + '"') + '</label>';
+      });
+      fieldsHtml += '</div>';
+    }
+
+    li.innerHTML = thumbHtml + numHtml + '<div class="media-edit-fields">' + fieldsHtml + '</div>' +
+      '<button class="row-remove-btn" type="button" title="Remove">✕</button>';
+    li.querySelector('.row-remove-btn').addEventListener('click', () => li.remove());
+    wireMediaEditThumb(li.querySelector('.media-edit-thumb'), type, item);
+    return li;
+  }
+
+  function renderMediaPage(type){
+    const config = MEDIA_CONFIGS[type];
+    const dom = mediaState[type].dom;
+    const state = mediaState[type];
+    const rows = state.rows;
+
+    dom.editToggleBtn.style.display = state.editMode ? 'none' : 'inline-block';
+    dom.editControls.style.display = state.editMode ? 'flex' : 'none';
+    dom.addBtn.style.display = state.editMode ? 'none' : 'inline-block';
+    if (dom.importBtn) dom.importBtn.style.display = state.editMode ? 'none' : 'inline-block';
+
+    if (state.editMode){
+      dom.grid.innerHTML = '';
+      dom.grid.style.display = 'none';
+      dom.empty.style.display = 'none';
+      dom.list.innerHTML = '';
+      rows.forEach((item, idx) => dom.list.appendChild(buildMediaEditRow(type, item, idx)));
+      return;
+    }
+
+    if (!rows.length){
+      dom.grid.innerHTML = '';
+      dom.grid.style.display = 'none';
+      dom.list.innerHTML = '';
+      dom.empty.style.display = 'block';
+      return;
+    }
+    dom.empty.style.display = 'none';
+
+    const ordered = getOrderedMedia(type);
+    const goldCards = [];
+    const listRows = [];
+    ordered.forEach((item, i) => {
+      const realIndex = rows.indexOf(item);
+      if (state.searchFilter && !config.matchFn(item, state.searchFilter)) return;
+      const rank = i + 1;
+      const cover = item.coverPhoto || '';
+      const meta = config.metaFn(item);
+
+      if (rank <= 20){
+        goldCards.push(
+          '<div class="restaurant-gold-card" data-media-index="' + realIndex + '">' +
+            '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+            (cover
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 350)) + '" alt="" loading="lazy">'
+              : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
+            '<div class="restaurant-gold-card-overlay">' +
+              '<div class="restaurant-gold-card-name">' + escapeHtml(item.title || '') + '</div>' +
+              (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
+            '</div>' +
+          '</div>'
+        );
+        return;
+      }
+
+      const total = mediaTotal(item, config);
+      listRows.push(
+        '<li data-media-index="' + realIndex + '">' +
+          '<span class="rank-num">' + rank + '</span>' +
+          '<span class="rank-item">' +
+            '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(item.title || '') + '</span></span>' +
+            (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+          '</span>' +
+          (total !== null ? '<span class="restaurant-total">' + total + '</span>' : '') +
+        '</li>'
+      );
+    });
+
+    dom.grid.innerHTML = goldCards.join('');
+    dom.grid.style.display = goldCards.length ? 'grid' : 'none';
+    dom.list.innerHTML = listRows.join('');
+
+    // No details tray to open — clicking simply previews the cover, same
+    // single-image lightbox Albums' own art thumbnails use.
+    const openCoverIfAny = (realIndex) => {
+      const cover = rows[realIndex] && rows[realIndex].coverPhoto;
+      if (cover) openArtLightbox(cover);
+    };
+    Array.from(dom.grid.children).forEach(card => card.addEventListener('click', () => openCoverIfAny(Number(card.dataset.mediaIndex))));
+    Array.from(dom.list.children).forEach(li => li.addEventListener('click', () => openCoverIfAny(Number(li.dataset.mediaIndex))));
+  }
+
+  function toggleMediaEditMode(type){
+    mediaState[type].editMode = true;
+    renderMediaPage(type);
+  }
+  function cancelMediaEditMode(type){
+    mediaState[type].editMode = false;
+    renderMediaPage(type);
+  }
+  function addMediaEditRow(type){
+    const dom = mediaState[type].dom;
+    const newItem = { id: genMediaId('new') };
+    const li = buildMediaEditRow(type, newItem, dom.list.children.length);
+    dom.list.appendChild(li);
+    li.querySelector('.media-edit-title').focus();
+    li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  // The "+ Add X" primary button (visible outside Edit mode) — jumps
+  // straight into Edit mode with one fresh row ready to fill in, since
+  // there's nowhere else (no details tray) to create a new entry.
+  function addNewMediaItem(type){
+    mediaState[type].editMode = true;
+    renderMediaPage(type);
+    addMediaEditRow(type);
+  }
+
+  // Rebuilds mediaState[type].rows entirely from whatever's currently in
+  // the DOM — same approach as Albums' own saveReorder, simpler than
+  // diffing against the previous array given rows can be added, removed,
+  // retyped, and reordered all in the same pass. Blank titles are dropped,
+  // matching Albums' own convention for an edit-mode row left empty.
+  function saveMediaEdits(type){
+    const dom = mediaState[type].dom;
+    const rows = Array.from(dom.list.children);
+    const pairs = rows.map(li => {
+      const pos = Number(li.querySelector('.rank-num-input').value) || 0;
+      const title = li.querySelector('.media-edit-title').value.trim();
+      if (!title) return null;
+      const item = li._mediaItem || {};
+      item.id = item.id || genMediaId(pos);
+      item.title = title;
+      li.querySelectorAll('[data-field]').forEach(inputEl => {
+        item[inputEl.dataset.field] = inputEl.value.trim();
+      });
+      return { pos, item };
+    }).filter(Boolean);
+    pairs.sort((a, b) => a.pos - b.pos);
+    mediaState[type].rows = pairs.map(p => p.item);
+    mediaState[type].editMode = false;
+    saveMediaProgress(type);
+    renderMediaPage(type);
+  }
+
+  ['book', 'movie', 'game'].forEach(type => {
+    const dom = mediaState[type].dom;
+    dom.editToggleBtn.addEventListener('click', () => toggleMediaEditMode(type));
+    dom.saveBtn.addEventListener('click', () => saveMediaEdits(type));
+    dom.cancelBtn.addEventListener('click', () => cancelMediaEditMode(type));
+    dom.addRowBtn.addEventListener('click', () => addMediaEditRow(type));
+    dom.addBtn.addEventListener('click', () => addNewMediaItem(type));
+    dom.searchInput.addEventListener('input', () => {
+      mediaState[type].searchFilter = dom.searchInput.value.trim().toLowerCase();
+      dom.searchClear.style.display = mediaState[type].searchFilter ? 'flex' : 'none';
+      renderMediaPage(type);
+    });
+    dom.searchClear.addEventListener('click', () => {
+      dom.searchInput.value = '';
+      mediaState[type].searchFilter = '';
+      dom.searchClear.style.display = 'none';
+      renderMediaPage(type);
+    });
+  });
+
+  // ---------- Books: paste-text import ----------
+  // "Lastname, Firstname" (Goodreads' own author-name convention) reversed
+  // for display — everything before the first comma is treated as the
+  // surname regardless of how many words it contains, which handles
+  // multi-part surnames (e.g. "Le Guin, Ursula K.") correctly too.
+  function reformatAuthorName(raw){
+    const idx = raw.indexOf(',');
+    if (idx === -1) return raw.trim();
+    const last = raw.slice(0, idx).trim();
+    const first = raw.slice(idx + 1).trim();
+    return first ? (first + ' ' + last) : last;
+  }
+
+  function parseBookImportText(text){
+    return text.split('\n').map(line => line.trim()).filter(Boolean).map((line, i) => {
+      const parts = line.split('|').map(p => p.trim());
+      const title = parts[0] || '';
+      const authorRaw = parts[1] || '';
+      const series = parts[2] || '';
+      return {
+        id: genMediaId(i),
+        title,
+        author: authorRaw ? reformatAuthorName(authorRaw) : '',
+        series,
+        year: '',
+      };
+    }).filter(b => b.title);
+  }
+
+  bookImportBtn.addEventListener('click', () => {
+    bookImportTextarea.value = '';
+    bookImportOverlay.classList.add('show');
+  });
+  bookImportCancelBtn.addEventListener('click', () => bookImportOverlay.classList.remove('show'));
+  bookImportConfirmBtn.addEventListener('click', () => {
+    const parsed = parseBookImportText(bookImportTextarea.value);
+    if (!parsed.length){ showToast('No valid lines found'); return; }
+    mediaState.book.rows = parsed;
+    saveMediaProgress('book');
+    bookImportOverlay.classList.remove('show');
+    renderMediaPage('book');
+    showToast('Imported ' + parsed.length + ' book' + (parsed.length === 1 ? '' : 's'));
+  });
+
+  // ---------- Games: .xlsx import ----------
+  // Column A = title, B-G = the 6 score categories in the order listed.
+  // header:1 reads rows positionally (arrays, not header-keyed objects),
+  // matching "column A/B/C..." exactly regardless of whether row 1 turns
+  // out to be a header or the first real game.
+  function parseGameImportXlsx(arrayBuffer){
+    // XLSX.read's {type:'array'} path needs an actual Uint8Array, not a raw
+    // ArrayBuffer — passing the ArrayBuffer directly works by accident in
+    // Node (where the library can silently coerce it via Node's Buffer,
+    // which every real browser lacks), but silently misparses it as
+    // something else entirely in an actual browser, with no error thrown to
+    // signal anything went wrong.
+    const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const scoreKeys = MEDIA_CONFIGS.game.scoreFields;
+    const games = [];
+    rows.forEach((row, i) => {
+      const title = String(row[0] || '').trim();
+      if (!title) return;
+      const scoreCells = row.slice(1, 7);
+      const allNonNumeric = scoreCells.every(c => c === '' || isNaN(Number(c)));
+      if (i === 0 && allNonNumeric) return; // looks like a header row — skip it
+      const game = { id: genMediaId(i), title, year: '' };
+      scoreKeys.forEach((key, colIdx) => {
+        const raw = row[colIdx + 1];
+        const num = Number(raw);
+        game[key] = (raw !== '' && !isNaN(num)) ? String(num) : '';
+      });
+      games.push(game);
+    });
+    return games;
+  }
+
+  gameImportBtn.addEventListener('click', () => gameImportFile.click());
+  gameImportFile.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let games;
+      try{ games = parseGameImportXlsx(reader.result); }catch(err){ showToast('Could not read that file'); return; }
+      if (!games.length){ showToast('No valid rows found in that file'); return; }
+      mediaState.game.rows = games;
+      saveMediaProgress('game');
+      renderMediaPage('game');
+      showToast('Imported ' + games.length + ' game' + (games.length === 1 ? '' : 's'));
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
   });
 
   // ---------- DISHES ----------
@@ -10840,7 +12069,11 @@
   loadGuestViewSetting();
   loadDishOrder();
   loadHikeProgress();
+  loadRoadProgress();
   loadPhotoProgress();
+  loadMediaProgress('book');
+  loadMediaProgress('movie');
+  loadMediaProgress('game');
   loadPointsAlgorithm().then(checkSavedProgress);
 })();
 </script>
