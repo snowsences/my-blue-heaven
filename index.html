@@ -247,6 +247,23 @@
   #road-details-panel.open{
     width: 600px;
   }
+  #hike-full-list-panel{
+    width: 0;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: var(--desktop-nav-height);
+    min-height: calc(100vh - var(--desktop-nav-height));
+    max-height: calc(100vh - var(--desktop-nav-height));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+  }
+  #hike-full-list-panel.open{
+    width: 600px;
+  }
   .restaurant-details-panel-inner{
     width: 600px;
   }
@@ -782,6 +799,19 @@
     font-size: 14px;
   }
   .restaurant-edit-input:focus{ outline: none; border-color: var(--amber); }
+  .hike-full-list-btn-wrap{
+    padding: 20px 0 12px;
+    display: flex;
+    justify-content: center;
+  }
+  .hike-full-list-textarea{
+    width: 100%;
+    min-height: 60vh;
+    resize: vertical;
+    font-family: 'Figtree', sans-serif;
+    line-height: 1.5;
+    margin: 16px 0;
+  }
   /* The native date-picker calendar icon defaults to a dark color, which is
      nearly invisible against this app's dark input backgrounds — this is
      exactly why it worked on mobile (the OS-level picker doesn't depend on
@@ -1151,14 +1181,6 @@
     transform: translateX(20px);
     background: var(--amber);
   }
-  .dock-import-row{
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-  }
-
   .lastfm-block{ margin-top: 16px; }
   .lastfm-row{
     display: flex;
@@ -1395,6 +1417,27 @@
   .rank-item{ font-size: 15px; flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .rank-album{ font-size: 15px; font-weight: 600; }
   .rank-meta{ font-size: 12px; color: var(--chalk-dim); }
+  /* Games' List view — the only place all 6 score categories are visible
+     at once, since there's no details tray. A row of small labeled chips
+     rather than a single combined meta line. */
+  .game-scores-display{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .game-score-chip{
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+  .game-score-chip-label{ color: var(--chalk-dim); }
+  .game-score-chip-value{ color: var(--chalk); font-weight: 700; }
 
   .rank-num-input{
     width: 54px;
@@ -1535,12 +1578,33 @@
     border: 1px solid var(--panel-line);
   }
   .restaurant-gold-card.drag-over{ border-color: var(--amber); }
+  .grid-card.drag-over{ outline: 2px solid var(--amber); outline-offset: -2px; }
   /* Books/Movies/Games use this alongside .restaurant-gold-grid/.restaurant-gold-card
      — same grid mechanics, but a standard poster/cover aspect ratio (taller
-     than wide) instead of Restaurants/Hikes' square photos, and narrower
-     columns since a 260px-wide card at this aspect would be enormous. */
+     than wide) instead of Restaurants/Hikes' square photos. Fixed at 5
+     columns (was auto-fill, which could grow to ~7 on wide screens) for a
+     guaranteed cap regardless of window width, same fixed-count approach as
+     Roads' own large-grid below.
+     Books' grid view (toggled, not split like Movies/Games) instead uses
+     .results-list.grid-mode + .grid-card — a compound selector, so the
+     plain-class rule below needs matching specificity here or it silently
+     loses to .results-list.grid-mode's own column count. */
   .media-poster-grid{
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .results-list.grid-mode.media-poster-grid{
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .media-poster-grid .grid-card .art-drop{
+    aspect-ratio: 48 / 75;
+  }
+  /* Roads: a small list, so every road gets a large photo card (not just
+     the top 20), capped at 2 columns instead of the usual auto-fill ~4 —
+     fewer, wider columns is what actually makes the photos bigger, since
+     the square aspect ratio itself is unchanged. */
+  .road-large-grid{
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
   .media-poster-grid .restaurant-gold-card{
     aspect-ratio: 48 / 75;
@@ -1773,10 +1837,15 @@
      — scoped to this page specifically, not the shared .filters-group used
      on Albums/Songs too. */
   #page-restaurants .filters-group{ margin-bottom: 12px; }
+  #page-songs .filters-group{ margin-bottom: 12px; }
   .year-filter-input{ width: 120px; }
   .artist-filter-input{ width: 160px; }
-  .grouping-filter-input{ width: 140px; }
+  .grouping-filter-input{ width: 160px; }
   .restaurant-search-filter-input{ width: 280px; }
+  /* Hikes' search bar: twice the app's standard search width, plus the
+     same 12px gap above the grid that Restaurants' own search bar uses. */
+  #hike-search-filter-input{ width: 560px; }
+  #page-hikes .filters-group{ margin-bottom: 12px; }
 
   .filter-clear{
     position: absolute;
@@ -2171,13 +2240,6 @@
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-  }
-  #book-import-overlay .modal-box{ max-width: 560px; }
-  #book-import-textarea{
-    width: 100%;
-    resize: vertical;
-    font-family: 'Figtree', sans-serif;
-    margin-bottom: 16px;
   }
   .btn-danger{
     background: var(--brick);
@@ -2623,6 +2685,22 @@
       transform: translateX(0);
       visibility: visible;
     }
+    #hike-full-list-panel{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      min-height: 100vh;
+      max-height: 100vh;
+      z-index: 200;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      visibility: hidden;
+    }
+    #hike-full-list-panel.open{
+      width: 100%;
+      transform: translateX(0);
+      visibility: visible;
+    }
     .restaurant-details-panel-inner{ width: 100%; }
 
     /* Prevents the page underneath from scrolling while the full-screen
@@ -2639,6 +2717,7 @@
        viewport horizontally rather than dropping to a second line. */
     .filters-group{ flex-wrap: wrap; row-gap: 10px; }
     .restaurant-search-filter-input{ width: 100%; max-width: 280px; }
+    #hike-search-filter-input{ width: 100%; max-width: 560px; }
 
     /* Five fixed grid columns leaves ~60-70px tiles on a phone width —
        technically not broken (grid columns are fluid via 1fr) but too
@@ -2646,6 +2725,13 @@
        reasonable size down to the narrowest common phone widths. */
     .results-list.grid-mode{ grid-template-columns: repeat(3, 1fr); }
     .restaurant-gold-grid{ grid-template-columns: repeat(2, 1fr); }
+    /* Books' own grid view uses a 3-class selector (higher specificity than
+       the plain .results-list.grid-mode rule above), so it needs its own
+       mobile override here or it would otherwise win even on mobile and
+       force 5 columns onto a phone screen. Matches the 2-column mobile
+       treatment Movies/Games already get, for consistency across all three
+       poster-aspect media types. */
+    .results-list.grid-mode.media-poster-grid{ grid-template-columns: repeat(2, 1fr); }
 
     /* ---- Bottom-fixed tab bar (mobile only) ----
        Desktop/tablet keeps the fixed top bar (brand + underlined tabs +
@@ -2807,8 +2893,9 @@
   /* One specific, hard-coded Google account (see LOCKED_GUEST_EMAIL) — on
      top of everything guest-view-active already hides (this account always
      has that set too, forced on sign-in), this additionally removes their
-     only path to the Settings tab, where the Guest View toggle itself
-     lives — so there's no way for this account to ever turn it back off. */
+     only path to the Settings tab, which still holds other sensitive
+     controls (Cloud Sync, Cloudinary, Full Backup, Album Ranker Settings)
+     this account should never be able to reach. */
   body.locked-guest-account #top-nav-settings-btn{ display: none; }
 </style>
 <script type="module">
@@ -2951,11 +3038,9 @@
     </div>
 
     <div class="tab-panel" id="tab-results">
-      <h1 id="results-heading">Your Album Rankings</h1>
       <p class="sub" id="results-sub"></p>
 
       <div class="reorder-bar" id="reorder-bar">
-        <button class="btn-ghost" id="reorder-toggle-btn">Edit Items</button>
         <div class="reorder-edit-controls" id="reorder-edit-controls">
           <span class="reorder-hint">Edit text or position, add or remove items, then save.</span>
           <button class="btn-ghost" id="edit-add-btn" type="button">+ Add Item</button>
@@ -2986,6 +3071,7 @@
             <button class="filter-clear" id="grouping-filter-clear" type="button" title="Clear grouping filter" style="display:none;">✕</button>
           </div>
         </div>
+        <button class="btn-ghost" id="reorder-toggle-btn">Edit Items</button>
       </div>
 
       <ol class="results-list" id="results-list"></ol>
@@ -3047,13 +3133,6 @@
     </div>
 
     <div class="tab-panel" id="tab-dock">
-      <p class="eyebrow">Loading Dock</p>
-      <h1>Need to Listen Again</h1>
-      <p class="sub" id="dock-sub"></p>
-      <div class="dock-import-row">
-        <button class="btn-ghost" id="dock-import-btn" type="button">Import Dock Items (.txt/.xlsx)</button>
-        <input type="file" id="dock-import-file" accept=".txt,.xlsx" style="display:none;">
-      </div>
       <ol class="results-list" id="dock-list"></ol>
     </div>
 
@@ -3249,8 +3328,7 @@
         <button class="group-sub-tab-btn active" id="food-subtab-dishes-btn-2" type="button"><span class="group-sub-tab-icon">🍽️</span>Dishes</button>
       </div>
 
-      <div class="reorder-bar" id="dish-reorder-bar" style="display:flex;">
-        <button class="btn-ghost" id="dish-reorder-toggle-btn" type="button">Edit</button>
+      <div class="reorder-bar" id="dish-reorder-bar">
         <div class="reorder-edit-controls" id="dish-reorder-edit-controls">
           <button class="btn-primary" id="dish-reorder-save-btn" type="button">Save Changes</button>
           <button class="btn-ghost" id="dish-reorder-cancel-btn" type="button">Cancel</button>
@@ -3274,6 +3352,7 @@
             <button class="filter-clear" id="dish-description-filter-clear" type="button" title="Clear filter" style="display:none;">✕</button>
           </div>
         </div>
+        <button class="btn-ghost" id="dish-reorder-toggle-btn" type="button">Edit</button>
       </div>
 
       <ol class="results-list grid-mode" id="dish-results-list"></ol>
@@ -3310,6 +3389,9 @@
 
       <div class="restaurant-gold-grid" id="hike-gold-grid"></div>
       <ol class="results-list" id="hike-list"></ol>
+      <div class="hike-full-list-btn-wrap">
+        <button class="btn-ghost" id="hike-full-list-btn" type="button">Show Full List</button>
+      </div>
     </div>
   </div>
 
@@ -3329,14 +3411,7 @@
         </div>
       </div>
 
-      <div class="filters-group">
-        <div class="filter-wrap">
-          <input type="text" class="filter-input road-search-filter-input" id="road-search-filter-input" placeholder="Search name, state, or country..." autocomplete="off">
-          <button class="filter-clear" id="road-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
-        </div>
-      </div>
-
-      <div class="restaurant-gold-grid" id="road-gold-grid"></div>
+      <div class="restaurant-gold-grid road-large-grid" id="road-gold-grid"></div>
       <ol class="results-list" id="road-list"></ol>
     </div>
   </div>
@@ -3374,7 +3449,10 @@
             <button class="btn-ghost" id="book-edit-cancel-btn" type="button">Cancel</button>
             <button class="btn-ghost" id="book-edit-add-btn" type="button">+ Add Row</button>
           </div>
-          <button class="btn-ghost" id="book-import-btn" type="button">Import</button>
+          <div class="view-toggle" id="book-view-toggle">
+            <button class="view-toggle-btn" id="book-view-list-btn" type="button">List</button>
+            <button class="view-toggle-btn active" id="book-view-grid-btn" type="button">Grid</button>
+          </div>
           <button class="btn-primary" id="book-add-btn" type="button">+ Add Book</button>
         </div>
       </div>
@@ -3386,21 +3464,8 @@
         </div>
       </div>
 
-      <div class="restaurant-gold-grid media-poster-grid" id="book-gold-grid"></div>
-      <ol class="results-list" id="book-list"></ol>
+      <ol class="results-list grid-mode media-poster-grid" id="book-list"></ol>
       <p class="restaurant-course-empty" id="book-empty-message" style="display:none;">No books yet — add one, or import your list.</p>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="book-import-overlay">
-    <div class="modal-box">
-      <h3 class="modal-title">Import Books</h3>
-      <p class="modal-body">One book per line, in the order you want them ranked (top of the list = #1). Format each line as:<br><code>Title | Author Lastname, Firstname | Series (optional)</code></p>
-      <textarea id="book-import-textarea" class="restaurant-edit-input" style="min-height:200px;" placeholder="Project Hail Mary | Weir, Andy&#10;The Fellowship of the Ring | Tolkien, J.R.R. | The Lord of the Rings"></textarea>
-      <div class="modal-actions">
-        <button class="btn-ghost" id="book-import-cancel-btn" type="button">Cancel</button>
-        <button class="btn-primary" id="book-import-confirm-btn" type="button">Import</button>
-      </div>
     </div>
   </div>
 
@@ -3451,8 +3516,10 @@
             <button class="btn-ghost" id="game-edit-cancel-btn" type="button">Cancel</button>
             <button class="btn-ghost" id="game-edit-add-btn" type="button">+ Add Row</button>
           </div>
-          <button class="btn-ghost" id="game-import-btn" type="button">Import</button>
-          <input type="file" id="game-import-file" accept=".xlsx,.xls" style="display:none;">
+          <div class="view-toggle" id="game-view-toggle">
+            <button class="view-toggle-btn" id="game-view-list-btn" type="button">List</button>
+            <button class="view-toggle-btn active" id="game-view-grid-btn" type="button">Grid</button>
+          </div>
           <button class="btn-primary" id="game-add-btn" type="button">+ Add Game</button>
         </div>
       </div>
@@ -3464,33 +3531,21 @@
         </div>
       </div>
 
-      <div class="restaurant-gold-grid media-poster-grid" id="game-gold-grid"></div>
-      <ol class="results-list" id="game-list"></ol>
-      <p class="restaurant-course-empty" id="game-empty-message" style="display:none;">No games yet — add one, or import your scores.</p>
+      <ol class="results-list grid-mode media-poster-grid" id="game-list"></ol>
+      <p class="restaurant-course-empty" id="game-empty-message" style="display:none;">No games yet — add one to get started.</p>
     </div>
   </div>
 
   <div id="page-settings" class="top-page">
     <div class="page-content">
-      <h1>Settings</h1>
-
-      <div class="settings-section">
-        <h2 class="settings-section-title">Guest View</h2>
-        <div class="import-row">
-          <span>Hides Albums &amp; Songs, strips restaurant rankings/scores down to order-only, and disables all editing — for sharing this device or account with a guest</span>
-          <label class="toggle-switch" title="Enable Guest View">
-            <input type="checkbox" id="guest-view-toggle">
-            <span class="toggle-switch-track"></span>
-          </label>
-        </div>
-      </div>
+      <h1 style="display:none;">Settings</h1>
 
       <div class="settings-section">
         <h2 class="settings-section-title">Full Backup</h2>
 
         <div class="import-row">
           <span>Back up albums, songs, and restaurants together</span>
-          <button class="btn-ghost" id="export-all-btn" type="button">Export All Data (.json)</button>
+          <button class="btn-primary" id="export-all-btn" type="button">Export All Data (.json)</button>
         </div>
 
         <div class="import-row">
@@ -3505,7 +3560,7 @@
         <div class="lastfm-block">
           <div class="lastfm-row">
             <span class="lastfm-status-text" id="firebase-status-text">Not signed in</span>
-            <button class="btn-ghost" id="firebase-signin-btn" type="button">Sign in with Google</button>
+            <button class="btn-primary" id="firebase-signin-btn" type="button">Sign in with Google</button>
             <button class="btn-ghost" id="firebase-signout-btn" type="button" style="display:none;">Sign out</button>
           </div>
           <p class="footer-note" style="margin-top:8px;">Syncs albums, songs, and restaurants automatically across any device signed into the same Google account — no folder to reconnect. Works alongside folder sync below; you don't need both.</p>
@@ -3517,7 +3572,7 @@
         <div class="lastfm-block">
           <div class="lastfm-row">
             <span class="lastfm-status-text" id="cloudinary-status-text">Cloudinary: not connected</span>
-            <button class="btn-ghost" id="cloudinary-connect-btn" type="button">Connect Cloudinary</button>
+            <button class="btn-primary" id="cloudinary-connect-btn" type="button">Connect Cloudinary</button>
             <button class="btn-ghost" id="cloudinary-disconnect-btn" type="button" style="display:none;">Disconnect</button>
           </div>
           <div class="lastfm-form" id="cloudinary-form" style="display:none;">
@@ -3534,7 +3589,7 @@
         <div class="lastfm-block">
           <div class="lastfm-row">
             <span class="lastfm-status-text" id="lastfm-status-text">Last.fm: not connected</span>
-            <button class="btn-ghost" id="lastfm-connect-btn" type="button">Connect Last.fm</button>
+            <button class="btn-primary" id="lastfm-connect-btn" type="button">Connect Last.fm</button>
             <button class="btn-ghost" id="lastfm-disconnect-btn" type="button" style="display:none;">Disconnect</button>
           </div>
           <div class="lastfm-form" id="lastfm-form" style="display:none;">
@@ -3576,6 +3631,22 @@
 
 <aside id="road-details-panel">
   <div class="restaurant-details-panel-inner" id="road-details-panel-inner"></div>
+</aside>
+
+<aside id="hike-full-list-panel">
+  <div class="restaurant-details-panel-inner" id="hike-full-list-panel-inner">
+    <div class="details-art-wrap">
+      <button class="details-close-btn" type="button" id="hike-full-list-close-btn" title="Close">✕</button>
+    </div>
+    <div class="details-content" style="padding-top:20px;">
+      <h2 class="details-album">Full List</h2>
+      <p class="details-artist">Paste or type freely — this is just plain text, saved as-is.</p>
+      <textarea id="hike-full-list-textarea" class="restaurant-edit-input hike-full-list-textarea" placeholder="Paste your old list here..."></textarea>
+      <div class="restaurant-edit-actions">
+        <button class="btn-primary" id="hike-full-list-save-btn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
 </aside>
 
 </div>
@@ -3710,10 +3781,7 @@
   const tabDock = document.getElementById('tab-dock');
   const liveDot = document.getElementById('live-dot');
   const dockBadge = document.getElementById('dock-badge');
-  const dockSub = document.getElementById('dock-sub');
   const dockList = document.getElementById('dock-list');
-  const dockImportBtn = document.getElementById('dock-import-btn');
-  const dockImportFile = document.getElementById('dock-import-file');
 
   const itemInput = document.getElementById('item-input');
   const countTag = document.getElementById('count-tag');
@@ -3922,6 +3990,11 @@
   const hikeNewBtn = document.getElementById('hike-new-btn');
   const hikeSearchFilterInput = document.getElementById('hike-search-filter-input');
   const hikeSearchFilterClear = document.getElementById('hike-search-filter-clear');
+  const hikeFullListBtn = document.getElementById('hike-full-list-btn');
+  const hikeFullListPanel = document.getElementById('hike-full-list-panel');
+  const hikeFullListCloseBtn = document.getElementById('hike-full-list-close-btn');
+  const hikeFullListTextarea = document.getElementById('hike-full-list-textarea');
+  const hikeFullListSaveBtn = document.getElementById('hike-full-list-save-btn');
   const roadDetailsPanel = document.getElementById('road-details-panel');
   const roadDetailsPanelInner = document.getElementById('road-details-panel-inner');
   const roadGoldGridEl = document.getElementById('road-gold-grid');
@@ -3930,18 +4003,9 @@
   const roadRearrangeSaveBtn = document.getElementById('road-rearrange-save-btn');
   const roadRearrangeCancelBtn = document.getElementById('road-rearrange-cancel-btn');
   const roadNewBtn = document.getElementById('road-new-btn');
-  const roadSearchFilterInput = document.getElementById('road-search-filter-input');
-  const roadSearchFilterClear = document.getElementById('road-search-filter-clear');
   const photoGrid = document.getElementById('photo-grid');
   const photoEmptyMessage = document.getElementById('photo-empty-message');
   const photoAddBtn = document.getElementById('photo-add-btn');
-  const bookImportBtn = document.getElementById('book-import-btn');
-  const bookImportOverlay = document.getElementById('book-import-overlay');
-  const bookImportTextarea = document.getElementById('book-import-textarea');
-  const bookImportCancelBtn = document.getElementById('book-import-cancel-btn');
-  const bookImportConfirmBtn = document.getElementById('book-import-confirm-btn');
-  const gameImportBtn = document.getElementById('game-import-btn');
-  const gameImportFile = document.getElementById('game-import-file');
   const exportAllBtn = document.getElementById('export-all-btn');
   const importAllBtn = document.getElementById('import-all-btn');
   const importAllFile = document.getElementById('import-all-file');
@@ -4071,8 +4135,6 @@
 
   function applyGuestViewMode(){
     document.body.classList.toggle('guest-view-active', guestViewEnabled);
-    const guestViewToggle = document.getElementById('guest-view-toggle');
-    if (guestViewToggle) guestViewToggle.checked = guestViewEnabled;
     if (guestViewEnabled){
       // Anything outside Restaurants/Hikes/Settings is hidden — if the
       // currently active page is one of those, jump to Restaurants so
@@ -4207,7 +4269,7 @@
 
   function updateFirebaseUI(){
     if (firebaseUser){
-      firebaseStatusText.textContent = '🔄 Synced as ' + (firebaseUser.email || firebaseUser.displayName || 'signed in');
+      firebaseStatusText.textContent = '✅ Synced as ' + (firebaseUser.email || firebaseUser.displayName || 'signed in');
       firebaseSigninBtn.style.display = 'none';
       firebaseSignoutBtn.style.display = 'inline-block';
     } else {
@@ -4215,6 +4277,8 @@
       firebaseSigninBtn.style.display = 'inline-block';
       firebaseSignoutBtn.style.display = 'none';
     }
+    firebaseSigninBtn.classList.toggle('btn-primary', !firebaseUser);
+    firebaseSigninBtn.classList.toggle('btn-ghost', !!firebaseUser);
   }
 
   async function firebaseSignIn(){
@@ -4378,10 +4442,8 @@
   }
 
   // This specific Google account is permanently locked into Guest View —
-  // no toggle, no Settings tab, no way back. Distinct from the general
-  // Guest View toggle above (which the owner can freely flip on/off): this
-  // check overrides that entirely for one hard-coded account, regardless of
-  // whatever this device's own local Guest View setting happens to be.
+  // no toggle, no Settings tab, no way back. This is now the ONLY way
+  // Guest View is ever entered — there's no owner-facing toggle anymore.
   const LOCKED_GUEST_EMAIL = 'meganec96@gmail.com';
   // Fill this in with the OWNER's own Firebase UID — found in the Firebase
   // console under Authentication → Users, next to the owner's Google
@@ -4411,17 +4473,14 @@
         // true by the time any of that actually runs.
         guestViewEnabled = true;
         document.body.classList.add('guest-view-active');
-        const guestViewToggle = document.getElementById('guest-view-toggle');
-        if (guestViewToggle) guestViewToggle.checked = true;
       }
       if (user){
         await localDataReadyPromise; // see this promise's own comment — avoids racing checkSavedProgress
         if (isLockedGuestAccount){
-          // Unlike the general Guest View toggle (which the owner uses and
-          // needs Settings to turn back off), this account should never be
-          // allowed to land on Settings at all — redirect away immediately,
-          // now that it's actually safe to call switchGuestPage (which
-          // touches restaurantRows via renderRestaurantsPage).
+          // This account should never be allowed to land on Settings at
+          // all — redirect away immediately, now that it's actually safe
+          // to call switchGuestPage (which touches restaurantRows via
+          // renderRestaurantsPage).
           const activeTopPage = document.querySelector('.top-page.active');
           if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes'){
             switchGuestPage('restaurants');
@@ -4588,6 +4647,38 @@
     }
   }
 
+  // Native <datalist> shows every option immediately on focus, before any
+  // typing — for a filter with dozens of values that's a wall of
+  // suggestions nobody asked for. This keeps the datalist genuinely empty
+  // until the person has typed at least one character, at which point the
+  // full option set becomes available for the browser's own substring
+  // matching to filter. setGatedDatalistOptions is called from each
+  // render*FilterOptions function in place of setting innerHTML directly;
+  // wireDatalistGating is called once per filter input at setup time to
+  // toggle visibility live as the person types or clears the field.
+  function setGatedDatalistOptions(datalistEl, inputEl, optionsHtml){
+    datalistEl.dataset.fullOptions = optionsHtml;
+    datalistEl.innerHTML = inputEl.value.length > 0 ? optionsHtml : '';
+  }
+
+  function wireDatalistGating(inputEl, datalistEl){
+    inputEl.addEventListener('input', () => {
+      const shouldShow = inputEl.value.length > 0;
+      const isShowing = datalistEl.innerHTML.length > 0;
+      if (shouldShow && !isShowing){
+        datalistEl.innerHTML = datalistEl.dataset.fullOptions || '';
+      } else if (!shouldShow && isShowing){
+        datalistEl.innerHTML = '';
+      }
+    });
+  }
+  wireDatalistGating(yearFilterInput, yearFilterDatalist);
+  wireDatalistGating(artistFilterInput, artistFilterDatalist);
+  wireDatalistGating(groupingFilterInput, groupingFilterDatalist);
+  wireDatalistGating(songArtistFilterInput, songArtistFilterDatalist);
+  wireDatalistGating(songGroupingFilterInput, songGroupingFilterDatalist);
+  wireDatalistGating(dishRestaurantFilterInput, dishRestaurantFilterDatalist);
+
   // Resets to 'auto' first so shrinking (e.g. deleting text) is picked up
   // correctly — scrollHeight alone only ever reports the larger of the two
   // during a shrink, since the old inline height is still in effect when
@@ -4642,6 +4733,9 @@
       cloudinaryConnectBtn.style.display = 'inline-block';
       cloudinaryDisconnectBtn.style.display = 'none';
     }
+    const cloudinaryConnected = !!(cloudinaryConfig && cloudinaryConfig.cloudName && cloudinaryConfig.workerUrl);
+    cloudinaryConnectBtn.classList.toggle('btn-primary', !cloudinaryConnected);
+    cloudinaryConnectBtn.classList.toggle('btn-ghost', cloudinaryConnected);
   }
 
   async function loadCloudinaryConfig(){
@@ -4819,15 +4913,6 @@
       showToast("Couldn't read that image");
       return null;
     }
-  }
-
-  const guestViewToggleEl = document.getElementById('guest-view-toggle');
-  if (guestViewToggleEl){
-    guestViewToggleEl.addEventListener('change', () => {
-      guestViewEnabled = guestViewToggleEl.checked;
-      saveGuestViewSetting();
-      applyGuestViewMode();
-    });
   }
 
   loadCloudinaryConfig();
@@ -5193,8 +5278,10 @@
 
   function updateLastfmUI(){
     const connected = !!(lastfmApiKey && lastfmUsername);
-    lastfmStatusText.textContent = connected ? ('Last.fm: connected as ' + lastfmUsername) : 'Last.fm: not connected';
+    lastfmStatusText.textContent = connected ? ('✅ Last.fm: connected as ' + lastfmUsername) : 'Last.fm: not connected';
     lastfmConnectBtn.style.display = connected ? 'none' : 'inline-block';
+    lastfmConnectBtn.classList.toggle('btn-primary', !connected);
+    lastfmConnectBtn.classList.toggle('btn-ghost', connected);
     lastfmDisconnectBtn.style.display = connected ? 'inline-block' : 'none';
     lastfmForm.style.display = 'none';
   }
@@ -5513,7 +5600,7 @@
     const lovedCount = musicbeeTracks.filter(t => t.loved).length;
     const groupedCount = musicbeeTracks.filter(t => t.grouping).length;
     musicbeeStatusText.textContent = count
-      ? ('MusicBee: ' + count.toLocaleString() + ' tracks imported (' + lovedCount.toLocaleString() + ' loved, ' + groupedCount.toLocaleString() + ' grouped)')
+      ? ('✅ MusicBee: ' + count.toLocaleString() + ' tracks imported (' + lovedCount.toLocaleString() + ' loved, ' + groupedCount.toLocaleString() + ' grouped)')
       : 'MusicBee: not imported yet';
   }
 
@@ -5956,7 +6043,7 @@
 
   function renderSongArtistFilterOptions(list){
     const artists = Array.from(new Set(list.map(raw => parseSongEntry(raw).artist).filter(Boolean))).sort();
-    songArtistFilterDatalist.innerHTML = artists.map(a => '<option value="' + escapeAttr(a) + '">').join('');
+    setGatedDatalistOptions(songArtistFilterDatalist, songArtistFilterInput, artists.map(a => '<option value="' + escapeAttr(a) + '">').join(''));
     if (!artists.includes(activeSongArtistFilter)) activeSongArtistFilter = '';
     songArtistFilterInput.value = activeSongArtistFilter;
     songArtistFilterClear.style.display = activeSongArtistFilter ? 'flex' : 'none';
@@ -5967,7 +6054,7 @@
       const p = parseSongEntry(raw);
       return p.artist ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
     }).filter(Boolean))).sort();
-    songGroupingFilterDatalist.innerHTML = groupings.map(g => '<option value="' + escapeAttr(g) + '">').join('');
+    setGatedDatalistOptions(songGroupingFilterDatalist, songGroupingFilterInput, groupings.map(g => '<option value="' + escapeAttr(g) + '">').join(''));
     if (!groupings.includes(activeSongGroupingFilter)) activeSongGroupingFilter = '';
     songGroupingFilterInput.value = activeSongGroupingFilter;
     songGroupingFilterClear.style.display = activeSongGroupingFilter ? 'flex' : 'none';
@@ -6190,7 +6277,7 @@
       if (!songEditMode && ((activeSongArtistFilter && p.artist !== activeSongArtistFilter) || (activeSongGroupingFilter && itemGrouping !== activeSongGroupingFilter))) return;
 
       const li = document.createElement('li');
-      if (idx === 0 && songIsComplete && !songEditMode) li.classList.add('top');
+      // #1 highlight intentionally removed for Songs (Albums' own is unaffected, see renderResultsTab).
 
       const numHtml = songEditMode
         ? '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">'
@@ -6415,6 +6502,9 @@
     }
     if (page !== 'hikes' && openHikeIndex !== null){
       closeHikeDetailsPanel();
+    }
+    if (page !== 'hikes' && hikeFullListPanel.classList.contains('open')){
+      closeHikeFullListPanel();
     }
     if (page !== 'roads' && openRoadIndex !== null){
       closeRoadDetailsPanel();
@@ -7106,62 +7196,6 @@
     });
   }
 
-  // ---------- DOCK-ONLY IMPORT ----------
-  // Separate from the full-list import above: this merges into whatever's
-  // already in the Loading Dock rather than replacing the whole app state —
-  // meant for pulling in dock items exported by hand (or from an older
-  // version of this app with no dock-export feature of its own) without
-  // disturbing an already-migrated ranking. Accepts either a plain list of
-  // "Artist - Album (Year)" lines, or a full export file (it'll just use
-  // the Loading Dock sheet/section from that and ignore the ranked part).
-  function parseDockImportXlsx(arrayBuffer){
-    const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-    const sheetName = wb.SheetNames.find(n => /loading dock/i.test(n)) || wb.SheetNames[0];
-    return xlsxSheetToItems(wb.Sheets[sheetName], false);
-  }
-
-  function mergeDockImport(newDockItems){
-    if (!Array.isArray(newDockItems) || newDockItems.length < 1){
-      showToast('No valid rows found in that file');
-      return;
-    }
-    const existing = new Set(loadingDock.map(x => x.toLowerCase()));
-    let added = 0;
-    newDockItems.forEach(item => {
-      const key = item.toLowerCase();
-      if (!existing.has(key)){
-        loadingDock.push(item);
-        existing.add(key);
-        added++;
-      }
-    });
-    saveProgress();
-    renderDockTab();
-    const skipped = newDockItems.length - added;
-    showToast('Added ' + added + ' to the Loading Dock' +
-      (skipped ? ' (' + skipped + ' duplicate' + (skipped === 1 ? '' : 's') + ' skipped)' : ''));
-  }
-
-  dockImportBtn.addEventListener('click', () => dockImportFile.click());
-  dockImportFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const isXlsx = /\.xlsx$/i.test(file.name);
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try{
-        const parsed = isXlsx ? parseDockImportXlsx(evt.target.result) : parseItems(evt.target.result);
-        mergeDockImport(parsed);
-      }catch(err){
-        showToast('Could not read that file');
-      }
-    };
-    reader.onerror = () => showToast('Could not read that file');
-    if (isXlsx) reader.readAsArrayBuffer(file);
-    else reader.readAsText(file);
-    e.target.value = '';
-  });
-
   cardLeft.addEventListener('click', () => pick(true));
   cardRight.addEventListener('click', () => pick(false));
   undoBtn.addEventListener('click', undo);
@@ -7178,7 +7212,7 @@
   // ---------- RESULTS ----------
   function renderYearFilterOptions(list){
     const years = Array.from(new Set(list.map(item => parseEntry(item).year).filter(Boolean))).sort();
-    yearFilterDatalist.innerHTML = years.map(y => '<option value="' + y + '">').join('');
+    setGatedDatalistOptions(yearFilterDatalist, yearFilterInput, years.map(y => '<option value="' + y + '">').join(''));
     if (!years.includes(yearFilter)) yearFilter = '';
     yearFilterInput.value = yearFilter;
     yearFilterClear.style.display = yearFilter ? 'flex' : 'none';
@@ -7186,7 +7220,7 @@
 
   function renderArtistFilterOptions(list){
     const artists = Array.from(new Set(list.map(item => parseEntry(item).artist).filter(Boolean))).sort();
-    artistFilterDatalist.innerHTML = artists.map(a => '<option value="' + escapeAttr(a) + '">').join('');
+    setGatedDatalistOptions(artistFilterDatalist, artistFilterInput, artists.map(a => '<option value="' + escapeAttr(a) + '">').join(''));
     if (!artists.includes(artistFilter)) artistFilter = '';
     artistFilterInput.value = artistFilter;
     artistFilterClear.style.display = artistFilter ? 'flex' : 'none';
@@ -7201,7 +7235,7 @@
       const p = parseEntry(item);
       return p.artist ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
     }).filter(Boolean))).sort();
-    groupingFilterDatalist.innerHTML = groupings.map(g => '<option value="' + escapeAttr(g) + '">').join('');
+    setGatedDatalistOptions(groupingFilterDatalist, groupingFilterInput, groupings.map(g => '<option value="' + escapeAttr(g) + '">').join(''));
     if (!groupings.includes(groupingFilter)) groupingFilter = '';
     groupingFilterInput.value = groupingFilter;
     groupingFilterClear.style.display = groupingFilter ? 'flex' : 'none';
@@ -7295,11 +7329,12 @@
     }
 
     if (isComplete){
-      reorderBar.style.display = 'flex';
+      reorderBar.style.display = editMode ? 'flex' : 'none';
       reorderToggleBtn.style.display = editMode ? 'none' : 'inline-block';
       reorderEditControls.style.display = editMode ? 'flex' : 'none';
     } else {
       reorderBar.style.display = 'none';
+      reorderToggleBtn.style.display = 'none';
       editMode = false;
     }
 
@@ -7550,12 +7585,10 @@
     loadArtForItems(loadingDock); // fire-and-forget; dock items aren't part of displayedRanking's load
 
     if (loadingDock.length === 0){
-      dockSub.textContent = 'Nothing parked here — mark an album from a duel or the results list when you want to revisit it later.';
       dockList.innerHTML = '<li class="dock-empty">Nothing here yet.</li>';
       return;
     }
 
-    dockSub.textContent = loadingDock.length + ' album' + (loadingDock.length === 1 ? '' : 's') + ' waiting for a re-listen.';
     dockList.innerHTML = '';
     loadingDock.forEach((item) => {
       const li = document.createElement('li');
@@ -8801,7 +8834,7 @@
         ? '<span class="restaurant-visits" title="Visited ' + visits + ' times">×' + visits + '</span>'
         : '';
       const price = formatRestaurantPrice(r.price);
-      const total = (r.total || '').trim();
+      const total = restaurantTotal(r);
       // Best Flavor / Flavor Variety / Total now share one line (separated
       // by "|"), rather than Total alone on its own line above a separate
       // "12 + 14" breakdown line — drops the card from 3 lines to 2 on this
@@ -9732,6 +9765,46 @@
     renderHikesPage();
   });
 
+  // ---------- HIKES: Full List (free-text notes) ----------
+  // A simple slide-in panel holding one block of plain text — no parsing,
+  // no structure, just paste-and-save. For migrating an old text-file list
+  // that doesn't map cleanly onto the structured Hike fields above.
+  const HIKE_FULL_LIST_STORAGE_KEY = 'hike-full-list-text';
+  let hikeFullListText = '';
+
+  async function loadHikeFullListText(){
+    try{
+      const res = await window.storage.get(HIKE_FULL_LIST_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        hikeFullListText = parsed.text || '';
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+
+  function saveHikeFullListText(){
+    hikeFullListText = hikeFullListTextarea.value;
+    try{ window.storage.set(HIKE_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: hikeFullListText, savedAt: new Date().toISOString() }), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  function openHikeFullListPanel(){
+    hikeFullListTextarea.value = hikeFullListText;
+    hikeFullListPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+  }
+  function closeHikeFullListPanel(){
+    hikeFullListPanel.classList.remove('open');
+    document.body.classList.remove('details-open-lock');
+  }
+
+  hikeFullListBtn.addEventListener('click', openHikeFullListPanel);
+  hikeFullListCloseBtn.addEventListener('click', closeHikeFullListPanel);
+  hikeFullListSaveBtn.addEventListener('click', () => {
+    saveHikeFullListText();
+    showToast('Saved');
+  });
+
   // ---------- ROADS ----------
   // Mirrors Hikes' architecture (details panel, gold-grid+list split,
   // auto-sort by total with manual tie-break) but simpler: no dates concept
@@ -9746,7 +9819,6 @@
   let newRoadDraft = null;
   let roadEditMode = false;
   let roadRearrangeMode = false;
-  let roadSearchFilter = '';
 
   async function loadRoadProgress(){
     try{
@@ -9796,13 +9868,6 @@
 
   function getEffectiveRoadCover(r){
     return r.coverPhoto || gatherAllRoadPhotos(r)[0] || '';
-  }
-
-  function roadMatchesSearch(r, query){
-    const q = query.toLowerCase();
-    return (r.name || '').toLowerCase().includes(q)
-      || (r.state || '').toLowerCase().includes(q)
-      || (r.country || '').toLowerCase().includes(q);
   }
 
   function openRoadDetailsPanel(index){
@@ -10226,53 +10291,32 @@
     }
 
     const goldCards = [];
-    const listRows = [];
 
     ordered.forEach((r, i) => {
       const realIndex = roadRows.indexOf(r);
-      if (roadSearchFilter && !roadMatchesSearch(r, roadSearchFilter)) return;
       const rank = i + 1;
       const meta = [r.state, r.country].filter(Boolean).join(' • ');
-
-      if (rank <= 20){
-        const effectiveCover = getEffectiveRoadCover(r);
-        goldCards.push(
-          '<div class="restaurant-gold-card" data-road-index="' + realIndex + '">' +
-            '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
-            (effectiveCover
-              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
-              : '<span class="art-drop-hint">🏎️</span>') +
-            '<div class="restaurant-gold-card-overlay">' +
-              '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
-              (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
-            '</div>' +
-          '</div>'
-        );
-        return;
-      }
-
-      const total = roadTotal(r);
-      listRows.push(
-        '<li data-road-index="' + realIndex + '">' +
-          '<span class="rank-num">' + rank + '</span>' +
-          '<span class="rank-item">' +
-            '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(r.name) + '</span></span>' +
-            (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
-          '</span>' +
-          (total !== null ? '<span class="restaurant-total">' + total + '</span>' : '') +
-        '</li>'
+      const effectiveCover = getEffectiveRoadCover(r);
+      goldCards.push(
+        '<div class="restaurant-gold-card" data-road-index="' + realIndex + '">' +
+          '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+          (effectiveCover
+            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="" loading="lazy">'
+            : '<span class="art-drop-hint">🏎️</span>') +
+          '<div class="restaurant-gold-card-overlay">' +
+            '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
+            (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
+          '</div>' +
+        '</div>'
       );
     });
 
     roadGoldGridEl.innerHTML = goldCards.join('');
     roadGoldGridEl.style.display = goldCards.length ? 'grid' : 'none';
-    roadList.innerHTML = listRows.join('');
+    roadList.innerHTML = '';
 
     Array.from(roadGoldGridEl.children).forEach(card => {
       card.addEventListener('click', () => openRoadDetailsPanel(Number(card.dataset.roadIndex)));
-    });
-    Array.from(roadList.children).forEach(li => {
-      li.addEventListener('click', () => openRoadDetailsPanel(Number(li.dataset.roadIndex)));
     });
   }
 
@@ -10280,17 +10324,6 @@
   roadRearrangeBtn.addEventListener('click', toggleRoadRearrangeMode);
   roadRearrangeSaveBtn.addEventListener('click', saveRoadRearrange);
   roadRearrangeCancelBtn.addEventListener('click', cancelRoadRearrangeMode);
-  roadSearchFilterInput.addEventListener('input', () => {
-    roadSearchFilter = roadSearchFilterInput.value.trim();
-    roadSearchFilterClear.style.display = roadSearchFilter ? 'flex' : 'none';
-    renderRoadsPage();
-  });
-  roadSearchFilterClear.addEventListener('click', () => {
-    roadSearchFilterInput.value = '';
-    roadSearchFilter = '';
-    roadSearchFilterClear.style.display = 'none';
-    renderRoadsPage();
-  });
 
   // ---------- PHOTOS ----------
   // Deliberately minimal — no data per photo, no details tray, no dedicated
@@ -10402,7 +10435,7 @@
   const GAME_SCORES = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
   const MEDIA_CONFIGS = {
     book: {
-      storageKey: 'book-list', storageField: 'bookRows', emptyIcon: '📖', hasScoring: false,
+      storageKey: 'book-list', storageField: 'bookRows', emptyIcon: '📖', hasScoring: false, hasGridListToggle: true,
       metaFn: (item) => [item.author, item.year].filter(Boolean).join(' • '),
       matchFn: (item, q) => (item.title || '').toLowerCase().includes(q) || (item.author || '').toLowerCase().includes(q),
     },
@@ -10412,16 +10445,16 @@
       matchFn: (item, q) => (item.title || '').toLowerCase().includes(q) || (item.director || '').toLowerCase().includes(q),
     },
     game: {
-      storageKey: 'game-list', storageField: 'gameRows', emptyIcon: '🎮', hasScoring: true,
+      storageKey: 'game-list', storageField: 'gameRows', emptyIcon: '🎮', hasScoring: true, hasGridListToggle: true,
       scoreFields: ['characters', 'world', 'story', 'gameplay', 'music', 'visuals'],
       metaFn: (item) => item.year || '',
       matchFn: (item, q) => (item.title || '').toLowerCase().includes(q),
     },
   };
   const mediaState = {
-    book: { rows: [], editMode: false, searchFilter: '' },
+    book: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid' },
     movie: { rows: [], editMode: false, searchFilter: '' },
-    game: { rows: [], editMode: false, searchFilter: '' },
+    game: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid' },
   };
 
   function genMediaId(salt){
@@ -10442,6 +10475,9 @@
       importBtn: document.getElementById(type + '-import-btn'), // null for Movies — no import for that type
       searchInput: document.getElementById(type + '-search-filter-input'),
       searchClear: document.getElementById(type + '-search-filter-clear'),
+      viewToggle: document.getElementById(type + '-view-toggle'), // only Books has this — Movies/Games keep their split gold-grid+list view
+      viewListBtn: document.getElementById(type + '-view-list-btn'),
+      viewGridBtn: document.getElementById(type + '-view-grid-btn'),
     };
   }
   mediaState.book.dom = getMediaDom('book');
@@ -10585,19 +10621,19 @@
     dom.editControls.style.display = state.editMode ? 'flex' : 'none';
     dom.addBtn.style.display = state.editMode ? 'none' : 'inline-block';
     if (dom.importBtn) dom.importBtn.style.display = state.editMode ? 'none' : 'inline-block';
+    if (dom.viewToggle) dom.viewToggle.style.display = state.editMode ? 'none' : 'inline-flex';
 
     if (state.editMode){
-      dom.grid.innerHTML = '';
-      dom.grid.style.display = 'none';
+      if (dom.grid){ dom.grid.innerHTML = ''; dom.grid.style.display = 'none'; }
       dom.empty.style.display = 'none';
+      dom.list.classList.remove('grid-mode'); // edit mode always forces row layout, same as Albums' own edit mode
       dom.list.innerHTML = '';
       rows.forEach((item, idx) => dom.list.appendChild(buildMediaEditRow(type, item, idx)));
       return;
     }
 
     if (!rows.length){
-      dom.grid.innerHTML = '';
-      dom.grid.style.display = 'none';
+      if (dom.grid){ dom.grid.innerHTML = ''; dom.grid.style.display = 'none'; }
       dom.list.innerHTML = '';
       dom.empty.style.display = 'block';
       return;
@@ -10605,8 +10641,21 @@
     dom.empty.style.display = 'none';
 
     const ordered = getOrderedMedia(type);
+
+    if (config.hasGridListToggle){
+      renderMediaGridListToggleView(type, config, dom, state, rows, ordered);
+      return;
+    }
+
+    // ---- Movies/Games: split view — gold-grid photo cards for the top 20,
+    // plain rows for the rest. Drag now works in both sections (grid cards
+    // drag as a whole; list rows drag via a handle, same split Albums uses
+    // between its own grid and list views) — each section only reorders
+    // within itself, never moves an item between sections.
     const goldCards = [];
     const listRows = [];
+    const noDragActive = !state.searchFilter; // reorder needs the full, unfiltered list present — same reasoning as Albums
+
     ordered.forEach((item, i) => {
       const realIndex = rows.indexOf(item);
       if (state.searchFilter && !config.matchFn(item, state.searchFilter)) return;
@@ -10616,7 +10665,7 @@
 
       if (rank <= 20){
         goldCards.push(
-          '<div class="restaurant-gold-card" data-media-index="' + realIndex + '">' +
+          '<div class="restaurant-gold-card" data-media-id="' + item.id + '" data-media-index="' + realIndex + '">' +
             '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
             (cover
               ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 350)) + '" alt="" loading="lazy">'
@@ -10631,14 +10680,16 @@
       }
 
       const total = mediaTotal(item, config);
+      const dragHandleHtml = noDragActive ? mediaDragHandleHtml() : '';
       listRows.push(
-        '<li data-media-index="' + realIndex + '">' +
+        '<li data-media-id="' + item.id + '" data-media-index="' + realIndex + '">' +
           '<span class="rank-num">' + rank + '</span>' +
           '<span class="rank-item">' +
             '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(item.title || '') + '</span></span>' +
             (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
           '</span>' +
           (total !== null ? '<span class="restaurant-total">' + total + '</span>' : '') +
+          dragHandleHtml +
         '</li>'
       );
     });
@@ -10647,14 +10698,209 @@
     dom.grid.style.display = goldCards.length ? 'grid' : 'none';
     dom.list.innerHTML = listRows.join('');
 
-    // No details tray to open — clicking simply previews the cover, same
-    // single-image lightbox Albums' own art thumbnails use.
     const openCoverIfAny = (realIndex) => {
       const cover = rows[realIndex] && rows[realIndex].coverPhoto;
       if (cover) openArtLightbox(cover);
     };
-    Array.from(dom.grid.children).forEach(card => card.addEventListener('click', () => openCoverIfAny(Number(card.dataset.mediaIndex))));
-    Array.from(dom.list.children).forEach(li => li.addEventListener('click', () => openCoverIfAny(Number(li.dataset.mediaIndex))));
+    Array.from(dom.grid.children).forEach(card => {
+      const item = rows[Number(card.dataset.mediaIndex)];
+      wireImmediateClick(card, mediaCardClickHandler(type, item));
+      wireMediaCoverDropZone(card, type, item);
+      if (noDragActive) makeMediaCardDraggable(card, type, false);
+    });
+    Array.from(dom.list.children).forEach(li => {
+      wireImmediateClick(li, () => openCoverIfAny(Number(li.dataset.mediaIndex)));
+      if (noDragActive) makeMediaCardDraggable(li, type, true);
+    });
+  }
+
+  function mediaDragHandleHtml(){
+    return '<span class="row-drag-handle" title="Drag to reorder">' +
+        '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" draggable="false">' +
+          '<circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>' +
+          '<circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/>' +
+          '<circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>' +
+        '</svg>' +
+      '</span>';
+  }
+
+  // Books' own view — a single unified container toggled between a poster
+  // grid and a plain list (Albums' actual format), replacing the old
+  // top-20-grid/rest-list split. Movies/Games keep that split; only Books
+  // asked to mirror Albums here.
+  function renderMediaGridListToggleView(type, config, dom, state, rows, ordered){
+    const showGrid = state.viewMode === 'grid';
+    dom.viewListBtn.classList.toggle('active', !showGrid);
+    dom.viewGridBtn.classList.toggle('active', showGrid);
+    dom.list.classList.toggle('grid-mode', showGrid);
+    dom.list.innerHTML = '';
+
+    const filtered = state.searchFilter ? ordered.filter(item => config.matchFn(item, state.searchFilter)) : ordered;
+    const noDragActive = !state.searchFilter; // same reasoning as Albums — reorder needs the full, unfiltered list present
+    const isBook = type === 'book';
+
+    if (showGrid){
+      filtered.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'grid-card';
+        card.dataset.mediaId = item.id;
+        card.title = item.title || '';
+        // Books: Title (bold) / Series / Author — series only shown when the
+        // book actually has one. Other types (Games): just title + whatever
+        // config.metaFn gives (year, for Games) — scores are deliberately
+        // left off the grid card and only shown in List view.
+        const overlayHtml = isBook
+          ? ('<div class="restaurant-gold-card-overlay">' +
+              '<div class="restaurant-gold-card-name">' + escapeHtml(item.title || '') + '</div>' +
+              (item.series ? '<div class="restaurant-gold-card-meta">' + escapeHtml(item.series) + '</div>' : '') +
+              (item.author ? '<div class="restaurant-gold-card-meta">' + escapeHtml(item.author) + '</div>' : '') +
+            '</div>')
+          : ('<div class="restaurant-gold-card-overlay">' +
+              '<div class="restaurant-gold-card-name">' + escapeHtml(item.title || '') + '</div>' +
+              (config.metaFn(item) ? '<div class="restaurant-gold-card-meta">' + escapeHtml(config.metaFn(item)) + '</div>' : '') +
+            '</div>');
+        card.innerHTML =
+          '<span class="grid-card-rank">#' + (idx + 1) + '</span>' +
+          '<div class="art-drop" style="cursor:pointer;">' +
+            (item.coverPhoto
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(item.coverPhoto, 500)) + '" alt="" loading="lazy">'
+              : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
+          '</div>' +
+          overlayHtml;
+        dom.list.appendChild(card);
+        wireImmediateClick(card, mediaCardClickHandler(type, item));
+        wireMediaCoverDropZone(card, type, item);
+        if (noDragActive) makeMediaCardDraggable(card, type, false);
+      });
+    } else {
+      filtered.forEach((item, idx) => {
+        const li = document.createElement('li');
+        li.dataset.mediaId = item.id;
+        const total = mediaTotal(item, config);
+        // Games have no details tray, so List view is the only place all 6
+        // score categories are visible at once — shown as labeled chips
+        // rather than folded into a single combined meta line.
+        const metaHtml = isBook
+          ? (item.series ? '<span class="rank-meta">' + escapeHtml(item.series) + '</span>' : '') +
+            (item.author ? '<span class="rank-meta">' + escapeHtml(item.author) + '</span>' : '')
+          : config.hasScoring
+            ? '<span class="game-scores-display">' + config.scoreFields.map(f =>
+                '<span class="game-score-chip"><span class="game-score-chip-label">' + f.charAt(0).toUpperCase() + f.slice(1) + '</span><span class="game-score-chip-value">' + escapeHtml(item[f] || '—') + '</span></span>'
+              ).join('') + '</span>'
+            : (config.metaFn(item) ? '<span class="rank-meta">' + escapeHtml(config.metaFn(item)) + '</span>' : '');
+        li.innerHTML =
+          '<span class="rank-num">' + (idx + 1) + '</span>' +
+          '<span class="rank-item">' +
+            '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(item.title || '') + '</span></span>' +
+            metaHtml +
+          '</span>' +
+          (total !== null ? '<span class="restaurant-total">' + total + '</span>' : '') +
+          (noDragActive ? mediaDragHandleHtml() : '');
+        dom.list.appendChild(li);
+        wireImmediateClick(li, mediaCardClickHandler(type, item));
+        if (noDragActive) makeMediaCardDraggable(li, type, true);
+      });
+    }
+  }
+
+  // Mirrors makeRowDraggable/commitDragOrder from Albums, generalized across
+  // Books/Movies/Games via each item's stable id (rather than Albums' raw
+  // string entries). Rebuilds mediaState[type].rows by walking the ORIGINAL
+  // array and substituting each participating id with the next one from the
+  // container's new order — this is what correctly scopes a drag to "reorder
+  // within this subset" for Movies/Games' split view (gold-grid vs list)
+  // without ever moving an item between sections, while still working
+  // correctly for Books' single-container view (every id participates).
+  let mediaDragSourceEl = null;
+  let mediaDragSourceType = null;
+
+  // Every grid-view card (Books/Movies/Games) doubles as a cover-photo drop
+  // target, independent of the reorder-drag wiring on the same element —
+  // distinguished by checking dataTransfer.types for 'Files', same pattern
+  // used everywhere else in this app that layers a file-drop zone under a
+  // draggable-for-reorder element (e.g. Hikes' own cover drop zone).
+  async function uploadMediaCover(type, item, file){
+    if (!file) return;
+    const url = await uploadRestaurantPhoto(file, 'RankHeaven/' + type.charAt(0).toUpperCase() + type.slice(1) + 'Covers');
+    if (url){
+      item.coverPhoto = url;
+      saveMediaProgress(type);
+      renderMediaPage(type);
+    }
+  }
+
+  function wireMediaCoverDropZone(el, type, item){
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      uploadMediaCover(type, item, e.dataTransfer.files[0]);
+    });
+  }
+
+  // Click opens the lightbox when a cover exists, or a file picker to add
+  // one when it doesn't — covers both halves of "add or replace" alongside
+  // the drag-and-drop path above.
+  function mediaCardClickHandler(type, item){
+    return () => {
+      if (item.coverPhoto){
+        openArtLightbox(item.coverPhoto);
+      } else {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.addEventListener('change', () => uploadMediaCover(type, item, input.files && input.files[0]));
+        input.click();
+      }
+    };
+  }
+
+  function makeMediaCardDraggable(el, type, dragHandleOnly){
+    const dragSource = dragHandleOnly ? el.querySelector('.row-drag-handle') : el;
+    if (!dragSource) return;
+    dragSource.setAttribute('draggable', 'true');
+    dragSource.addEventListener('dragstart', () => {
+      mediaDragSourceEl = el;
+      mediaDragSourceType = type;
+      el.classList.add('dragging');
+    });
+    dragSource.addEventListener('dragend', () => commitMediaDragOrder(type));
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!mediaDragSourceEl || mediaDragSourceEl === el || !el.parentNode || mediaDragSourceType !== type) return;
+      if (isBeforeInDom(mediaDragSourceEl, el)){
+        el.parentNode.insertBefore(mediaDragSourceEl, el.nextSibling);
+      } else {
+        el.parentNode.insertBefore(mediaDragSourceEl, el);
+      }
+    });
+    el.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  function commitMediaDragOrder(type){
+    if (mediaDragSourceEl) mediaDragSourceEl.classList.remove('dragging');
+    const draggedEl = mediaDragSourceEl;
+    mediaDragSourceEl = null;
+    mediaDragSourceType = null;
+    if (!draggedEl || !draggedEl.parentNode) return;
+
+    const newOrderIds = Array.from(draggedEl.parentNode.children).map(c => c.dataset.mediaId).filter(Boolean);
+    if (!newOrderIds.length) return;
+    const idSet = new Set(newOrderIds);
+    const rows = mediaState[type].rows;
+    const idToItem = {};
+    rows.forEach(item => { idToItem[item.id] = item; });
+
+    let cursor = 0;
+    mediaState[type].rows = rows.map(item => idSet.has(item.id) ? idToItem[newOrderIds[cursor++]] : item);
+    saveMediaProgress(type);
+    renderMediaPage(type);
   }
 
   function toggleMediaEditMode(type){
@@ -10727,102 +10973,10 @@
       dom.searchClear.style.display = 'none';
       renderMediaPage(type);
     });
-  });
-
-  // ---------- Books: paste-text import ----------
-  // "Lastname, Firstname" (Goodreads' own author-name convention) reversed
-  // for display — everything before the first comma is treated as the
-  // surname regardless of how many words it contains, which handles
-  // multi-part surnames (e.g. "Le Guin, Ursula K.") correctly too.
-  function reformatAuthorName(raw){
-    const idx = raw.indexOf(',');
-    if (idx === -1) return raw.trim();
-    const last = raw.slice(0, idx).trim();
-    const first = raw.slice(idx + 1).trim();
-    return first ? (first + ' ' + last) : last;
-  }
-
-  function parseBookImportText(text){
-    return text.split('\n').map(line => line.trim()).filter(Boolean).map((line, i) => {
-      const parts = line.split('|').map(p => p.trim());
-      const title = parts[0] || '';
-      const authorRaw = parts[1] || '';
-      const series = parts[2] || '';
-      return {
-        id: genMediaId(i),
-        title,
-        author: authorRaw ? reformatAuthorName(authorRaw) : '',
-        series,
-        year: '',
-      };
-    }).filter(b => b.title);
-  }
-
-  bookImportBtn.addEventListener('click', () => {
-    bookImportTextarea.value = '';
-    bookImportOverlay.classList.add('show');
-  });
-  bookImportCancelBtn.addEventListener('click', () => bookImportOverlay.classList.remove('show'));
-  bookImportConfirmBtn.addEventListener('click', () => {
-    const parsed = parseBookImportText(bookImportTextarea.value);
-    if (!parsed.length){ showToast('No valid lines found'); return; }
-    mediaState.book.rows = parsed;
-    saveMediaProgress('book');
-    bookImportOverlay.classList.remove('show');
-    renderMediaPage('book');
-    showToast('Imported ' + parsed.length + ' book' + (parsed.length === 1 ? '' : 's'));
-  });
-
-  // ---------- Games: .xlsx import ----------
-  // Column A = title, B-G = the 6 score categories in the order listed.
-  // header:1 reads rows positionally (arrays, not header-keyed objects),
-  // matching "column A/B/C..." exactly regardless of whether row 1 turns
-  // out to be a header or the first real game.
-  function parseGameImportXlsx(arrayBuffer){
-    // XLSX.read's {type:'array'} path needs an actual Uint8Array, not a raw
-    // ArrayBuffer — passing the ArrayBuffer directly works by accident in
-    // Node (where the library can silently coerce it via Node's Buffer,
-    // which every real browser lacks), but silently misparses it as
-    // something else entirely in an actual browser, with no error thrown to
-    // signal anything went wrong.
-    const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-    const scoreKeys = MEDIA_CONFIGS.game.scoreFields;
-    const games = [];
-    rows.forEach((row, i) => {
-      const title = String(row[0] || '').trim();
-      if (!title) return;
-      const scoreCells = row.slice(1, 7);
-      const allNonNumeric = scoreCells.every(c => c === '' || isNaN(Number(c)));
-      if (i === 0 && allNonNumeric) return; // looks like a header row — skip it
-      const game = { id: genMediaId(i), title, year: '' };
-      scoreKeys.forEach((key, colIdx) => {
-        const raw = row[colIdx + 1];
-        const num = Number(raw);
-        game[key] = (raw !== '' && !isNaN(num)) ? String(num) : '';
-      });
-      games.push(game);
-    });
-    return games;
-  }
-
-  gameImportBtn.addEventListener('click', () => gameImportFile.click());
-  gameImportFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      let games;
-      try{ games = parseGameImportXlsx(reader.result); }catch(err){ showToast('Could not read that file'); return; }
-      if (!games.length){ showToast('No valid rows found in that file'); return; }
-      mediaState.game.rows = games;
-      saveMediaProgress('game');
-      renderMediaPage('game');
-      showToast('Imported ' + games.length + ' game' + (games.length === 1 ? '' : 's'));
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = '';
+    if (dom.viewListBtn && dom.viewGridBtn){
+      dom.viewListBtn.addEventListener('click', () => { mediaState[type].viewMode = 'list'; renderMediaPage(type); });
+      dom.viewGridBtn.addEventListener('click', () => { mediaState[type].viewMode = 'grid'; renderMediaPage(type); });
+    }
   });
 
   // ---------- DISHES ----------
@@ -10912,7 +11066,7 @@
   // shift depending on what the description filter currently narrows.
   function renderDishRestaurantFilterOptions(dishes){
     const names = Array.from(new Set(dishes.map(d => d.restaurant.name).filter(Boolean))).sort();
-    dishRestaurantFilterDatalist.innerHTML = names.map(n => '<option value="' + escapeAttr(n) + '">').join('');
+    setGatedDatalistOptions(dishRestaurantFilterDatalist, dishRestaurantFilterInput, names.map(n => '<option value="' + escapeAttr(n) + '">').join(''));
     if (!names.includes(dishRestaurantFilter)) dishRestaurantFilter = '';
     dishRestaurantFilterInput.value = dishRestaurantFilter;
     dishRestaurantFilterClear.style.display = dishRestaurantFilter ? 'flex' : 'none';
@@ -10958,9 +11112,11 @@
     const hasAny = allDishes.length > 0;
     dishEmptyMessage.style.display = hasAny ? 'none' : 'block';
     dishResultsList.style.display = hasAny ? '' : 'none';
-    dishReorderBar.style.display = hasAny ? 'flex' : 'none';
-
-    dishReorderToggleBtn.style.display = dishEditMode ? 'none' : 'inline-block';
+    // The reorder-bar now holds only the Edit-mode Save/Cancel/hint — the
+    // Edit toggle itself lives in results-controls instead — so it only
+    // ever needs to show while actively editing.
+    dishReorderBar.style.display = dishEditMode ? 'flex' : 'none';
+    dishReorderToggleBtn.style.display = (!dishEditMode && hasAny) ? 'inline-block' : 'none';
     dishReorderEditControls.style.display = dishEditMode ? 'flex' : 'none';
 
     renderDishRestaurantFilterOptions(allDishes);
@@ -11361,6 +11517,7 @@
     const location = restaurantDetailsPanelInner.querySelector('#restaurant-edit-location').value.trim();
     const stars = restaurantDetailsPanelInner.querySelector('#restaurant-edit-stars').value;
     const website = restaurantDetailsPanelInner.querySelector('#restaurant-edit-website').value.trim();
+    const price = restaurantDetailsPanelInner.querySelector('#restaurant-edit-price').value.trim();
 
     if (!name){
       showToast('Give it a name first');
@@ -11371,8 +11528,8 @@
       // Appended to the end — unranked/untiered by default, same as any
       // fresh entry with no established score yet.
       restaurantRows.push({
-        name, cuisine, location, stars, website,
-        notes: '', bestFlavor: '', flavorVariety: '', total: '', price: '', year: '', bests: '',
+        name, cuisine, location, stars, website, price,
+        notes: '', bestFlavor: '', flavorVariety: '', total: '', year: '', bests: '',
         photos: [], courses: []
       });
       newRestaurantDraft = null;
@@ -11389,6 +11546,7 @@
         rest.location = location;
         rest.stars = stars;
         rest.website = website;
+        rest.price = price;
       });
       renderRestaurantsPage(); // list card reflects a renamed restaurant too
     }
@@ -11555,7 +11713,7 @@
         (r.price ? (
           '<div class="restaurant-score-block">' +
             '<span class="restaurant-score-label">Price</span>' +
-            '<span class="restaurant-score-price-value">' + escapeHtml(r.price) + '</span>' +
+            '<span class="restaurant-score-price-value">' + escapeHtml(formatRestaurantPrice(r.price)) + '</span>' +
           '</div>'
         ) : '') +
       '</div>'
@@ -11615,6 +11773,8 @@
           '</select>' +
           '<label class="restaurant-edit-label">Website</label>' +
           '<input type="text" class="restaurant-edit-input" id="restaurant-edit-website" placeholder="restaurant-website.com" value="' + escapeAttr(r.website || '') + '">' +
+          '<label class="restaurant-edit-label">Price</label>' +
+          '<input type="text" class="restaurant-edit-input" id="restaurant-edit-price" placeholder="$$ or 45" value="' + escapeAttr(r.price || '') + '">' +
         '</div>' +
         '<div class="restaurant-edit-actions">' +
           '<button class="btn-primary" id="restaurant-edit-save-btn" type="button">Save</button>' +
@@ -12154,6 +12314,7 @@
   loadGuestViewSetting();
   loadDishOrder();
   loadHikeProgress();
+  loadHikeFullListText();
   loadRoadProgress();
   loadPhotoProgress();
   loadMediaProgress('book');
