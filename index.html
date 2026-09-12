@@ -2494,6 +2494,26 @@
       transform: translateX(0);
       visibility: visible;
     }
+    /* Same overlay treatment as #restaurant-details-panel above — this one
+       was missing entirely, meaning on mobile it was still trying to behave
+       like a 600px sticky side column with nothing to make room for it,
+       pushing its content off the right edge of the screen. */
+    #hike-details-panel{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      min-height: 100vh;
+      max-height: 100vh;
+      z-index: 200;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      visibility: hidden;
+    }
+    #hike-details-panel.open{
+      width: 100%;
+      transform: translateX(0);
+      visibility: visible;
+    }
     .restaurant-details-panel-inner{ width: 100%; }
 
     /* Prevents the page underneath from scrolling while the full-screen
@@ -8577,7 +8597,8 @@
 
   // ---------- HIKES ----------
   const HIKE_STORAGE_KEY = 'hike-list';
-  const HIKE_SCENERY_SCORES = [12, 11, 10, 9, 8];
+  const HIKE_BEST_SCENERY_SCORES = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+  const HIKE_AMOUNT_SCENERY_SCORES = [20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
   const HIKE_DIFFICULTIES = ['Easy', 'Moderate', 'Hard'];
   const US_STATES = ['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming'];
   const CA_PROVINCES = ['Alberta','British Columbia','Manitoba','New Brunswick','Newfoundland and Labrador','Northwest Territories','Nova Scotia','Nunavut','Ontario','Prince Edward Island','Quebec','Saskatchewan','Yukon'];
@@ -8926,11 +8947,11 @@
       '<div class="restaurant-scores-row">' +
         '<div class="restaurant-score-block">' +
           '<span class="restaurant-score-label">Best Scenery</span>' +
-          buildScoreSelectHtml(HIKE_SCENERY_SCORES, h.bestScenery, 'id="hike-best-scenery-select"') +
+          buildScoreSelectHtml(HIKE_BEST_SCENERY_SCORES, h.bestScenery, 'id="hike-best-scenery-select"') +
         '</div>' +
         '<div class="restaurant-score-block">' +
           '<span class="restaurant-score-label">Amount of Scenery</span>' +
-          buildScoreSelectHtml(HIKE_SCENERY_SCORES, h.amountOfScenery, 'id="hike-amount-scenery-select"') +
+          buildScoreSelectHtml(HIKE_AMOUNT_SCENERY_SCORES, h.amountOfScenery, 'id="hike-amount-scenery-select"') +
         '</div>' +
         '<div class="restaurant-score-block restaurant-score-total-block" id="hike-score-total-block" style="display:none;">' +
           '<span class="restaurant-score-label">Total</span>' +
@@ -9007,10 +9028,17 @@
     hikeDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeHikeDetailsPanel);
     hikeDetailsPanelInner.querySelector('#hike-edit-save-btn').addEventListener('click', saveHikeEditForm);
     hikeDetailsPanelInner.querySelector('#hike-edit-cancel-btn').addEventListener('click', cancelHikeEdit);
-    // Re-renders the whole form on country change so the state/province
-    // field (and its datalist) can appear, disappear, or swap between US
-    // states and Canadian provinces — simplest correct approach given how
-    // much of the form's shape depends on this one field.
+    // Only re-renders when the country's classification (which state list,
+    // if any, should show) actually changes — not on every keystroke, which
+    // would otherwise rebuild this input on every character typed. Even for
+    // the keystroke that DOES change classification, the rebuilt input is a
+    // brand new element with no memory of where the cursor was, so
+    // re-focusing it alone leaves the cursor at position 0 — meaning the
+    // very next character types before everything already there, silently
+    // reversing the string one keystroke at a time. Saving and restoring
+    // the cursor position explicitly across the rebuild is what actually
+    // fixes that, not just cutting down how often it happens.
+    let lastHikeCountryClassification = hikeStateOptionsHtml(h.country) ? (isCanadaCountry(h.country) ? 'ca' : 'us') : null;
     hikeDetailsPanelInner.querySelector('#hike-edit-country').addEventListener('input', (e) => {
       h.country = e.target.value;
       h.name = hikeDetailsPanelInner.querySelector('#hike-edit-name').value;
@@ -9018,8 +9046,16 @@
       h.distance = hikeDetailsPanelInner.querySelector('#hike-edit-distance').value;
       h.elevation = hikeDetailsPanelInner.querySelector('#hike-edit-elevation').value;
       h.allTrailsUrl = hikeDetailsPanelInner.querySelector('#hike-edit-alltrails').value;
+
+      const newClassification = hikeStateOptionsHtml(h.country) ? (isCanadaCountry(h.country) ? 'ca' : 'us') : null;
+      if (newClassification === lastHikeCountryClassification) return;
+      lastHikeCountryClassification = newClassification;
+
+      const cursorPos = e.target.selectionStart;
       renderHikeEditForm();
-      hikeDetailsPanelInner.querySelector('#hike-edit-country').focus();
+      const freshCountryInput = hikeDetailsPanelInner.querySelector('#hike-edit-country');
+      freshCountryInput.focus();
+      freshCountryInput.setSelectionRange(cursorPos, cursorPos);
     });
   }
 
