@@ -36,6 +36,41 @@
 
   *{ box-sizing: border-box; }
 
+  .export-reminder-banner{
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    z-index: 150;
+    background: var(--brick);
+    color: #fff;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    padding: 0 16px;
+  }
+  .export-reminder-banner a{
+    color: #fff;
+    text-decoration: underline;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  body.export-reminder-active .export-reminder-banner{
+    display: flex;
+  }
+  body.export-reminder-active{
+    /* Every sticky/padding rule in the app reads its offset from this one
+       variable, so bumping it here (64px original nav + the banner's own
+       40px) automatically pushes the nav, details panels, and page padding
+       down together — no need to touch each of those rules individually. */
+    --desktop-nav-height: 104px;
+  }
+
   html,body{
     margin:0; padding:0;
     background-color: var(--bg-2);
@@ -383,6 +418,21 @@
     grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
     gap: 8px;
   }
+  .restaurant-course-thumb-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .restaurant-course-thumb-tile{
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-2);
+    cursor: pointer;
+  }
+  .restaurant-course-thumb-tile[data-course-photo-index]{ cursor: pointer; }
+  .restaurant-course-thumb-tile:not([data-course-photo-index]){ cursor: default; }
   .restaurant-photo-thumb{
     position: relative;
     aspect-ratio: 1 / 1;
@@ -1490,6 +1540,29 @@
   .game-score-chip-label{ color: var(--chalk-dim); }
   .game-score-chip-value{ color: var(--chalk); font-weight: 700; }
 
+  .show-category-section{ margin-bottom: 32px; }
+  .show-category-section:last-child{ margin-bottom: 0; }
+  .show-category-heading{
+    font-family: 'Figtree', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--chalk);
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .show-category-items{ min-height: 40px; } /* keeps an empty section a real drop target, not a zero-height sliver */
+  .show-category-items.media-poster-grid{ margin: 0; }
+  .show-category-empty{
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    color: var(--chalk-dim);
+    font-size: 13px;
+    font-style: italic;
+    margin: 0;
+  }
+
   .rank-num-input{
     width: 54px;
     background: var(--bg-2);
@@ -2582,6 +2655,9 @@
     font-size: 11.5px;
     text-align: center;
   }
+  .firestore-size-note{ font-weight: 600; }
+  .firestore-size-note.size-warning{ color: var(--amber); }
+  .firestore-size-note.size-critical{ color: var(--brick); }
 
   .screen{ display: none; flex: 1; flex-direction: column; }
   .screen.active{ display: flex; }
@@ -3019,6 +3095,11 @@
 </script>
 </head>
 <body>
+
+<div id="export-reminder-banner" class="export-reminder-banner">
+  It's been over 2 weeks since your last backup.
+  <a href="#" id="export-reminder-link">Export your data now</a>
+</div>
 
 <div id="page-shell">
 <div id="main-content">
@@ -3704,7 +3785,8 @@
             <button class="btn-primary" id="firebase-signin-btn" type="button">Sign in with Google</button>
             <button class="btn-ghost" id="firebase-signout-btn" type="button" style="display:none;">Sign out</button>
           </div>
-          <p class="footer-note" style="margin-top:8px;">Syncs albums, songs, and restaurants automatically across any device signed into the same Google account — no folder to reconnect. Works alongside folder sync below; you don't need both.</p>
+          <p class="footer-note" style="margin-top:8px;">Syncs albums, songs, restaurants, hikes, parks, roads, photos, books, movies, games, and shows automatically across any device signed into the same Google account — no folder to reconnect. Works alongside folder sync below; you don't need both.</p>
+          <p class="footer-note firestore-size-note" id="firestore-size-note" style="margin-top:8px; display:none;"></p>
         </div>
       </div>
 
@@ -4001,6 +4083,7 @@
   const reorderCancelBtn = document.getElementById('reorder-cancel-btn');
 
   const firebaseStatusText = document.getElementById('firebase-status-text');
+  const firestoreSizeNote = document.getElementById('firestore-size-note');
   const firebaseSigninBtn = document.getElementById('firebase-signin-btn');
   const firebaseSignoutBtn = document.getElementById('firebase-signout-btn');
   const cloudinaryStatusText = document.getElementById('cloudinary-status-text');
@@ -4174,6 +4257,7 @@
   const photoEmptyMessage = document.getElementById('photo-empty-message');
   const photoAddBtn = document.getElementById('photo-add-btn');
   const exportAllBtn = document.getElementById('export-all-btn');
+  const exportReminderLink = document.getElementById('export-reminder-link');
   const importAllBtn = document.getElementById('import-all-btn');
   const importAllFile = document.getElementById('import-all-file');
 
@@ -4478,6 +4562,24 @@
     firestoreWriteTimer = setTimeout(writeFirestoreData, 600);
   }
 
+  // Below 70% of Firestore's 1MB-per-document cap, this stays hidden
+  // entirely — there's nothing to act on yet, and showing a size readout
+  // at all times would just be clutter. Once it's actually worth knowing
+  // about, amber first, then red as it gets genuinely close to the wall.
+  function updateFirestoreSizeDisplay(sizeMB){
+    if (sizeMB < 0.7){
+      firestoreSizeNote.style.display = 'none';
+      firestoreSizeNote.classList.remove('size-warning', 'size-critical');
+      return;
+    }
+    const pct = Math.round((sizeMB / 1) * 100);
+    const isCritical = sizeMB >= 0.9;
+    firestoreSizeNote.textContent = (isCritical ? '⚠️ ' : '') + 'Backup size: ' + sizeMB.toFixed(2) + ' MB of Firestore\'s 1 MB limit (' + pct + '%)' + (isCritical ? ' — approaching the limit, some data may stop syncing' : '');
+    firestoreSizeNote.classList.toggle('size-warning', !isCritical);
+    firestoreSizeNote.classList.toggle('size-critical', isCritical);
+    firestoreSizeNote.style.display = 'block';
+  }
+
   async function writeFirestoreData(){
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return;
@@ -4512,7 +4614,9 @@
         showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt,
         lastfmApiKey, lastfmUsername
       });
-      console.log('Firestore payload size:', (payload.length / 1024 / 1024).toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
+      const payloadSizeMB = payload.length / 1024 / 1024;
+      console.log('Firestore payload size:', payloadSizeMB.toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
+      updateFirestoreSizeDisplay(payloadSizeMB);
       const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
       await fb.setDoc(docRef, { json: payload });
     }catch(e){
@@ -8754,6 +8858,28 @@
     return parseRestaurantNotes(r.notes).stars;
   }
 
+  // Same migration pattern as restaurantStarsCount above: prefer the
+  // explicit field (set via the Edit form's new Visits input) over the
+  // older notes-embedded "xN" pattern, so a restaurant edited before this
+  // field existed keeps showing its already-known visit count rather than
+  // resetting to 1 the first time it's opened.
+  function restaurantManualVisitCount(r){
+    if (r.manualVisitCount !== undefined && r.manualVisitCount !== null && r.manualVisitCount !== ''){
+      const n = Number(r.manualVisitCount);
+      return isNaN(n) ? 1 : n;
+    }
+    return parseRestaurantNotes(r.notes).visits;
+  }
+
+  // The number actually shown on the ×3-style badge. Deliberately
+  // independent of the real Visits logged in the details tray (per the
+  // request, editing one should never edit the other) — but the badge
+  // should never undercount reality, so whichever number is larger wins.
+  function restaurantVisitsCount(r){
+    const actualVisits = Array.isArray(r.visits) ? r.visits.length : 0;
+    return Math.max(restaurantManualVisitCount(r), actualVisits);
+  }
+
   function formatRestaurantPrice(raw){
     const trimmed = (raw || '').trim();
     if (!trimmed) return '';
@@ -9208,13 +9334,15 @@
       const rank = idx + 1;
       const tier = restaurantTierBoundaries ? getRestaurantTierForRank(rank, restaurantTierBoundaries) : null;
 
-      // Photo cards now go by rank position (top 20), not tier membership —
+      // Photo cards now go by rank position (top 32), not tier membership —
       // a restaurant can be here without being Gold, so its actual tier (if
       // any) needs its own badge now rather than being implied by section.
-      if (rank <= 20){
+      if (rank <= 32){
         const goldStars = restaurantStarsCount(r);
         const goldStarsText = goldStars > 0 ? '⭐'.repeat(goldStars) : '';
-        const meta = [goldStarsText, r.location].filter(Boolean).join(' • ');
+        const goldVisits = restaurantVisitsCount(r);
+        const goldVisitsText = goldVisits >= 2 ? '×' + goldVisits : '';
+        const meta = [goldStarsText, goldVisitsText, r.location].filter(Boolean).join(' • ');
         const tierBadgeHtml = tier
           ? '<span class="restaurant-gold-card-tier" style="background:' + hexToRgba(tier.color, 0.85) + ';" title="' + escapeAttr(tier.name) + '"></span>'
           : '';
@@ -9236,7 +9364,7 @@
       }
 
       const stars = restaurantStarsCount(r);
-      const { visits } = parseRestaurantNotes(r.notes);
+      const visits = restaurantVisitsCount(r);
       const starsHtml = stars > 0
         ? '<span class="restaurant-stars" title="' + stars + ' Michelin star' + (stars === 1 ? '' : 's') + '">' + '⭐'.repeat(stars) + '</span>'
         : '';
@@ -9319,6 +9447,7 @@
   let newRestaurantDraft = null; // { name, cuisine, location, stars } while creating a brand-new restaurant; null otherwise
   let restaurantActiveVisitId = null; // which visit's Courses/Photos are currently shown
   let restaurantVisitEditMode = false; // editing the active visit's date/notes (separate from restaurantEditMode, which is the restaurant's own basic info)
+  let restaurantVisitThumbnailMode = false; // 3-column thumbnails-only view for the active visit's dishes — forced true for guests, who have no other option
 
   // Visits didn't always exist — courses/photos used to live directly on the
   // restaurant. The first time a restaurant's visits are touched, whatever
@@ -11452,13 +11581,18 @@
 
     const ordered = getOrderedMedia(type);
 
+    if (type === 'show'){
+      renderShowsCategorizedView(config, dom, state, rows);
+      return;
+    }
+
     if (config.hasGridListToggle){
       renderMediaGridListToggleView(type, config, dom, state, rows, ordered);
       return;
     }
 
     // ---- Movies: every item shows as a gold-grid photo card, no plain
-    // list at all (unlike Restaurants/Hikes, which still split at 20).
+    // list at all (unlike Restaurants/Hikes, which still split by rank).
     const goldCards = [];
     const noDragActive = !state.searchFilter; // reorder needs the full, unfiltered list present — same reasoning as Albums
 
@@ -11503,6 +11637,129 @@
           '<circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>' +
         '</svg>' +
       '</span>';
+  }
+
+  // ---------- SHOWS: category sections (Drama / Comedy / Reality) ----------
+  // A fixed, ordered set of vertical sections instead of one flat grid/list
+  // — otherwise built from the exact same card/row markup and Grid/List
+  // toggle every other media type uses. Dragging works across sections
+  // (not just within one, like the shared makeMediaCardDraggable/
+  // commitMediaDragOrder), since the whole point here is being able to
+  // freely move a show from one category into another.
+  const SHOW_CATEGORIES = ['drama', 'comedy', 'reality'];
+  const SHOW_CATEGORY_LABELS = { drama: 'Drama', comedy: 'Comedy', reality: 'Reality' };
+
+  function renderShowsCategorizedView(config, dom, state, rows){
+    const showGrid = state.viewMode === 'grid';
+    dom.viewListBtn.classList.toggle('active', !showGrid);
+    dom.viewGridBtn.classList.toggle('active', showGrid);
+    dom.list.classList.remove('grid-mode'); // dom.list is now just a wrapper for the 3 sections, not itself a grid
+
+    const noDragActive = !state.searchFilter; // same reasoning as every other media type — a filter can hide items the commit logic needs to see
+
+    dom.list.innerHTML = SHOW_CATEGORIES.map(cat => {
+      const itemsInCat = rows.filter(item => (item.category || 'drama') === cat);
+      const filtered = state.searchFilter ? itemsInCat.filter(item => config.matchFn(item, state.searchFilter)) : itemsInCat;
+
+      const itemsHtml = filtered.map(item => showGrid
+        ? ('<div class="grid-card" data-media-id="' + item.id + '" title="' + escapeAttr(item.title || '') + '">' +
+            '<div class="art-drop" style="cursor:pointer;">' +
+              (item.coverPhoto
+                ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(item.coverPhoto, 500)) + '" alt="" loading="lazy">'
+                : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
+            '</div>' +
+            '<div class="restaurant-gold-card-overlay">' +
+              '<div class="restaurant-gold-card-name">' + escapeHtml(item.title || '') + '</div>' +
+              (config.metaFn(item) ? '<div class="restaurant-gold-card-meta">' + escapeHtml(config.metaFn(item)) + '</div>' : '') +
+            '</div>' +
+          '</div>')
+        : ('<li data-media-id="' + item.id + '">' +
+            '<span class="rank-item">' +
+              '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(item.title || '') + '</span></span>' +
+              (config.metaFn(item) ? '<span class="rank-meta">' + escapeHtml(config.metaFn(item)) + '</span>' : '') +
+            '</span>' +
+            (noDragActive ? mediaDragHandleHtml() : '') +
+          '</li>')
+      ).join('');
+
+      const tag = showGrid ? 'div' : 'ol';
+      return (
+        '<div class="show-category-section">' +
+          '<h3 class="show-category-heading">' + SHOW_CATEGORY_LABELS[cat] + '</h3>' +
+          '<' + tag + ' class="show-category-items' + (showGrid ? ' media-poster-grid' : '') + '" data-category="' + cat + '">' +
+            (itemsHtml || '<p class="show-category-empty">No shows here yet — drag one in.</p>') +
+          '</' + tag + '>' +
+        '</div>'
+      );
+    }).join('');
+
+    dom.list.querySelectorAll('.show-category-items').forEach(container => {
+      Array.from(container.children).forEach(el => {
+        const item = rows.find(r => r.id === el.dataset.mediaId);
+        if (!item) return; // the empty-state <p> has no data-media-id and is safely skipped here
+        wireImmediateClick(el, mediaCardClickHandler('show', item));
+        if (showGrid) wireMediaCoverDropZone(el, 'show', item);
+        if (noDragActive) makeShowCardDraggable(el);
+      });
+      if (noDragActive) wireShowCategoryContainer(container);
+    });
+  }
+
+  let showDragSourceEl = null;
+
+  function makeShowCardDraggable(el){
+    el.setAttribute('draggable', 'true');
+    el.addEventListener('dragstart', () => {
+      showDragSourceEl = el;
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', commitShowDragOrder);
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!showDragSourceEl || showDragSourceEl === el || !el.parentNode) return;
+      if (isBeforeInDom(showDragSourceEl, el)){
+        el.parentNode.insertBefore(showDragSourceEl, el.nextSibling);
+      } else {
+        el.parentNode.insertBefore(showDragSourceEl, el);
+      }
+    });
+    el.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  // Handles the two cases the per-card handler above can't: dropping into a
+  // section that's currently empty (nothing to hover over), and dropping
+  // into open space after the last card in a non-empty section.
+  function wireShowCategoryContainer(container){
+    container.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!showDragSourceEl || container.contains(showDragSourceEl)) return;
+      container.appendChild(showDragSourceEl);
+    });
+    container.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  function commitShowDragOrder(){
+    if (showDragSourceEl) showDragSourceEl.classList.remove('dragging');
+    showDragSourceEl = null;
+
+    const rows = mediaState.show.rows;
+    const idToItem = {};
+    rows.forEach(item => { idToItem[item.id] = item; });
+
+    const newRows = [];
+    SHOW_CATEGORIES.forEach(cat => {
+      const container = document.querySelector('.show-category-items[data-category="' + cat + '"]');
+      if (!container) return;
+      Array.from(container.children).forEach(el => {
+        const item = idToItem[el.dataset.mediaId];
+        if (!item) return; // skips the empty-state <p>, same guard as above
+        item.category = cat;
+        newRows.push(item);
+      });
+    });
+    mediaState.show.rows = newRows;
+    saveMediaProgress('show');
+    renderMediaPage('show');
   }
 
   // Books' own view — a single unified container toggled between a poster
@@ -11695,6 +11952,7 @@
   function addMediaEditRow(type){
     const dom = mediaState[type].dom;
     const newItem = { id: genMediaId('new') };
+    if (type === 'show') newItem.category = 'drama';
     const li = buildMediaEditRow(type, newItem, dom.list.children.length);
     dom.list.appendChild(li);
     li.querySelector('.media-edit-title').focus();
@@ -11858,6 +12116,35 @@
   // its sibling photos from the same dish, since the caption describes the
   // dish, not the individual photo. dishId lets the click handler find
   // exactly where a specific dish's photos start in this flattened list.
+  // Merges dishes from the same restaurant that share a non-empty
+  // description into a single displayed entry, combining every member's
+  // photos into one array. Deliberately only ever applied to the read-only
+  // Grid/List display — Edit mode still shows every individual course
+  // separately, since that's where per-course text edits and unfavoriting
+  // happen and a merged entry has no single course to apply those to.
+  // Blank descriptions are never merged with each other — two different,
+  // unnamed dishes from the same restaurant aren't "the same dish" just
+  // because neither has a name yet.
+  function getGroupedDishes(dishes){
+    const groups = [];
+    const groupByKey = {};
+    dishes.forEach(d => {
+      const normalizedText = (d.course.text || '').trim().toLowerCase();
+      const key = normalizedText ? (d.restaurantIndex + '::' + normalizedText) : null;
+      if (key && groupByKey[key]){
+        const existing = groupByKey[key];
+        existing.course.photos.push(...(d.course.photos || []));
+        existing.mergedIds.push(d.id);
+        return;
+      }
+      const combinedCourse = Object.assign({}, d.course, { photos: (d.course.photos || []).slice() });
+      const merged = Object.assign({}, d, { course: combinedCourse, mergedIds: [d.id] });
+      groups.push(merged);
+      if (key) groupByKey[key] = merged;
+    });
+    return groups;
+  }
+
   function buildDishesLightboxEntries(dishes){
     const entries = [];
     dishes.forEach(d => {
@@ -11936,7 +12223,8 @@
         li.querySelector('.dish-unfavorite-btn').addEventListener('click', () => li.remove());
       });
     } else if (showGrid){
-      dishes.forEach((d, idx) => {
+      const displayDishes = getGroupedDishes(dishes);
+      displayDishes.forEach((d, idx) => {
         const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
         const card = document.createElement('div');
         card.className = 'grid-card';
@@ -11946,7 +12234,7 @@
           '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 500)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
         dishResultsList.appendChild(card);
         makeDishDraggable(card, d.id);
-        card.addEventListener('click', () => openDishLightbox(d, dishes));
+        card.addEventListener('click', () => openDishLightbox(d, displayDishes));
       });
     } else {
       // Read-only list view — Photo, Restaurant Name, Description, nothing
@@ -11954,7 +12242,8 @@
       // name label, then the main text) just with plain static text instead
       // of inputs, and no position number or star since there's nothing to
       // act on here — that's what Edit mode is for.
-      dishes.forEach((d) => {
+      const displayDishes = getGroupedDishes(dishes);
+      displayDishes.forEach((d) => {
         const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
         const li = document.createElement('li');
         li.dataset.dishId = d.id;
@@ -11962,7 +12251,7 @@
           '<span class="dish-restaurant-name-readonly">' + escapeHtml(d.restaurant.name || '') + '</span>' +
           '<span class="rank-item">' + escapeHtml(d.course.text || '') + '</span>';
         if (firstPhoto){
-          li.addEventListener('click', () => openDishLightbox(d, dishes));
+          li.addEventListener('click', () => openDishLightbox(d, displayDishes));
         } else {
           li.style.cursor = 'default';
         }
@@ -12272,6 +12561,7 @@
     openRestaurantIndex = null;
     newRestaurantDraft = null;
     restaurantEditMode = false;
+    restaurantVisitThumbnailMode = false;
     restaurantDetailsPanel.classList.remove('open');
     document.body.classList.remove('details-open-lock');
   }
@@ -12297,6 +12587,8 @@
     const cuisine = restaurantDetailsPanelInner.querySelector('#restaurant-edit-cuisine').value.trim();
     const location = restaurantDetailsPanelInner.querySelector('#restaurant-edit-location').value.trim();
     const stars = restaurantDetailsPanelInner.querySelector('#restaurant-edit-stars').value;
+    const rawVisits = Number(restaurantDetailsPanelInner.querySelector('#restaurant-edit-visits').value);
+    const manualVisitCount = (!isNaN(rawVisits) && rawVisits >= 1) ? Math.floor(rawVisits) : 1;
     const website = restaurantDetailsPanelInner.querySelector('#restaurant-edit-website').value.trim();
     const price = restaurantDetailsPanelInner.querySelector('#restaurant-edit-price').value.trim();
 
@@ -12309,7 +12601,7 @@
       // Appended to the end — unranked/untiered by default, same as any
       // fresh entry with no established score yet.
       restaurantRows.push({
-        name, cuisine, location, stars, website, price,
+        name, cuisine, location, stars, manualVisitCount, website, price,
         notes: '', bestFlavor: '', flavorVariety: '', total: '', year: '', bests: '',
         photos: [], courses: []
       });
@@ -12326,6 +12618,7 @@
         rest.cuisine = cuisine;
         rest.location = location;
         rest.stars = stars;
+        rest.manualVisitCount = manualVisitCount;
         rest.website = website;
         rest.price = price;
       });
@@ -12418,7 +12711,31 @@
     );
   }
 
+  // 3-column, view-only: just a thumbnail per dish, tap to open the same
+  // shared gallery the full view uses. No text, no scores, no drink
+  // pairings, no "+ Add Course", no "More Photos" section, no upload or
+  // drag-drop — this view has exactly one job. Forced on for guests, who
+  // have no other option here.
+  function renderRestaurantCoursesThumbnailGridHtml(visit){
+    const courses = visit.courses || [];
+    if (!courses.length) return '<p class="restaurant-course-empty">No courses added yet.</p>';
+    const tilesHtml = courses.map((course, i) => {
+      const photos = ensureCoursePhotosArray(course);
+      const firstPhoto = photos[0];
+      return (
+        '<div class="restaurant-course-thumb-tile"' + (firstPhoto ? ' data-course-photo-index="' + i + '" title="View in the gallery"' : '') + '>' +
+          (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 350)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">📷</span>') +
+        '</div>'
+      );
+    }).join('');
+    return '<div class="restaurant-course-thumb-grid">' + tilesHtml + '</div>';
+  }
+
   function renderRestaurantCoursesContentHtml(visit){
+    if (guestViewEnabled || restaurantVisitThumbnailMode){
+      return renderRestaurantCoursesThumbnailGridHtml(visit);
+    }
+
     const courses = visit.courses || [];
     const listHtml = courses.length
       ? courses.map((course, i) => {
@@ -12474,6 +12791,7 @@
   // "total" string from the original spreadsheet import, which a brand new
   // restaurant wouldn't have anyway. Hidden entirely until both are set.
   function renderRestaurantScoresRowHtml(r){
+    if (guestViewEnabled) return '';
     return (
       '<div class="restaurant-scores-row">' +
         '<div class="restaurant-score-block">' +
@@ -12534,6 +12852,7 @@
     const isNew = !!newRestaurantDraft;
     const r = isNew ? newRestaurantDraft : restaurantRows[openRestaurantIndex];
     const starsVal = isNew ? (r.stars === '' ? 0 : r.stars) : restaurantStarsCount(r);
+    const visitCountVal = isNew ? 1 : restaurantManualVisitCount(r);
 
     restaurantDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
@@ -12552,6 +12871,9 @@
           '<select class="restaurant-edit-input" id="restaurant-edit-stars">' +
             [0, 1, 2, 3].map(n => '<option value="' + n + '"' + (String(starsVal) === String(n) ? ' selected' : '') + '>' + n + (n === 0 ? ' (none)' : '') + '</option>').join('') +
           '</select>' +
+          '<label class="restaurant-edit-label">Visits</label>' +
+          '<input type="number" class="restaurant-edit-input" id="restaurant-edit-visits" min="1" step="1" value="' + escapeAttr(visitCountVal) + '">' +
+          '<p style="font-size:12px; color:var(--chalk-dim); line-height:1.5; margin:-4px 0 0;">Sets the ×N badge next to the name — separate from the actual Visits logged below. If more Visits get logged than this number, the badge shows that higher count instead.</p>' +
           '<label class="restaurant-edit-label">Website</label>' +
           '<input type="text" class="restaurant-edit-input" id="restaurant-edit-website" placeholder="restaurant-website.com" value="' + escapeAttr(r.website || '') + '">' +
           '<label class="restaurant-edit-label">Price</label>' +
@@ -12665,6 +12987,12 @@
     return (
       '<div class="restaurant-visit-meta-row">' +
         '<span class="restaurant-visit-date-display">' + escapeHtml(formatVisitDate(visit.date)) + '</span>' +
+        (guestViewEnabled ? '' :
+          '<div class="view-toggle restaurant-visit-view-toggle">' +
+            '<button class="view-toggle-btn' + (restaurantVisitThumbnailMode ? '' : ' active') + '" id="restaurant-visit-view-full-btn" type="button">Full</button>' +
+            '<button class="view-toggle-btn' + (restaurantVisitThumbnailMode ? ' active' : '') + '" id="restaurant-visit-view-thumb-btn" type="button">Thumbnails</button>' +
+          '</div>'
+        ) +
         '<button class="btn-ghost" id="restaurant-visit-edit-btn" type="button">Edit</button>' +
       '</div>' +
       (visit.notes ? '<p class="restaurant-visit-notes-display">' + escapeHtml(visit.notes) + '</p>' : '')
@@ -12682,7 +13010,7 @@
     const rank = openRestaurantIndex + 1;
     const starsCount = restaurantStarsCount(r);
     const starsHtml = starsCount > 0 ? ' <span class="restaurant-stars">' + '⭐'.repeat(starsCount) + '</span>' : '';
-    const { visits: visitCount } = parseRestaurantNotes(r.notes);
+    const visitCount = restaurantVisitsCount(r);
     const visitsHtml = visitCount >= 2
       ? ' <span class="restaurant-visits" title="Visited ' + visitCount + ' times">×' + visitCount + '</span>'
       : '';
@@ -12741,21 +13069,25 @@
       });
     }
 
-    // Best Flavor / Flavor Variety wiring
-    updateRestaurantScoreTotalDisplay();
+    // Best Flavor / Flavor Variety wiring — the whole row (and these
+    // elements) don't exist in the DOM at all for guests, per
+    // renderRestaurantScoresRowHtml above.
     const bestFlavorSelect = restaurantDetailsPanelInner.querySelector('#restaurant-best-flavor-select');
     const flavorVarietySelect = restaurantDetailsPanelInner.querySelector('#restaurant-flavor-variety-select');
-    restaurantDetailsPanelInner.querySelector('#restaurant-tie-move-btn').addEventListener('click', moveRestaurantToTiePosition);
-    bestFlavorSelect.addEventListener('change', () => {
-      bestFlavorSelect.classList.toggle('has-score', !!bestFlavorSelect.value);
-      saveOpenRestaurantQuietly(rest => { rest.bestFlavor = bestFlavorSelect.value; });
+    if (bestFlavorSelect && flavorVarietySelect){
       updateRestaurantScoreTotalDisplay();
-    });
-    flavorVarietySelect.addEventListener('change', () => {
-      flavorVarietySelect.classList.toggle('has-score', !!flavorVarietySelect.value);
-      saveOpenRestaurantQuietly(rest => { rest.flavorVariety = flavorVarietySelect.value; });
-      updateRestaurantScoreTotalDisplay();
-    });
+      restaurantDetailsPanelInner.querySelector('#restaurant-tie-move-btn').addEventListener('click', moveRestaurantToTiePosition);
+      bestFlavorSelect.addEventListener('change', () => {
+        bestFlavorSelect.classList.toggle('has-score', !!bestFlavorSelect.value);
+        saveOpenRestaurantQuietly(rest => { rest.bestFlavor = bestFlavorSelect.value; });
+        updateRestaurantScoreTotalDisplay();
+      });
+      flavorVarietySelect.addEventListener('change', () => {
+        flavorVarietySelect.classList.toggle('has-score', !!flavorVarietySelect.value);
+        saveOpenRestaurantQuietly(rest => { rest.flavorVariety = flavorVarietySelect.value; });
+        updateRestaurantScoreTotalDisplay();
+      });
+    }
 
     // Visit tabs / dropdown / add wiring
     const visitAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-add-btn');
@@ -12787,6 +13119,33 @@
     }
 
     restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-btn').addEventListener('click', enterVisitEditMode);
+
+    const visitViewFullBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-view-full-btn');
+    const visitViewThumbBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-view-thumb-btn');
+    if (visitViewFullBtn && visitViewThumbBtn){
+      visitViewFullBtn.addEventListener('click', () => {
+        restaurantVisitThumbnailMode = false;
+        renderRestaurantDetailsContent();
+      });
+      visitViewThumbBtn.addEventListener('click', () => {
+        restaurantVisitThumbnailMode = true;
+        renderRestaurantDetailsContent();
+      });
+    }
+
+    // Thumbnail-only view: tap opens the same shared gallery the full view
+    // uses, positioned at that dish's photo — nothing else is interactive
+    // here (no upload, no drag-drop, no editing), matching the empty-tile
+    // case simply having no data-course-photo-index at all to hook into.
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-thumb-tile[data-course-photo-index]').forEach(el => {
+      const i = Number(el.dataset.coursePhotoIndex);
+      el.addEventListener('click', () => {
+        const photos = ensureCoursePhotosArray(activeVisit.courses[i]);
+        if (!photos.length) return;
+        const allPhotos = gatherAllRestaurantPhotos(r);
+        openPhotoLightbox(allPhotos, allPhotos.indexOf(photos[0]), { restaurantIndex: openRestaurantIndex });
+      });
+    });
 
     // Course photo drop zones — each tap-to-browse/drag-drop uploads (via
     // Cloudinary when configured, else base64) and appends to that course's
@@ -13025,7 +13384,34 @@
   restaurantNewBtn.addEventListener('click', openNewRestaurantForm);
 
   // ---------- FULL BACKUP (Settings) — bundles all nine domains together ----------
-  exportAllBtn.addEventListener('click', async () => {
+  // ---------- EXPORT REMINDER BANNER ----------
+  const LAST_MANUAL_EXPORT_KEY = 'last-manual-export-at';
+  const EXPORT_REMINDER_DAYS = 14;
+
+  async function recordManualExport(){
+    try{ await window.storage.set(LAST_MANUAL_EXPORT_KEY, new Date().toISOString(), false); }catch(e){ /* best effort */ }
+    document.body.classList.remove('export-reminder-active');
+  }
+
+  async function checkExportReminderBanner(){
+    let lastExportAt = null;
+    try{
+      const res = await window.storage.get(LAST_MANUAL_EXPORT_KEY, false);
+      if (res && res.value) lastExportAt = res.value;
+    }catch(e){ /* never exported yet */ }
+
+    // No record at all counts as overdue too — that's an even more
+    // pressing case than "it's just been a while", not an exemption from it.
+    const daysSince = lastExportAt ? (Date.now() - new Date(lastExportAt).getTime()) / 86400000 : Infinity;
+    document.body.classList.toggle('export-reminder-active', daysSince >= EXPORT_REMINDER_DAYS);
+  }
+
+  exportReminderLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    performFullExport();
+  });
+
+  async function performFullExport(){
     const artKeys = Array.from(new Set([...items, ...loadingDock]));
     const art = {};
     await Promise.all(artKeys.map(async (raw) => {
@@ -13053,8 +13439,11 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Full backup exported — albums, songs, restaurants, hikes, roads, photos, books, movies, and games');
-  });
+    showToast('Full backup exported — albums, songs, restaurants, hikes, parks, roads, photos, books, movies, games, and shows');
+    recordManualExport();
+  }
+
+  exportAllBtn.addEventListener('click', performFullExport);
 
   importAllBtn.addEventListener('click', () => importAllFile.click());
   importAllFile.addEventListener('change', (e) => {
@@ -13133,6 +13522,7 @@
   loadDishOrder();
   loadHikeProgress();
   loadParkProgress();
+  checkExportReminderBanner();
   loadHikeFullListText();
   loadRoadProgress();
   loadPhotoProgress();
