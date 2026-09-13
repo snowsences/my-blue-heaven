@@ -1036,6 +1036,7 @@
   .page-heading-row h1{ margin: 0 0 14px; }
   .restaurant-heading-actions{
     display: flex;
+    align-items: center;
     gap: 10px;
     flex-wrap: wrap;
   }
@@ -1579,6 +1580,18 @@
     border: 1px solid var(--panel-line);
   }
   .restaurant-gold-card.drag-over{ border-color: var(--amber); }
+  /* Zoom-on-hover, matching .grid-card's own effect (used by Albums/Dishes/
+     Books/Games) — scoped specifically to Restaurants and Movies, the two
+     places this was requested, rather than applied to every gold-card
+     grid (Hikes/Roads/Games also use this class but weren't asked for it). */
+  #restaurant-gold-grid .restaurant-gold-card .art-img,
+  #movie-gold-grid .restaurant-gold-card .art-img{
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #restaurant-gold-grid .restaurant-gold-card:hover .art-img,
+  #movie-gold-grid .restaurant-gold-card:hover .art-img{
+    transform: scale(1.05);
+  }
   .grid-card.drag-over{ outline: 2px solid var(--amber); outline-offset: -2px; }
   /* Books/Movies/Games use this alongside .restaurant-gold-grid/.restaurant-gold-card
      — same grid mechanics, but a standard poster/cover aspect ratio (taller
@@ -3443,6 +3456,7 @@
           <button class="group-sub-tab-btn active" id="art-subtab-books-btn" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
           <button class="group-sub-tab-btn" id="art-subtab-movies-btn" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
           <button class="group-sub-tab-btn" id="art-subtab-games-btn" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+          <button class="group-sub-tab-btn" id="art-subtab-shows-btn" type="button"><span class="group-sub-tab-icon">📺</span>Shows</button>
         </div>
         <div class="restaurant-heading-actions">
           <button class="btn-ghost" id="book-edit-toggle-btn" type="button">Edit</button>
@@ -3478,6 +3492,7 @@
           <button class="group-sub-tab-btn" id="art-subtab-books-btn-2" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
           <button class="group-sub-tab-btn active" id="art-subtab-movies-btn-2" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
           <button class="group-sub-tab-btn" id="art-subtab-games-btn-2" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+          <button class="group-sub-tab-btn" id="art-subtab-shows-btn-2" type="button"><span class="group-sub-tab-icon">📺</span>Shows</button>
         </div>
         <div class="restaurant-heading-actions">
           <button class="btn-ghost" id="movie-edit-toggle-btn" type="button">Edit</button>
@@ -3510,6 +3525,7 @@
           <button class="group-sub-tab-btn" id="art-subtab-books-btn-3" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
           <button class="group-sub-tab-btn" id="art-subtab-movies-btn-3" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
           <button class="group-sub-tab-btn active" id="art-subtab-games-btn-3" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+          <button class="group-sub-tab-btn" id="art-subtab-shows-btn-3" type="button"><span class="group-sub-tab-icon">📺</span>Shows</button>
         </div>
         <div class="restaurant-heading-actions">
           <button class="btn-ghost" id="game-edit-toggle-btn" type="button">Edit</button>
@@ -3535,6 +3551,42 @@
 
       <ol class="results-list grid-mode media-poster-grid" id="game-list"></ol>
       <p class="restaurant-course-empty" id="game-empty-message" style="display:none;">No games yet — add one to get started.</p>
+    </div>
+  </div>
+
+  <div id="page-shows" class="top-page">
+    <div class="page-content">
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="art-sub-tabs-shows">
+          <button class="group-sub-tab-btn" id="art-subtab-books-btn-4" type="button"><span class="group-sub-tab-icon">📖</span>Books</button>
+          <button class="group-sub-tab-btn" id="art-subtab-movies-btn-4" type="button"><span class="group-sub-tab-icon">🍿</span>Movies</button>
+          <button class="group-sub-tab-btn" id="art-subtab-games-btn-4" type="button"><span class="group-sub-tab-icon">🎮</span>Games</button>
+          <button class="group-sub-tab-btn active" id="art-subtab-shows-btn-4" type="button"><span class="group-sub-tab-icon">📺</span>Shows</button>
+        </div>
+        <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="show-edit-toggle-btn" type="button">Edit</button>
+          <div class="reorder-edit-controls" id="show-edit-controls" style="display:none;">
+            <button class="btn-primary" id="show-edit-save-btn" type="button">Save Changes</button>
+            <button class="btn-ghost" id="show-edit-cancel-btn" type="button">Cancel</button>
+            <button class="btn-ghost" id="show-edit-add-btn" type="button">+ Add Row</button>
+          </div>
+          <div class="view-toggle" id="show-view-toggle">
+            <button class="view-toggle-btn" id="show-view-list-btn" type="button">List</button>
+            <button class="view-toggle-btn active" id="show-view-grid-btn" type="button">Grid</button>
+          </div>
+          <button class="btn-primary" id="show-add-btn" type="button">+ Add Show</button>
+        </div>
+      </div>
+
+      <div class="filters-group">
+        <div class="filter-wrap">
+          <input type="text" class="filter-input" id="show-search-filter-input" placeholder="Search title..." autocomplete="off">
+          <button class="filter-clear" id="show-search-filter-clear" type="button" title="Clear search" style="display:none;">✕</button>
+        </div>
+      </div>
+
+      <ol class="results-list grid-mode media-poster-grid" id="show-list"></ol>
+      <p class="restaurant-course-empty" id="show-empty-message" style="display:none;">No shows yet — add one to get started.</p>
     </div>
   </div>
 
@@ -3903,6 +3955,7 @@
   const pageBooks = document.getElementById('page-books');
   const pageMovies = document.getElementById('page-movies');
   const pageGames = document.getElementById('page-games');
+  const pageShows = document.getElementById('page-shows');
 
   // ---------- TOP-LEVEL NAV: groups (Music/Food/Nature/Art/Settings), each
   // containing their own sub-tabs. See switchTopGroup/switchXSubPage further
@@ -3941,12 +3994,19 @@
   const artSubtabBooksBtn = document.getElementById('art-subtab-books-btn');
   const artSubtabBooksBtn2 = document.getElementById('art-subtab-books-btn-2');
   const artSubtabBooksBtn3 = document.getElementById('art-subtab-books-btn-3');
+  const artSubtabBooksBtn4 = document.getElementById('art-subtab-books-btn-4');
   const artSubtabMoviesBtn = document.getElementById('art-subtab-movies-btn');
   const artSubtabMoviesBtn2 = document.getElementById('art-subtab-movies-btn-2');
   const artSubtabMoviesBtn3 = document.getElementById('art-subtab-movies-btn-3');
+  const artSubtabMoviesBtn4 = document.getElementById('art-subtab-movies-btn-4');
   const artSubtabGamesBtn = document.getElementById('art-subtab-games-btn');
   const artSubtabGamesBtn2 = document.getElementById('art-subtab-games-btn-2');
   const artSubtabGamesBtn3 = document.getElementById('art-subtab-games-btn-3');
+  const artSubtabGamesBtn4 = document.getElementById('art-subtab-games-btn-4');
+  const artSubtabShowsBtn = document.getElementById('art-subtab-shows-btn');
+  const artSubtabShowsBtn2 = document.getElementById('art-subtab-shows-btn-2');
+  const artSubtabShowsBtn3 = document.getElementById('art-subtab-shows-btn-3');
+  const artSubtabShowsBtn4 = document.getElementById('art-subtab-shows-btn-4');
 
   const dishReorderBar = document.getElementById('dish-reorder-bar');
   const dishReorderToggleBtn = document.getElementById('dish-reorder-toggle-btn');
@@ -4344,6 +4404,7 @@
         bookRows: mediaState.book.rows, bookSavedAt: mediaState.book.lastSavedAt,
         movieRows: mediaState.movie.rows, movieSavedAt: mediaState.movie.lastSavedAt,
         gameRows: mediaState.game.rows, gameSavedAt: mediaState.game.lastSavedAt,
+        showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt,
         lastfmApiKey, lastfmUsername
       });
       console.log('Firestore payload size:', (payload.length / 1024 / 1024).toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
@@ -4468,8 +4529,9 @@
       book: { rows: 'bookRows', savedAt: 'bookSavedAt' },
       movie: { rows: 'movieRows', savedAt: 'movieSavedAt' },
       game: { rows: 'gameRows', savedAt: 'gameSavedAt' },
+      show: { rows: 'showRows', savedAt: 'showSavedAt' },
     };
-    for (const type of ['book', 'movie', 'game']){
+    for (const type of ['book', 'movie', 'game', 'show']){
       const fields = mediaFirestoreFields[type];
       const remoteRows = existing[fields.rows];
       if (Array.isArray(remoteRows) && remoteRows.length >= 1){
@@ -4505,7 +4567,8 @@
       || (Array.isArray(photoRows) && photoRows.length >= 1)
       || (Array.isArray(mediaState.book.rows) && mediaState.book.rows.length >= 1)
       || (Array.isArray(mediaState.movie.rows) && mediaState.movie.rows.length >= 1)
-      || (Array.isArray(mediaState.game.rows) && mediaState.game.rows.length >= 1);
+      || (Array.isArray(mediaState.game.rows) && mediaState.game.rows.length >= 1)
+      || (Array.isArray(mediaState.show.rows) && mediaState.show.rows.length >= 1);
     if (hasCurrentData) writeFirestoreData();
   }
 
@@ -4659,7 +4722,7 @@
       photoLastSavedAt = localPhotoParsed.savedAt || null;
     }
 
-    for (const type of ['book', 'movie', 'game']){
+    for (const type of ['book', 'movie', 'game', 'show']){
       const config = MEDIA_CONFIGS[type];
       let localMediaParsed = null;
       try{
@@ -4672,7 +4735,7 @@
       }
     }
 
-    resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, roads, photos, books, movies, games) has finished loading — safe for Firebase sync to compare/write now
+    resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, roads, photos, books, movies, games, shows) has finished loading — safe for Firebase sync to compare/write now
   }
 
   // ---------- PARSE INPUT ----------
@@ -6608,7 +6671,7 @@
     const pages = {
       albums: pageAlbums, songs: pageSongs, restaurants: pageRestaurants, dishes: pageDishes,
       hikes: pageHikes, roads: pageRoads, photos: pagePhotos,
-      books: pageBooks, movies: pageMovies, games: pageGames,
+      books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
       settings: pageSettings
     };
     Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
@@ -6654,6 +6717,9 @@
     }
     if (page === 'games'){
       renderMediaPage('game');
+    }
+    if (page === 'shows'){
+      renderMediaPage('show');
     }
   }
 
@@ -6710,9 +6776,10 @@
   }
   function switchArtSubPage(page){
     activeArtSubPage = page;
-    [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3].forEach(b => b.classList.toggle('active', page === 'books'));
-    [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3].forEach(b => b.classList.toggle('active', page === 'movies'));
-    [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3].forEach(b => b.classList.toggle('active', page === 'games'));
+    [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3, artSubtabBooksBtn4].forEach(b => b.classList.toggle('active', page === 'books'));
+    [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3, artSubtabMoviesBtn4].forEach(b => b.classList.toggle('active', page === 'movies'));
+    [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3, artSubtabGamesBtn4].forEach(b => b.classList.toggle('active', page === 'games'));
+    [artSubtabShowsBtn, artSubtabShowsBtn2, artSubtabShowsBtn3, artSubtabShowsBtn4].forEach(b => b.classList.toggle('active', page === 'shows'));
     switchTopPage(page);
   }
 
@@ -6729,9 +6796,10 @@
   [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
   [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('roads')));
   [natureSubtabPhotosBtn, natureSubtabPhotosBtn2, natureSubtabPhotosBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('photos')));
-  [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('books')));
-  [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('movies')));
-  [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3].forEach(b => b.addEventListener('click', () => switchArtSubPage('games')));
+  [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3, artSubtabBooksBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('books')));
+  [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3, artSubtabMoviesBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('movies')));
+  [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3, artSubtabGamesBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('games')));
+  [artSubtabShowsBtn, artSubtabShowsBtn2, artSubtabShowsBtn3, artSubtabShowsBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('shows')));
 
   // Click anywhere outside the panel closes it — except on a grid card or
   // list row, which have their own click-to-open handling that should just
@@ -10577,11 +10645,17 @@
       metaFn: (item) => item.year || '',
       matchFn: (item, q) => (item.title || '').toLowerCase().includes(q),
     },
+    show: {
+      storageKey: 'show-list', storageField: 'showRows', emptyIcon: '📺', hasScoring: false, hasGridListToggle: true,
+      metaFn: (item) => item.year || '',
+      matchFn: (item, q) => (item.title || '').toLowerCase().includes(q),
+    },
   };
   const mediaState = {
     book: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid', lastSavedAt: null },
     movie: { rows: [], editMode: false, searchFilter: '', lastSavedAt: null },
     game: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid', lastSavedAt: null },
+    show: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid', lastSavedAt: null },
   };
 
   function genMediaId(salt){
@@ -10610,6 +10684,7 @@
   mediaState.book.dom = getMediaDom('book');
   mediaState.movie.dom = getMediaDom('movie');
   mediaState.game.dom = getMediaDom('game');
+  mediaState.show.dom = getMediaDom('show');
 
   function mediaTotal(item, config){
     if (!config.hasScoring) return null;
@@ -10722,6 +10797,8 @@
       fieldsHtml += '<input type="text" data-field="year" placeholder="Year" value="' + escapeAttr(item.year || '') + '">';
     } else if (type === 'game'){
       fieldsHtml += '<input type="text" data-field="year" placeholder="Year" value="' + escapeAttr(item.year || '') + '">';
+    } else if (type === 'show'){
+      fieldsHtml += '<input type="text" data-field="year" placeholder="Year" value="' + escapeAttr(item.year || '') + '">';
     }
     fieldsHtml += '</div>';
     if (config.hasScoring){
@@ -10776,13 +10853,9 @@
       return;
     }
 
-    // ---- Movies/Games: split view — gold-grid photo cards for the top 20,
-    // plain rows for the rest. Drag now works in both sections (grid cards
-    // drag as a whole; list rows drag via a handle, same split Albums uses
-    // between its own grid and list views) — each section only reorders
-    // within itself, never moves an item between sections.
+    // ---- Movies: every item shows as a gold-grid photo card, no plain
+    // list at all (unlike Restaurants/Hikes, which still split at 20).
     const goldCards = [];
-    const listRows = [];
     const noDragActive = !state.searchFilter; // reorder needs the full, unfiltered list present — same reasoning as Albums
 
     ordered.forEach((item, i) => {
@@ -10792,54 +10865,29 @@
       const cover = item.coverPhoto || '';
       const meta = config.metaFn(item);
 
-      if (rank <= 20){
-        goldCards.push(
-          '<div class="restaurant-gold-card" data-media-id="' + item.id + '" data-media-index="' + realIndex + '">' +
-            '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
-            (cover
-              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 350)) + '" alt="" loading="lazy">'
-              : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
-            '<div class="restaurant-gold-card-overlay">' +
-              '<div class="restaurant-gold-card-name">' + escapeHtml(item.title || '') + '</div>' +
-              (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
-            '</div>' +
-          '</div>'
-        );
-        return;
-      }
-
-      const total = mediaTotal(item, config);
-      const dragHandleHtml = noDragActive ? mediaDragHandleHtml() : '';
-      listRows.push(
-        '<li data-media-id="' + item.id + '" data-media-index="' + realIndex + '">' +
-          '<span class="rank-num">' + rank + '</span>' +
-          '<span class="rank-item">' +
-            '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(item.title || '') + '</span></span>' +
-            (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
-          '</span>' +
-          (total !== null ? '<span class="restaurant-total">' + total + '</span>' : '') +
-          dragHandleHtml +
-        '</li>'
+      goldCards.push(
+        '<div class="restaurant-gold-card" data-media-id="' + item.id + '" data-media-index="' + realIndex + '">' +
+          '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+          (cover
+            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 350)) + '" alt="" loading="lazy">'
+            : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
+          '<div class="restaurant-gold-card-overlay">' +
+            '<div class="restaurant-gold-card-name">' + escapeHtml(item.title || '') + '</div>' +
+            (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
+          '</div>' +
+        '</div>'
       );
     });
 
     dom.grid.innerHTML = goldCards.join('');
     dom.grid.style.display = goldCards.length ? 'grid' : 'none';
-    dom.list.innerHTML = listRows.join('');
+    dom.list.innerHTML = '';
 
-    const openCoverIfAny = (realIndex) => {
-      const cover = rows[realIndex] && rows[realIndex].coverPhoto;
-      if (cover) openArtLightbox(cover);
-    };
     Array.from(dom.grid.children).forEach(card => {
       const item = rows[Number(card.dataset.mediaIndex)];
       wireImmediateClick(card, mediaCardClickHandler(type, item));
       wireMediaCoverDropZone(card, type, item);
       if (noDragActive) makeMediaCardDraggable(card, type, false);
-    });
-    Array.from(dom.list.children).forEach(li => {
-      wireImmediateClick(li, () => openCoverIfAny(Number(li.dataset.mediaIndex)));
-      if (noDragActive) makeMediaCardDraggable(li, type, true);
     });
   }
 
@@ -11084,7 +11132,7 @@
     renderMediaPage(type);
   }
 
-  ['book', 'movie', 'game'].forEach(type => {
+  ['book', 'movie', 'game', 'show'].forEach(type => {
     const dom = mediaState[type].dom;
     dom.editToggleBtn.addEventListener('click', () => toggleMediaEditMode(type));
     dom.saveBtn.addEventListener('click', () => saveMediaEdits(type));
@@ -12389,6 +12437,7 @@
       restaurantRows,
       hikeRows, roadRows, photoRows,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
+      showRows: mediaState.show.rows,
       savedAt: new Date().toISOString()
     }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
@@ -12446,8 +12495,8 @@
         renderPhotosPage();
         restoredParts.push(parsed.photoRows.length + ' photo' + (parsed.photoRows.length === 1 ? '' : 's'));
       }
-      const mediaImportFields = { book: 'bookRows', movie: 'movieRows', game: 'gameRows' };
-      for (const type of ['book', 'movie', 'game']){
+      const mediaImportFields = { book: 'bookRows', movie: 'movieRows', game: 'gameRows', show: 'showRows' };
+      for (const type of ['book', 'movie', 'game', 'show']){
         const field = mediaImportFields[type];
         if (Array.isArray(parsed[field]) && parsed[field].length){
           mediaState[type].rows = parsed[field];
@@ -12479,6 +12528,7 @@
   loadMediaProgress('book');
   loadMediaProgress('movie');
   loadMediaProgress('game');
+  loadMediaProgress('show');
   loadPointsAlgorithm().then(checkSavedProgress);
 })();
 </script>
