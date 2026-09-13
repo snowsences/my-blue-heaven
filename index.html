@@ -247,6 +247,35 @@
   #road-details-panel.open{
     width: 600px;
   }
+  #park-details-panel{
+    width: 0;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: var(--desktop-nav-height);
+    min-height: calc(100vh - var(--desktop-nav-height));
+    max-height: calc(100vh - var(--desktop-nav-height));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+  }
+  #park-details-panel.open{
+    width: 600px;
+  }
+  .park-linked-hikes-section{ margin-top: 24px; }
+  .park-linked-hike-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--panel-line);
+    cursor: pointer;
+  }
+  .park-linked-hike-row:last-child{ border-bottom: none; }
+  .park-linked-hike-name{ font-weight: 600; color: var(--chalk); }
+  .park-linked-hike-goto{ color: var(--chalk-dim); font-size: 13px; flex-shrink: 0; margin-left: 10px; }
   #hike-full-list-panel{
     width: 0;
     flex-shrink: 0;
@@ -1332,6 +1361,26 @@
   @keyframes cardIn{
     from{ opacity: 0; transform: translateY(6px) scale(0.985); }
     to{ opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Skeleton shimmer while a photo is loading — .img-loaded (added by the
+     single global listener below, since 'load' doesn't bubble and touching
+     every render function individually isn't necessary) stops the
+     animation and settles back to the plain background these classes
+     already had, so nothing keeps animating invisibly forever after the
+     image is actually in. */
+  @keyframes skeletonShimmer{
+    0%{ background-position: 200% 0; }
+    100%{ background-position: -200% 0; }
+  }
+  .art-img, .art-lightbox-img, .restaurant-photo-thumb img{
+    background-image: linear-gradient(100deg, var(--bg-2) 30%, var(--panel-line) 50%, var(--bg-2) 70%);
+    background-size: 250% 100%;
+    animation: skeletonShimmer 1.4s ease-in-out infinite;
+  }
+  .art-img.img-loaded, .art-lightbox-img.img-loaded, .restaurant-photo-thumb img.img-loaded{
+    animation: none;
+    background: var(--bg-2);
   }
 
   .vs-badge{
@@ -2699,6 +2748,22 @@
       transform: translateX(0);
       visibility: visible;
     }
+    #park-details-panel{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      min-height: 100vh;
+      max-height: 100vh;
+      z-index: 200;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      visibility: hidden;
+    }
+    #park-details-panel.open{
+      width: 100%;
+      transform: translateX(0);
+      visibility: visible;
+    }
     #hike-full-list-panel{
       position: fixed;
       inset: 0;
@@ -3384,6 +3449,7 @@
       <div class="page-heading-row">
         <div class="group-sub-tabs" id="nature-sub-tabs-hikes">
           <button class="group-sub-tab-btn active" id="nature-subtab-hikes-btn" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-parks-btn" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
           <button class="group-sub-tab-btn" id="nature-subtab-roads-btn" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
           <button class="group-sub-tab-btn" id="nature-subtab-photos-btn" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
@@ -3410,11 +3476,31 @@
     </div>
   </div>
 
+  <div id="page-parks" class="top-page">
+    <div class="page-content">
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="nature-sub-tabs-parks">
+          <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-4" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+          <button class="group-sub-tab-btn active" id="nature-subtab-parks-btn-2" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-roads-btn-4" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-photos-btn-4" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
+        </div>
+        <div class="restaurant-heading-actions">
+          <button class="btn-primary" id="park-new-btn" type="button">+ New Park</button>
+        </div>
+      </div>
+
+      <div class="restaurant-gold-grid" id="park-gold-grid"></div>
+      <p class="restaurant-course-empty" id="park-empty-message" style="display:none;">No parks yet — add one to get started.</p>
+    </div>
+  </div>
+
   <div id="page-roads" class="top-page">
     <div class="page-content">
       <div class="page-heading-row">
         <div class="group-sub-tabs" id="nature-sub-tabs-roads">
           <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-2" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-parks-btn-3" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
           <button class="group-sub-tab-btn active" id="nature-subtab-roads-btn-2" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
           <button class="group-sub-tab-btn" id="nature-subtab-photos-btn-2" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
@@ -3436,6 +3522,7 @@
       <div class="page-heading-row">
         <div class="group-sub-tabs" id="nature-sub-tabs-photos">
           <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-3" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
+          <button class="group-sub-tab-btn" id="nature-subtab-parks-btn-4" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
           <button class="group-sub-tab-btn" id="nature-subtab-roads-btn-3" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
           <button class="group-sub-tab-btn active" id="nature-subtab-photos-btn-3" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
@@ -3681,6 +3768,10 @@
 
 <aside id="hike-details-panel">
   <div class="restaurant-details-panel-inner" id="hike-details-panel-inner"></div>
+</aside>
+
+<aside id="park-details-panel">
+  <div class="restaurant-details-panel-inner" id="park-details-panel-inner"></div>
 </aside>
 
 <aside id="road-details-panel">
@@ -3950,6 +4041,7 @@
   const pageRestaurants = document.getElementById('page-restaurants');
   const pageDishes = document.getElementById('page-dishes');
   const pageHikes = document.getElementById('page-hikes');
+  const pageParks = document.getElementById('page-parks');
   const pageRoads = document.getElementById('page-roads');
   const pagePhotos = document.getElementById('page-photos');
   const pageBooks = document.getElementById('page-books');
@@ -3985,12 +4077,19 @@
   const natureSubtabHikesBtn = document.getElementById('nature-subtab-hikes-btn');
   const natureSubtabHikesBtn2 = document.getElementById('nature-subtab-hikes-btn-2');
   const natureSubtabHikesBtn3 = document.getElementById('nature-subtab-hikes-btn-3');
+  const natureSubtabHikesBtn4 = document.getElementById('nature-subtab-hikes-btn-4');
+  const natureSubtabParksBtn = document.getElementById('nature-subtab-parks-btn');
+  const natureSubtabParksBtn2 = document.getElementById('nature-subtab-parks-btn-2');
+  const natureSubtabParksBtn3 = document.getElementById('nature-subtab-parks-btn-3');
+  const natureSubtabParksBtn4 = document.getElementById('nature-subtab-parks-btn-4');
   const natureSubtabRoadsBtn = document.getElementById('nature-subtab-roads-btn');
   const natureSubtabRoadsBtn2 = document.getElementById('nature-subtab-roads-btn-2');
   const natureSubtabRoadsBtn3 = document.getElementById('nature-subtab-roads-btn-3');
+  const natureSubtabRoadsBtn4 = document.getElementById('nature-subtab-roads-btn-4');
   const natureSubtabPhotosBtn = document.getElementById('nature-subtab-photos-btn');
   const natureSubtabPhotosBtn2 = document.getElementById('nature-subtab-photos-btn-2');
   const natureSubtabPhotosBtn3 = document.getElementById('nature-subtab-photos-btn-3');
+  const natureSubtabPhotosBtn4 = document.getElementById('nature-subtab-photos-btn-4');
   const artSubtabBooksBtn = document.getElementById('art-subtab-books-btn');
   const artSubtabBooksBtn2 = document.getElementById('art-subtab-books-btn-2');
   const artSubtabBooksBtn3 = document.getElementById('art-subtab-books-btn-3');
@@ -4058,6 +4157,11 @@
   const hikeFullListCloseBtn = document.getElementById('hike-full-list-close-btn');
   const hikeFullListTextarea = document.getElementById('hike-full-list-textarea');
   const hikeFullListSaveBtn = document.getElementById('hike-full-list-save-btn');
+  const parkDetailsPanel = document.getElementById('park-details-panel');
+  const parkDetailsPanelInner = document.getElementById('park-details-panel-inner');
+  const parkGoldGridEl = document.getElementById('park-gold-grid');
+  const parkEmptyMessage = document.getElementById('park-empty-message');
+  const parkNewBtn = document.getElementById('park-new-btn');
   const roadDetailsPanel = document.getElementById('road-details-panel');
   const roadDetailsPanelInner = document.getElementById('road-details-panel-inner');
   const roadGoldGridEl = document.getElementById('road-gold-grid');
@@ -4400,6 +4504,7 @@
         restaurantRows, restaurantSavedAt: restaurantLastSavedAt,
         hikeRows, hikeSavedAt: hikeLastSavedAt,
         roadRows, roadSavedAt: roadLastSavedAt,
+        parkRows, parkSavedAt: parkLastSavedAt,
         photoRows, photoSavedAt: photoLastSavedAt,
         bookRows: mediaState.book.rows, bookSavedAt: mediaState.book.lastSavedAt,
         movieRows: mediaState.movie.rows, movieSavedAt: mediaState.movie.lastSavedAt,
@@ -4515,6 +4620,16 @@
         renderRoadsPage();
       }
     }
+    if (Array.isArray(existing.parkRows) && existing.parkRows.length >= 1){
+      const remoteTime = new Date(existing.parkSavedAt || 0).getTime();
+      const localTime = new Date(parkLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        parkRows = existing.parkRows;
+        parkLastSavedAt = existing.parkSavedAt || null;
+        try{ await window.storage.set(PARK_STORAGE_KEY, JSON.stringify({ parkRows, savedAt: parkLastSavedAt }), false); }catch(e){ /* best effort */ }
+        renderParksPage();
+      }
+    }
     if (Array.isArray(existing.photoRows) && existing.photoRows.length >= 1){
       const remoteTime = new Date(existing.photoSavedAt || 0).getTime();
       const localTime = new Date(photoLastSavedAt || 0).getTime();
@@ -4564,6 +4679,7 @@
       || (Array.isArray(restaurantRows) && restaurantRows.length >= 1)
       || (Array.isArray(hikeRows) && hikeRows.length >= 1)
       || (Array.isArray(roadRows) && roadRows.length >= 1)
+      || (Array.isArray(parkRows) && parkRows.length >= 1)
       || (Array.isArray(photoRows) && photoRows.length >= 1)
       || (Array.isArray(mediaState.book.rows) && mediaState.book.rows.length >= 1)
       || (Array.isArray(mediaState.movie.rows) && mediaState.movie.rows.length >= 1)
@@ -4712,6 +4828,16 @@
       roadLastSavedAt = localRoadParsed.savedAt || null;
     }
 
+    let localParkParsed = null;
+    try{
+      const res = await window.storage.get(PARK_STORAGE_KEY, false);
+      if (res && res.value) localParkParsed = JSON.parse(res.value);
+    }catch(e){ /* no local park save */ }
+    if (localParkParsed && Array.isArray(localParkParsed.parkRows) && localParkParsed.parkRows.length){
+      parkRows = localParkParsed.parkRows;
+      parkLastSavedAt = localParkParsed.savedAt || null;
+    }
+
     let localPhotoParsed = null;
     try{
       const res = await window.storage.get(PHOTOS_STORAGE_KEY, false);
@@ -4735,7 +4861,7 @@
       }
     }
 
-    resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, roads, photos, books, movies, games, shows) has finished loading — safe for Firebase sync to compare/write now
+    resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, parks, roads, photos, books, movies, games, shows) has finished loading — safe for Firebase sync to compare/write now
   }
 
   // ---------- PARSE INPUT ----------
@@ -4825,6 +4951,26 @@
       default: return n + 'th';
     }
   }
+
+  // Skeleton shimmer for every photo in the app (grid/gold-card thumbnails,
+  // the lightbox, restaurant "other photos") — one delegated listener
+  // rather than touching each render function individually. 'load' and
+  // 'error' don't bubble, so this only works in the capture phase; that's
+  // also why it's registered once here instead of per-image, since a
+  // capture-phase listener on document sees every matching image
+  // regardless of which function created it or when.
+  document.addEventListener('load', (e) => {
+    const img = e.target;
+    if (img && img.tagName === 'IMG' && (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb'))){
+      img.classList.add('img-loaded');
+    }
+  }, true);
+  document.addEventListener('error', (e) => {
+    const img = e.target;
+    if (img && img.tagName === 'IMG' && (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb'))){
+      img.classList.add('img-loaded'); // stops the shimmer even on failure, rather than animating forever on a broken image
+    }
+  }, true);
 
   // Native <datalist> shows every option immediately on focus, before any
   // typing — for a filter with dozens of values that's a wall of
@@ -6670,7 +6816,7 @@
     if (isLockedGuestAccount && page === 'settings') page = 'restaurants';
     const pages = {
       albums: pageAlbums, songs: pageSongs, restaurants: pageRestaurants, dishes: pageDishes,
-      hikes: pageHikes, roads: pageRoads, photos: pagePhotos,
+      hikes: pageHikes, parks: pageParks, roads: pageRoads, photos: pagePhotos,
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
       settings: pageSettings
     };
@@ -6691,6 +6837,9 @@
     if (page !== 'roads' && openRoadIndex !== null){
       closeRoadDetailsPanel();
     }
+    if (page !== 'parks' && openParkIndex !== null){
+      closeParkDetailsPanel();
+    }
     if (page === 'songs'){
       renderSongsPage();
     }
@@ -6702,6 +6851,9 @@
     }
     if (page === 'hikes'){
       renderHikesPage();
+    }
+    if (page === 'parks'){
+      renderParksPage();
     }
     if (page === 'roads'){
       renderRoadsPage();
@@ -6769,9 +6921,10 @@
   }
   function switchNatureSubPage(page){
     activeNatureSubPage = page;
-    [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3].forEach(b => b.classList.toggle('active', page === 'hikes'));
-    [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3].forEach(b => b.classList.toggle('active', page === 'roads'));
-    [natureSubtabPhotosBtn, natureSubtabPhotosBtn2, natureSubtabPhotosBtn3].forEach(b => b.classList.toggle('active', page === 'photos'));
+    [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3, natureSubtabHikesBtn4].forEach(b => b.classList.toggle('active', page === 'hikes'));
+    [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3, natureSubtabParksBtn4].forEach(b => b.classList.toggle('active', page === 'parks'));
+    [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3, natureSubtabRoadsBtn4].forEach(b => b.classList.toggle('active', page === 'roads'));
+    [natureSubtabPhotosBtn, natureSubtabPhotosBtn2, natureSubtabPhotosBtn3, natureSubtabPhotosBtn4].forEach(b => b.classList.toggle('active', page === 'photos'));
     switchTopPage(page);
   }
   function switchArtSubPage(page){
@@ -6793,13 +6946,81 @@
   [musicSubtabSongsBtn, musicSubtabSongsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('songs')));
   [foodSubtabRestaurantsBtn, foodSubtabRestaurantsBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('restaurants')));
   [foodSubtabDishesBtn, foodSubtabDishesBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('dishes')));
-  [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
-  [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('roads')));
-  [natureSubtabPhotosBtn, natureSubtabPhotosBtn2, natureSubtabPhotosBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('photos')));
+  [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3, natureSubtabHikesBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
+  [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3, natureSubtabParksBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('parks')));
+  [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3, natureSubtabRoadsBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('roads')));
+  [natureSubtabPhotosBtn, natureSubtabPhotosBtn2, natureSubtabPhotosBtn3, natureSubtabPhotosBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('photos')));
   [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3, artSubtabBooksBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('books')));
   [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3, artSubtabMoviesBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('movies')));
   [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3, artSubtabGamesBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('games')));
   [artSubtabShowsBtn, artSubtabShowsBtn2, artSubtabShowsBtn3, artSubtabShowsBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('shows')));
+
+  // ---------- MOBILE SWIPE BETWEEN SUB-TABS ----------
+  // Left/right swipe pages between a group's own sub-tabs (Restaurants <->
+  // Dishes, or across all 4 of Nature/Art) — mobile only, since desktop
+  // already has each sub-tab directly clickable and a swipe gesture there
+  // would just be an unexpected, unsupported thing to try.
+  const GROUP_SUBPAGES = {
+    music: ['albums', 'songs'],
+    food: ['restaurants', 'dishes'],
+    nature: ['hikes', 'parks', 'roads', 'photos'],
+    art: ['books', 'movies', 'games', 'shows'],
+  };
+  const GROUP_SWITCHERS = {
+    music: switchMusicSubPage,
+    food: switchFoodSubPage,
+    nature: switchNatureSubPage,
+    art: switchArtSubPage,
+  };
+  function getActiveSubPageForGroup(group){
+    if (group === 'music') return activeMusicSubPage;
+    if (group === 'food') return activeFoodSubPage;
+    if (group === 'nature') return activeNatureSubPage;
+    if (group === 'art') return activeArtSubPage;
+    return null;
+  }
+
+  let swipeStartX = null;
+  let swipeStartY = null;
+
+  document.addEventListener('touchstart', (e) => {
+    if (window.innerWidth > 768) return;
+    if (e.touches.length !== 1) return;
+    // A details panel (or similar full-screen overlay) sitting on top
+    // shouldn't let a swipe change the page underneath it.
+    if (document.body.classList.contains('details-open-lock')) return;
+    // Text fields have their own native touch behavior (cursor placement,
+    // text selection, opening a picker) that a global swipe shouldn't step on.
+    if (e.target.closest('input, textarea, select')) return;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (swipeStartX === null) return;
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - swipeStartX;
+    const deltaY = touch.clientY - swipeStartY;
+    swipeStartX = null;
+    swipeStartY = null;
+
+    const SWIPE_THRESHOLD = 60;
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+    if (Math.abs(deltaY) > Math.abs(deltaX) * 0.6) return; // mostly vertical — this is a scroll, not a page-swipe
+
+    const subpages = GROUP_SUBPAGES[activeTopGroup];
+    if (!subpages || subpages.length < 2) return;
+    const currentPage = getActiveSubPageForGroup(activeTopGroup);
+    const currentIndex = subpages.indexOf(currentPage);
+    if (currentIndex === -1) return;
+
+    const switcher = GROUP_SWITCHERS[activeTopGroup];
+    if (deltaX < 0 && currentIndex < subpages.length - 1){
+      switcher(subpages[currentIndex + 1]); // swiped left — next tab
+    } else if (deltaX > 0 && currentIndex > 0){
+      switcher(subpages[currentIndex - 1]); // swiped right — previous tab
+    }
+  }, { passive: true });
 
   // Click anywhere outside the panel closes it — except on a grid card or
   // list row, which have their own click-to-open handling that should just
@@ -9994,6 +10215,389 @@
     showToast('Saved');
   });
 
+  // ---------- PARKS ----------
+  // Grid-only (no list view, no split at 20 — every park is a large card,
+  // same reasoning as Roads), but ordered purely manually via direct
+  // drag-and-drop on the cards themselves (Albums' own mechanism), not
+  // auto-sorted by score like Hikes/Roads/Games. Scenery/Variety are shown
+  // as an informational Total, the same role Restaurants' own Total plays
+  // despite Restaurants also being purely manually ordered.
+  //
+  // Linking to Hikes: deliberately NOT a hard reference. A Park just stores
+  // a plain string (linkedHikeCity) matching one of the distinct values
+  // already used in Hikes' own City/Park field — chosen from a dropdown of
+  // whatever those values currently are, in the Park edit form. Hikes
+  // itself never stores or knows about a Park's id — this keeps Hikes
+  // fully independent, exactly as asked, while Parks can still look up
+  // "which hikes belong here" on demand by filtering hikeRows for a match.
+  const PARK_STORAGE_KEY = 'park-list';
+  const PARK_SCENERY_SCORES = [13, 12, 11, 10, 9, 8, 7];
+  const PARK_VARIETY_SCORES = [13, 12, 11, 10, 9, 8, 7, 6, 5];
+
+  let parkRows = [];
+  let parkLastSavedAt = null;
+  let openParkIndex = null;
+  let newParkDraft = null;
+  let parkEditMode = false;
+
+  async function loadParkProgress(){
+    try{
+      const res = await window.storage.get(PARK_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        parkRows = Array.isArray(parsed.parkRows) ? parsed.parkRows : [];
+        parkLastSavedAt = parsed.savedAt || null;
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+
+  function saveParkProgress(){
+    parkLastSavedAt = new Date().toISOString();
+    try{ window.storage.set(PARK_STORAGE_KEY, JSON.stringify({ parkRows, savedAt: parkLastSavedAt }), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  function parkTotal(p){
+    const a = p.scenery ? Number(p.scenery) : null;
+    const b = p.variety ? Number(p.variety) : null;
+    return (a !== null && b !== null && !isNaN(a) && !isNaN(b)) ? a + b : null;
+  }
+
+  function getHikeCityOptions(){
+    return Array.from(new Set(hikeRows.map(h => (h.city || '').trim()).filter(Boolean))).sort();
+  }
+
+  function getHikesForPark(p){
+    if (!p.linkedHikeCity) return [];
+    return hikeRows.filter(h => (h.city || '').trim() === p.linkedHikeCity);
+  }
+
+  function openParkDetailsPanel(index){
+    openParkIndex = index;
+    newParkDraft = null;
+    parkEditMode = false;
+    parkDetailsPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+    renderParkDetailsContent();
+  }
+
+  function openNewParkForm(){
+    openParkIndex = null;
+    newParkDraft = { name: '', location: '', linkedHikeCity: '' };
+    parkDetailsPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+    renderParkDetailsContent();
+  }
+
+  function closeParkDetailsPanel(){
+    openParkIndex = null;
+    newParkDraft = null;
+    parkEditMode = false;
+    parkDetailsPanel.classList.remove('open');
+    document.body.classList.remove('details-open-lock');
+  }
+
+  function enterParkEditMode(){
+    parkEditMode = true;
+    renderParkDetailsContent();
+  }
+  function cancelParkEdit(){
+    if (newParkDraft){
+      closeParkDetailsPanel();
+      return;
+    }
+    parkEditMode = false;
+    renderParkDetailsContent();
+  }
+
+  function saveParkEditForm(){
+    if (guestViewEnabled) return;
+    const name = parkDetailsPanelInner.querySelector('#park-edit-name').value.trim();
+    const location = parkDetailsPanelInner.querySelector('#park-edit-location').value.trim();
+    const linkedHikeCity = parkDetailsPanelInner.querySelector('#park-edit-linked-city').value;
+
+    if (!name){
+      showToast('Give it a name first');
+      return;
+    }
+
+    if (newParkDraft){
+      parkRows.push({ id: genMediaId('park'), name, location, linkedHikeCity, scenery: '', variety: '', coverPhoto: '' });
+      newParkDraft = null;
+      openParkIndex = parkRows.length - 1;
+      saveParkProgress();
+      renderParksPage();
+      renderParkDetailsContent();
+      showToast('Park added');
+    } else if (openParkIndex !== null){
+      parkEditMode = false;
+      updateOpenPark(park => {
+        park.name = name;
+        park.location = location;
+        park.linkedHikeCity = linkedHikeCity;
+      });
+      renderParksPage();
+    }
+  }
+
+  function updateOpenPark(mutatorFn){
+    if (guestViewEnabled) return;
+    if (openParkIndex === null) return;
+    const p = parkRows[openParkIndex];
+    mutatorFn(p);
+    saveParkProgress();
+    renderParkDetailsContent();
+    renderParksPage();
+  }
+
+  function saveOpenParkQuietly(mutatorFn){
+    if (guestViewEnabled) return;
+    if (openParkIndex === null) return;
+    const p = parkRows[openParkIndex];
+    mutatorFn(p);
+    saveParkProgress();
+  }
+
+  function renderParkScoresRowHtml(p){
+    return (
+      '<div class="restaurant-scores-row">' +
+        '<div class="restaurant-score-block">' +
+          '<span class="restaurant-score-label">Scenery</span>' +
+          buildScoreSelectHtml(PARK_SCENERY_SCORES, p.scenery, 'id="park-scenery-select"') +
+        '</div>' +
+        '<div class="restaurant-score-block">' +
+          '<span class="restaurant-score-label">Variety</span>' +
+          buildScoreSelectHtml(PARK_VARIETY_SCORES, p.variety, 'id="park-variety-select"') +
+        '</div>' +
+        '<div class="restaurant-score-block restaurant-score-total-block" id="park-score-total-block" style="display:none;">' +
+          '<span class="restaurant-score-label">Total</span>' +
+          '<span class="restaurant-score-total-value" id="park-score-total-value"></span>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function updateParkScoreTotalDisplay(){
+    const a = parkDetailsPanelInner.querySelector('#park-scenery-select');
+    const b = parkDetailsPanelInner.querySelector('#park-variety-select');
+    const totalBlock = parkDetailsPanelInner.querySelector('#park-score-total-block');
+    const totalValueEl = parkDetailsPanelInner.querySelector('#park-score-total-value');
+    if (!a || !b || !totalBlock) return;
+    const av = a.value ? Number(a.value) : null;
+    const bv = b.value ? Number(b.value) : null;
+    if (av !== null && bv !== null && !isNaN(av) && !isNaN(bv)){
+      totalValueEl.textContent = av + bv;
+      totalBlock.style.display = '';
+    } else {
+      totalBlock.style.display = 'none';
+    }
+  }
+
+  function renderParkEditForm(){
+    const isNew = !!newParkDraft;
+    const p = isNew ? newParkDraft : parkRows[openParkIndex];
+    const cityOptions = getHikeCityOptions();
+
+    parkDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">' + (isNew ? 'New Park' : 'Edit Park') + '</h2>' +
+        '<div class="restaurant-edit-form">' +
+          '<label class="restaurant-edit-label">Name</label>' +
+          '<input type="text" class="restaurant-edit-input" id="park-edit-name" value="' + escapeAttr(p.name || '') + '">' +
+          '<label class="restaurant-edit-label">Location</label>' +
+          '<input type="text" class="restaurant-edit-input" id="park-edit-location" value="' + escapeAttr(p.location || '') + '">' +
+          '<label class="restaurant-edit-label">Linked City/Park (for Hikes)</label>' +
+          '<select class="restaurant-edit-input" id="park-edit-linked-city">' +
+            '<option value="">— None —</option>' +
+            cityOptions.map(c => '<option value="' + escapeAttr(c) + '"' + (p.linkedHikeCity === c ? ' selected' : '') + '>' + escapeHtml(c) + '</option>').join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="restaurant-edit-actions">' +
+          '<button class="btn-primary" id="park-edit-save-btn" type="button">Save</button>' +
+          '<button class="btn-ghost" id="park-edit-cancel-btn" type="button">Cancel</button>' +
+        '</div>' +
+      '</div>';
+
+    parkDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeParkDetailsPanel);
+    parkDetailsPanelInner.querySelector('#park-edit-save-btn').addEventListener('click', saveParkEditForm);
+    parkDetailsPanelInner.querySelector('#park-edit-cancel-btn').addEventListener('click', cancelParkEdit);
+  }
+
+  function renderParkLinkedHikesSectionHtml(p){
+    if (!p.linkedHikeCity) return '';
+    const linkedHikes = getHikesForPark(p);
+    return (
+      '<div class="park-linked-hikes-section">' +
+        '<span class="restaurant-other-photos-label">Hikes in ' + escapeHtml(p.linkedHikeCity) + '</span>' +
+        (linkedHikes.length
+          ? linkedHikes.map(h => '<div class="park-linked-hike-row" data-hike-id="' + h.id + '"><span class="park-linked-hike-name">' + escapeHtml(h.name) + '</span><span class="park-linked-hike-goto">Go to Hike ↗</span></div>').join('')
+          : '<p class="details-future-note">No hikes linked to this city/park yet.</p>') +
+      '</div>'
+    );
+  }
+
+  function renderParkDetailsContent(){
+    if (newParkDraft || parkEditMode){
+      renderParkEditForm();
+      return;
+    }
+    if (openParkIndex === null) return;
+
+    const p = parkRows[openParkIndex];
+    const rank = openParkIndex + 1; // purely manual order — array position IS the rank
+    const effectiveCover = p.coverPhoto || '';
+
+    parkDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to view"' : ' title="Click or drag an image to add a cover"') + '>' +
+          (effectiveCover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="">' : '<span class="art-drop-hint">🏞️</span>') +
+        '</div>' +
+        '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(p.name) + '</h2>' +
+        (p.location ? '<p class="details-artist">' + escapeHtml(p.location) + '</p>' : '') +
+        renderParkScoresRowHtml(p) +
+        renderParkLinkedHikesSectionHtml(p) +
+      '</div>';
+
+    parkDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeParkDetailsPanel);
+    parkDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', enterParkEditMode);
+    wireParkCoverPhotoDropZone(parkDetailsPanelInner.querySelector('.restaurant-cover-drop'), p);
+
+    updateParkScoreTotalDisplay();
+    const scenerySelect = parkDetailsPanelInner.querySelector('#park-scenery-select');
+    const varietySelect = parkDetailsPanelInner.querySelector('#park-variety-select');
+    scenerySelect.addEventListener('change', () => {
+      scenerySelect.classList.toggle('has-score', !!scenerySelect.value);
+      saveOpenParkQuietly(park => { park.scenery = scenerySelect.value; });
+      updateParkScoreTotalDisplay();
+    });
+    varietySelect.addEventListener('change', () => {
+      varietySelect.classList.toggle('has-score', !!varietySelect.value);
+      saveOpenParkQuietly(park => { park.variety = varietySelect.value; });
+      updateParkScoreTotalDisplay();
+    });
+    scenerySelect.classList.toggle('has-score', !!scenerySelect.value);
+    varietySelect.classList.toggle('has-score', !!varietySelect.value);
+
+    parkDetailsPanelInner.querySelectorAll('.park-linked-hike-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const hikeIndex = hikeRows.findIndex(h => h.id === row.dataset.hikeId);
+        if (hikeIndex === -1) return;
+        closeParkDetailsPanel();
+        switchTopGroup('nature');
+        switchNatureSubPage('hikes');
+        openHikeDetailsPanel(hikeIndex);
+      });
+    });
+  }
+
+  function wireParkCoverPhotoDropZone(el, p){
+    const doUpload = async (file) => {
+      if (!file) return;
+      const url = await uploadRestaurantPhoto(file, 'RankHeaven/ParkCovers');
+      if (url) updateOpenPark(park => { park.coverPhoto = url; });
+    };
+    el.addEventListener('click', () => {
+      if (p.coverPhoto){
+        openArtLightbox(p.coverPhoto);
+      } else {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.addEventListener('change', () => doUpload(input.files && input.files[0]));
+        input.click();
+      }
+    });
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      doUpload(e.dataTransfer.files[0]);
+    });
+  }
+
+  // Direct drag-and-drop reorder on the cards themselves, like Albums — no
+  // separate rearrange mode. Order is purely manual (the drop position
+  // directly becomes the new absolute order), unlike Hikes/Roads/Games
+  // which auto-sort by score and only let a drag settle ties.
+  let parkDragSourceEl = null;
+  function makeParkCardDraggable(card){
+    card.setAttribute('draggable', 'true');
+    card.addEventListener('dragstart', () => {
+      parkDragSourceEl = card;
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', commitParkDragOrder);
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!parkDragSourceEl || parkDragSourceEl === card || !card.parentNode) return;
+      if (isBeforeInDom(parkDragSourceEl, card)){
+        card.parentNode.insertBefore(parkDragSourceEl, card.nextSibling);
+      } else {
+        card.parentNode.insertBefore(parkDragSourceEl, card);
+      }
+    });
+    card.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  function commitParkDragOrder(){
+    if (parkDragSourceEl) parkDragSourceEl.classList.remove('dragging');
+    parkDragSourceEl = null;
+    const newOrderIds = Array.from(parkGoldGridEl.children).map(c => c.dataset.parkId);
+    const idToItem = {};
+    parkRows.forEach(p => { idToItem[p.id] = p; });
+    parkRows = newOrderIds.map(id => idToItem[id]).filter(Boolean);
+    saveParkProgress();
+    renderParksPage();
+  }
+
+  function renderParksPage(){
+    if (!parkRows.length){
+      parkGoldGridEl.innerHTML = '';
+      parkGoldGridEl.style.display = 'none';
+      parkEmptyMessage.style.display = 'block';
+      return;
+    }
+    parkEmptyMessage.style.display = 'none';
+
+    parkGoldGridEl.innerHTML = parkRows.map((p, idx) => {
+      const rank = idx + 1;
+      const effectiveCover = p.coverPhoto || '';
+      return (
+        '<div class="restaurant-gold-card" data-park-id="' + p.id + '" data-park-index="' + idx + '">' +
+          '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
+          (effectiveCover
+            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
+            : '<span class="art-drop-hint">🏞️</span>') +
+          '<div class="restaurant-gold-card-overlay">' +
+            '<div class="restaurant-gold-card-name">' + escapeHtml(p.name) + '</div>' +
+            (p.location ? '<div class="restaurant-gold-card-meta">' + escapeHtml(p.location) + '</div>' : '') +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+    parkGoldGridEl.style.display = 'grid';
+
+    Array.from(parkGoldGridEl.children).forEach(card => {
+      wireImmediateClick(card, () => openParkDetailsPanel(Number(card.dataset.parkIndex)));
+      makeParkCardDraggable(card);
+    });
+  }
+
+  parkNewBtn.addEventListener('click', openNewParkForm);
+
   // ---------- ROADS ----------
   // Mirrors Hikes' architecture (details panel, gold-grid+list split,
   // auto-sort by total with manual tie-break) but simpler: no dates concept
@@ -12435,7 +13039,7 @@
       items, history, isComplete, finalRanking, loadingDock, art, tierBoundaries, tierBoundariesTotal,
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
-      hikeRows, roadRows, photoRows,
+      hikeRows, parkRows, roadRows, photoRows,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
       savedAt: new Date().toISOString()
@@ -12489,6 +13093,12 @@
         renderRoadsPage();
         restoredParts.push(parsed.roadRows.length + ' road' + (parsed.roadRows.length === 1 ? '' : 's'));
       }
+      if (Array.isArray(parsed.parkRows) && parsed.parkRows.length){
+        parkRows = parsed.parkRows;
+        saveParkProgress();
+        renderParksPage();
+        restoredParts.push(parsed.parkRows.length + ' park' + (parsed.parkRows.length === 1 ? '' : 's'));
+      }
       if (Array.isArray(parsed.photoRows) && parsed.photoRows.length){
         photoRows = parsed.photoRows;
         savePhotoProgress();
@@ -12522,6 +13132,7 @@
   loadGuestViewSetting();
   loadDishOrder();
   loadHikeProgress();
+  loadParkProgress();
   loadHikeFullListText();
   loadRoadProgress();
   loadPhotoProgress();
