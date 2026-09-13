@@ -1047,6 +1047,7 @@
     max-width: 46ch;
     margin: 0 0 32px;
   }
+  #results-sub{ margin-bottom: 16px; }
 
   /* ---------- INPUT SCREEN ---------- */
   .panel{
@@ -3049,7 +3050,7 @@
         </div>
       </div>
 
-      <div class="results-controls">
+      <div class="results-controls" id="results-controls">
         <div class="view-toggle" id="view-toggle">
           <button class="view-toggle-btn" id="view-list-btn" type="button">List</button>
           <button class="view-toggle-btn active" id="view-grid-btn" type="button">Grid</button>
@@ -3209,11 +3210,9 @@
       </div>
 
       <div class="tab-panel" id="song-tab-results">
-        <h1>Your Song Rankings</h1>
         <p class="sub" id="song-results-sub"></p>
 
         <div class="reorder-bar" id="song-reorder-bar">
-          <button class="btn-ghost" id="song-reorder-toggle-btn">Edit Items</button>
           <div class="reorder-edit-controls" id="song-reorder-edit-controls">
             <span class="reorder-hint">Edit text or position, add or remove items, then save.</span>
             <button class="btn-ghost" id="song-edit-add-btn" type="button">+ Add Item</button>
@@ -3222,17 +3221,20 @@
           </div>
         </div>
 
-        <div class="filters-group">
-          <div class="filter-wrap">
-            <input type="text" class="filter-input artist-filter-input" id="song-artist-filter-input" list="song-artist-filter-datalist" placeholder="All Artists" autocomplete="off">
-            <datalist id="song-artist-filter-datalist"></datalist>
-            <button class="filter-clear" id="song-artist-filter-clear" type="button" title="Clear artist filter" style="display:none;">✕</button>
+        <div class="results-controls" id="song-results-controls">
+          <div class="filters-group">
+            <div class="filter-wrap">
+              <input type="text" class="filter-input artist-filter-input" id="song-artist-filter-input" list="song-artist-filter-datalist" placeholder="All Artists" autocomplete="off">
+              <datalist id="song-artist-filter-datalist"></datalist>
+              <button class="filter-clear" id="song-artist-filter-clear" type="button" title="Clear artist filter" style="display:none;">✕</button>
+            </div>
+            <div class="filter-wrap">
+              <input type="text" class="filter-input grouping-filter-input" id="song-grouping-filter-input" list="song-grouping-filter-datalist" placeholder="All Groupings" autocomplete="off">
+              <datalist id="song-grouping-filter-datalist"></datalist>
+              <button class="filter-clear" id="song-grouping-filter-clear" type="button" title="Clear grouping filter" style="display:none;">✕</button>
+            </div>
           </div>
-          <div class="filter-wrap">
-            <input type="text" class="filter-input grouping-filter-input" id="song-grouping-filter-input" list="song-grouping-filter-datalist" placeholder="All Groupings" autocomplete="off">
-            <datalist id="song-grouping-filter-datalist"></datalist>
-            <button class="filter-clear" id="song-grouping-filter-clear" type="button" title="Clear grouping filter" style="display:none;">✕</button>
-          </div>
+          <button class="btn-ghost" id="song-reorder-toggle-btn">Edit Items</button>
         </div>
 
         <ol class="results-list" id="song-results-list"></ol>
@@ -3849,6 +3851,7 @@
 
   const reorderBar = document.getElementById('reorder-bar');
   const reorderToggleBtn = document.getElementById('reorder-toggle-btn');
+  const resultsControls = document.getElementById('results-controls');
   const reorderEditControls = document.getElementById('reorder-edit-controls');
   const editAddBtn = document.getElementById('edit-add-btn');
   const reorderSaveBtn = document.getElementById('reorder-save-btn');
@@ -4039,6 +4042,7 @@
   const songResultsSub = document.getElementById('song-results-sub');
   const songReorderBar = document.getElementById('song-reorder-bar');
   const songReorderToggleBtn = document.getElementById('song-reorder-toggle-btn');
+  const songResultsControls = document.getElementById('song-results-controls');
   const songReorderEditControls = document.getElementById('song-reorder-edit-controls');
   const songEditAddBtn = document.getElementById('song-edit-add-btn');
   const songReorderSaveBtn = document.getElementById('song-reorder-save-btn');
@@ -6374,11 +6378,14 @@
     }
 
     if (songIsComplete){
-      songReorderBar.style.display = 'flex';
+      songReorderBar.style.display = songEditMode ? 'flex' : 'none';
       songReorderToggleBtn.style.display = songEditMode ? 'none' : 'inline-block';
       songReorderEditControls.style.display = songEditMode ? 'flex' : 'none';
+      songResultsControls.style.display = songEditMode ? 'none' : 'flex';
     } else {
       songReorderBar.style.display = 'none';
+      songReorderToggleBtn.style.display = 'none';
+      songResultsControls.style.display = 'flex';
       songEditMode = false;
     }
 
@@ -7444,9 +7451,11 @@
       reorderBar.style.display = editMode ? 'flex' : 'none';
       reorderToggleBtn.style.display = editMode ? 'none' : 'inline-block';
       reorderEditControls.style.display = editMode ? 'flex' : 'none';
+      resultsControls.style.display = editMode ? 'none' : 'flex';
     } else {
       reorderBar.style.display = 'none';
       reorderToggleBtn.style.display = 'none';
+      resultsControls.style.display = 'flex';
       editMode = false;
     }
 
