@@ -5540,11 +5540,29 @@
     lightboxCounter.textContent = (lightboxIndex + 1) + ' / ' + lightboxPhotos.length;
   }
 
+  // Backward-compatible with the original Restaurant-only {restaurantIndex}
+  // shape (existing callers are untouched) — Road/Park callers just pass
+  // {roadIndex}/{parkIndex} instead, and this infers which type applies
+  // from whichever key is actually present.
+  function resolveLightboxCoverHandler(context){
+    if (!context) return null;
+    if (context.restaurantIndex !== undefined){
+      return { row: restaurantRows[context.restaurantIndex], index: context.restaurantIndex, setCover: setRestaurantCoverPhoto, deletePhoto: deleteRestaurantPhoto, gatherPhotos: gatherAllRestaurantPhotos };
+    }
+    if (context.roadIndex !== undefined){
+      return { row: roadRows[context.roadIndex], index: context.roadIndex, setCover: setRoadCoverPhoto, deletePhoto: deleteRoadPhoto, gatherPhotos: gatherAllRoadPhotos };
+    }
+    if (context.parkIndex !== undefined){
+      return { row: parkRows[context.parkIndex], index: context.parkIndex, setCover: setParkCoverPhoto, deletePhoto: deleteParkPhoto, gatherPhotos: gatherAllParkPhotos };
+    }
+    return null;
+  }
+
   function updateLightboxCoverToggle(){
     if (!lightboxCoverContext) return;
-    const r = restaurantRows[lightboxCoverContext.restaurantIndex];
-    if (!r) return;
-    const isCover = r.coverPhoto === lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
+    const handler = resolveLightboxCoverHandler(lightboxCoverContext);
+    if (!handler || !handler.row) return;
+    const isCover = handler.row.coverPhoto === lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
     lightboxCoverToggleBtn.textContent = isCover ? '★ Cover photo' : '☆ Set as cover';
     lightboxCoverToggleBtn.classList.toggle('is-cover', isCover);
   }
@@ -5609,27 +5627,25 @@
   });
   lightboxCoverToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!lightboxCoverContext) return;
-    const idx = lightboxCoverContext.restaurantIndex;
-    const r = restaurantRows[idx];
-    if (!r) return;
+    const handler = resolveLightboxCoverHandler(lightboxCoverContext);
+    if (!handler || !handler.row) return;
     const currentUrl = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
     // Toggling off just clears the cover entirely — there's always at most
     // one, never a "previous" one to fall back to.
-    const newCover = r.coverPhoto === currentUrl ? '' : currentUrl;
-    setRestaurantCoverPhoto(idx, newCover);
+    const newCover = handler.row.coverPhoto === currentUrl ? '' : currentUrl;
+    handler.setCover(handler.index, newCover);
     updateLightboxCoverToggle();
   });
   lightboxDeleteBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!lightboxCoverContext || !lightboxPhotos || !lightboxPhotos.length) return;
-    const idx = lightboxCoverContext.restaurantIndex;
+    if (!lightboxPhotos || !lightboxPhotos.length) return;
+    const handler = resolveLightboxCoverHandler(lightboxCoverContext);
+    if (!handler) return;
     const url = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
-    deleteRestaurantPhoto(idx, url);
+    handler.deletePhoto(handler.index, url);
     showToast('Photo deleted');
 
-    const r = restaurantRows[idx];
-    const refreshedPhotos = r ? gatherAllRestaurantPhotos(r) : [];
+    const refreshedPhotos = handler.row ? (handler.gatherPhotos(handler.row) || []) : [];
     if (!refreshedPhotos.length){
       closeArtLightbox(); // that was the only photo left
       return;
@@ -10392,6 +10408,40 @@
     return (a !== null && b !== null && !isNaN(a) && !isNaN(b)) ? a + b : null;
   }
 
+  function gatherAllParkPhotos(p){
+    const all = [];
+    if (p.coverPhoto) all.push(p.coverPhoto);
+    (p.photos || []).forEach(photo => {
+      const url = photo && photo.url;
+      if (url && all.indexOf(url) === -1) all.push(url);
+    });
+    return all;
+  }
+
+  function getEffectiveParkCover(p){
+    return p.coverPhoto || gatherAllParkPhotos(p)[0] || '';
+  }
+
+  function setParkCoverPhoto(index, url){
+    if (guestViewEnabled) return;
+    if (!parkRows[index]) return;
+    parkRows[index].coverPhoto = url;
+    saveParkProgress();
+    renderParksPage();
+    if (openParkIndex === index) renderParkDetailsContent();
+  }
+
+  function deleteParkPhoto(index, url){
+    if (guestViewEnabled) return;
+    const p = parkRows[index];
+    if (!p || !url) return;
+    p.photos = (p.photos || []).filter(photo => photo.url !== url);
+    if (p.coverPhoto === url) p.coverPhoto = '';
+    saveParkProgress();
+    renderParksPage();
+    if (openParkIndex === index) renderParkDetailsContent();
+  }
+
   function getHikeCityOptions(){
     return Array.from(new Set(hikeRows.map(h => (h.city || '').trim()).filter(Boolean))).sort();
   }
@@ -10568,6 +10618,25 @@
     );
   }
 
+  function renderParkPhotosContentHtml(p){
+    const photos = p.photos || [];
+    const gridHtml = photos.map((photo, i) =>
+      '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(photo.url, 350)) + '" alt="" loading="lazy">' +
+        '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
+      '</div>'
+    ).join('');
+    return (
+      '<div class="restaurant-other-photos-section">' +
+        '<span class="restaurant-other-photos-label">Photos</span>' +
+        '<div class="restaurant-photo-grid">' +
+          gridHtml +
+          '<div class="restaurant-photo-add-tile" id="park-photo-add-tile" title="Drag images here, or click to browse">+</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   function renderParkDetailsContent(){
     if (newParkDraft || parkEditMode){
       renderParkEditForm();
@@ -10577,11 +10646,11 @@
 
     const p = parkRows[openParkIndex];
     const rank = openParkIndex + 1; // purely manual order — array position IS the rank
-    const effectiveCover = p.coverPhoto || '';
+    const effectiveCover = getEffectiveParkCover(p);
 
     parkDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
-        '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to view"' : ' title="Click or drag an image to add a cover"') + '>' +
+        '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to open the photo gallery"' : ' title="Add photos below"') + '>' +
           (effectiveCover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="">' : '<span class="art-drop-hint">🏞️</span>') +
         '</div>' +
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
@@ -10592,7 +10661,8 @@
         (p.location ? '<p class="details-artist">' + escapeHtml(p.location) + '</p>' : '') +
         renderParkScoresRowHtml(p) +
         renderParkLinkedHikesSectionHtml(p) +
-      '</div>';
+      '</div>' +
+      renderParkPhotosContentHtml(p);
 
     parkDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeParkDetailsPanel);
     parkDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', enterParkEditMode);
@@ -10624,24 +10694,71 @@
         openHikeDetailsPanel(hikeIndex);
       });
     });
-  }
 
-  function wireParkCoverPhotoDropZone(el, p){
-    const doUpload = async (file) => {
-      if (!file) return;
-      const url = await uploadRestaurantPhoto(file, 'RankHeaven/ParkCovers');
-      if (url) updateOpenPark(park => { park.coverPhoto = url; });
-    };
-    el.addEventListener('click', () => {
-      if (p.coverPhoto){
-        openArtLightbox(p.coverPhoto);
-      } else {
+    parkDetailsPanelInner.querySelectorAll('.restaurant-photo-thumb').forEach(thumb => {
+      thumb.addEventListener('click', (e) => {
+        if (e.target.closest('.restaurant-photo-remove-btn')) return;
+        const url = ((p.photos || [])[Number(thumb.dataset.photoIndex)] || {}).url;
+        const allPhotos = gatherAllParkPhotos(p);
+        openPhotoLightbox(allPhotos, allPhotos.indexOf(url), { parkIndex: openParkIndex });
+      });
+    });
+    parkDetailsPanelInner.querySelectorAll('.restaurant-photo-remove-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = Number(btn.dataset.removePhotoIndex);
+        updateOpenPark(park => { (park.photos || []).splice(i, 1); });
+      });
+    });
+
+    const addTile = parkDetailsPanelInner.querySelector('#park-photo-add-tile');
+    if (addTile){
+      const addPhotoFiles = async (files) => {
+        const fileArray = Array.from(files || []).filter(f => f);
+        if (!fileArray.length) return;
+        const originalText = addTile.textContent;
+        const uploaded = [];
+        for (let i = 0; i < fileArray.length; i++){
+          if (fileArray.length > 1) addTile.textContent = (i + 1) + '/' + fileArray.length;
+          const url = await uploadRestaurantPhoto(fileArray[i], 'RankHeaven/ParkPhotos');
+          if (url) uploaded.push({ url });
+        }
+        addTile.textContent = originalText;
+        if (uploaded.length){
+          updateOpenPark(park => {
+            if (!park.photos) park.photos = [];
+            park.photos.push(...uploaded);
+          });
+        }
+      };
+      addTile.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        addTile.classList.add('drag-over');
+      });
+      addTile.addEventListener('dragleave', () => addTile.classList.remove('drag-over'));
+      addTile.addEventListener('drop', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        addTile.classList.remove('drag-over');
+        addPhotoFiles(e.dataTransfer.files);
+      });
+      addTile.addEventListener('click', () => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
-        input.addEventListener('change', () => doUpload(input.files && input.files[0]));
+        input.multiple = true;
+        input.addEventListener('change', () => addPhotoFiles(input.files));
         input.click();
-      }
+      });
+    }
+  }
+
+  function wireParkCoverPhotoDropZone(el, p){
+    el.addEventListener('click', () => {
+      const allPhotos = gatherAllParkPhotos(p);
+      if (!allPhotos.length) return;
+      openPhotoLightbox(allPhotos, 0, { parkIndex: openParkIndex });
     });
     el.addEventListener('dragover', (e) => {
       if (!e.dataTransfer.types.includes('Files')) return;
@@ -10649,11 +10766,16 @@
       el.classList.add('drag-over');
     });
     el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-    el.addEventListener('drop', (e) => {
+    el.addEventListener('drop', async (e) => {
       if (!e.dataTransfer.types.includes('Files')) return;
       e.preventDefault();
       el.classList.remove('drag-over');
-      doUpload(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const url = await uploadRestaurantPhoto(file, 'RankHeaven/ParkCovers');
+      if (url){
+        updateOpenPark(park => { park.coverPhoto = url; });
+      }
     });
   }
 
@@ -10703,7 +10825,7 @@
 
     parkGoldGridEl.innerHTML = parkRows.map((p, idx) => {
       const rank = idx + 1;
-      const effectiveCover = p.coverPhoto || '';
+      const effectiveCover = getEffectiveParkCover(p);
       return (
         '<div class="restaurant-gold-card" data-park-id="' + p.id + '" data-park-index="' + idx + '">' +
           '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
@@ -10793,6 +10915,26 @@
 
   function getEffectiveRoadCover(r){
     return r.coverPhoto || gatherAllRoadPhotos(r)[0] || '';
+  }
+
+  function setRoadCoverPhoto(index, url){
+    if (guestViewEnabled) return;
+    if (!roadRows[index]) return;
+    roadRows[index].coverPhoto = url;
+    saveRoadProgress();
+    renderRoadsPage();
+    if (openRoadIndex === index) renderRoadDetailsContent();
+  }
+
+  function deleteRoadPhoto(index, url){
+    if (guestViewEnabled) return;
+    const r = roadRows[index];
+    if (!r || !url) return;
+    r.photos = (r.photos || []).filter(p => p.url !== url);
+    if (r.coverPhoto === url) r.coverPhoto = '';
+    saveRoadProgress();
+    renderRoadsPage();
+    if (openRoadIndex === index) renderRoadDetailsContent();
   }
 
   function openRoadDetailsPanel(index){
@@ -11057,7 +11199,7 @@
         if (e.target.closest('.restaurant-photo-remove-btn')) return;
         const url = ((r.photos || [])[Number(thumb.dataset.photoIndex)] || {}).url;
         const allPhotos = gatherAllRoadPhotos(r);
-        openPhotoLightbox(allPhotos, allPhotos.indexOf(url), null);
+        openPhotoLightbox(allPhotos, allPhotos.indexOf(url), { roadIndex: openRoadIndex });
       });
     });
     roadDetailsPanelInner.querySelectorAll('.restaurant-photo-remove-btn').forEach(btn => {
@@ -11115,7 +11257,7 @@
     el.addEventListener('click', () => {
       const allPhotos = gatherAllRoadPhotos(r);
       if (!allPhotos.length) return;
-      openPhotoLightbox(allPhotos, 0, null);
+      openPhotoLightbox(allPhotos, 0, { roadIndex: openRoadIndex });
     });
     el.addEventListener('dragover', (e) => {
       if (!e.dataTransfer.types.includes('Files')) return;
