@@ -4334,6 +4334,12 @@
         tierBoundaries, tierBoundariesTotal, savedAt: new Date().toISOString(),
         songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt,
         restaurantRows, restaurantSavedAt: restaurantLastSavedAt,
+        hikeRows, hikeSavedAt: hikeLastSavedAt,
+        roadRows, roadSavedAt: roadLastSavedAt,
+        photoRows, photoSavedAt: photoLastSavedAt,
+        bookRows: mediaState.book.rows, bookSavedAt: mediaState.book.lastSavedAt,
+        movieRows: mediaState.movie.rows, movieSavedAt: mediaState.movie.lastSavedAt,
+        gameRows: mediaState.game.rows, gameSavedAt: mediaState.game.lastSavedAt,
         lastfmApiKey, lastfmUsername
       });
       console.log('Firestore payload size:', (payload.length / 1024 / 1024).toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
@@ -4424,6 +4430,58 @@
         renderRestaurantsPage();
       }
     }
+    if (Array.isArray(existing.hikeRows) && existing.hikeRows.length >= 1){
+      const remoteTime = new Date(existing.hikeSavedAt || 0).getTime();
+      const localTime = new Date(hikeLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        hikeRows = existing.hikeRows;
+        hikeLastSavedAt = existing.hikeSavedAt || null;
+        try{ await window.storage.set(HIKE_STORAGE_KEY, JSON.stringify({ hikeRows, savedAt: hikeLastSavedAt }), false); }catch(e){ /* best effort */ }
+        renderHikesPage();
+      }
+    }
+    if (Array.isArray(existing.roadRows) && existing.roadRows.length >= 1){
+      const remoteTime = new Date(existing.roadSavedAt || 0).getTime();
+      const localTime = new Date(roadLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        roadRows = existing.roadRows;
+        roadLastSavedAt = existing.roadSavedAt || null;
+        try{ await window.storage.set(ROAD_STORAGE_KEY, JSON.stringify({ roadRows, savedAt: roadLastSavedAt }), false); }catch(e){ /* best effort */ }
+        renderRoadsPage();
+      }
+    }
+    if (Array.isArray(existing.photoRows) && existing.photoRows.length >= 1){
+      const remoteTime = new Date(existing.photoSavedAt || 0).getTime();
+      const localTime = new Date(photoLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        photoRows = existing.photoRows;
+        photoLastSavedAt = existing.photoSavedAt || null;
+        try{ await window.storage.set(PHOTOS_STORAGE_KEY, JSON.stringify({ photoRows, savedAt: photoLastSavedAt }), false); }catch(e){ /* best effort */ }
+        renderPhotosPage();
+      }
+    }
+    const mediaFirestoreFields = {
+      book: { rows: 'bookRows', savedAt: 'bookSavedAt' },
+      movie: { rows: 'movieRows', savedAt: 'movieSavedAt' },
+      game: { rows: 'gameRows', savedAt: 'gameSavedAt' },
+    };
+    for (const type of ['book', 'movie', 'game']){
+      const fields = mediaFirestoreFields[type];
+      const remoteRows = existing[fields.rows];
+      if (Array.isArray(remoteRows) && remoteRows.length >= 1){
+        const remoteTime = new Date(existing[fields.savedAt] || 0).getTime();
+        const localTime = new Date(mediaState[type].lastSavedAt || 0).getTime();
+        if (remoteTime > localTime){
+          mediaState[type].rows = remoteRows;
+          mediaState[type].lastSavedAt = existing[fields.savedAt] || null;
+          const config = MEDIA_CONFIGS[type];
+          const savePayload = { savedAt: mediaState[type].lastSavedAt };
+          savePayload[config.storageField] = mediaState[type].rows;
+          try{ await window.storage.set(config.storageKey, JSON.stringify(savePayload), false); }catch(e){ /* best effort */ }
+          renderMediaPage(type);
+        }
+      }
+    }
     // No timestamp on this one (it's just two short config strings, not
     // something that grows/changes over time) — fills in from remote only
     // if local hasn't been configured at all, never overwrites a config
@@ -4437,7 +4495,13 @@
 
     const hasCurrentData = (Array.isArray(items) && items.length >= 2)
       || (Array.isArray(songItems) && songItems.length >= 2)
-      || (Array.isArray(restaurantRows) && restaurantRows.length >= 1);
+      || (Array.isArray(restaurantRows) && restaurantRows.length >= 1)
+      || (Array.isArray(hikeRows) && hikeRows.length >= 1)
+      || (Array.isArray(roadRows) && roadRows.length >= 1)
+      || (Array.isArray(photoRows) && photoRows.length >= 1)
+      || (Array.isArray(mediaState.book.rows) && mediaState.book.rows.length >= 1)
+      || (Array.isArray(mediaState.movie.rows) && mediaState.movie.rows.length >= 1)
+      || (Array.isArray(mediaState.game.rows) && mediaState.game.rows.length >= 1);
     if (hasCurrentData) writeFirestoreData();
   }
 
@@ -4451,7 +4515,7 @@
   // data instead of its own (empty) uid-keyed document — see
   // readFirestoreData below, and the matching Firestore security rule this
   // requires (see this session's chat for the exact rule to add).
-  const OWNER_FIREBASE_UID = 'YOUR_OWNER_UID_HERE';
+  const OWNER_FIREBASE_UID = 'iDLf8r8mPVSYMJlEkMvBrZwB6Jg1';
   let isLockedGuestAccount = false;
 
   function initFirebaseSync(){
@@ -4556,7 +4620,55 @@
       restaurantLastSavedAt = localRestaurantParsed.savedAt || null;
     }
 
-    resolveLocalDataReady(); // albums, songs, and restaurants have all finished loading — safe for Firebase sync to compare/write now
+    // Same independent-local-key pattern, for the domains that were missing
+    // from this gate entirely — see this session's chat for the full story,
+    // but in short: without this, Firestore sync could run its "seed if
+    // nothing there yet" write before these had actually finished loading
+    // locally, pushing an empty array over whatever was already synced.
+    let localHikeParsed = null;
+    try{
+      const res = await window.storage.get(HIKE_STORAGE_KEY, false);
+      if (res && res.value) localHikeParsed = JSON.parse(res.value);
+    }catch(e){ /* no local hike save */ }
+    if (localHikeParsed && Array.isArray(localHikeParsed.hikeRows) && localHikeParsed.hikeRows.length){
+      hikeRows = localHikeParsed.hikeRows;
+      hikeLastSavedAt = localHikeParsed.savedAt || null;
+    }
+
+    let localRoadParsed = null;
+    try{
+      const res = await window.storage.get(ROAD_STORAGE_KEY, false);
+      if (res && res.value) localRoadParsed = JSON.parse(res.value);
+    }catch(e){ /* no local road save */ }
+    if (localRoadParsed && Array.isArray(localRoadParsed.roadRows) && localRoadParsed.roadRows.length){
+      roadRows = localRoadParsed.roadRows;
+      roadLastSavedAt = localRoadParsed.savedAt || null;
+    }
+
+    let localPhotoParsed = null;
+    try{
+      const res = await window.storage.get(PHOTOS_STORAGE_KEY, false);
+      if (res && res.value) localPhotoParsed = JSON.parse(res.value);
+    }catch(e){ /* no local photo save */ }
+    if (localPhotoParsed && Array.isArray(localPhotoParsed.photoRows) && localPhotoParsed.photoRows.length){
+      photoRows = localPhotoParsed.photoRows;
+      photoLastSavedAt = localPhotoParsed.savedAt || null;
+    }
+
+    for (const type of ['book', 'movie', 'game']){
+      const config = MEDIA_CONFIGS[type];
+      let localMediaParsed = null;
+      try{
+        const res = await window.storage.get(config.storageKey, false);
+        if (res && res.value) localMediaParsed = JSON.parse(res.value);
+      }catch(e){ /* no local save for this media type */ }
+      if (localMediaParsed && Array.isArray(localMediaParsed[config.storageField]) && localMediaParsed[config.storageField].length){
+        mediaState[type].rows = localMediaParsed[config.storageField];
+        mediaState[type].lastSavedAt = localMediaParsed.savedAt || null;
+      }
+    }
+
+    resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, roads, photos, books, movies, games) has finished loading — safe for Firebase sync to compare/write now
   }
 
   // ---------- PARSE INPUT ----------
@@ -9815,6 +9927,7 @@
   const ROAD_SCENERY_SCORES = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
 
   let roadRows = [];
+  let roadLastSavedAt = null;
   let openRoadIndex = null;
   let newRoadDraft = null;
   let roadEditMode = false;
@@ -9826,12 +9939,14 @@
       if (res && res.value){
         const parsed = JSON.parse(res.value);
         roadRows = Array.isArray(parsed.roadRows) ? parsed.roadRows : [];
+        roadLastSavedAt = parsed.savedAt || null;
       }
     }catch(e){ /* nothing saved yet */ }
   }
 
   function saveRoadProgress(){
-    try{ window.storage.set(ROAD_STORAGE_KEY, JSON.stringify({ roadRows, savedAt: new Date().toISOString() }), false); }catch(e){ /* best effort */ }
+    roadLastSavedAt = new Date().toISOString();
+    try{ window.storage.set(ROAD_STORAGE_KEY, JSON.stringify({ roadRows, savedAt: roadLastSavedAt }), false); }catch(e){ /* best effort */ }
     scheduleSyncWrite();
   }
 
@@ -10332,6 +10447,7 @@
   // grid already uses), and a lightbox spanning all of them at once.
   const PHOTOS_STORAGE_KEY = 'photo-list';
   let photoRows = [];
+  let photoLastSavedAt = null;
 
   async function loadPhotoProgress(){
     try{
@@ -10339,12 +10455,14 @@
       if (res && res.value){
         const parsed = JSON.parse(res.value);
         photoRows = Array.isArray(parsed.photoRows) ? parsed.photoRows : [];
+        photoLastSavedAt = parsed.savedAt || null;
       }
     }catch(e){ /* nothing saved yet */ }
   }
 
   function savePhotoProgress(){
-    try{ window.storage.set(PHOTOS_STORAGE_KEY, JSON.stringify({ photoRows, savedAt: new Date().toISOString() }), false); }catch(e){ /* best effort */ }
+    photoLastSavedAt = new Date().toISOString();
+    try{ window.storage.set(PHOTOS_STORAGE_KEY, JSON.stringify({ photoRows, savedAt: photoLastSavedAt }), false); }catch(e){ /* best effort */ }
     scheduleSyncWrite();
   }
 
@@ -10452,9 +10570,9 @@
     },
   };
   const mediaState = {
-    book: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid' },
-    movie: { rows: [], editMode: false, searchFilter: '' },
-    game: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid' },
+    book: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid', lastSavedAt: null },
+    movie: { rows: [], editMode: false, searchFilter: '', lastSavedAt: null },
+    game: { rows: [], editMode: false, searchFilter: '', viewMode: 'grid', lastSavedAt: null },
   };
 
   function genMediaId(salt){
@@ -10521,13 +10639,15 @@
       if (res && res.value){
         const parsed = JSON.parse(res.value);
         mediaState[type].rows = Array.isArray(parsed[config.storageField]) ? parsed[config.storageField] : [];
+        mediaState[type].lastSavedAt = parsed.savedAt || null;
       }
     }catch(e){ /* nothing saved yet */ }
   }
 
   function saveMediaProgress(type){
     const config = MEDIA_CONFIGS[type];
-    const payload = { savedAt: new Date().toISOString() };
+    mediaState[type].lastSavedAt = new Date().toISOString();
+    const payload = { savedAt: mediaState[type].lastSavedAt };
     payload[config.storageField] = mediaState[type].rows;
     try{ window.storage.set(config.storageKey, JSON.stringify(payload), false); }catch(e){ /* best effort */ }
     scheduleSyncWrite();
@@ -12243,7 +12363,7 @@
 
   restaurantNewBtn.addEventListener('click', openNewRestaurantForm);
 
-  // ---------- FULL BACKUP (Settings) — bundles all three domains together ----------
+  // ---------- FULL BACKUP (Settings) — bundles all nine domains together ----------
   exportAllBtn.addEventListener('click', async () => {
     const artKeys = Array.from(new Set([...items, ...loadingDock]));
     const art = {};
@@ -12258,6 +12378,8 @@
       items, history, isComplete, finalRanking, loadingDock, art, tierBoundaries, tierBoundariesTotal,
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
+      hikeRows, roadRows, photoRows,
+      bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       savedAt: new Date().toISOString()
     }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
@@ -12269,7 +12391,7 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Full backup exported — albums, songs, and restaurants');
+    showToast('Full backup exported — albums, songs, restaurants, hikes, roads, photos, books, movies, and games');
   });
 
   importAllBtn.addEventListener('click', () => importAllFile.click());
@@ -12296,6 +12418,34 @@
         saveRestaurantProgress();
         renderRestaurantsPage();
         restoredParts.push(parsed.restaurantRows.length + ' restaurant' + (parsed.restaurantRows.length === 1 ? '' : 's'));
+      }
+      if (Array.isArray(parsed.hikeRows) && parsed.hikeRows.length){
+        hikeRows = parsed.hikeRows;
+        saveHikeProgress();
+        renderHikesPage();
+        restoredParts.push(parsed.hikeRows.length + ' hike' + (parsed.hikeRows.length === 1 ? '' : 's'));
+      }
+      if (Array.isArray(parsed.roadRows) && parsed.roadRows.length){
+        roadRows = parsed.roadRows;
+        saveRoadProgress();
+        renderRoadsPage();
+        restoredParts.push(parsed.roadRows.length + ' road' + (parsed.roadRows.length === 1 ? '' : 's'));
+      }
+      if (Array.isArray(parsed.photoRows) && parsed.photoRows.length){
+        photoRows = parsed.photoRows;
+        savePhotoProgress();
+        renderPhotosPage();
+        restoredParts.push(parsed.photoRows.length + ' photo' + (parsed.photoRows.length === 1 ? '' : 's'));
+      }
+      const mediaImportFields = { book: 'bookRows', movie: 'movieRows', game: 'gameRows' };
+      for (const type of ['book', 'movie', 'game']){
+        const field = mediaImportFields[type];
+        if (Array.isArray(parsed[field]) && parsed[field].length){
+          mediaState[type].rows = parsed[field];
+          saveMediaProgress(type);
+          renderMediaPage(type);
+          restoredParts.push(parsed[field].length + ' ' + type + (parsed[field].length === 1 ? '' : 's'));
+        }
       }
       if (!restoredParts.length){
         showToast("That file doesn't look like a full backup");
