@@ -1086,7 +1086,7 @@
     display: flex;
     align-items: baseline;
     gap: 24px;
-    margin: 0 0 20px;
+    margin: 0 0 8px;
     flex-wrap: wrap;
   }
   .group-sub-tab-btn{
@@ -1109,7 +1109,6 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
     flex-wrap: wrap;
   }
   .page-heading-row h1{ margin: 0 0 14px; }
@@ -1118,6 +1117,7 @@
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+    margin-bottom: 8px;
   }
 
   .sub{
@@ -1838,6 +1838,12 @@
     background: linear-gradient(to top, rgba(15,33,36,0.94), rgba(15,33,36,0));
     color: #fff;
   }
+  /* 70% of the shared overlay's opacity above (0.94 * 0.7 ≈ 0.658) —
+     scoped to Restaurants only, since this class is shared with Hikes,
+     Roads, Parks, Movies, and Shows and wasn't asked to change there. */
+  #restaurant-gold-grid .restaurant-gold-card-overlay{
+    background: linear-gradient(to top, rgba(15,33,36,0.658), rgba(15,33,36,0));
+  }
   .restaurant-gold-card-name{
     font-family: 'Figtree', sans-serif;
     font-size: 13.5px;
@@ -1904,7 +1910,6 @@
     border: 1px solid var(--panel-line);
     border-radius: 999px;
     padding: 4px;
-    margin-bottom: 16px;
   }
   .view-toggle-btn{
     background: transparent;
@@ -1925,7 +1930,6 @@
     gap: 12px;
     margin-bottom: 16px;
   }
-  .results-controls .view-toggle{ margin-bottom: 0; }
   .points-algo-row{
     display: flex;
     align-items: center;
@@ -1943,11 +1947,32 @@
     align-items: center;
     gap: 12px;
   }
+  #page-books .filters-group, #page-movies .filters-group, #page-games .filters-group, #page-shows .filters-group{
+    margin-bottom: 8px;
+  }
 
   .filter-wrap{
     position: relative;
     display: inline-flex;
     align-items: center;
+  }
+  /* Album Rankings' controls row specifically (not Songs', which shares
+     these same filter classes but wasn't part of this cleanup): above the
+     breakpoint below, view-toggle/filters/Edit-button all sit on one line
+     and the 3 filters shrink together to make room; below it, the filters
+     drop to their own full-width line while view-toggle (left) and the
+     Edit button (right) stay put on the line above.
+     NOTE: 700px is an estimated threshold based on these elements' typical
+     widths, not something verified in an actual rendered browser — worth
+     a live check once you see it, in case it wants nudging either way. */
+  #tab-results{ container-type: inline-size; container-name: album-rankings-row; }
+  #results-controls{ flex-wrap: nowrap; }
+  #results-controls .filters-group{ flex: 1 1 auto; min-width: 0; }
+  #results-controls .filter-wrap{ flex: 1 1 0; min-width: 60px; }
+  #results-controls .filter-input{ width: 100%; min-width: 0; }
+  @container album-rankings-row (max-width: 700px){
+    #results-controls{ flex-wrap: wrap; }
+    #results-controls .filters-group{ order: 3; flex: 1 1 100%; width: 100%; }
   }
   .filter-input{
     appearance: none;
@@ -2670,7 +2695,6 @@
     border: 1px solid var(--panel-line);
     border-radius: 999px;
     padding: 4px;
-    margin-bottom: 30px;
     max-width: 460px;
     flex-wrap: wrap;
   }
@@ -3216,17 +3240,17 @@
         </div>
         <div class="filters-group">
           <div class="filter-wrap">
-            <input type="text" class="filter-input year-filter-input" id="year-filter-input" list="year-filter-datalist" placeholder="All Years" autocomplete="off">
+            <input type="text" class="filter-input year-filter-input" id="year-filter-input" list="year-filter-datalist" placeholder="Years" autocomplete="off">
             <datalist id="year-filter-datalist"></datalist>
             <button class="filter-clear" id="year-filter-clear" type="button" title="Clear year filter" style="display:none;">✕</button>
           </div>
           <div class="filter-wrap">
-            <input type="text" class="filter-input artist-filter-input" id="artist-filter-input" list="artist-filter-datalist" placeholder="All Artists" autocomplete="off">
+            <input type="text" class="filter-input artist-filter-input" id="artist-filter-input" list="artist-filter-datalist" placeholder="Artists" autocomplete="off">
             <datalist id="artist-filter-datalist"></datalist>
             <button class="filter-clear" id="artist-filter-clear" type="button" title="Clear artist filter" style="display:none;">✕</button>
           </div>
           <div class="filter-wrap">
-            <input type="text" class="filter-input grouping-filter-input" id="grouping-filter-input" list="grouping-filter-datalist" placeholder="All Groupings" autocomplete="off">
+            <input type="text" class="filter-input grouping-filter-input" id="grouping-filter-input" list="grouping-filter-datalist" placeholder="Groupings" autocomplete="off">
             <datalist id="grouping-filter-datalist"></datalist>
             <button class="filter-clear" id="grouping-filter-clear" type="button" title="Clear grouping filter" style="display:none;">✕</button>
           </div>
@@ -4612,7 +4636,8 @@
         movieRows: mediaState.movie.rows, movieSavedAt: mediaState.movie.lastSavedAt,
         gameRows: mediaState.game.rows, gameSavedAt: mediaState.game.lastSavedAt,
         showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt,
-        lastfmApiKey, lastfmUsername
+        lastfmApiKey, lastfmUsername,
+        lastManualExportAt
       });
       const payloadSizeMB = payload.length / 1024 / 1024;
       console.log('Firestore payload size:', payloadSizeMB.toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
@@ -4776,6 +4801,22 @@
       lastfmUsername = existing.lastfmUsername || '';
       saveLastfmConfig();
       updateLastfmUI();
+    }
+
+    // A manual export from ANY device should suppress the reminder banner
+    // on every other one — not just the device it happened on — so this is
+    // a plain "newest wins" comparison, unlike Last.fm's "only fill in if
+    // locally unconfigured" above (that reflects a different question:
+    // "has this device set up Last.fm at all" vs. this one's "when did
+    // anyone, anywhere, last actually back up").
+    if (existing.lastManualExportAt){
+      const remoteExportTime = new Date(existing.lastManualExportAt).getTime();
+      const localExportTime = new Date(lastManualExportAt || 0).getTime();
+      if (remoteExportTime > localExportTime){
+        lastManualExportAt = existing.lastManualExportAt;
+        try{ await window.storage.set(LAST_MANUAL_EXPORT_KEY, lastManualExportAt, false); }catch(e){ /* best effort */ }
+        checkExportReminderBanner(); // re-check now that a newer export elsewhere is known about
+      }
     }
 
     const hasCurrentData = (Array.isArray(items) && items.length >= 2)
@@ -4964,6 +5005,11 @@
         mediaState[type].lastSavedAt = localMediaParsed.savedAt || null;
       }
     }
+
+    try{
+      const res = await window.storage.get(LAST_MANUAL_EXPORT_KEY, false);
+      if (res && res.value) lastManualExportAt = res.value;
+    }catch(e){ /* never exported on this device */ }
 
     resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, parks, roads, photos, books, movies, games, shows) has finished loading — safe for Firebase sync to compare/write now
   }
@@ -12449,16 +12495,21 @@
   // Albums' own edit mode, so Cancel can simply discard by re-rendering.
   function saveDishChanges(){
     const rows = dishResultsList.querySelectorAll('li');
-    const newOrder = [];
+    const pairs = [];
     const stillPresentIds = new Set();
     rows.forEach(li => {
       const id = li.dataset.dishId;
       const dish = dishEditModeSnapshot[id];
       if (!dish) return;
       stillPresentIds.add(id);
-      newOrder.push(id);
       const textInput = li.querySelector('.rank-edit-input');
       if (textInput) dish.course.text = textInput.value;
+      const numInput = li.querySelector('.rank-num-input');
+      const raw = numInput ? Number(numInput.value) : NaN;
+      // Invalid or blank position pushes to the end — same convention
+      // Albums' own saveReorder uses for its rank-num-input.
+      const key = (numInput && numInput.value.trim() !== '' && Number.isFinite(raw)) ? raw : 1e9;
+      pairs.push({ id, key });
     });
     // Present when edit mode opened, but no longer among the rows — that's
     // exactly the "starred off" case (the row was removed, not the course).
@@ -12469,7 +12520,8 @@
         dishEditModeSnapshot[id].course.score = null;
       }
     });
-    dishOrder = newOrder;
+    pairs.sort((a, b) => a.key - b.key);
+    dishOrder = pairs.map(p => p.id);
     dishEditMode = false;
     saveDishOrder();
     saveRestaurantProgress(); // persists the comment edits and score changes, which live on the actual restaurant/course data
@@ -12803,7 +12855,7 @@
   // cards and the Best Flavor / Flavor Variety selects near the heading.
   // 12/18 (the top of each range) come first in the option list — matches
   // the established "most likely score gets easiest access" convention.
-  const RESTAURANT_COURSE_SCORES = [12, 11, 10, 9, 8];
+  const RESTAURANT_COURSE_SCORES = [12, 11, 10, 9, 8, 7, 6];
   const RESTAURANT_BEST_FLAVOR_SCORES = [12, 11, 10, 9, 8];
   const RESTAURANT_FLAVOR_VARIETY_SCORES = [18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
 
@@ -13015,7 +13067,6 @@
           '</select>' +
           '<label class="restaurant-edit-label">Visits</label>' +
           '<input type="number" class="restaurant-edit-input" id="restaurant-edit-visits" min="1" step="1" value="' + escapeAttr(visitCountVal) + '">' +
-          '<p style="font-size:12px; color:var(--chalk-dim); line-height:1.5; margin:-4px 0 0;">Sets the ×N badge next to the name — separate from the actual Visits logged below. If more Visits get logged than this number, the badge shows that higher count instead.</p>' +
           '<label class="restaurant-edit-label">Website</label>' +
           '<input type="text" class="restaurant-edit-input" id="restaurant-edit-website" placeholder="restaurant-website.com" value="' + escapeAttr(r.website || '') + '">' +
           '<label class="restaurant-edit-label">Price</label>' +
@@ -13529,22 +13580,24 @@
   // ---------- EXPORT REMINDER BANNER ----------
   const LAST_MANUAL_EXPORT_KEY = 'last-manual-export-at';
   const EXPORT_REMINDER_DAYS = 14;
+  let lastManualExportAt = null; // in-memory copy, needed so Firestore sync can compare it like every other synced field
 
   async function recordManualExport(){
-    try{ await window.storage.set(LAST_MANUAL_EXPORT_KEY, new Date().toISOString(), false); }catch(e){ /* best effort */ }
+    lastManualExportAt = new Date().toISOString();
+    try{ await window.storage.set(LAST_MANUAL_EXPORT_KEY, lastManualExportAt, false); }catch(e){ /* best effort */ }
     document.body.classList.remove('export-reminder-active');
+    scheduleSyncWrite(); // pushes this to Firestore promptly, so other devices pick it up rather than waiting on an unrelated save
   }
 
   async function checkExportReminderBanner(){
-    let lastExportAt = null;
     try{
       const res = await window.storage.get(LAST_MANUAL_EXPORT_KEY, false);
-      if (res && res.value) lastExportAt = res.value;
-    }catch(e){ /* never exported yet */ }
+      if (res && res.value) lastManualExportAt = res.value;
+    }catch(e){ /* never exported yet, on this device or any synced one */ }
 
     // No record at all counts as overdue too — that's an even more
     // pressing case than "it's just been a while", not an exemption from it.
-    const daysSince = lastExportAt ? (Date.now() - new Date(lastExportAt).getTime()) / 86400000 : Infinity;
+    const daysSince = lastManualExportAt ? (Date.now() - new Date(lastManualExportAt).getTime()) / 86400000 : Infinity;
     document.body.classList.toggle('export-reminder-active', daysSince >= EXPORT_REMINDER_DAYS);
   }
 
