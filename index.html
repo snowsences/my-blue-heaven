@@ -1552,7 +1552,11 @@
     border-bottom: 1px solid var(--panel-line);
   }
   .show-category-items{ min-height: 40px; } /* keeps an empty section a real drop target, not a zero-height sliver */
-  .show-category-items.media-poster-grid{ margin: 0; }
+  .show-category-items.media-poster-grid{
+    display: grid;
+    gap: 2px;
+    margin: 0;
+  }
   .show-category-empty{
     min-height: 40px;
     display: flex;
@@ -2914,6 +2918,7 @@
        treatment Movies/Games already get, for consistency across all three
        poster-aspect media types. */
     .results-list.grid-mode.media-poster-grid{ grid-template-columns: repeat(2, 1fr); }
+    .show-category-items.media-poster-grid{ grid-template-columns: repeat(2, 1fr); }
 
     /* ---- Bottom-fixed tab bar (mobile only) ----
        Desktop/tablet keeps the fixed top bar (brand + underlined tabs +
