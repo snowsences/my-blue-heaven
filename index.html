@@ -1930,6 +1930,9 @@
     gap: 12px;
     margin-bottom: 16px;
   }
+  /* Songs only — Albums still needs this gap between its filters and the
+     list below, per the request that scoped this removal to Songs alone. */
+  #song-results-controls{ margin-bottom: 0; }
   .points-algo-row{
     display: flex;
     align-items: center;
@@ -3393,8 +3396,6 @@
       </div>
 
       <div class="tab-panel" id="song-tab-results">
-        <p class="sub" id="song-results-sub"></p>
-
         <div class="reorder-bar" id="song-reorder-bar">
           <div class="reorder-edit-controls" id="song-reorder-edit-controls">
             <span class="reorder-hint">Edit text or position, add or remove items, then save.</span>
@@ -4311,7 +4312,6 @@
   const songUndoBtn = document.getElementById('song-undo-btn');
   const songExportBtn = document.getElementById('song-export-btn');
 
-  const songResultsSub = document.getElementById('song-results-sub');
   const songReorderBar = document.getElementById('song-reorder-bar');
   const songReorderToggleBtn = document.getElementById('song-reorder-toggle-btn');
   const songResultsControls = document.getElementById('song-results-controls');
@@ -6740,17 +6740,7 @@
     // directly. Matches Albums' own maintenance-mode wording once its Duels
     // tab is hidden — no "head-to-head picks" language left to give context.
     songTabSwitcher.style.display = songIsComplete ? 'none' : 'flex';
-    if (songIsComplete){
-      songLiveDot.style.display = 'none';
-      songResultsSub.innerHTML = '';
-    } else if (songHistory.length === 0){
-      songLiveDot.style.display = 'inline-block';
-      songResultsSub.innerHTML = '<span class="status-pill live">Live Estimate</span> Make a few picks to see standings take shape.';
-    } else {
-      songLiveDot.style.display = 'inline-block';
-      songResultsSub.innerHTML = '<span class="status-pill live">Live Estimate</span> ' +
-        songHistory.length + ' of ~' + songEstimatedTotal + ' duels done — refines as you go.';
-    }
+    songLiveDot.style.display = songIsComplete ? 'none' : 'inline-block';
 
     if (songIsComplete){
       songReorderBar.style.display = songEditMode ? 'flex' : 'none';
