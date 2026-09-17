@@ -328,6 +328,23 @@
   #hike-full-list-panel.open{
     width: 600px;
   }
+  #dish-full-list-panel{
+    width: 0;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: var(--desktop-nav-height);
+    min-height: calc(100vh - var(--desktop-nav-height));
+    max-height: calc(100vh - var(--desktop-nav-height));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+  }
+  #dish-full-list-panel.open{
+    width: 600px;
+  }
   .restaurant-details-panel-inner{
     width: 600px;
   }
@@ -1706,6 +1723,12 @@
     border: 1px solid var(--panel-line);
   }
   .restaurant-gold-card.drag-over{ border-color: var(--amber); }
+  #hike-gold-grid .restaurant-gold-card, #park-gold-grid .restaurant-gold-card, #road-gold-grid .restaurant-gold-card{
+    border-color: transparent;
+  }
+  #hike-gold-grid .restaurant-gold-card.drag-over, #park-gold-grid .restaurant-gold-card.drag-over, #road-gold-grid .restaurant-gold-card.drag-over{
+    border-color: var(--amber);
+  }
   /* Zoom-on-hover, matching .grid-card's own effect (used by Albums/Dishes/
      Books/Games) — scoped specifically to Restaurants and Movies, the two
      places this was requested, rather than applied to every gold-card
@@ -2585,6 +2608,27 @@
   .lightbox-delete-btn.show{ display: flex; }
   .lightbox-delete-btn:hover{ background: var(--brick); }
 
+  /* Same gating idea as the goto button above — only Dishes' entries carry
+     a dishID at all, so this only ever shows there. */
+  .lightbox-hide-dish-btn{
+    display: none;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    color: #fff;
+    font-family: 'Figtree', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(15,33,36,0.72);
+    border: none;
+    padding: 7px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    z-index: 301;
+  }
+  .lightbox-hide-dish-btn.show{ display: block; }
+  .lightbox-hide-dish-btn:hover{ background: var(--brick); }
+
   /* ---------- INSIGHTS ---------- */
   .insights-section{
     display: none;
@@ -2761,6 +2805,30 @@
 
   /* ---------- MOBILE (narrow viewport) ---------- */
   @media (max-width: 768px){
+    /* Nature and Art each have 4 sub-tabs now (Hikes/Parks/Roads/Photos,
+       Books/Movies/Games/Shows) — at the desktop 24px size these wrap to
+       2+ lines on a phone. Forcing one line via equal-width flex items
+       plus a viewport-scaled font size keeps all 4 fitting together,
+       shrinking further on narrower phones rather than wrapping. Scoped
+       to just these two groups (via their shared ID prefixes) — Food's
+       own 2-tab layout uses this same .group-sub-tabs/.group-sub-tab-btn
+       markup but wasn't part of this and doesn't need shrinking.
+       NOTE: these clamp() bounds are an estimate, not verified in an
+       actual rendered browser — worth a live check on a real phone in
+       case "Photos"/"Movies" (the longest labels) need a bit more room. */
+    [id^="nature-sub-tabs-"], [id^="art-sub-tabs-"]{
+      flex-wrap: nowrap;
+      gap: 10px;
+    }
+    [id^="nature-sub-tabs-"] .group-sub-tab-btn, [id^="art-sub-tabs-"] .group-sub-tab-btn{
+      flex: 1 1 0;
+      min-width: 0;
+      font-size: clamp(12px, 4vw, 17px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* The details panel's desktop behavior is a sticky side column that
        widens from 0 to 600px, sitting next to the list. That fundamentally
        doesn't work below 768px — there's no room for a 600px column next to
@@ -2883,6 +2951,22 @@
       visibility: hidden;
     }
     #hike-full-list-panel.open{
+      width: 100%;
+      transform: translateX(0);
+      visibility: visible;
+    }
+    #dish-full-list-panel{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      min-height: 100vh;
+      max-height: 100vh;
+      z-index: 200;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      visibility: hidden;
+    }
+    #dish-full-list-panel.open{
       width: 100%;
       transform: translateX(0);
       visibility: visible;
@@ -3548,6 +3632,9 @@
 
       <ol class="results-list grid-mode" id="dish-results-list"></ol>
       <p class="restaurant-course-empty" id="dish-empty-message" style="display:none;">No dishes yet — score a course 12/10 from a restaurant's details tray to add it here.</p>
+      <div class="hike-full-list-btn-wrap">
+        <button class="btn-ghost" id="dish-full-list-btn" type="button">Show Full List</button>
+      </div>
     </div>
   </div>
 
@@ -3906,6 +3993,22 @@
   </div>
 </aside>
 
+<aside id="dish-full-list-panel">
+  <div class="restaurant-details-panel-inner" id="dish-full-list-panel-inner">
+    <div class="details-art-wrap">
+      <button class="details-close-btn" type="button" id="dish-full-list-close-btn" title="Close">✕</button>
+    </div>
+    <div class="details-content" style="padding-top:20px;">
+      <h2 class="details-album">Full List</h2>
+      <p class="details-artist">Paste or type freely — this is just plain text, saved as-is.</p>
+      <textarea id="dish-full-list-textarea" class="restaurant-edit-input hike-full-list-textarea" placeholder="Paste your old list here..."></textarea>
+      <div class="restaurant-edit-actions">
+        <button class="btn-primary" id="dish-full-list-save-btn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
 </div>
 
 <div class="toast" id="toast">Copied to clipboard</div>
@@ -3932,6 +4035,7 @@
   <button class="lightbox-goto-btn" id="lightbox-goto-btn" type="button" title="Go to restaurant">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
   </button>
+  <button class="lightbox-hide-dish-btn" id="lightbox-hide-dish-btn" type="button">Hide from Dishes</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -4238,6 +4342,7 @@
   const dishDescriptionFilterClear = document.getElementById('dish-description-filter-clear');
   const lightboxCaption = document.getElementById('lightbox-caption');
   const lightboxGotoBtn = document.getElementById('lightbox-goto-btn');
+  const lightboxHideDishBtn = document.getElementById('lightbox-hide-dish-btn');
   const restaurantListEl = document.getElementById('restaurant-list');
   const restaurantGoldGridEl = document.getElementById('restaurant-gold-grid');
   const restaurantNewBtn = document.getElementById('restaurant-new-btn');
@@ -4270,6 +4375,11 @@
   const hikeFullListCloseBtn = document.getElementById('hike-full-list-close-btn');
   const hikeFullListTextarea = document.getElementById('hike-full-list-textarea');
   const hikeFullListSaveBtn = document.getElementById('hike-full-list-save-btn');
+  const dishFullListBtn = document.getElementById('dish-full-list-btn');
+  const dishFullListPanel = document.getElementById('dish-full-list-panel');
+  const dishFullListCloseBtn = document.getElementById('dish-full-list-close-btn');
+  const dishFullListTextarea = document.getElementById('dish-full-list-textarea');
+  const dishFullListSaveBtn = document.getElementById('dish-full-list-save-btn');
   const parkDetailsPanel = document.getElementById('park-details-panel');
   const parkDetailsPanelInner = document.getElementById('park-details-panel-inner');
   const parkGoldGridEl = document.getElementById('park-gold-grid');
@@ -4642,7 +4752,9 @@
         gameRows: mediaState.game.rows, gameSavedAt: mediaState.game.lastSavedAt,
         showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt,
         lastfmApiKey, lastfmUsername,
-        lastManualExportAt
+        lastManualExportAt,
+        hikeFullListText, hikeFullListTextSavedAt,
+        dishFullListText, dishFullListTextSavedAt
       });
       const payloadSizeMB = payload.length / 1024 / 1024;
       console.log('Firestore payload size:', payloadSizeMB.toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
@@ -4824,6 +4936,27 @@
       }
     }
 
+    if (existing.hikeFullListText !== undefined){
+      const remoteTime = new Date(existing.hikeFullListTextSavedAt || 0).getTime();
+      const localTime = new Date(hikeFullListTextSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        hikeFullListText = existing.hikeFullListText || '';
+        hikeFullListTextSavedAt = existing.hikeFullListTextSavedAt || null;
+        try{ await window.storage.set(HIKE_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: hikeFullListText, savedAt: hikeFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
+        if (hikeFullListPanel.classList.contains('open')) hikeFullListTextarea.value = hikeFullListText;
+      }
+    }
+    if (existing.dishFullListText !== undefined){
+      const remoteTime = new Date(existing.dishFullListTextSavedAt || 0).getTime();
+      const localTime = new Date(dishFullListTextSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        dishFullListText = existing.dishFullListText || '';
+        dishFullListTextSavedAt = existing.dishFullListTextSavedAt || null;
+        try{ await window.storage.set(DISH_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: dishFullListText, savedAt: dishFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
+        if (dishFullListPanel.classList.contains('open')) dishFullListTextarea.value = dishFullListText;
+      }
+    }
+
     const hasCurrentData = (Array.isArray(items) && items.length >= 2)
       || (Array.isArray(songItems) && songItems.length >= 2)
       || (Array.isArray(restaurantRows) && restaurantRows.length >= 1)
@@ -4834,7 +4967,9 @@
       || (Array.isArray(mediaState.book.rows) && mediaState.book.rows.length >= 1)
       || (Array.isArray(mediaState.movie.rows) && mediaState.movie.rows.length >= 1)
       || (Array.isArray(mediaState.game.rows) && mediaState.game.rows.length >= 1)
-      || (Array.isArray(mediaState.show.rows) && mediaState.show.rows.length >= 1);
+      || (Array.isArray(mediaState.show.rows) && mediaState.show.rows.length >= 1)
+      || !!hikeFullListText
+      || !!dishFullListText;
     if (hasCurrentData) writeFirestoreData();
   }
 
@@ -5015,6 +5150,23 @@
       const res = await window.storage.get(LAST_MANUAL_EXPORT_KEY, false);
       if (res && res.value) lastManualExportAt = res.value;
     }catch(e){ /* never exported on this device */ }
+
+    try{
+      const res = await window.storage.get(HIKE_FULL_LIST_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        hikeFullListText = parsed.text || '';
+        hikeFullListTextSavedAt = parsed.savedAt || null;
+      }
+    }catch(e){ /* nothing saved yet */ }
+    try{
+      const res = await window.storage.get(DISH_FULL_LIST_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        dishFullListText = parsed.text || '';
+        dishFullListTextSavedAt = parsed.savedAt || null;
+      }
+    }catch(e){ /* nothing saved yet */ }
 
     resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, parks, roads, photos, books, movies, games, shows) has finished loading — safe for Firebase sync to compare/write now
   }
@@ -5584,6 +5736,7 @@
     updateLightboxCoverToggle();
     updateLightboxCaption();
     updateLightboxGotoBtn();
+    updateLightboxHideDishBtn();
   }
 
   function updateLightboxCounter(){
@@ -5602,6 +5755,9 @@
     }
     if (context.roadIndex !== undefined){
       return { row: roadRows[context.roadIndex], index: context.roadIndex, setCover: setRoadCoverPhoto, deletePhoto: deleteRoadPhoto, gatherPhotos: gatherAllRoadPhotos };
+    }
+    if (context.hikeIndex !== undefined){
+      return { row: hikeRows[context.hikeIndex], index: context.hikeIndex, setCover: setHikeCoverPhoto, deletePhoto: deleteHikePhoto, gatherPhotos: gatherAllHikePhotos };
     }
     if (context.parkIndex !== undefined){
       return { row: parkRows[context.parkIndex], index: context.parkIndex, setCover: setParkCoverPhoto, deletePhoto: deleteParkPhoto, gatherPhotos: gatherAllParkPhotos };
@@ -5641,6 +5797,14 @@
     lightboxGotoBtn.classList.toggle('show', !!goToContext);
   }
 
+  // Same gating as the goto button — only Dishes' entries carry a dishID.
+  function updateLightboxHideDishBtn(){
+    if (!lightboxPhotos){ lightboxHideDishBtn.classList.remove('show'); return; }
+    const entry = lightboxPhotos[lightboxIndex];
+    const dishId = (entry && typeof entry === 'object') ? entry.dishId : null;
+    lightboxHideDishBtn.classList.toggle('show', !!dishId);
+  }
+
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
@@ -5649,6 +5813,7 @@
     updateLightboxCoverToggle();
     updateLightboxCaption();
     updateLightboxGotoBtn();
+    updateLightboxHideDishBtn();
   }
 
   function closeArtLightbox(){
@@ -5658,6 +5823,7 @@
     lightboxDeleteBtn.classList.remove('show');
     lightboxCaption.classList.remove('show');
     lightboxGotoBtn.classList.remove('show');
+    lightboxHideDishBtn.classList.remove('show');
     artLightboxImg.src = '';
     lightboxPhotos = null;
     lightboxCoverContext = null;
@@ -5714,6 +5880,41 @@
     const goToContext = (entry && typeof entry === 'object') ? entry.goToContext : null;
     if (!goToContext) return;
     goToDishSource(goToContext.restaurantIndex, goToContext.visitId);
+  });
+
+  // Mainly for duplicates — two dishes that represent the same thing but
+  // weren't automatically merged (different restaurant, or descriptions
+  // that don't quite match). Hides the underlying course from Dishes
+  // entirely (score stays as-is, so it's not "unfavoriting" it — just
+  // keeping it out of this view) rather than deleting anything.
+  lightboxHideDishBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!lightboxPhotos) return;
+    const entry = lightboxPhotos[lightboxIndex];
+    const dishId = (entry && typeof entry === 'object') ? entry.dishId : null;
+    if (!dishId) return;
+    const course = findCourseByDishId(dishId);
+    if (!course) return;
+    course.hiddenFromDishes = true;
+    saveRestaurantProgress();
+    renderDishesPage();
+    showToast('Hidden from Dishes');
+
+    // A dish can have more than one photo — all of them share this same
+    // dishId, so all of them leave the current lightbox session together.
+    const remainingPhotos = lightboxPhotos.filter(p => ((p && typeof p === 'object') ? p.dishId : null) !== dishId);
+    if (!remainingPhotos.length){
+      closeArtLightbox();
+      return;
+    }
+    lightboxPhotos = remainingPhotos;
+    lightboxIndex = Math.min(lightboxIndex, remainingPhotos.length - 1);
+    artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(remainingPhotos[lightboxIndex]), 1600);
+    updateLightboxCounter();
+    updateLightboxCoverToggle();
+    updateLightboxCaption();
+    updateLightboxGotoBtn();
+    updateLightboxHideDishBtn();
   });
 
   // Jumps from a dish's photo in the lightbox to that exact dish's source —
@@ -6994,6 +7195,9 @@
     }
     if (page !== 'hikes' && hikeFullListPanel.classList.contains('open')){
       closeHikeFullListPanel();
+    }
+    if (page !== 'dishes' && dishFullListPanel.classList.contains('open')){
+      closeDishFullListPanel();
     }
     if (page !== 'roads' && openRoadIndex !== null){
       closeRoadDetailsPanel();
@@ -9650,6 +9854,30 @@
     return h.coverPhoto || gatherAllHikePhotos(h)[0] || '';
   }
 
+  function setHikeCoverPhoto(index, url){
+    if (guestViewEnabled) return;
+    if (!hikeRows[index]) return;
+    hikeRows[index].coverPhoto = url;
+    saveHikeProgress();
+    renderHikesPage();
+    if (openHikeIndex === index) renderHikeDetailsContent();
+  }
+
+  function deleteHikePhoto(index, url){
+    if (guestViewEnabled) return;
+    const h = hikeRows[index];
+    if (!h || !url) return;
+    // Photos live per-date, not in one flat array — has to search every
+    // date's own photos rather than a single list like Roads/Parks.
+    sortedHikeDates(h).forEach(d => {
+      d.photos = (d.photos || []).filter(p => p.url !== url);
+    });
+    if (h.coverPhoto === url) h.coverPhoto = '';
+    saveHikeProgress();
+    renderHikesPage();
+    if (openHikeIndex === index) renderHikeDetailsContent();
+  }
+
   function hikeMatchesSearch(h, query){
     const q = query.toLowerCase();
     return (h.name || '').toLowerCase().includes(q)
@@ -10117,7 +10345,7 @@
           if (e.target.closest('.restaurant-photo-remove-btn')) return;
           const url = ((activeDate.photos || [])[Number(thumb.dataset.photoIndex)] || {}).url;
           const allPhotos = gatherAllHikePhotos(h);
-          openPhotoLightbox(allPhotos, allPhotos.indexOf(url), null);
+          openPhotoLightbox(allPhotos, allPhotos.indexOf(url), { hikeIndex: openHikeIndex });
         });
       });
       hikeDetailsPanelInner.querySelectorAll('.restaurant-photo-remove-btn').forEach(btn => {
@@ -10179,7 +10407,7 @@
     el.addEventListener('click', () => {
       const allPhotos = gatherAllHikePhotos(h);
       if (!allPhotos.length) return;
-      openPhotoLightbox(allPhotos, 0, null);
+      openPhotoLightbox(allPhotos, 0, { hikeIndex: openHikeIndex });
     });
     el.addEventListener('dragover', (e) => {
       if (!e.dataTransfer.types.includes('Files')) return;
@@ -10367,6 +10595,7 @@
   // that doesn't map cleanly onto the structured Hike fields above.
   const HIKE_FULL_LIST_STORAGE_KEY = 'hike-full-list-text';
   let hikeFullListText = '';
+  let hikeFullListTextSavedAt = null;
 
   async function loadHikeFullListText(){
     try{
@@ -10374,13 +10603,15 @@
       if (res && res.value){
         const parsed = JSON.parse(res.value);
         hikeFullListText = parsed.text || '';
+        hikeFullListTextSavedAt = parsed.savedAt || null;
       }
     }catch(e){ /* nothing saved yet */ }
   }
 
   function saveHikeFullListText(){
     hikeFullListText = hikeFullListTextarea.value;
-    try{ window.storage.set(HIKE_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: hikeFullListText, savedAt: new Date().toISOString() }), false); }catch(e){ /* best effort */ }
+    hikeFullListTextSavedAt = new Date().toISOString();
+    try{ window.storage.set(HIKE_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: hikeFullListText, savedAt: hikeFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
     scheduleSyncWrite();
   }
 
@@ -10398,6 +10629,45 @@
   hikeFullListCloseBtn.addEventListener('click', closeHikeFullListPanel);
   hikeFullListSaveBtn.addEventListener('click', () => {
     saveHikeFullListText();
+    showToast('Saved');
+  });
+
+  const DISH_FULL_LIST_STORAGE_KEY = 'dish-full-list-text';
+  let dishFullListText = '';
+  let dishFullListTextSavedAt = null;
+
+  async function loadDishFullListText(){
+    try{
+      const res = await window.storage.get(DISH_FULL_LIST_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        dishFullListText = parsed.text || '';
+        dishFullListTextSavedAt = parsed.savedAt || null;
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+
+  function saveDishFullListText(){
+    dishFullListText = dishFullListTextarea.value;
+    dishFullListTextSavedAt = new Date().toISOString();
+    try{ window.storage.set(DISH_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: dishFullListText, savedAt: dishFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  function openDishFullListPanel(){
+    dishFullListTextarea.value = dishFullListText;
+    dishFullListPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+  }
+  function closeDishFullListPanel(){
+    dishFullListPanel.classList.remove('open');
+    document.body.classList.remove('details-open-lock');
+  }
+
+  dishFullListBtn.addEventListener('click', openDishFullListPanel);
+  dishFullListCloseBtn.addEventListener('click', closeDishFullListPanel);
+  dishFullListSaveBtn.addEventListener('click', () => {
+    saveDishFullListText();
     showToast('Saved');
   });
 
@@ -12222,6 +12492,17 @@
     return course.id;
   }
 
+  function findCourseByDishId(dishId){
+    for (const r of restaurantRows){
+      for (const visit of ensureRestaurantVisits(r)){
+        for (const course of (visit.courses || [])){
+          if (course.id === dishId) return course;
+        }
+      }
+    }
+    return null;
+  }
+
   // A "dish" is any course scored the maximum 12/10 — no separate favorite
   // flag; scoring is already how a course's quality gets recorded, so
   // reusing that as the Dishes criterion means there's nothing new to keep
@@ -12232,7 +12513,7 @@
       const visits = ensureRestaurantVisits(r);
       visits.forEach(visit => {
         (visit.courses || []).forEach((course, courseIndex) => {
-          if (course.score === '12'){
+          if (course.score === '12' && !course.hiddenFromDishes){
             dishes.push({ id: ensureCourseId(course), course, restaurant: r, restaurantIndex, visit, courseIndex });
           }
         });
@@ -13618,6 +13899,7 @@
       hikeRows, parkRows, roadRows, photoRows,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
+      hikeFullListText, dishFullListText,
       savedAt: new Date().toISOString()
     }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
@@ -13694,6 +13976,18 @@
           restoredParts.push(parsed[field].length + ' ' + type + (parsed[field].length === 1 ? '' : 's'));
         }
       }
+      if (typeof parsed.hikeFullListText === 'string' && parsed.hikeFullListText){
+        hikeFullListText = parsed.hikeFullListText;
+        hikeFullListTextSavedAt = new Date().toISOString();
+        try{ window.storage.set(HIKE_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: hikeFullListText, savedAt: hikeFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
+        restoredParts.push('hike full list text');
+      }
+      if (typeof parsed.dishFullListText === 'string' && parsed.dishFullListText){
+        dishFullListText = parsed.dishFullListText;
+        dishFullListTextSavedAt = new Date().toISOString();
+        try{ window.storage.set(DISH_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: dishFullListText, savedAt: dishFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
+        restoredParts.push('dish full list text');
+      }
       if (!restoredParts.length){
         showToast("That file doesn't look like a full backup");
         return;
@@ -13714,6 +14008,7 @@
   loadParkProgress();
   checkExportReminderBanner();
   loadHikeFullListText();
+  loadDishFullListText();
   loadRoadProgress();
   loadPhotoProgress();
   loadMediaProgress('book');
