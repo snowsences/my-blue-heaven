@@ -7802,14 +7802,30 @@
       isComplete = true;
       finalRanking = parsed.finalRanking;
       history = Array.isArray(parsed.history) ? parsed.history : [];
-      updateTabVisibility();
-      renderDuelTab();
-      renderResultsTab();
-      renderDockTab();
     } else {
+      // Deliberately NOT handleGenResult here, even though the assignment
+      // is identical — handleGenResult also calls saveProgress(), and
+      // resuming/displaying existing state must never itself trigger a
+      // fresh save+sync-push. That was the actual bug behind a completed
+      // ranking silently reverting: simply opening the app with old,
+      // still-incomplete local data (e.g. a stale browser tab left open
+      // from before the ranking was finished) would re-stamp that stale
+      // data with a brand-new timestamp and push it to Firestore,
+      // overwriting a genuinely completed ranking on every other device —
+      // with no edit, and no explicit action, ever made by the user.
       const res = runGenerator(Array.isArray(parsed.history) ? parsed.history : []);
-      handleGenResult(res);
+      if (res.done){
+        isComplete = true;
+        finalRanking = res.value;
+      } else {
+        isComplete = false;
+        currentPair = res.value;
+      }
     }
+    updateTabVisibility();
+    renderDuelTab();
+    renderResultsTab();
+    renderDockTab();
     showScreen(screenRanking);
     switchTab(parsed.isComplete ? 'results' : 'duels');
   }
@@ -9070,13 +9086,21 @@
       songIsComplete = true;
       songFinalRanking = parsed.songFinalRanking;
       songHistory = Array.isArray(parsed.songHistory) ? parsed.songHistory : [];
-      updateSongTabVisibility();
-      renderSongDuelTab();
-      renderSongResultsTab();
     } else {
+      // Same fix as resumeFromData (Albums) above, for the same reason —
+      // see that function's comment for the full explanation.
       const res = runSongGenerator(Array.isArray(parsed.songHistory) ? parsed.songHistory : []);
-      handleSongGenResult(res);
+      if (res.done){
+        songIsComplete = true;
+        songFinalRanking = res.value;
+      } else {
+        songIsComplete = false;
+        songCurrentPair = res.value;
+      }
     }
+    updateSongTabVisibility();
+    renderSongDuelTab();
+    renderSongResultsTab();
   }
 
   // Renders whatever the Songs tab should currently show — called whenever
