@@ -3644,6 +3644,7 @@
      Viewing (tabs, dropdown, gallery navigation) is untouched — only
      controls that create, remove, or modify something are hidden. */
   body.guest-view-active #restaurant-tiers-panel{ display: none; }
+  body.guest-view-active #photo-edit-toggle-btn,
   body.guest-view-active #hike-new-btn,
   body.guest-view-active #hike-rearrange-btn,
   body.guest-view-active #hike-date-edit-btn,
@@ -4246,11 +4247,21 @@
           <button class="group-sub-tab-btn active" id="nature-subtab-photos-btn-3" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
         <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="photo-edit-toggle-btn" type="button">Edit</button>
           <button class="btn-primary" id="photo-add-btn" type="button">+ Add Photos</button>
         </div>
       </div>
 
+      <div class="reorder-bar" id="photo-reorder-bar">
+        <div class="reorder-edit-controls" id="photo-reorder-controls">
+          <span class="reorder-hint">Drag the handle or change a number to reorder, remove photos, then save.</span>
+          <button class="btn-primary" id="photo-edit-save-btn" type="button">Save Changes</button>
+          <button class="btn-ghost" id="photo-edit-cancel-btn" type="button">Cancel</button>
+        </div>
+      </div>
+
       <div class="results-list grid-mode" id="photo-grid"></div>
+      <ol class="results-list" id="photo-edit-list" style="display:none;"></ol>
       <p class="restaurant-course-empty" id="photo-empty-message" style="display:none;">No photos yet — add some to get started.</p>
     </div>
   </div>
@@ -4964,6 +4975,13 @@
   const photoGrid = document.getElementById('photo-grid');
   const photoEmptyMessage = document.getElementById('photo-empty-message');
   const photoAddBtn = document.getElementById('photo-add-btn');
+  const photoEditToggleBtn = document.getElementById('photo-edit-toggle-btn');
+  const photoReorderBar = document.getElementById('photo-reorder-bar');
+  const photoReorderControls = document.getElementById('photo-reorder-controls');
+  const photoEditSaveBtn = document.getElementById('photo-edit-save-btn');
+  const photoEditCancelBtn = document.getElementById('photo-edit-cancel-btn');
+  const photoEditList = document.getElementById('photo-edit-list');
+  let photoEditMode = false; // declared this early because switchTopPage (defined well before the Photos section) checks it
   const exportAllBtn = document.getElementById('export-all-btn');
   const exportReminderLink = document.getElementById('export-reminder-link');
   const importAllBtn = document.getElementById('import-all-btn');
@@ -7801,6 +7819,9 @@
     };
     Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
 
+    if (page !== 'photos' && photoEditMode){
+      photoEditMode = false; // an unfinished Photos edit is dropped, same as closing the panels below
+    }
     if (page !== 'albums' && selectedItem){
       closeDetailsPanel();
     }
@@ -12681,13 +12702,24 @@
   }
 
   function renderPhotosPage(){
-    if (!photoRows.length){
+    const empty = !photoRows.length;
+    if (empty) photoEditMode = false;
+    photoEmptyMessage.style.display = empty ? 'block' : 'none';
+    photoAddBtn.style.display = photoEditMode ? 'none' : 'inline-block';
+    photoEditToggleBtn.style.display = (!empty && !photoEditMode) ? 'inline-block' : 'none';
+    photoReorderBar.style.display = photoEditMode ? 'flex' : 'none';
+    photoReorderControls.style.display = photoEditMode ? 'flex' : 'none';
+    photoGrid.style.display = (photoEditMode || empty) ? 'none' : '';
+    photoEditList.style.display = photoEditMode ? '' : 'none';
+
+    if (photoEditMode){
       photoGrid.innerHTML = '';
-      photoEmptyMessage.style.display = 'block';
+      renderPhotoEditRows();
       return;
     }
-    photoEmptyMessage.style.display = 'none';
+    photoEditList.innerHTML = '';
     photoGrid.innerHTML = '';
+    if (empty) return;
     photoRows.forEach((p, idx) => {
       const card = document.createElement('div');
       card.className = 'grid-card';
@@ -12700,6 +12732,133 @@
       });
     });
   }
+
+  // ---------- EDIT MODE (same idea as Albums' Edit Items) ----------
+  // Switches to a list of rows: thumbnail, a position number, the date the
+  // photo carries (if any), a remove button, and a drag handle. Reorder by
+  // dragging the handle OR typing a number (positions are shown as 10, 20,
+  // 30…, so typing 15 slots a photo between the 10 and 20 rows; after a
+  // drag the numbers reset to match the new order). Removing a row and every
+  // other change are plain edits to the list on screen until Save — nothing
+  // touches photoRows until then, so Cancel simply re-renders from truth.
+  function photoEditRowLabel(p){
+    const main = p.date ? formatVisitDate(p.date) : 'No date';
+    let meta = '';
+    if (p.time){
+      const t = new Date('1970-01-01T' + p.time);
+      if (!isNaN(t.getTime())) meta = t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    return { main, meta };
+  }
+
+  function renderPhotoEditRows(){
+    photoEditList.innerHTML = '';
+    photoRows.forEach((p, idx) => {
+      const label = photoEditRowLabel(p);
+      const li = document.createElement('li');
+      li.dataset.photoId = p.id;
+      li.innerHTML =
+        '<div class="art-drop has-art" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 200)) + '" alt="" loading="lazy"></div>' +
+        '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '" aria-label="Position">' +
+        '<span class="rank-item"><span class="rank-album">' + escapeHtml(label.main) + '</span>' +
+          (label.meta ? '<span class="rank-meta">' + escapeHtml(label.meta) + '</span>' : '') + '</span>' +
+        '<button class="row-remove-btn" type="button" title="Remove this photo" aria-label="Remove this photo">✕</button>' +
+        '<span class="row-drag-handle" title="Drag to reorder">' +
+          '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" draggable="false">' +
+            '<circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>' +
+            '<circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/>' +
+            '<circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>' +
+          '</svg>' +
+        '</span>';
+      photoEditList.appendChild(li);
+
+      // Tap the thumbnail to see the photo full-size (in the order currently on screen).
+      li.querySelector('.art-drop').addEventListener('click', () => {
+        const rows = Array.from(photoEditList.children);
+        const urls = rows.map(r => (photoRows.find(x => x.id === r.dataset.photoId) || {}).url).filter(Boolean);
+        openPhotoLightbox(urls, Math.max(0, rows.indexOf(li)), null);
+      });
+      li.querySelector('.row-remove-btn').addEventListener('click', () => {
+        showConfirmModal('Remove this photo?', label.main + (label.meta ? ' · ' + label.meta : ''), () => li.remove());
+      });
+      makePhotoEditRowDraggable(li);
+    });
+  }
+
+  let photoEditDragEl = null;
+  function makePhotoEditRowDraggable(li){
+    const handle = li.querySelector('.row-drag-handle');
+    if (!handle) return;
+    handle.setAttribute('draggable', 'true');
+    handle.addEventListener('dragstart', (e) => {
+      photoEditDragEl = li;
+      li.classList.add('dragging');
+      if (e.dataTransfer){
+        e.dataTransfer.effectAllowed = 'move';
+        try{ e.dataTransfer.setData('text/plain', li.dataset.photoId); }catch(err){ /* some browsers refuse; the drag still works */ }
+      }
+    });
+    handle.addEventListener('dragend', () => {
+      li.classList.remove('dragging');
+      photoEditDragEl = null;
+      renumberPhotoEditRows();
+    });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      if (!photoEditDragEl || photoEditDragEl === li || !li.parentNode) return;
+      if (isBeforeInDom(photoEditDragEl, li)){
+        li.parentNode.insertBefore(photoEditDragEl, li.nextSibling);
+      } else {
+        li.parentNode.insertBefore(photoEditDragEl, li);
+      }
+    });
+    li.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  // After a drag settles, the numbers reset to clean multiples of 10 in the
+  // new on-screen order, so the two ways of reordering always agree.
+  function renumberPhotoEditRows(){
+    Array.from(photoEditList.children).forEach((li, i) => {
+      const numInput = li.querySelector('.rank-num-input');
+      if (numInput) numInput.value = (i + 1) * 10;
+    });
+  }
+
+  function enterPhotoEditMode(){
+    if (!photoRows.length) return;
+    photoEditMode = true;
+    renderPhotosPage();
+    window.scrollTo({ top: 0 });
+  }
+
+  function cancelPhotoEdit(){
+    photoEditMode = false;
+    renderPhotosPage();
+  }
+
+  function savePhotoEdit(){
+    const pairs = [];
+    Array.from(photoEditList.children).forEach(li => {
+      const row = photoRows.find(x => x.id === li.dataset.photoId);
+      if (!row) return;
+      const numInput = li.querySelector('.rank-num-input');
+      const raw = Number(numInput.value);
+      const key = (numInput.value.trim() !== '' && Number.isFinite(raw)) ? raw : 1e9; // invalid position -> push to the end
+      pairs.push({ row, key });
+    });
+    pairs.sort((a, b) => a.key - b.key); // stable: equal numbers keep their on-screen order
+    const removed = photoRows.length - pairs.length;
+    photoRows = pairs.map(x => x.row);
+    photoEditMode = false;
+    savePhotoProgress();
+    renderPhotosPage();
+    showToast('Changes saved' + (removed ? ' — ' + removed + (removed === 1 ? ' photo' : ' photos') + ' removed' : ''));
+  }
+
+  photoEditToggleBtn.addEventListener('click', enterPhotoEditMode);
+  photoEditSaveBtn.addEventListener('click', savePhotoEdit);
+  photoEditCancelBtn.addEventListener('click', cancelPhotoEdit);
 
   let photoDragSourceEl = null;
   function makePhotoDraggable(card){
