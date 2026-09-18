@@ -2893,6 +2893,19 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    /* Nature only: the bar used to shrink to fit its content, leaving empty
+       space beside it while the longer labels got cut off with "…". Now it
+       fills the whole row so each of the 4 tabs gets an equal quarter of it
+       (less a small gap). If a label still doesn't fit, it's cut off
+       cleanly at the tab's edge — no ellipsis. */
+    [id^="nature-sub-tabs-"]{
+      flex: 1 0 100%;
+      gap: 6px;
+    }
+    [id^="nature-sub-tabs-"] .group-sub-tab-btn{
+      text-overflow: clip;
+      text-align: left; /* buttons center by default — keep "Hikes" flush with the page's left edge */
+    }
 
     /* The details panel's desktop behavior is a sticky side column that
        widens from 0 to 600px, sitting next to the list. That fundamentally
@@ -14500,6 +14513,11 @@
   // there are many entry points into these (View, New, programmatic closes
   // elsewhere in the code), and a class-list observer catches all of them
   // automatically without touching any of that already-working code.
+  // NOTE: everything below must say window.history, never bare `history`.
+  // Inside this script `history` is the duel-pick array (declared near the
+  // top of the app), which shadows the browser's history object — a bare
+  // history.pushState()/history.back() here throws, and the try/catch
+  // wrappers swallow it, so the back button silently did nothing.
   const BACK_BUTTON_OVERLAYS = [
     { el: modalOverlay, openClass: 'show' },
     { el: artLightboxOverlay, openClass: 'show' },
@@ -14523,7 +14541,7 @@
     if (nowOpen > openOverlayCount){
       for (let i = openOverlayCount; i < nowOpen; i++){
         openOverlayCount++;
-        try{ history.pushState({ overlayDepth: openOverlayCount }, ''); }catch(e){ /* best effort */ }
+        try{ window.history.pushState({ overlayDepth: openOverlayCount }, ''); }catch(e){ /* best effort */ }
       }
     } else if (nowOpen < openOverlayCount){
       const closedCount = openOverlayCount - nowOpen;
@@ -14535,7 +14553,7 @@
       if (!closingOverlayViaBackButton){
         for (let i = 0; i < closedCount; i++){
           ignoreNextPopstate = true;
-          try{ history.back(); }catch(e){ ignoreNextPopstate = false; }
+          try{ window.history.back(); }catch(e){ ignoreNextPopstate = false; }
         }
       }
     }
@@ -14565,6 +14583,12 @@
     if (openOverlayCount > 0){
       closingOverlayViaBackButton = true;
       closeTopmostBackButtonOverlay();
+      // MutationObserver callbacks run only AFTER this handler returns — by
+      // then the flag above is already false, so the observer would treat
+      // this as a UI close and call history.back() a second time, sending
+      // the app to the previous page. Settling the count right here, while
+      // the flag is still true, leaves the observer nothing to act on.
+      handleOverlayClassChange();
       closingOverlayViaBackButton = false;
     }
   });
