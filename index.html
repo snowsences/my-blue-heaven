@@ -1541,6 +1541,50 @@
   .grid-card[draggable="true"]{ cursor: grab; }
   .results-list li.dragging,
   .grid-card.dragging{ opacity: 0.4; }
+
+  /* ---------- TOUCH DRAG-TO-REORDER (see setupTouchDrag in the script) ---------- */
+  .touch-drag-ghost{
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    z-index: 10000;
+    pointer-events: none !important;
+    opacity: 0.92;
+    box-shadow: 0 14px 32px rgba(0,0,0,0.5);
+    transition: none !important;
+    animation: none !important;
+    will-change: transform;
+  }
+  body.touch-dragging{
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+  }
+  @media (pointer: coarse){
+    /* Stops the long-press text-selection / image menu from fighting a hold-to-drag */
+    [draggable="true"]{
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    /* A fingertip needs far more than a 20px-wide target. The extra reach is
+       invisible and grows outward without moving anything in the layout; the
+       handle owns its touches (no page scroll starting from it), which is what
+       lets a drag start the instant a finger moves. */
+    .row-drag-handle{
+      position: relative;
+      touch-action: none;
+    }
+    .row-drag-handle::after{
+      content: '';
+      position: absolute;
+      top: -12px;
+      bottom: -12px;
+      left: -8px;
+      right: -8px;
+    }
+  }
   .results-list li.top{
     background: linear-gradient(90deg, rgba(232,163,61,0.18), var(--panel));
     border-color: var(--amber);
@@ -7481,6 +7525,282 @@
       switcher(subpages[currentIndex - 1]); // swiped right — previous tab
     }
   }, { passive: true });
+
+  // ---------- TOUCH DRAG-TO-REORDER ----------
+  // Every reorder in this app (Albums, Songs, Restaurants, Hikes, Parks,
+  // Roads, Books/Movies/Games/Shows, Dishes) is built on the browser's
+  // built-in HTML5 drag events: dragstart on the item, dragover on whatever
+  // it's dragged across, dragend to commit. Those events only come from a
+  // mouse — on a phone, a finger dragging an item just scrolls the page and
+  // no drag event is ever fired. Rather than re-plumbing every one of those
+  // handlers, this turns touch gestures into the same events, so every
+  // existing handler (and every existing guard — filters, edit mode, guest
+  // mode, which simply never mark anything draggable) works untouched.
+  //
+  //   Row drag handle (⋮⋮):  put a finger on it and move — starts right away
+  //   Whole card / row:      press and hold ~0.35s, then move
+  //
+  // A quick swipe that starts on a card still scrolls the page as normal.
+  (function setupTouchDrag(){
+    const HOLD_MS = 350;      // press-and-hold time before a whole card lifts
+    const HOLD_SLOP = 8;      // px of finger travel that turns a press into a scroll
+    const HANDLE_SLOP = 4;    // px of finger travel before a handle grab starts
+    const EDGE_TOP = 90;      // px from the top of the screen where auto-scroll kicks in
+    const EDGE_BOTTOM = 120;  // ...and from the bottom (larger, to clear the mobile tab bar)
+    const MAX_STEP = 20;      // fastest auto-scroll, px per frame
+
+    let s = null; // the one active touch session, if any
+
+    // The reorder handlers only ever touch these few dataTransfer members
+    // (and Files checks, which an empty `types` correctly answers "no").
+    function makeDataTransfer(){
+      const store = {};
+      return {
+        types: [], files: [], items: [],
+        effectAllowed: 'uninitialized', dropEffect: 'none',
+        setData(type, value){ store[type] = String(value); },
+        getData(type){ return store[type] || ''; },
+        clearData(){},
+        setDragImage(){}
+      };
+    }
+
+    function fireDragEvent(ses, target, type){
+      if (!target) return;
+      const ev = new Event(type, { bubbles: true, cancelable: true });
+      ev.dataTransfer = ses.dt;
+      ev.clientX = ses.x;
+      ev.clientY = ses.y;
+      try { target.dispatchEvent(ev); } catch (err) { console.error('touch drag ' + type + ' handler failed', err); }
+    }
+
+    function findTouch(list){
+      for (let i = 0; i < list.length; i++){
+        if (list[i].identifier === s.id) return list[i];
+      }
+      return null;
+    }
+
+    // ---- the lifted "copy" that follows the finger ----
+    // Styles are copied inline because the app's list styling is scoped to
+    // parents (".results-list li ...") that a copy appended to <body> isn't in.
+    function copyComputedStyles(from, to){
+      const cs = getComputedStyle(from);
+      let css = '';
+      for (let i = 0; i < cs.length; i++) css += cs[i] + ':' + cs.getPropertyValue(cs[i]) + ';';
+      to.style.cssText = css;
+      for (let i = 0; i < from.children.length; i++){
+        if (to.children[i]) copyComputedStyles(from.children[i], to.children[i]);
+      }
+    }
+
+    function buildGhost(){
+      const liftEl = s.isHandle ? (s.source.closest('li') || s.source) : s.source;
+      const rect = liftEl.getBoundingClientRect();
+      try {
+        const ghost = liftEl.cloneNode(true);
+        ghost.classList.remove('dragging');
+        ghost.removeAttribute('id');
+        ghost.removeAttribute('draggable');
+        ghost.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+        copyComputedStyles(liftEl, ghost);
+        ghost.classList.add('touch-drag-ghost');
+        ghost.style.width = rect.width + 'px';
+        ghost.style.height = rect.height + 'px';
+        // Inline copies above would otherwise outrank the class, so these are forced.
+        [['position', 'fixed'], ['left', '0'], ['top', '0'], ['margin', '0'],
+         ['pointer-events', 'none'], ['opacity', '0.92'], ['transition', 'none'],
+         ['animation', 'none'], ['z-index', '10000'],
+         ['box-shadow', '0 14px 32px rgba(0,0,0,0.5)']
+        ].forEach(([p, v]) => ghost.style.setProperty(p, v, 'important'));
+        // The copied styles gave every child an explicit pointer-events value,
+        // which beats inheriting "none" from the parent — without this the copy
+        // would sit under the finger and swallow the hit-test for the real list.
+        ghost.querySelectorAll('*').forEach(n => n.style.setProperty('pointer-events', 'none', 'important'));
+        document.body.appendChild(ghost);
+        s.ghost = ghost;
+        s.offX = s.x - rect.left;
+        s.offY = s.y - rect.top;
+        moveGhost();
+      } catch (err) {
+        s.ghost = null; // dragging still works without the copy — the real item still moves live in the list
+      }
+    }
+
+    function moveGhost(){
+      if (!s.ghost) return;
+      s.ghost.style.transform = 'translate3d(' + (s.x - s.offX) + 'px,' + (s.y - s.offY) + 'px,0) scale(1.04)';
+    }
+
+    // ---- auto-scroll near the top/bottom edge, so long lists can be reordered ----
+    function scrollerFor(el){
+      for (let n = el.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement){
+        const oy = getComputedStyle(n).overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n;
+      }
+      return window;
+    }
+
+    function hitTest(){
+      const el = document.elementFromPoint(s.x, s.y);
+      if (el) fireDragEvent(s, el, 'dragover');
+    }
+
+    function tick(){
+      if (!s || s.phase !== 'dragging') return;
+      const h = window.innerHeight;
+      let dy = 0;
+      if (s.y < EDGE_TOP){
+        dy = -Math.ceil(MAX_STEP * Math.min(1, (EDGE_TOP - s.y) / EDGE_TOP));
+      } else if (s.y > h - EDGE_BOTTOM){
+        dy = Math.ceil(MAX_STEP * Math.min(1, (s.y - (h - EDGE_BOTTOM)) / EDGE_BOTTOM));
+      }
+      if (dy){
+        const sc = scrollerFor(s.source);
+        const before = sc === window ? window.scrollY : sc.scrollTop;
+        if (sc === window) window.scrollBy(0, dy); else sc.scrollTop += dy;
+        const after = sc === window ? window.scrollY : sc.scrollTop;
+        if (after !== before) s.hitPending = true; // content moved under a stationary finger
+      }
+      if (s.hitPending){
+        s.hitPending = false;
+        hitTest();
+      }
+      s.raf = requestAnimationFrame(tick);
+    }
+
+    // ---- session lifecycle ----
+    function beginDrag(){
+      clearTimeout(s.timer);
+      s.timer = null;
+      s.phase = 'dragging';
+      // The page-swipe-between-subtabs gesture (above) must not also fire
+      // when this finger lifts.
+      swipeStartX = null;
+      swipeStartY = null;
+      buildGhost();
+      document.body.classList.add('touch-dragging');
+      fireDragEvent(s, s.source, 'dragstart');
+      if (navigator.vibrate){ try { navigator.vibrate(12); } catch (err) {} }
+      s.hitPending = true;
+      s.raf = requestAnimationFrame(tick);
+    }
+
+    function teardown(commit){
+      const cur = s;
+      if (!cur) return;
+      s = null; // cleared first so nothing a handler does can re-enter this
+      clearTimeout(cur.timer);
+      cancelAnimationFrame(cur.raf);
+      cur.target.removeEventListener('touchmove', onMove);
+      cur.target.removeEventListener('touchend', onEnd);
+      cur.target.removeEventListener('touchcancel', onCancel);
+      if (cur.ghost) cur.ghost.remove();
+      document.body.classList.remove('touch-dragging');
+      cur.source.setAttribute('draggable', 'true'); // put back what touchstart took off
+      if (cur.phase === 'dragging' && commit) fireDragEvent(cur, cur.source, 'dragend');
+    }
+
+    // Belt-and-braces alongside preventDefault on touchend: some browsers
+    // still synthesize a click after a drag, which would open the item's
+    // details panel right after dropping it.
+    function swallowNextClick(){
+      const handler = (ev) => { ev.stopPropagation(); ev.preventDefault(); done(); };
+      const done = () => { window.removeEventListener('click', handler, true); clearTimeout(timer); };
+      const timer = setTimeout(done, 450);
+      window.addEventListener('click', handler, true);
+    }
+
+    function onMove(e){
+      if (!s) return;
+      const t = findTouch(e.touches);
+      if (!t) return;
+      s.x = t.clientX;
+      s.y = t.clientY;
+
+      if (s.phase === 'pending'){
+        const dist = Math.hypot(s.x - s.startX, s.y - s.startY);
+        if (s.isHandle){
+          if (dist <= HANDLE_SLOP) return;
+          beginDrag();
+        } else {
+          // Moved before the hold finished: that's a scroll or swipe, not a
+          // drag. Leave the gesture alone.
+          if (dist > HOLD_SLOP) teardown(false);
+          return;
+        }
+      }
+
+      e.preventDefault(); // owns the gesture now — no page scroll or pull-to-refresh
+      moveGhost();
+      s.hitPending = true;
+    }
+
+    function onEnd(e){
+      if (!s) return;
+      const t = findTouch(e.changedTouches);
+      if (!t) return;
+      if (s.phase === 'dragging'){
+        e.preventDefault();
+        swallowNextClick();
+        s.x = t.clientX;
+        s.y = t.clientY;
+        const el = document.elementFromPoint(s.x, s.y);
+        if (el) fireDragEvent(s, el, 'drop');
+      }
+      teardown(true);
+    }
+
+    function onCancel(){
+      if (s) teardown(true);
+    }
+
+    document.addEventListener('touchstart', (e) => {
+      if (s) teardown(true); // a leftover session (missed touchend) never blocks a fresh gesture
+      if (e.touches.length !== 1) return;
+      const target = e.target;
+      if (!target || !target.closest) return;
+      if (target.closest('input, textarea, select')) return;
+      const source = target.closest('[draggable="true"]');
+      if (!source) return;
+
+      const touch = e.touches[0];
+      s = {
+        id: touch.identifier,
+        target, source,
+        // Grabbing the ⋮⋮ handle starts at once, even on screens where the
+        // whole row (not just the handle) is the drag source.
+        isHandle: !!target.closest('.row-drag-handle'),
+        phase: 'pending',
+        x: touch.clientX, y: touch.clientY,
+        startX: touch.clientX, startY: touch.clientY,
+        offX: 0, offY: 0,
+        timer: null, raf: 0, ghost: null, hitPending: false,
+        dt: makeDataTransfer()
+      };
+
+      // Take over from the browser's own long-press behavior (Android's drag
+      // pickup, iOS's lift gesture, the image/link menu). The attribute is
+      // put back in teardown(); the app's dragstart/dragover/dragend listeners
+      // don't depend on it.
+      source.removeAttribute('draggable');
+
+      // Listeners live on the touched element itself, not the document: the
+      // item gets moved around in the DOM as it's dragged, and touch events
+      // only keep bubbling reliably to the original target.
+      target.addEventListener('touchmove', onMove, { passive: false });
+      target.addEventListener('touchend', onEnd, { passive: false });
+      target.addEventListener('touchcancel', onCancel, { passive: false });
+
+      if (!s.isHandle){
+        s.timer = setTimeout(() => { if (s && s.phase === 'pending') beginDrag(); }, HOLD_MS);
+      }
+    }, { passive: true });
+
+    // No long-press text selection or context menu while a hold is pending or a drag is live.
+    document.addEventListener('contextmenu', (e) => { if (s) e.preventDefault(); });
+    document.addEventListener('selectstart', (e) => { if (s) e.preventDefault(); });
+  })();
 
   // Click anywhere outside the panel closes it — except on a grid card or
   // list row, which have their own click-to-open handling that should just
