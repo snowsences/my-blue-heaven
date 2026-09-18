@@ -3025,6 +3025,30 @@
     .results-list.grid-mode.media-poster-grid{ grid-template-columns: repeat(2, 1fr); }
     .show-category-items.media-poster-grid{ grid-template-columns: repeat(2, 1fr); }
 
+    /* Full-width photo grids on mobile — breaks these three grid
+       containers out of .page-content's own 20px side padding via
+       negative margins, so cards run edge-to-edge and use the maximum
+       available width. Nothing else on the page (headings, filters,
+       buttons) is touched — .page-content's padding stays exactly as-is
+       for everything but these grids. gap is already 2px on all three
+       (unchanged here), so each column's actual width works out to
+       (100vw - 2px) / column-count, same reasoning as the 2-column case
+       having each card at (100vw - 2px) / 2. Covers Albums/Dishes/Photos
+       (.results-list.grid-mode), Restaurants/Hikes/Roads/Parks/Movies
+       (.restaurant-gold-grid), and Books/Games/Shows (the
+       media-poster-grid variants) in one place, so it applies consistently
+       regardless of each grid's own column count.
+       aspect-ratio:1/1 cards (most of these) grow taller automatically as
+       their width grows; Books' poster aspect ratio does the same at its
+       own ratio — neither needs separate handling here. */
+    .restaurant-gold-grid,
+    .results-list.grid-mode,
+    .show-category-items.media-poster-grid{
+      width: calc(100% + 40px);
+      margin-left: -20px;
+      margin-right: -20px;
+    }
+
     /* ---- Bottom-fixed tab bar (mobile only) ----
        Desktop/tablet keeps the fixed top bar (brand + underlined tabs +
        gear icon). Below 768px it becomes a fixed bottom bar instead — the
@@ -4056,6 +4080,7 @@
   <span class="lightbox-caption" id="lightbox-caption"></span>
   <span class="lightbox-counter" id="lightbox-counter"></span>
   <button class="lightbox-cover-toggle-btn" id="lightbox-cover-toggle-btn" type="button"></button>
+  <button class="lightbox-cover-toggle-btn lightbox-dish-cover-btn" id="lightbox-dish-cover-btn" type="button"></button>
   <button class="lightbox-delete-btn" id="lightbox-delete-btn" type="button" title="Delete this photo">🗑️</button>
   <button class="lightbox-goto-btn" id="lightbox-goto-btn" type="button" title="Go to restaurant">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -4265,6 +4290,7 @@
   const lightboxNextBtn = document.getElementById('lightbox-next-btn');
   const lightboxCounter = document.getElementById('lightbox-counter');
   const lightboxCoverToggleBtn = document.getElementById('lightbox-cover-toggle-btn');
+  const lightboxDishCoverBtn = document.getElementById('lightbox-dish-cover-btn');
   const lightboxDeleteBtn = document.getElementById('lightbox-delete-btn');
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
@@ -5764,6 +5790,7 @@
     updateLightboxCaption();
     updateLightboxGotoBtn();
     updateLightboxHideDishBtn();
+    updateLightboxDishCoverBtn();
   }
 
   function updateLightboxCounter(){
@@ -5832,6 +5859,26 @@
     lightboxHideDishBtn.classList.toggle('show', !!dishId);
   }
 
+  // Only for a dish with more than one photo — with just one, there's
+  // nothing to choose between. "How many photos does this dish have" is
+  // read directly from the current lightbox session's own photo set,
+  // since Dishes always opens with every visible dish's photos combined —
+  // counting entries sharing this dishId is exactly that dish's count,
+  // merged dishes included (their combined photos all carry the same id).
+  function updateLightboxDishCoverBtn(){
+    if (!lightboxPhotos){ lightboxDishCoverBtn.classList.remove('show'); return; }
+    const entry = lightboxPhotos[lightboxIndex];
+    const dishId = (entry && typeof entry === 'object') ? entry.dishId : null;
+    if (!dishId){ lightboxDishCoverBtn.classList.remove('show'); return; }
+    const siblingCount = lightboxPhotos.filter(p => ((p && typeof p === 'object') ? p.dishId : null) === dishId).length;
+    if (siblingCount <= 1){ lightboxDishCoverBtn.classList.remove('show'); return; }
+    const course = findCourseByDishId(dishId);
+    const isCover = !!course && course.dishCoverPhoto === lightboxEntryUrl(entry);
+    lightboxDishCoverBtn.textContent = isCover ? '★ Dish cover photo' : '☆ Use as Dish cover photo';
+    lightboxDishCoverBtn.classList.toggle('is-cover', isCover);
+    lightboxDishCoverBtn.classList.add('show');
+  }
+
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
@@ -5841,6 +5888,7 @@
     updateLightboxCaption();
     updateLightboxGotoBtn();
     updateLightboxHideDishBtn();
+    updateLightboxDishCoverBtn();
   }
 
   function closeArtLightbox(){
@@ -5851,6 +5899,7 @@
     lightboxCaption.classList.remove('show');
     lightboxGotoBtn.classList.remove('show');
     lightboxHideDishBtn.classList.remove('show');
+    lightboxDishCoverBtn.classList.remove('show');
     artLightboxImg.src = '';
     lightboxPhotos = null;
     lightboxCoverContext = null;
@@ -5942,6 +5991,25 @@
     updateLightboxCaption();
     updateLightboxGotoBtn();
     updateLightboxHideDishBtn();
+    updateLightboxDishCoverBtn();
+  });
+
+  // Toggling off just clears the chosen cover entirely, same convention
+  // as the Restaurant/Road/Park/Hike cover toggle above — falls back to
+  // the first photo per getDishCoverPhoto once cleared.
+  lightboxDishCoverBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!lightboxPhotos) return;
+    const entry = lightboxPhotos[lightboxIndex];
+    const dishId = (entry && typeof entry === 'object') ? entry.dishId : null;
+    if (!dishId) return;
+    const course = findCourseByDishId(dishId);
+    if (!course) return;
+    const currentUrl = lightboxEntryUrl(entry);
+    course.dishCoverPhoto = course.dishCoverPhoto === currentUrl ? '' : currentUrl;
+    saveRestaurantProgress();
+    renderDishesPage();
+    updateLightboxDishCoverBtn();
   });
 
   // Jumps from a dish's photo in the lightbox to that exact dish's source —
@@ -12574,6 +12642,16 @@
     return course.id;
   }
 
+  // Falls back to the first photo if no cover was ever chosen, or if the
+  // chosen one was since removed from the course's photos entirely.
+  // course.photos is a plain array of URL strings here (unlike Hikes/
+  // Roads/Parks' {url} objects), so this checks against the URLs directly.
+  function getDishCoverPhoto(course){
+    const photos = course.photos || [];
+    if (course.dishCoverPhoto && photos.includes(course.dishCoverPhoto)) return course.dishCoverPhoto;
+    return photos[0] || null;
+  }
+
   function findCourseByDishId(dishId){
     for (const r of restaurantRows){
       for (const visit of ensureRestaurantVisits(r)){
@@ -12642,7 +12720,7 @@
   }
 
   function dishPhotoHtml(course){
-    const photo = (course.photos && course.photos[0]) || null;
+    const photo = getDishCoverPhoto(course);
     return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(photo, 120)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
   }
 
@@ -12771,7 +12849,7 @@
     } else if (showGrid){
       const displayDishes = getGroupedDishes(dishes);
       displayDishes.forEach((d, idx) => {
-        const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
+        const firstPhoto = getDishCoverPhoto(d.course);
         const card = document.createElement('div');
         card.className = 'grid-card';
         card.dataset.dishId = d.id;
@@ -12790,7 +12868,7 @@
       // act on here — that's what Edit mode is for.
       const displayDishes = getGroupedDishes(dishes);
       displayDishes.forEach((d) => {
-        const firstPhoto = (d.course.photos && d.course.photos[0]) || null;
+        const firstPhoto = getDishCoverPhoto(d.course);
         const li = document.createElement('li');
         li.dataset.dishId = d.id;
         li.innerHTML = dishPhotoHtml(d.course) +
@@ -14090,6 +14168,87 @@
   loadParkProgress();
   checkExportReminderBanner();
   loadHikeFullListText();
+  // ---------- ANDROID BACK BUTTON: CLOSE OVERLAYS INSTEAD OF THE APP ----------
+  // In a PWA there's no earlier page in the tab's history, so the hardware/
+  // gesture back button normally just exits the app straight away. This
+  // pushes one extra history entry per open overlay (details panels, the
+  // two full-list panels, the confirm modal, the lightbox) and pops it on
+  // close, so back correctly closes whatever's open first instead.
+  //
+  // Deliberately built via MutationObserver watching each overlay's own
+  // class list, rather than editing every individual open/close function —
+  // there are many entry points into these (View, New, programmatic closes
+  // elsewhere in the code), and a class-list observer catches all of them
+  // automatically without touching any of that already-working code.
+  const BACK_BUTTON_OVERLAYS = [
+    { el: modalOverlay, openClass: 'show' },
+    { el: artLightboxOverlay, openClass: 'show' },
+    { el: hikeFullListPanel, openClass: 'open' },
+    { el: dishFullListPanel, openClass: 'open' },
+    { el: restaurantDetailsPanel, openClass: 'open' },
+    { el: hikeDetailsPanel, openClass: 'open' },
+    { el: roadDetailsPanel, openClass: 'open' },
+    { el: parkDetailsPanel, openClass: 'open' },
+  ];
+  let openOverlayCount = 0;
+  let ignoreNextPopstate = false;
+  let closingOverlayViaBackButton = false;
+
+  function countOpenOverlays(){
+    return BACK_BUTTON_OVERLAYS.filter(o => o.el.classList.contains(o.openClass)).length;
+  }
+
+  function handleOverlayClassChange(){
+    const nowOpen = countOpenOverlays();
+    if (nowOpen > openOverlayCount){
+      for (let i = openOverlayCount; i < nowOpen; i++){
+        openOverlayCount++;
+        try{ history.pushState({ overlayDepth: openOverlayCount }, ''); }catch(e){ /* best effort */ }
+      }
+    } else if (nowOpen < openOverlayCount){
+      const closedCount = openOverlayCount - nowOpen;
+      openOverlayCount = nowOpen;
+      // Only consume history entries here if this closed via the UI (a
+      // close button, backdrop, Escape) — if it closed because the back
+      // button was pressed, the entry is already consumed by that actual
+      // navigation, and closingOverlayViaBackButton below skips this.
+      if (!closingOverlayViaBackButton){
+        for (let i = 0; i < closedCount; i++){
+          ignoreNextPopstate = true;
+          try{ history.back(); }catch(e){ ignoreNextPopstate = false; }
+        }
+      }
+    }
+  }
+
+  BACK_BUTTON_OVERLAYS.forEach(o => {
+    new MutationObserver(handleOverlayClassChange).observe(o.el, { attributes: true, attributeFilter: ['class'] });
+  });
+
+  // Priority order matters here: the confirm modal and lightbox can each
+  // sit on top of a details panel, so they should close first, the same
+  // way pressing Escape or tapping outside would only dismiss the topmost
+  // layer rather than everything underneath it at once.
+  function closeTopmostBackButtonOverlay(){
+    if (modalOverlay.classList.contains('show')){ hideConfirmModal(); return; }
+    if (artLightboxOverlay.classList.contains('show')){ closeArtLightbox(); return; }
+    if (hikeFullListPanel.classList.contains('open')){ closeHikeFullListPanel(); return; }
+    if (dishFullListPanel.classList.contains('open')){ closeDishFullListPanel(); return; }
+    if (restaurantDetailsPanel.classList.contains('open')){ closeRestaurantDetailsPanel(); return; }
+    if (hikeDetailsPanel.classList.contains('open')){ closeHikeDetailsPanel(); return; }
+    if (roadDetailsPanel.classList.contains('open')){ closeRoadDetailsPanel(); return; }
+    if (parkDetailsPanel.classList.contains('open')){ closeParkDetailsPanel(); return; }
+  }
+
+  window.addEventListener('popstate', () => {
+    if (ignoreNextPopstate){ ignoreNextPopstate = false; return; }
+    if (openOverlayCount > 0){
+      closingOverlayViaBackButton = true;
+      closeTopmostBackButtonOverlay();
+      closingOverlayViaBackButton = false;
+    }
+  });
+
   loadDishFullListText();
   loadRoadProgress();
   loadPhotoProgress();
