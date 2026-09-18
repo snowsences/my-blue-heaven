@@ -1542,6 +1542,402 @@
   .results-list li.dragging,
   .grid-card.dragging{ opacity: 0.4; }
 
+  /* ---------- ON THIS DAY (see the ON THIS DAY block in the script) ---------- */
+  /* Phones and tablets only — never shown, and not configurable, on wide screens. */
+  #otd-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 250; /* above the details panels (200) and nav; below the photo viewer (300) */
+    visibility: hidden;
+    pointer-events: none;
+    transition: visibility 0s linear 0.3s;
+  }
+  #otd-overlay.open{
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+  .otd-backdrop{
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 14, 16, 0.66);
+    opacity: 0;
+    transition: opacity 0.28s ease;
+  }
+  #otd-overlay.open .otd-backdrop{ opacity: 1; }
+  .otd-sheet{
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    max-height: calc(100% - 44px);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-bottom: none;
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    overflow: hidden;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  #otd-overlay.open .otd-sheet{ transform: translateY(0); }
+  .otd-grabber{
+    position: relative;
+    z-index: 4;
+    flex: none;
+    height: 26px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 10px;
+  }
+  .otd-handle{
+    width: 40px; height: 4px;
+    border-radius: 999px;
+    background: rgba(241, 236, 222, 0.28);
+  }
+  .otd-close{
+    position: absolute;
+    top: 12px; right: 16px;
+    z-index: 5;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--chalk);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .otd-compact{
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 3;
+    height: 66px;
+    padding: 24px 76px 0 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--panel-line);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .otd-compact.scrolled{ opacity: 1; }
+  .otd-compact-date{ font-size: 18px; font-weight: 700; }
+  .otd-scroll{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  .otd-eyebrow{
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--amber);
+  }
+  .otd-header{ padding: 8px 56px 0 0; }
+  .otd-title{
+    margin: 6px 0 0;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.05;
+    font-family: 'Figtree', sans-serif;
+    color: var(--chalk);
+  }
+  .otd-sub{ margin-top: 6px; font-size: 14px; color: var(--chalk-dim); }
+  .otd-lede{ margin: 16px 0 0; font-size: 16px; line-height: 1.45; }
+  .otd-year{ margin-top: 22px; }
+  .otd-year-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .otd-year-ago{ font-size: 15px; font-weight: 700; }
+  .otd-year-date{ font-size: 13px; color: var(--chalk-dim); }
+  .otd-year-body{ display: flex; flex-direction: column; gap: 12px; }
+  .otd-year-body-compact{ gap: 10px; }
+
+  .otd-card{
+    display: block;
+    width: 100%;
+    padding: 0;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 18px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .otd-hero{
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 128px;
+    background: #2F4C4A;
+    color: rgba(241, 236, 222, 0.34);
+    overflow: hidden;
+  }
+  .otd-hero-icon{ display: flex; }
+  .otd-hero-img{
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .otd-hero-chip{
+    position: absolute;
+    left: 12px; bottom: 12px;
+    z-index: 1;
+    background: rgba(20, 42, 46, 0.88);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--chalk);
+  }
+  .otd-body{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 16px;
+  }
+  .otd-row-between{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .otd-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(232, 163, 61, 0.16);
+    color: var(--amber);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .otd-rank{ font-size: 13px; font-weight: 600; color: var(--amber); }
+  .otd-name{ display: block; font-size: 21px; font-weight: 700; line-height: 1.15; }
+  .otd-place{ display: block; margin-top: 2px; font-size: 14px; color: var(--chalk-dim); }
+  .otd-score{ display: flex; align-items: center; gap: 12px; }
+  .otd-score-num{
+    flex: none;
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--amber);
+  }
+  .otd-score-text{ display: flex; flex-direction: column; font-size: 14px; line-height: 1.35; }
+  .otd-score-title{ font-weight: 600; }
+  .otd-score-sub{ color: var(--chalk-dim); }
+  .otd-dishes{ font-size: 14px; line-height: 1.4; color: var(--chalk-dim); }
+  .otd-star{
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(232, 163, 61, 0.16);
+    color: var(--amber);
+    border-radius: 12px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .otd-insights{ display: flex; flex-direction: column; gap: 6px; }
+  .otd-insights-ruled{ padding-top: 10px; margin-top: 2px; border-top: 1px solid var(--panel-line); }
+  .otd-insight{ display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.35; }
+  .otd-dot{ flex: none; width: 6px; height: 6px; margin-top: 7px; border-radius: 999px; background: var(--amber); }
+
+  .otd-row{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px 10px 10px;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    cursor: pointer;
+  }
+  .otd-thumb{
+    position: relative;
+    flex: none;
+    width: 76px; height: 76px;
+    border-radius: 12px;
+    background: #2C4A4E;
+    color: rgba(241, 236, 222, 0.34);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .otd-row-text{ display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .otd-kicker{ font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--amber); }
+  .otd-row-name{ font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .otd-row-place{ font-size: 13px; color: var(--chalk-dim); }
+  .otd-row-line{ font-size: 13px; }
+  .otd-chevron{ flex: none; display: flex; color: var(--chalk-dim); }
+
+  .otd-photos-card{
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 18px;
+    padding: 14px;
+  }
+  .otd-photos-count{ font-size: 14px; font-weight: 600; }
+  .otd-photo-grid{
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .otd-tile{
+    position: relative;
+    display: block;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+    background: #2F4C4A;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .otd-tile-more{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 42, 46, 0.66);
+    color: var(--chalk);
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .otd-end{ margin: 26px 0 0; text-align: center; font-size: 14px; color: var(--chalk-dim); }
+  .otd-done{
+    display: block;
+    width: 100%;
+    height: 52px;
+    margin-top: 16px;
+    border: none;
+    border-radius: 999px;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: 'Figtree', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  @media (prefers-reduced-motion: reduce){
+    #otd-overlay, .otd-backdrop, .otd-sheet, .otd-compact{ transition: none !important; }
+  }
+  @media (min-width: 769px){
+    #otd-overlay{ display: none !important; }
+    #otd-settings-section{ display: none; }
+  }
+
+  /* Settings section */
+  .otd-setting-row{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .otd-setting-row input[type="checkbox"]{
+    width: 22px; height: 22px;
+    accent-color: var(--amber);
+    margin: 0;
+    flex: none;
+  }
+  .otd-switch{
+    flex: none;
+    width: 52px; height: 32px;
+    padding: 3px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(241, 236, 222, 0.22);
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    cursor: pointer;
+  }
+  .otd-switch.on{ background: var(--amber); justify-content: flex-end; }
+  .otd-switch-knob{ display: block; width: 26px; height: 26px; border-radius: 999px; background: var(--bg); }
+  .otd-settings-caption{
+    margin: 14px 0 2px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--chalk-dim);
+  }
+  .otd-undated-box{
+    margin-top: 16px;
+    padding: 14px;
+    background: rgba(232, 163, 61, 0.12);
+    border: 1px solid rgba(232, 163, 61, 0.32);
+    border-radius: 14px;
+  }
+  .otd-undated-title{ font-size: 14px; font-weight: 700; color: var(--amber); }
+  .otd-undated-text{ margin: 4px 0 0; font-size: 14px; line-height: 1.45; }
+  .otd-undated-toggle{
+    margin-top: 6px;
+    min-height: 44px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--amber);
+    font-family: 'Figtree', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .otd-undated-list{ display: none; margin-top: 4px; }
+  .otd-undated-item{
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 0;
+    text-align: left;
+    border: none;
+    border-top: 1px solid var(--panel-line);
+    background: transparent;
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
   /* ---------- TOUCH DRAG-TO-REORDER (see setupTouchDrag in the script) ---------- */
   .touch-drag-ghost{
     position: fixed !important;
@@ -4076,6 +4472,34 @@
         <p class="footer-note" style="margin-top:10px;">Export from MusicBee: Tools &gt; Additional Tagging Tools &gt; Library Report, with columns Album Artist, Album, Track #, Title, Rating, Love.</p>
       </div>
 
+      <div class="settings-section" id="otd-settings-section">
+        <h2 class="settings-section-title">On This Day</h2>
+        <p class="footer-note" style="margin:0 0 6px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">A look back at hikes, restaurants and photos from this date in earlier years. It shows once a day, the first time you open the app on this device.</p>
+
+        <div class="otd-setting-row" style="border-top:1px solid var(--panel-line); min-height:56px;">
+          <span style="font-weight:600;">Show On this day</span>
+          <button type="button" class="otd-switch" id="otd-master-switch" role="switch" aria-checked="true" aria-label="Show On this day"><span class="otd-switch-knob"></span></button>
+        </div>
+
+        <div style="border-top:1px solid var(--panel-line);">
+          <div class="otd-settings-caption">INCLUDE</div>
+          <label class="otd-setting-row"><span>Hikes</span><input type="checkbox" id="otd-hikes-check" checked></label>
+          <label class="otd-setting-row"><span>Restaurants</span><input type="checkbox" id="otd-restaurants-check" checked></label>
+          <label class="otd-setting-row" style="min-height:56px;"><span style="display:flex; flex-direction:column; gap:2px;"><span>Photos</span><span style="font-size:13px; line-height:1.35; color:var(--chalk-dim);">Matched by the date at the start of each file name, like 20250517_021456</span></span><input type="checkbox" id="otd-photos-check" checked></label>
+        </div>
+
+        <div class="import-row" style="margin-top:8px;">
+          <button class="btn-ghost" id="otd-show-again-btn" type="button">Show today's again</button>
+        </div>
+
+        <div class="otd-undated-box" id="otd-undated-box" style="display:none;">
+          <div class="otd-undated-title" id="otd-undated-title"></div>
+          <p class="otd-undated-text" id="otd-undated-text"></p>
+          <button type="button" class="otd-undated-toggle" id="otd-undated-toggle">Review undated items</button>
+          <div class="otd-undated-list" id="otd-undated-list"></div>
+        </div>
+      </div>
+
       <!-- Future: <div class="settings-section"><h2 class="settings-section-title">Restaurant Ranker Settings</h2>...</div> -->
     </div>
   </div>
@@ -4137,6 +4561,21 @@
 </div>
 
 <div class="toast" id="toast">Copied to clipboard</div>
+
+<div class="otd-overlay" id="otd-overlay" aria-hidden="true">
+  <div class="otd-backdrop" id="otd-backdrop"></div>
+  <div class="otd-sheet" id="otd-sheet" role="dialog" aria-modal="true" aria-labelledby="otd-title">
+    <div class="otd-grabber" id="otd-grabber"><span class="otd-handle"></span></div>
+    <div class="otd-compact" id="otd-compact" aria-hidden="true">
+      <span class="otd-eyebrow">ON THIS DAY</span>
+      <span class="otd-compact-date" id="otd-compact-date"></span>
+    </div>
+    <button type="button" class="otd-close" id="otd-close-btn" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
+    <div class="otd-scroll" id="otd-scroll"><div id="otd-content"></div></div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal-box">
@@ -4786,6 +5225,11 @@
   // is called at the very end of checkSavedProgress().
   let resolveLocalDataReady;
   const localDataReadyPromise = new Promise(resolve => { resolveLocalDataReady = resolve; });
+  // Same idea for the cloud copy: resolves once the signed-in session's data
+  // has been merged in (or right away when nobody is signed in). "On This
+  // Day" waits on it briefly so it's built from the complete picture.
+  let resolveCloudSettled;
+  const cloudSettledPromise = new Promise(resolve => { resolveCloudSettled = resolve; });
 
   function updateFirebaseUI(){
     if (firebaseUser){
@@ -5135,6 +5579,7 @@
         guestViewEnabled = true;
         document.body.classList.add('guest-view-active');
       }
+      if (!user) resolveCloudSettled();
       if (user){
         await localDataReadyPromise; // see this promise's own comment — avoids racing checkSavedProgress
         if (isLockedGuestAccount){
@@ -5148,6 +5593,7 @@
           }
         }
         await loadOrSeedFirestoreData();
+        resolveCloudSettled();
         if (!isLockedGuestAccount){
           // MusicBee data is Albums-only, and Albums is entirely hidden for
           // this account — nothing here would ever be shown to it, so
@@ -7390,6 +7836,9 @@
     }
     if (page === 'parks'){
       renderParksPage();
+    }
+    if (page === 'settings'){
+      refreshOtdSettingsUI(); // the undated-items count can change whenever data does
     }
     if (page === 'roads'){
       renderRoadsPage();
@@ -12291,16 +12740,32 @@
       if (!files.length) return;
       const originalText = photoAddBtn.textContent;
       const uploaded = [];
+      let undatedCount = 0;
       for (let i = 0; i < files.length; i++){
         if (files.length > 1) photoAddBtn.textContent = 'Uploading ' + (i + 1) + '/' + files.length + '...';
         const url = await uploadRestaurantPhoto(files[i], 'RankHeaven/Photos');
-        if (url) uploaded.push({ id: 'ph' + Date.now().toString(36) + Math.random().toString(36).slice(2), url });
+        if (url){
+          const row = { id: 'ph' + Date.now().toString(36) + Math.random().toString(36).slice(2), url };
+          // A file named like 20250517_021456.jpg carries the date it was taken
+          // (anything after that — "-2", an extension — is ignored). It's kept
+          // on the photo so "On This Day" can find it; the file name itself
+          // isn't stored anywhere else once the photo is uploaded.
+          const info = parsePhotoFilenameDateTime(files[i].name);
+          if (info){
+            row.date = info.dateKey;
+            row.time = info.timestamp.toTimeString().slice(0, 8);
+          } else {
+            undatedCount++;
+          }
+          uploaded.push(row);
+        }
       }
       photoAddBtn.textContent = originalText;
       if (uploaded.length){
         photoRows.push(...uploaded); // added to the bottom of the list
         savePhotoProgress();
         renderPhotosPage();
+        if (undatedCount) showToast(undatedCount + (undatedCount === 1 ? ' photo has' : ' photos have') + ' no date in the file name');
       }
     });
     input.click();
@@ -14595,6 +15060,7 @@
     if (hikeDetailsPanel.classList.contains('open')){ closeHikeDetailsPanel(); return; }
     if (roadDetailsPanel.classList.contains('open')){ closeRoadDetailsPanel(); return; }
     if (parkDetailsPanel.classList.contains('open')){ closeParkDetailsPanel(); return; }
+    if (otdOverlay.classList.contains('open')){ closeOnThisDay(); return; }
   }
 
   window.addEventListener('popstate', () => {
@@ -14612,6 +15078,690 @@
     }
   });
 
+  // ---------- ON THIS DAY ----------
+  // A once-a-day look back, shown the first time the app is opened on a new
+  // day (on phone/tablet widths only): the hikes, restaurant visits and
+  // photos that happened on this exact month and day in earlier years.
+  //
+  // Where it gets its dates from:
+  //   • Hikes         — each outing's own date (hike.dates[].date)
+  //   • Restaurants   — each visit's date (restaurant.visits[].date)
+  //   • Photos        — the date read from the file name when the photo was
+  //                     uploaded (photoRows[].date; see the Photos upload handler)
+  // Anything without a valid date can't appear. Notes are deliberately never
+  // shown here. Everything below is read-only: showing this never saves,
+  // syncs or changes any ranking data. Its own settings and the "already
+  // shown today" marker live on this device only.
+  const OTD_STORAGE_KEY = 'on-this-day-settings';
+  const OTD_MAX_WIDTH_QUERY = '(max-width: 768px)'; // same cutoff the app's mobile layout uses
+  // Restaurant courses imported from photos are named by their timestamp
+  // ("7:33 PM"), which isn't a dish name and shouldn't be listed as one.
+  const OTD_TIME_LABEL = /^\d{1,2}:\d{2}\s*([AaPp][Mm])?$/;
+
+  const otdOverlay = document.getElementById('otd-overlay');
+  const otdBackdrop = document.getElementById('otd-backdrop');
+  const otdSheet = document.getElementById('otd-sheet');
+  const otdScroll = document.getElementById('otd-scroll');
+  const otdContent = document.getElementById('otd-content');
+  const otdCompact = document.getElementById('otd-compact');
+  const otdCompactDate = document.getElementById('otd-compact-date');
+  const otdCloseBtn = document.getElementById('otd-close-btn');
+
+  let otdSettings = { enabled: true, hikes: true, restaurants: true, photos: true, lastShown: '' };
+  let otdItems = [];        // what each tappable card/tile in the open pop-up points at
+  let otdReturnFocus = null;
+  let otdReady = false;     // startup waits (local data, cloud merge) are done
+
+  function otdSleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  async function loadOtdSettings(){
+    try{
+      const res = await window.storage.get(OTD_STORAGE_KEY, false);
+      if (res && res.value){
+        const p = JSON.parse(res.value);
+        otdSettings = {
+          enabled: p.enabled !== false,
+          hikes: p.hikes !== false,
+          restaurants: p.restaurants !== false,
+          photos: p.photos !== false,
+          lastShown: typeof p.lastShown === 'string' ? p.lastShown : ''
+        };
+      }
+    }catch(e){ /* nothing saved yet — defaults apply */ }
+  }
+  // Deliberately NOT followed by scheduleSyncWrite(): these are per-device.
+  function saveOtdSettings(){
+    try{ window.storage.set(OTD_STORAGE_KEY, JSON.stringify(otdSettings), false); }catch(e){ /* best effort */ }
+  }
+
+  // ---------- dates ----------
+  function otdPad(n){ return String(n).padStart(2, '0'); }
+  function otdDateKey(d){ return d.getFullYear() + '-' + otdPad(d.getMonth() + 1) + '-' + otdPad(d.getDate()); }
+  function otdIsLeap(y){ return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
+
+  // "2025-09-18" -> { y, m, d, str }, or null for anything blank or not a
+  // real calendar date (checked explicitly — JS's Date silently rolls
+  // month 13 over into the next year instead of rejecting it).
+  function otdParse(str){
+    const m = typeof str === 'string' ? str.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null;
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const t = new Date(y, mo - 1, d);
+    if (t.getFullYear() !== y || t.getMonth() !== mo - 1 || t.getDate() !== d) return null;
+    return { y, m: mo, d, str };
+  }
+
+  // Exact month + day, earlier years only. The one exception: a Feb 29
+  // memory has no exact match in a non-leap year, so it shows on Feb 28.
+  function otdMatches(p, today){
+    if (!p || p.y >= today.y) return false;
+    if (p.m === today.m && p.d === today.d) return true;
+    if (p.m === 2 && p.d === 29 && today.m === 2 && today.d === 28 && !otdIsLeap(today.y)) return true;
+    return false;
+  }
+
+  function otdLongDate(dateStr){ // "Thu · Sep 18, 2025"
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short' }) + ' · ' +
+      d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function otdMonthYear(dateStr){
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
+  function otdPlural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
+  function otdJoin(parts){
+    if (parts.length <= 1) return parts[0] || '';
+    return parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+  }
+
+  // ---------- figuring out what happened on this date ----------
+  function otdCoursePhotos(course){
+    if (Array.isArray(course.photos)) return course.photos.filter(Boolean);
+    return course.photo ? [course.photo] : [];
+  }
+
+  // Up to two short lines about where this outing sits in the place's own
+  // history ("3rd visit here · first was Mar 2024", "You've been back once
+  // since"). `distinct` is every valid date recorded for that place, sorted.
+  function otdHistoryLines(distinct, dateStr, kind){
+    const k = distinct.indexOf(dateStr) + 1;
+    const n = distinct.length;
+    const back = n - k;
+    const lines = [];
+    if (n === 1){
+      lines.push(kind === 'hike' ? 'Only time on this trail so far' : 'Only visit here so far');
+    } else if (k === 1){
+      lines.push(kind === 'hike' ? 'First time on this trail' : 'First visit here');
+    } else {
+      lines.push(ordinal(k) + (kind === 'hike' ? ' time here' : ' visit here') + ' · first was ' + otdMonthYear(distinct[0]));
+    }
+    if (n > 1){
+      if (back === 1) lines.push("You've been back once since");
+      else if (back > 1) lines.push("You've been back " + back + ' times since');
+      else lines.push(kind === 'hike' ? 'Your most recent time on this trail' : 'Your most recent visit here');
+    }
+    return lines;
+  }
+
+  function otdCollect(now){
+    const today = { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+    const byYear = new Map();
+    const slot = (p) => {
+      let g = byYear.get(p.y);
+      if (!g){ g = { year: p.y, dateStr: p.str, hikes: [], restaurants: [], photos: [] }; byYear.set(p.y, g); }
+      return g;
+    };
+
+    if (otdSettings.hikes){
+      const ordered = getOrderedHikes();
+      hikeRows.forEach(h => {
+        const dated = (h.dates || []).map(d => ({ d, p: otdParse(d.date) })).filter(x => x.p);
+        const matches = dated.filter(x => otdMatches(x.p, today));
+        if (!matches.length) return;
+        const distinct = Array.from(new Set(dated.map(x => x.p.str))).sort();
+        const perYear = new Map(); // two outings on the same day become one card
+        matches.forEach(x => {
+          let e = perYear.get(x.p.y);
+          if (!e){ e = { p: x.p, entries: [] }; perYear.set(x.p.y, e); }
+          e.entries.push(x.d);
+        });
+        perYear.forEach(e => {
+          const photos = [];
+          e.entries.forEach(en => (en.photos || []).forEach(ph => {
+            const url = ph && ph.url;
+            if (url && photos.indexOf(url) === -1) photos.push(url);
+          }));
+          slot(e.p).hikes.push({
+            type: 'hike', hike: h, dateId: e.entries[0].id, dateStr: e.p.str,
+            photos, cover: h.coverPhoto || '',
+            rank: ordered.indexOf(h) + 1, total: hikeRows.length,
+            history: otdHistoryLines(distinct, e.p.str, 'hike')
+          });
+        });
+      });
+    }
+
+    if (otdSettings.restaurants){
+      const total = restaurantRows.length;
+      const tiersUsable = !!restaurantTierBoundaries && restaurantTierBoundariesTotal === total;
+      restaurantRows.forEach((r, ri) => {
+        const visits = Array.isArray(r.visits) ? r.visits : [];
+        const dated = visits.map(v => ({ v, p: otdParse(v.date) })).filter(x => x.p);
+        const matches = dated.filter(x => otdMatches(x.p, today));
+        if (!matches.length) return;
+        const distinct = Array.from(new Set(dated.map(x => x.p.str))).sort();
+        const visitAvgs = visits.map(v => computeVisitAverageScore(v)).filter(s => s !== null);
+        const overallAvg = visitAvgs.length ? visitAvgs.reduce((a, b) => a + b, 0) / visitAvgs.length : null;
+        const perYear = new Map(); // two visits on the same day become one card
+        matches.forEach(x => {
+          let e = perYear.get(x.p.y);
+          if (!e){ e = { p: x.p, visits: [] }; perYear.set(x.p.y, e); }
+          e.visits.push(x.v);
+        });
+        perYear.forEach(e => {
+          const courses = [];
+          e.visits.forEach(v => (v.courses || []).forEach(c => courses.push(c)));
+
+          // Photo: the top-scored course's, then the visit's own, then any course's, then the restaurant's cover.
+          const scored = courses.filter(c => c.score !== null && c.score !== undefined && c.score !== '' && !isNaN(Number(c.score)));
+          const byScore = scored.slice().sort((a, b) => Number(b.score) - Number(a.score));
+          let cover = '', coverIsTopDish = false;
+          for (const c of byScore){
+            const ph = otdCoursePhotos(c);
+            if (ph.length){ cover = ph[0]; coverIsTopDish = true; break; }
+          }
+          if (!cover){
+            for (const v of e.visits){ if ((v.photos || []).filter(Boolean).length){ cover = v.photos.filter(Boolean)[0]; break; } }
+          }
+          if (!cover){
+            for (const c of courses){ const ph = otdCoursePhotos(c); if (ph.length){ cover = ph[0]; break; } }
+          }
+          if (!cover) cover = r.coverPhoto || '';
+
+          // Score for the day, and how it compares with the rest of this place's scored visits.
+          const nums = scored.map(c => Number(c.score));
+          const avg = nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null;
+          let scoreSub = '';
+          if (avg !== null){
+            if (visitAvgs.length >= 2 && avg >= Math.max.apply(null, visitAvgs) && visitAvgs.some(s => s < avg)){
+              scoreSub = 'Your best visit here';
+            } else if (visitAvgs.length >= 2 && overallAvg !== null && avg - overallAvg >= 0.3){
+              scoreSub = 'Above your ' + overallAvg.toFixed(1) + ' average here';
+            } else if (visitAvgs.length >= 2 && overallAvg !== null && avg - overallAvg <= -0.3){
+              scoreSub = 'Below your ' + overallAvg.toFixed(1) + ' average here';
+            } else if (visitAvgs.length >= 2){
+              scoreSub = 'About your usual here';
+            } else {
+              scoreSub = otdPlural(nums.length, 'course', 'courses') + ' scored';
+            }
+          }
+
+          const names = [];
+          courses.forEach(c => {
+            const t = (c.text || '').trim();
+            if (t && !OTD_TIME_LABEL.test(t) && names.indexOf(t) === -1) names.push(t);
+          });
+          const stars = courses.filter(c => c.score === '12' && !c.hiddenFromDishes);
+          let star = '';
+          if (stars.length > 1) star = stars.length + ' dishes scored 12/10';
+          else if (stars.length === 1){
+            const t = (stars[0].text || '').trim();
+            star = (t && !OTD_TIME_LABEL.test(t)) ? 'Dish of the night: ' + t + ', 12/10' : 'A 12/10 dish';
+          }
+
+          const rank = ri + 1;
+          slot(e.p).restaurants.push({
+            type: 'restaurant', restaurant: r, visitId: e.visits[0].id, dateStr: e.p.str,
+            cover, coverIsTopDish, avg, scoreSub,
+            dishes: names.slice(0, 3), moreDishes: Math.max(0, names.length - 3), star,
+            rank, total, tier: tiersUsable ? getRestaurantTierForRank(rank, restaurantTierBoundaries) : null,
+            history: otdHistoryLines(distinct, e.p.str, 'restaurant')
+          });
+        });
+      });
+    }
+
+    if (otdSettings.photos){
+      photoRows.forEach(ph => {
+        const p = ph && ph.url ? otdParse(ph.date) : null;
+        if (p && otdMatches(p, today)) slot(p).photos.push({ url: ph.url, time: ph.time || '' });
+      });
+      byYear.forEach(g => g.photos.sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+    }
+
+    const groups = Array.from(byYear.values())
+      .filter(g => g.hikes.length || g.restaurants.length || g.photos.length)
+      .sort((a, b) => b.year - a.year);
+    const counts = { hikes: 0, restaurants: 0, photos: 0, photoDays: 0, memories: 0, years: groups.length };
+    groups.forEach(g => {
+      counts.hikes += g.hikes.length;
+      counts.restaurants += g.restaurants.length;
+      counts.photos += g.photos.length;
+      if (g.photos.length) counts.photoDays++;
+    });
+    counts.memories = counts.hikes + counts.restaurants + counts.photoDays;
+    return { now, groups, counts };
+  }
+
+  // ---------- drawing it ----------
+  function otdIcon(name, size){
+    const s = size || 16;
+    if (name === 'star'){
+      return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"></path></svg>';
+    }
+    const paths = {
+      hike: '<path d="M3 19l6.5-11 4 6.5 2.5-3.5L21 19z"></path>',
+      food: '<path d="M6 3v6a2.5 2.5 0 0 0 5 0V3"></path><path d="M8.5 3v18"></path><path d="M17 3c-2 1.5-3 4-3 7h3v11"></path>',
+      camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.5" r="3.3"></circle>',
+      chevron: '<path d="M9 6l6 6-6 6"></path>',
+      close: '<path d="M6 6l12 12M18 6L6 18"></path>'
+    };
+    return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[name] + '</svg>';
+  }
+
+  function otdRegister(item){ otdItems.push(item); return otdItems.length - 1; }
+
+  function otdInsightsHtml(lines){
+    return lines.map(l => '<span class="otd-insight"><span class="otd-dot"></span><span>' + escapeHtml(l) + '</span></span>').join('');
+  }
+
+  function otdHeroHtml(url, icon, chipText){
+    return '<span class="otd-hero">' +
+      '<span class="otd-hero-icon">' + otdIcon(icon, 44) + '</span>' +
+      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 640)) + '" alt="" loading="lazy" decoding="async">' : '') +
+      (chipText ? '<span class="otd-hero-chip">' + escapeHtml(chipText) + '</span>' : '') +
+    '</span>';
+  }
+
+  function otdThumbHtml(url, icon){
+    return '<span class="otd-thumb">' +
+      '<span class="otd-hero-icon">' + otdIcon(icon, 28) + '</span>' +
+      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 240)) + '" alt="" loading="lazy" decoding="async">' : '') +
+    '</span>';
+  }
+
+  function otdHikePlace(h){ return [h.city, h.state, h.country].filter(Boolean).join(', '); }
+  function otdRestaurantPlace(r){ return [r.cuisine, r.location].filter(Boolean).join(' · '); }
+
+  function otdRestaurantRankHtml(m){
+    const text = '#' + m.rank + ' of ' + m.total;
+    if (m.tier) return '<span class="otd-rank" style="color:' + m.tier.color + ';">' + escapeHtml(m.tier.name + ' · ' + text) + '</span>';
+    return '<span class="otd-rank">' + escapeHtml(text) + '</span>';
+  }
+
+  function otdHikeCardHtml(m, compact){
+    const h = m.hike;
+    const url = m.photos[0] || m.cover;
+    const name = h.name || 'Untitled hike';
+    const idx = otdRegister(m);
+    if (compact){
+      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
+        otdThumbHtml(url, 'hike') +
+        '<span class="otd-row-text">' +
+          '<span class="otd-kicker">HIKE · #' + m.rank + ' OF ' + m.total + '</span>' +
+          '<span class="otd-row-name">' + escapeHtml(name) + '</span>' +
+          (otdHikePlace(h) ? '<span class="otd-row-place">' + escapeHtml(otdHikePlace(h)) + '</span>' : '') +
+          '<span class="otd-row-line">' + escapeHtml(m.history[0]) + '</span>' +
+        '</span>' +
+        '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
+      '</button>';
+    }
+    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
+      otdHeroHtml(url, 'hike', m.photos.length > 1 ? m.photos.length + ' photos' : '') +
+      '<span class="otd-body">' +
+        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('hike', 12) + 'HIKE</span><span class="otd-rank">#' + m.rank + ' of ' + m.total + '</span></span>' +
+        '<span><span class="otd-name">' + escapeHtml(name) + '</span>' +
+          (otdHikePlace(h) ? '<span class="otd-place">' + escapeHtml(otdHikePlace(h)) + '</span>' : '') + '</span>' +
+        '<span class="otd-insights">' + otdInsightsHtml(m.history) + '</span>' +
+      '</span>' +
+    '</button>';
+  }
+
+  function otdRestaurantCardHtml(m, compact){
+    const r = m.restaurant;
+    const name = r.name || 'Untitled restaurant';
+    const idx = otdRegister(m);
+    if (compact){
+      const line = m.avg !== null ? ('Visit score ' + m.avg.toFixed(1) + (m.scoreSub === 'Your best visit here' ? ' · your best here' : '')) : m.history[0];
+      const kicker = 'RESTAURANT' + (m.tier ? ' · ' + m.tier.name.toUpperCase() + ' #' + m.rank : ' · #' + m.rank + ' OF ' + m.total);
+      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
+        otdThumbHtml(m.cover, 'food') +
+        '<span class="otd-row-text">' +
+          '<span class="otd-kicker">' + escapeHtml(kicker) + '</span>' +
+          '<span class="otd-row-name">' + escapeHtml(name) + '</span>' +
+          (otdRestaurantPlace(r) ? '<span class="otd-row-place">' + escapeHtml(otdRestaurantPlace(r)) + '</span>' : '') +
+          '<span class="otd-row-line">' + escapeHtml(line) + '</span>' +
+        '</span>' +
+        '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
+      '</button>';
+    }
+    const dishText = m.dishes.length ? m.dishes.join(' · ') + (m.moreDishes ? ' · +' + m.moreDishes + ' more' : '') : '';
+    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
+      otdHeroHtml(m.cover, 'food', m.coverIsTopDish ? 'Photo of the top dish' : '') +
+      '<span class="otd-body">' +
+        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('food', 12) + 'RESTAURANT</span>' + otdRestaurantRankHtml(m) + '</span>' +
+        '<span><span class="otd-name">' + escapeHtml(name) + '</span>' +
+          (otdRestaurantPlace(r) ? '<span class="otd-place">' + escapeHtml(otdRestaurantPlace(r)) + '</span>' : '') + '</span>' +
+        (m.avg !== null
+          ? '<span class="otd-score"><span class="otd-score-num">' + m.avg.toFixed(1) + '</span><span class="otd-score-text"><span class="otd-score-title">Visit score</span><span class="otd-score-sub">' + escapeHtml(m.scoreSub) + '</span></span></span>'
+          : '') +
+        (dishText ? '<span class="otd-dishes">' + escapeHtml(dishText) + '</span>' : '') +
+        (m.star ? '<span class="otd-star">' + otdIcon('star', 14) + escapeHtml(m.star) + '</span>' : '') +
+        '<span class="otd-insights otd-insights-ruled">' + otdInsightsHtml(m.history) + '</span>' +
+      '</span>' +
+    '</button>';
+  }
+
+  function otdPhotosCardHtml(g){
+    const urls = g.photos.map(p => p.url);
+    const token = otdRegister({ type: 'photos', urls });
+    const shown = urls.length <= 4 ? urls : urls.slice(0, 4);
+    const tiles = shown.map((u, i) => {
+      const isMore = urls.length > 4 && i === 3;
+      return '<button type="button" class="otd-tile" data-otd-photos="' + token + '" data-otd-index="' + i + '" aria-label="' +
+        (isMore ? 'See all ' + urls.length + ' photos' : 'Open photo ' + (i + 1) + ' of ' + urls.length) + '">' +
+        '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy" decoding="async">' +
+        (isMore ? '<span class="otd-tile-more">+' + (urls.length - 3) + '</span>' : '') +
+      '</button>';
+    }).join('');
+    return '<div class="otd-photos-card">' +
+      '<div class="otd-row-between"><span class="otd-chip">' + otdIcon('camera', 12) + 'PHOTOS</span>' +
+      '<span class="otd-photos-count">' + escapeHtml(otdPlural(urls.length, 'photo', 'photos') + ' from this day') + '</span></div>' +
+      '<div class="otd-photo-grid">' + tiles + '</div>' +
+    '</div>';
+  }
+
+  function otdRender(data){
+    otdItems = [];
+    const now = data.now;
+    const c = data.counts;
+    const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const monthDay = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    const shortDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const sub = weekday + ' · ' + otdPlural(c.memories, 'memory', 'memories') + (c.years > 1 ? ' across ' + c.years + ' years' : '');
+
+    let lede = '';
+    if (c.memories >= 2){
+      const parts = [];
+      if (c.hikes) parts.push(otdPlural(c.hikes, 'hike', 'hikes'));
+      if (c.restaurants) parts.push(otdPlural(c.restaurants, 'restaurant visit', 'restaurant visits'));
+      if (c.photos) parts.push(otdPlural(c.photos, 'photo', 'photos'));
+      lede = otdJoin(parts) + ' have landed on this date, ' +
+        (c.years > 1 ? 'spread over ' + c.years + ' different years.' : 'all from ' + data.groups[0].year + '.');
+    }
+
+    const yearsHtml = data.groups.map((g, gi) => {
+      const compact = gi > 0; // the most recent year gets full cards; older years collapse to rows
+      const ago = now.getFullYear() - g.year;
+      const body =
+        g.hikes.map(m => otdHikeCardHtml(m, compact)).join('') +
+        g.restaurants.map(m => otdRestaurantCardHtml(m, compact)).join('') +
+        (g.photos.length ? otdPhotosCardHtml(g) : '');
+      return '<section class="otd-year">' +
+        '<div class="otd-year-head"><span class="otd-year-ago">' + escapeHtml(otdPlural(ago, 'year', 'years') + ' ago') + '</span>' +
+        '<span class="otd-year-date">' + escapeHtml(otdLongDate(g.dateStr)) + '</span></div>' +
+        '<div class="otd-year-body' + (compact ? ' otd-year-body-compact' : '') + '">' + body + '</div>' +
+      '</section>';
+    }).join('');
+
+    otdContent.innerHTML =
+      '<div class="otd-header">' +
+        '<div class="otd-eyebrow">ON THIS DAY</div>' +
+        '<h2 class="otd-title" id="otd-title">' + escapeHtml(monthDay) + '</h2>' +
+        '<div class="otd-sub">' + escapeHtml(sub) + '</div>' +
+      '</div>' +
+      (lede ? '<p class="otd-lede">' + escapeHtml(lede) + '</p>' : '') +
+      yearsHtml +
+      (c.memories >= 2 ? '<p class="otd-end">' + escapeHtml("That's everything for " + monthDay) + '</p>' : '') +
+      '<button type="button" class="otd-done" id="otd-done-btn">Done</button>';
+    otdCompactDate.textContent = shortDay;
+
+    // A photo that fails to load falls back to the icon underneath it.
+    otdContent.querySelectorAll('.otd-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
+  }
+
+  // ---------- opening / closing ----------
+  function openOnThisDay(data){
+    otdRender(data);
+    otdReturnFocus = document.activeElement;
+    otdScroll.scrollTop = 0;
+    otdCompact.classList.remove('scrolled');
+    otdSheet.style.transform = '';
+    otdOverlay.classList.add('open');           // the back-button observer notices this and adds its history entry
+    otdOverlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('details-open-lock');
+    setTimeout(() => { try{ otdCloseBtn.focus({ preventScroll: true }); }catch(e){} }, 60);
+  }
+
+  function closeOnThisDay(){
+    if (!otdOverlay.classList.contains('open')) return;
+    otdOverlay.classList.remove('open');
+    otdOverlay.setAttribute('aria-hidden', 'true');
+    otdSheet.style.transition = '';
+    otdSheet.style.transform = '';
+    if (countOpenOverlays() === 0) document.body.classList.remove('details-open-lock');
+    if (otdReturnFocus && document.contains(otdReturnFocus)){ try{ otdReturnFocus.focus({ preventScroll: true }); }catch(e){} }
+    otdReturnFocus = null;
+  }
+
+  function otdOpenItem(item){
+    if (!item) return;
+    if (item.type === 'hike'){
+      const idx = hikeRows.indexOf(item.hike);
+      if (idx === -1) return;
+      closeOnThisDay();
+      switchTopGroup('nature');
+      switchNatureSubPage('hikes');
+      openHikeDetailsPanel(idx);
+      const section = hikeDetailsPanelInner.querySelector('.hike-date-section[data-date-id="' + item.dateId + '"]');
+      if (section) section.scrollIntoView({ block: 'start' });
+    } else if (item.type === 'restaurant'){
+      const idx = restaurantRows.indexOf(item.restaurant);
+      if (idx === -1) return;
+      closeOnThisDay();
+      switchTopGroup('food');
+      switchFoodSubPage('restaurants');
+      restaurantActiveVisitId = item.visitId;
+      openRestaurantDetailsPanel(idx);
+    }
+  }
+
+  otdContent.addEventListener('click', (e) => {
+    if (e.target.closest('#otd-done-btn')){ closeOnThisDay(); return; }
+    const tile = e.target.closest('[data-otd-photos]');
+    if (tile){
+      const set = otdItems[Number(tile.dataset.otdPhotos)];
+      if (set) openPhotoLightbox(set.urls, Number(tile.dataset.otdIndex) || 0, null);
+      return;
+    }
+    const card = e.target.closest('[data-otd-item]');
+    if (card) otdOpenItem(otdItems[Number(card.dataset.otdItem)]);
+  });
+  otdCloseBtn.addEventListener('click', closeOnThisDay);
+  otdBackdrop.addEventListener('click', closeOnThisDay);
+  document.addEventListener('keydown', (e) => {
+    if (!otdOverlay.classList.contains('open')) return;
+    if (e.key === 'Escape' && !artLightboxOverlay.classList.contains('show')){ closeOnThisDay(); return; }
+    if (e.key === 'Tab'){ // keep keyboard focus inside the pop-up while it's open
+      const focusable = Array.from(otdSheet.querySelectorAll('button')).filter(b => b.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+
+  // The compact date bar fades in once the big header has scrolled away.
+  otdScroll.addEventListener('scroll', () => {
+    otdCompact.classList.toggle('scrolled', otdScroll.scrollTop > 90);
+  }, { passive: true });
+
+  // Pull down from the top to dismiss: only takes over the gesture when the
+  // list is already scrolled to the top, so normal scrolling is untouched.
+  (function wirePullDownToClose(){
+    let startY = 0, dy = 0, tracking = false, pulling = false;
+    otdSheet.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1){ tracking = false; return; }
+      tracking = otdScroll.scrollTop <= 0 || !!e.target.closest('.otd-grabber');
+      pulling = false;
+      startY = e.touches[0].clientY;
+      dy = 0;
+    }, { passive: true });
+    otdSheet.addEventListener('touchmove', (e) => {
+      if (!tracking) return;
+      dy = e.touches[0].clientY - startY;
+      if (dy > 6 && (pulling || otdScroll.scrollTop <= 0)){
+        pulling = true;
+        e.preventDefault();
+        otdSheet.style.transition = 'none';
+        otdSheet.style.transform = 'translateY(' + Math.round(dy * 0.9) + 'px)';
+      } else if (!pulling && dy < 0){
+        tracking = false; // heading the other way — that's a normal scroll
+      }
+    }, { passive: false });
+    const finish = () => {
+      if (!pulling){ tracking = false; return; }
+      pulling = false; tracking = false;
+      otdSheet.style.transition = '';
+      if (dy > 110){ closeOnThisDay(); } else { otdSheet.style.transform = ''; }
+    };
+    otdSheet.addEventListener('touchend', finish, { passive: true });
+    otdSheet.addEventListener('touchcancel', finish, { passive: true });
+  })();
+
+  // ---------- when to show it ----------
+  // Returns true if it opened, 'busy' if something else is open right now
+  // (worth retrying shortly), false if there's simply nothing to show.
+  function otdTryShow(opts){
+    opts = opts || {};
+    if (!otdSettings.enabled && !opts.force) return false;
+    if (guestViewEnabled || isLockedGuestAccount || document.body.classList.contains('guest-view-active')) return false; // owner only
+    if (!opts.force && !window.matchMedia(OTD_MAX_WIDTH_QUERY).matches) return false;  // phones and tablets only
+    const now = new Date();
+    const key = otdDateKey(now);
+    if (!opts.force && otdSettings.lastShown === key) return false;                    // once a day per device
+    if (otdOverlay.classList.contains('open')) return false;
+    if (countOpenOverlays() > 0) return 'busy';                                       // never on top of a panel, dialog or photo
+    const data = otdCollect(now);
+    if (!data.counts.memories) return false;
+    openOnThisDay(data);
+    otdSettings.lastShown = key;
+    saveOtdSettings();
+    return true;
+  }
+
+  async function otdStartupFlow(){
+    await loadOtdSettings();
+    refreshOtdSettingsUI();
+    // Wait for this device's own data, then give the cloud copy (if signed
+    // in) a moment to merge in — so the pop-up is built from the complete
+    // picture instead of appearing half-filled and then changing.
+    await Promise.race([localDataReadyPromise, otdSleep(8000)]);
+    await Promise.race([cloudSettledPromise, otdSleep(2000)]);
+    await otdSleep(400); // let startup notices and toasts settle first
+    otdReady = true;
+    for (let i = 0; i < 12; i++){
+      if (!document.hidden){
+        const r = otdTryShow();
+        if (r !== 'busy') return;
+      }
+      await otdSleep(700);
+    }
+  }
+
+  // Coming back to the app after midnight counts as a new day.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && otdReady) otdTryShow();
+  });
+
+  // ---------- Settings ----------
+  const otdMasterSwitch = document.getElementById('otd-master-switch');
+  const otdHikesCheck = document.getElementById('otd-hikes-check');
+  const otdRestaurantsCheck = document.getElementById('otd-restaurants-check');
+  const otdPhotosCheck = document.getElementById('otd-photos-check');
+  const otdShowAgainBtn = document.getElementById('otd-show-again-btn');
+  const otdUndatedBox = document.getElementById('otd-undated-box');
+  const otdUndatedTitle = document.getElementById('otd-undated-title');
+  const otdUndatedText = document.getElementById('otd-undated-text');
+  const otdUndatedToggle = document.getElementById('otd-undated-toggle');
+  const otdUndatedList = document.getElementById('otd-undated-list');
+  let otdUndatedTargets = [];
+
+  // Things that can never show up here because they have no usable date.
+  function otdFindUndated(){
+    const out = { hikes: [], restaurants: [], photos: 0 };
+    if (otdSettings.hikes){
+      hikeRows.forEach(h => (h.dates || []).forEach(d => { if (!otdParse(d.date)) out.hikes.push({ type: 'hike', hike: h, dateId: d.id }); }));
+    }
+    if (otdSettings.restaurants){
+      restaurantRows.forEach(r => (Array.isArray(r.visits) ? r.visits : []).forEach(v => { if (!otdParse(v.date)) out.restaurants.push({ type: 'restaurant', restaurant: r, visitId: v.id }); }));
+    }
+    if (otdSettings.photos){
+      photoRows.forEach(ph => { if (ph && !otdParse(ph.date)) out.photos++; });
+    }
+    return out;
+  }
+
+  function refreshOtdSettingsUI(){
+    otdMasterSwitch.classList.toggle('on', otdSettings.enabled);
+    otdMasterSwitch.setAttribute('aria-checked', String(otdSettings.enabled));
+    otdHikesCheck.checked = otdSettings.hikes;
+    otdRestaurantsCheck.checked = otdSettings.restaurants;
+    otdPhotosCheck.checked = otdSettings.photos;
+    [otdHikesCheck, otdRestaurantsCheck, otdPhotosCheck].forEach(cb => { cb.disabled = !otdSettings.enabled; });
+    otdShowAgainBtn.disabled = !otdSettings.enabled;
+
+    const u = otdFindUndated();
+    const total = u.hikes.length + u.restaurants.length + u.photos;
+    otdUndatedBox.style.display = (otdSettings.enabled && total > 0) ? 'block' : 'none';
+    if (!total) return;
+    otdUndatedTitle.textContent = otdPlural(total, 'item', 'items') + " can't appear yet";
+    const parts = [];
+    if (u.restaurants.length) parts.push(otdPlural(u.restaurants.length, 'restaurant visit', 'restaurant visits') + (u.restaurants.length === 1 ? ' has' : ' have') + ' no date');
+    if (u.hikes.length) parts.push(otdPlural(u.hikes.length, 'hike outing', 'hike outings') + (u.hikes.length === 1 ? ' has' : ' have') + ' no date');
+    if (u.photos) parts.push(otdPlural(u.photos, 'photo', 'photos') + (u.photos === 1 ? ' was' : ' were') + ' added without a date in the file name');
+    otdUndatedText.textContent = otdJoin(parts) + '.';
+
+    otdUndatedTargets = u.restaurants.concat(u.hikes).slice(0, 40);
+    otdUndatedToggle.style.display = otdUndatedTargets.length ? 'inline-block' : 'none';
+    otdUndatedList.innerHTML = otdUndatedTargets.map((t, i) => {
+      const label = t.type === 'hike'
+        ? (t.hike.name || 'Untitled hike') + ' · hike outing with no date'
+        : (t.restaurant.name || 'Untitled restaurant') + ' · visit with no date';
+      return '<button type="button" class="otd-undated-item" data-otd-undated="' + i + '">' + escapeHtml(label) + '</button>';
+    }).join('');
+  }
+
+  function otdSetSetting(key, value){
+    otdSettings[key] = value;
+    saveOtdSettings();
+    refreshOtdSettingsUI();
+  }
+  otdMasterSwitch.addEventListener('click', () => otdSetSetting('enabled', !otdSettings.enabled));
+  otdHikesCheck.addEventListener('change', () => otdSetSetting('hikes', otdHikesCheck.checked));
+  otdRestaurantsCheck.addEventListener('change', () => otdSetSetting('restaurants', otdRestaurantsCheck.checked));
+  otdPhotosCheck.addEventListener('change', () => otdSetSetting('photos', otdPhotosCheck.checked));
+  otdShowAgainBtn.addEventListener('click', () => {
+    const r = otdTryShow({ force: true });
+    if (r === 'busy') showToast('Close what is open first');
+    else if (!r) showToast('Nothing on this date in earlier years');
+  });
+  otdUndatedToggle.addEventListener('click', () => {
+    const open = otdUndatedList.style.display === 'block';
+    otdUndatedList.style.display = open ? 'none' : 'block';
+    otdUndatedToggle.textContent = open ? 'Review undated items' : 'Hide list';
+  });
+  otdUndatedList.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-otd-undated]');
+    if (btn) otdOpenItem(otdUndatedTargets[Number(btn.dataset.otdUndated)]);
+  });
+
+  // The back button (and history entries) treat this like every other overlay.
+  BACK_BUTTON_OVERLAYS.push({ el: otdOverlay, openClass: 'open' });
+  // The observers for the overlays above were attached before this ran, so
+  // this one needs its own.
+  new MutationObserver(handleOverlayClassChange).observe(otdOverlay, { attributes: true, attributeFilter: ['class'] });
+
   loadDishFullListText();
   loadRoadProgress();
   loadPhotoProgress();
@@ -14620,6 +15770,7 @@
   loadMediaProgress('game');
   loadMediaProgress('show');
   loadPointsAlgorithm().then(checkSavedProgress);
+  otdStartupFlow().catch(err => console.error('On This Day could not start', err));
 })();
 </script>
 
