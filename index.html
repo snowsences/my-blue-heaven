@@ -1938,6 +1938,173 @@
     cursor: pointer;
   }
 
+  /* ---------- GUESSING GAME (see the GUESSING GAME block in the script) ---------- */
+  /* Phones and tablets only. Sits below the details panels (200) so "Go to it"
+     opens the place on top of it, and below the photo viewer (300). */
+  #gg-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 190;
+    visibility: hidden;
+    pointer-events: none;
+    transition: visibility 0s linear 0.3s;
+  }
+  #gg-overlay.open{
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+  .gg-panel{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  #gg-overlay.open .gg-panel{ transform: translateY(0); }
+  .gg-topbar{
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px 12px 20px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .gg-eyebrow{ display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; color: var(--amber); }
+  .gg-progress{ display: block; margin-top: 2px; min-height: 18px; font-size: 14px; color: var(--chalk-dim); }
+  .gg-close{
+    flex: none;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--chalk);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .gg-scroll{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 20px 20px calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+  #gg-content{ max-width: 560px; margin: 0 auto; }
+  .gg-title{ margin: 0; font-size: 36px; font-weight: 700; line-height: 1.05; font-family: 'Figtree', sans-serif; color: var(--chalk); }
+  .gg-lede{ margin: 10px 0 0; font-size: 16px; line-height: 1.45; }
+  .gg-note{ margin: 12px 0 0; font-size: 14px; line-height: 1.45; color: var(--chalk-dim); }
+  .gg-cats{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+  .gg-cat{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 64px;
+    padding: 10px 14px;
+    text-align: left;
+    font-family: 'Figtree', sans-serif;
+    color: var(--chalk);
+    background: var(--panel);
+    border: 1.5px solid var(--panel-line);
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  .gg-cat:first-child{ grid-column: 1 / -1; }
+  .gg-cat.selected{ border-color: var(--amber); background: rgba(232, 163, 61, 0.14); }
+  .gg-cat:disabled{ opacity: 0.5; cursor: default; }
+  .gg-cat-name{ font-size: 16px; font-weight: 700; }
+  .gg-cat-sub{ font-size: 13px; color: var(--chalk-dim); }
+  .gg-primary{
+    display: block;
+    width: 100%;
+    height: 52px;
+    margin-top: 18px;
+    border: none;
+    border-radius: 999px;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: 'Figtree', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .gg-ghost{
+    height: 48px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(243, 238, 225, 0.28);
+    background: transparent;
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .gg-stats{ margin-top: 24px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; }
+  .gg-stats-head{ font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--chalk-dim); margin-bottom: 4px; }
+  .gg-stat-row{ display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 15px; border-top: 1px solid var(--panel-line); }
+  .gg-stats-head + .gg-stat-row{ border-top: none; }
+  .gg-stat-val{ font-weight: 700; color: var(--amber); }
+
+  .gg-photo{
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 1px solid var(--panel-line);
+    border-radius: 18px;
+    background: var(--bg-2);
+    overflow: hidden;
+    cursor: zoom-in;
+  }
+  .gg-photo img{ display: block; width: 100%; height: min(46vh, 420px); object-fit: cover; background: var(--bg-2); }
+  .gg-question{ margin: 18px 0 0; font-size: 24px; font-weight: 700; line-height: 1.2; font-family: 'Figtree', sans-serif; color: var(--chalk); }
+  .gg-options{ display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .gg-option{
+    min-height: 56px;
+    padding: 12px 16px;
+    text-align: left;
+    font-family: 'Figtree', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--chalk);
+    background: var(--panel);
+    border: 1.5px solid var(--panel-line);
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  .gg-option:disabled{ cursor: default; }
+  .gg-option.correct{ border-color: var(--green); background: rgba(95, 191, 119, 0.18); }
+  .gg-option.wrong{ border-color: var(--brick); background: rgba(200, 89, 63, 0.2); }
+  .gg-option.dim{ opacity: 0.5; }
+  .gg-reveal{ margin-top: 16px; padding: 16px; background: var(--panel); border: 1px solid var(--panel-line); border-left: 4px solid var(--green); border-radius: 16px; }
+  .gg-reveal.wrong{ border-left-color: var(--brick); }
+  .gg-verdict{ font-size: 15px; font-weight: 700; color: var(--green); }
+  .gg-reveal.wrong .gg-verdict{ color: #F0A08C; }
+  .gg-place-name{ margin-top: 8px; font-size: 21px; font-weight: 700; line-height: 1.15; }
+  .gg-place-where{ margin-top: 2px; font-size: 14px; color: var(--chalk-dim); }
+  .gg-place-meta{ display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 14px; color: var(--chalk-dim); }
+  .gg-rank{ font-weight: 700; color: var(--amber); }
+  .gg-actions{ display: flex; gap: 10px; margin-top: 16px; }
+  .gg-actions .gg-next{ flex: 1; margin-top: 0; height: 48px; }
+  .gg-actions-split .gg-ghost{ flex: 1; padding: 0 12px; }
+  @media (prefers-reduced-motion: reduce){
+    #gg-overlay, .gg-panel{ transition: none !important; }
+  }
+  @media (min-width: 769px){
+    #gg-overlay{ display: none !important; }
+    #gg-settings-section{ display: none; }
+  }
+  body.guest-view-active #gg-settings-section{ display: none; }
+
   /* ---------- TOUCH DRAG-TO-REORDER (see setupTouchDrag in the script) ---------- */
   .touch-drag-ghost{
     position: fixed !important;
@@ -4511,6 +4678,12 @@
         </div>
       </div>
 
+      <div class="settings-section" id="gg-settings-section">
+        <h2 class="settings-section-title">Guessing Game</h2>
+        <p class="footer-note" style="margin:0 0 12px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">Which park, road, hike or restaurant is this photo from? Uses the photos already attached to your places, including dish photos.</p>
+        <button class="btn-primary" id="gg-launch-btn" type="button">Play Guessing Game</button>
+      </div>
+
       <!-- Future: <div class="settings-section"><h2 class="settings-section-title">Restaurant Ranker Settings</h2>...</div> -->
     </div>
   </div>
@@ -4585,6 +4758,21 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
     </button>
     <div class="otd-scroll" id="otd-scroll"><div id="otd-content"></div></div>
+  </div>
+</div>
+
+<div class="gg-overlay" id="gg-overlay" aria-hidden="true">
+  <div class="gg-panel" id="gg-panel" role="dialog" aria-modal="true" aria-labelledby="gg-title">
+    <div class="gg-topbar">
+      <div>
+        <span class="gg-eyebrow">GUESS THE PLACE</span>
+        <span class="gg-progress" id="gg-progress"></span>
+      </div>
+      <button type="button" class="gg-close" id="gg-close-btn" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div class="gg-scroll" id="gg-scroll"><div id="gg-content"></div></div>
   </div>
 </div>
 
@@ -15220,6 +15408,7 @@
     if (roadDetailsPanel.classList.contains('open')){ closeRoadDetailsPanel(); return; }
     if (parkDetailsPanel.classList.contains('open')){ closeParkDetailsPanel(); return; }
     if (otdOverlay.classList.contains('open')){ closeOnThisDay(); return; }
+    if (ggOverlay.classList.contains('open')){ closeGuessGame(); return; }
   }
 
   window.addEventListener('popstate', () => {
@@ -15920,6 +16109,507 @@
   // The observers for the overlays above were attached before this ran, so
   // this one needs its own.
   new MutationObserver(handleOverlayClassChange).observe(otdOverlay, { attributes: true, attributeFilter: ['class'] });
+
+  // ---------- GUESSING GAME ----------
+  // "Which park / road / hike / restaurant is this photo from?" A round is 10
+  // photos, four choices each. Launched from the bottom of Settings; phone and
+  // tablet widths only, owner only (guest view never sees it).
+  //
+  // Photos come from what's already attached to each place — hike outing
+  // photos, park and road photos, and restaurant dish and visit photos. The
+  // Photos tab is deliberately not used: those photos aren't tied to a place.
+  // A place's cover photo is the one you see most, so it's only used when the
+  // place has no other photo. Wrong answers come from the same category, and
+  // up to two of them are lookalikes (same state, or same cuisine) so they're
+  // believable. Read-only apart from the stats kept on this device.
+  const GG_STORAGE_KEY = 'guess-game-stats';
+  const GG_ROUND_LENGTH = 10;
+  const GG_KINDS = ['park', 'road', 'hike', 'restaurant'];
+  const GG_INFO = {
+    park:       { plural: 'Parks',       noun: 'park' },
+    road:       { plural: 'Roads',       noun: 'road' },
+    hike:       { plural: 'Hikes',       noun: 'hike' },
+    restaurant: { plural: 'Restaurants', noun: 'restaurant' }
+  };
+
+  const ggOverlay = document.getElementById('gg-overlay');
+  const ggPanel = document.getElementById('gg-panel');
+  const ggScroll = document.getElementById('gg-scroll');
+  const ggContent = document.getElementById('gg-content');
+  const ggProgress = document.getElementById('gg-progress');
+  const ggCloseBtn = document.getElementById('gg-close-btn');
+  const ggLaunchBtn = document.getElementById('gg-launch-btn');
+
+  function ggEmptyStats(){
+    const cats = {};
+    GG_KINDS.forEach(k => { cats[k] = { right: 0, total: 0 }; });
+    return { cats, bestStreak: 0, rounds: 0 };
+  }
+  let ggStats = ggEmptyStats();
+  let ggPools = null;          // rebuilt from the current data every time the game opens
+  let ggRound = null;          // the round in progress, if any
+  let ggScreen = 'start';      // 'start' | 'question' | 'results'
+  let ggSelectedCat = 'all';
+  let ggReturnGroup = null;    // which top-level page to land back on when the game closes
+  let ggReturnFocus = null;
+  const ggBadUrls = new Set(); // photos that failed to load — never asked about again this session
+
+  async function loadGgStats(){
+    try{
+      const res = await window.storage.get(GG_STORAGE_KEY, false);
+      if (res && res.value){
+        const p = JSON.parse(res.value);
+        const base = ggEmptyStats();
+        GG_KINDS.forEach(k => {
+          const c = p && p.cats && p.cats[k];
+          if (c) base.cats[k] = { right: Number(c.right) || 0, total: Number(c.total) || 0 };
+        });
+        base.bestStreak = Number(p.bestStreak) || 0;
+        base.rounds = Number(p.rounds) || 0;
+        ggStats = base;
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+  // Device-only, like On This Day's settings — deliberately not synced.
+  function saveGgStats(){
+    try{ window.storage.set(GG_STORAGE_KEY, JSON.stringify(ggStats), false); }catch(e){ /* best effort */ }
+  }
+
+  function ggShuffle(arr){
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function ggPick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+  function ggNorm(s){ return (s || '').toString().trim().toLowerCase(); }
+
+  // ---------- what can be asked about ----------
+  function ggPlainDate(dateStr){
+    const p = otdParse(dateStr);
+    return p ? formatVisitDate(p.str) : '';
+  }
+  function ggIsDishName(t){ return !!t && !OTD_TIME_LABEL.test(t); }
+
+  // One place's usable photos, each remembering what it is (for the reveal
+  // afterwards) and whether it's the place's cover.
+  function ggAddPhoto(list, url, cover, extra){
+    if (!url || typeof url !== 'string') return;
+    const existing = list.find(e => e.url === url);
+    if (existing){
+      if (extra && extra.caption && !existing.caption) existing.caption = extra.caption;
+      return;
+    }
+    list.push(Object.assign({ url, isCover: !!cover && url === cover, caption: '' }, extra || {}));
+  }
+
+  function ggBuildPools(){
+    const kinds = {};
+    GG_KINDS.forEach(k => { kinds[k] = { all: [], withPhotos: [], photoCount: 0, eligible: false, reason: '' }; });
+    const orderedHikes = getOrderedHikes();
+    const orderedRoads = getOrderedRoads();
+
+    function finish(kind, place){
+      if (!ggNorm(place.name)) return;
+      kinds[kind].all.push(place);
+      if (place.photos.length) kinds[kind].withPhotos.push(place);
+    }
+
+    parkRows.forEach((p, i) => {
+      const photos = [];
+      (p.photos || []).forEach(ph => ggAddPhoto(photos, ph && ph.url, p.coverPhoto));
+      ggAddPhoto(photos, p.coverPhoto, p.coverPhoto);
+      finish('park', {
+        kind: 'park', row: p, name: (p.name || '').trim(), where: p.location || '',
+        simKey: ggNorm(p.location), photos, rank: i + 1, total: parkRows.length, tier: null
+      });
+    });
+
+    roadRows.forEach(r => {
+      const photos = [];
+      (r.photos || []).forEach(ph => ggAddPhoto(photos, ph && ph.url, r.coverPhoto));
+      ggAddPhoto(photos, r.coverPhoto, r.coverPhoto);
+      finish('road', {
+        kind: 'road', row: r, name: (r.name || '').trim(), where: [r.state, r.country].filter(Boolean).join(', '),
+        simKey: ggNorm(r.state) || ggNorm(r.country), photos, rank: orderedRoads.indexOf(r) + 1, total: roadRows.length, tier: null
+      });
+    });
+
+    hikeRows.forEach(h => {
+      const photos = [];
+      (h.dates || []).forEach(d => {
+        const when = ggPlainDate(d.date);
+        (d.photos || []).forEach(ph => ggAddPhoto(photos, ph && ph.url, h.coverPhoto,
+          { caption: when ? 'From your hike on ' + when : 'From one of your hikes', dateId: d.id }));
+      });
+      ggAddPhoto(photos, h.coverPhoto, h.coverPhoto, { caption: 'Cover photo' });
+      photos.forEach(ph => { if (ph.isCover && ph.caption !== 'Cover photo') ph.caption = 'Cover photo · ' + ph.caption; });
+      finish('hike', {
+        kind: 'hike', row: h, name: (h.name || '').trim(), where: [h.city, h.state, h.country].filter(Boolean).join(', '),
+        simKey: ggNorm(h.state) || ggNorm(h.country), photos, rank: orderedHikes.indexOf(h) + 1, total: hikeRows.length, tier: null
+      });
+    });
+
+    const tiersUsable = !!restaurantTierBoundaries && restaurantTierBoundariesTotal === restaurantRows.length;
+    restaurantRows.forEach((r, i) => {
+      const photos = [];
+      (Array.isArray(r.visits) ? r.visits : []).forEach(v => {
+        const when = ggPlainDate(v.date);
+        (v.courses || []).forEach(c => {
+          const dish = (c.text || '').trim();
+          const cap = (ggIsDishName(dish) ? 'Dish: ' + dish : 'A dish') + (when ? ' · ' + when : '');
+          otdCoursePhotos(c).forEach(url => ggAddPhoto(photos, url, r.coverPhoto, { caption: cap, visitId: v.id }));
+        });
+        (v.photos || []).forEach(url => ggAddPhoto(photos, url, r.coverPhoto,
+          { caption: when ? 'From your visit on ' + when : 'From one of your visits', visitId: v.id }));
+      });
+      ggAddPhoto(photos, r.coverPhoto, r.coverPhoto, { caption: 'Cover photo' });
+      photos.forEach(ph => { if (ph.isCover && ph.caption !== 'Cover photo') ph.caption = 'Cover photo · ' + ph.caption; });
+      const rank = i + 1;
+      finish('restaurant', {
+        kind: 'restaurant', row: r, name: (r.name || '').trim(), where: [r.cuisine, r.location].filter(Boolean).join(' · '),
+        simKey: ggNorm(r.cuisine) || ggNorm(r.location), photos, rank, total: restaurantRows.length,
+        tier: tiersUsable ? getRestaurantTierForRank(rank, restaurantTierBoundaries) : null
+      });
+    });
+
+    // A category is playable with at least 4 differently-named places (for
+    // the four choices) and at least one of them holding a photo.
+    let uniquePhotos = 0;
+    GG_KINDS.forEach(k => {
+      const pool = kinds[k];
+      const names = new Set(pool.all.map(p => ggNorm(p.name)));
+      const urls = new Set();
+      pool.withPhotos.forEach(p => p.photos.forEach(ph => urls.add(ph.url)));
+      pool.photoCount = urls.size;
+      if (names.size < 4) pool.reason = 'Needs 4 places';
+      else if (!pool.withPhotos.length) pool.reason = 'No photos yet';
+      pool.eligible = !pool.reason;
+      if (pool.eligible) uniquePhotos += urls.size;
+    });
+    return { kinds, uniquePhotos };
+  }
+
+  function ggAvailablePhotoCount(cat){
+    const kinds = (cat === 'all' ? GG_KINDS : [cat]).filter(k => ggPools.kinds[k].eligible);
+    const urls = new Set();
+    kinds.forEach(k => ggPools.kinds[k].withPhotos.forEach(p => p.photos.forEach(ph => { if (!ggBadUrls.has(ph.url)) urls.add(ph.url); })));
+    return urls.size;
+  }
+
+  // Three wrong answers from the same category — up to two lookalikes
+  // (same state / cuisine), the rest random — never a repeat of a name.
+  function ggBuildOptions(pool, place){
+    const seen = new Set([ggNorm(place.name)]);
+    const picked = [];
+    const take = (p) => {
+      const key = ggNorm(p.name);
+      if (p === place || seen.has(key)) return;
+      seen.add(key);
+      picked.push(p);
+    };
+    const others = ggShuffle(pool.all.filter(p => p !== place));
+    const alike = others.filter(p => place.simKey && p.simKey === place.simKey);
+    alike.forEach(p => { if (picked.length < 2) take(p); });
+    others.forEach(p => { if (picked.length < 3) take(p); });
+    if (picked.length < 3) return null;
+    return ggShuffle([place].concat(picked));
+  }
+
+  function ggPickQuestion(){
+    const r = ggRound;
+    const kinds = (r.category === 'all' ? GG_KINDS : [r.category]).filter(k => ggPools.kinds[k].eligible);
+    if (!kinds.length) return null;
+    for (let attempt = 0; attempt < 80; attempt++){
+      const kind = ggPick(kinds);
+      const pool = ggPools.kinds[kind];
+      let candidates = pool.withPhotos.filter(pl => !r.usedPlaces.has(pl));
+      if (!candidates.length) candidates = pool.withPhotos;   // every place asked once already — repeats are fine, photos still aren't
+      const place = ggPick(candidates);
+      const fresh = place.photos.filter(ph => !r.usedUrls.has(ph.url) && !ggBadUrls.has(ph.url));
+      if (!fresh.length) continue;
+      const nonCover = fresh.filter(ph => !ph.isCover);
+      const photo = ggPick(nonCover.length ? nonCover : fresh);
+      const options = ggBuildOptions(pool, place);
+      if (!options) continue;
+      return { kind, place, photo, options, answered: false, picked: -1, correct: false };
+    }
+    return null;
+  }
+
+  // ---------- drawing ----------
+  function ggStatsRowsHtml(byKind){
+    return GG_KINDS.filter(k => byKind[k].total > 0).map(k => {
+      const c = byKind[k];
+      const pct = Math.round((c.right / c.total) * 100);
+      return '<div class="gg-stat-row"><span>' + escapeHtml(GG_INFO[k].plural) + '</span><span class="gg-stat-val">' +
+        c.right + ' / ' + c.total + ' · ' + pct + '%</span></div>';
+    }).join('');
+  }
+
+  function ggRenderStart(){
+    const anyEligible = GG_KINDS.some(k => ggPools.kinds[k].eligible);
+    if (ggSelectedCat !== 'all' && !ggPools.kinds[ggSelectedCat].eligible) ggSelectedCat = 'all';
+
+    const cats = [{ key: 'all', label: 'Everything', count: ggPools.uniquePhotos, ok: anyEligible, reason: 'Nothing to ask about yet' }]
+      .concat(GG_KINDS.map(k => ({ key: k, label: GG_INFO[k].plural, count: ggPools.kinds[k].photoCount, ok: ggPools.kinds[k].eligible, reason: ggPools.kinds[k].reason })));
+    const catsHtml = cats.map(c =>
+      '<button type="button" class="gg-cat' + (c.key === ggSelectedCat && c.ok ? ' selected' : '') + '" data-gg-cat="' + c.key + '"' +
+        (c.ok ? ' aria-pressed="' + (c.key === ggSelectedCat) + '"' : ' disabled') + '>' +
+        '<span class="gg-cat-name">' + escapeHtml(c.label) + '</span>' +
+        '<span class="gg-cat-sub">' + escapeHtml(c.ok ? otdPlural(c.count, 'photo', 'photos') : c.reason) + '</span>' +
+      '</button>'
+    ).join('');
+
+    const hasStats = GG_KINDS.some(k => ggStats.cats[k].total > 0);
+    const rounds = Math.min(GG_ROUND_LENGTH, ggAvailablePhotoCount(ggSelectedCat));
+    ggProgress.textContent = '';
+    ggContent.innerHTML =
+      '<h2 class="gg-title" id="gg-title">Guess the Place</h2>' +
+      '<p class="gg-lede">Which park, road, hike or restaurant is this photo from? ' + GG_ROUND_LENGTH + ' photos a round, four choices each.</p>' +
+      '<div class="gg-cats">' + catsHtml + '</div>' +
+      (anyEligible
+        ? '<button type="button" class="gg-primary" id="gg-start-btn">Start round</button>' +
+          (rounds < GG_ROUND_LENGTH ? '<p class="gg-note">Only ' + otdPlural(rounds, 'photo', 'photos') + ' to ask about here, so this round will be shorter.</p>' : '')
+        : '<p class="gg-note">To play, you need at least 4 places of one kind (parks, roads, hikes or restaurants), with photos on some of them.</p>') +
+      (hasStats
+        ? '<div class="gg-stats"><div class="gg-stats-head">YOUR RECORD</div>' + ggStatsRowsHtml(ggStats.cats) +
+          '<div class="gg-stat-row"><span>Best streak</span><span class="gg-stat-val">' + ggStats.bestStreak + '</span></div>' +
+          '<div class="gg-stat-row"><span>Rounds played</span><span class="gg-stat-val">' + ggStats.rounds + '</span></div></div>'
+        : '');
+  }
+
+  function ggRevealHtml(q){
+    const pl = q.place;
+    const rankText = pl.rank ? '#' + pl.rank + ' of ' + pl.total : '';
+    const rankHtml = pl.tier
+      ? '<span style="color:' + pl.tier.color + ';">' + escapeHtml(pl.tier.name + ' · ' + rankText) + '</span>'
+      : escapeHtml(rankText);
+    return '<div class="gg-reveal ' + (q.correct ? 'right' : 'wrong') + '">' +
+        '<div class="gg-verdict">' + (q.correct ? 'Correct!' : 'Not quite — it was ' + escapeHtml(pl.name)) + '</div>' +
+        '<div class="gg-place-name">' + escapeHtml(pl.name) + '</div>' +
+        (pl.where ? '<div class="gg-place-where">' + escapeHtml(pl.where) + '</div>' : '') +
+        '<div class="gg-place-meta">' +
+          (rankText ? '<span class="gg-rank">' + rankHtml + '</span>' : '') +
+          (q.photo.caption ? '<span>' + escapeHtml(q.photo.caption) + '</span>' : '') +
+        '</div>' +
+        '<div class="gg-actions">' +
+          '<button type="button" class="gg-ghost" id="gg-goto-btn">Go to it</button>' +
+          '<button type="button" class="gg-primary gg-next" id="gg-next-btn">' + (ggRound.index + 1 >= ggRound.length ? 'See results' : 'Next') + '</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function ggRenderQuestion(){
+    const r = ggRound, q = r.question;
+    ggProgress.textContent = 'Question ' + (r.index + 1) + ' of ' + r.length + (r.streak > 1 ? ' · Streak ' + r.streak : '');
+    const optionsHtml = q.options.map((o, i) => {
+      let cls = 'gg-option';
+      if (q.answered){
+        if (o === q.place) cls += ' correct';
+        else if (i === q.picked) cls += ' wrong';
+        else cls += ' dim';
+      }
+      return '<button type="button" class="' + cls + '" data-gg-option="' + i + '"' + (q.answered ? ' disabled' : '') + '>' +
+        escapeHtml(o.name) + '</button>';
+    }).join('');
+    ggContent.innerHTML =
+      '<button type="button" class="gg-photo" id="gg-photo-btn" aria-label="View this photo full size">' +
+        '<img id="gg-photo-img" src="' + escapeAttr(cloudinaryThumbUrl(q.photo.url, 1100)) + '" alt="A photo to identify">' +
+      '</button>' +
+      '<h2 class="gg-question" id="gg-title">Which ' + GG_INFO[q.kind].noun + ' is this from?</h2>' +
+      '<div class="gg-options">' + optionsHtml + '</div>' +
+      '<div id="gg-feedback" aria-live="polite">' + (q.answered ? ggRevealHtml(q) : '') + '</div>';
+
+    const img = document.getElementById('gg-photo-img');
+    img.addEventListener('error', () => {
+      // A photo that won't load is skipped without counting for or against you.
+      if (ggScreen !== 'question' || ggRound !== r || r.question !== q || q.answered) return;
+      ggBadUrls.add(q.photo.url);
+      ggAdvanceOrFinish(false);
+    });
+    if (q.answered){
+      const next = document.getElementById('gg-next-btn');
+      if (next) setTimeout(() => { try{ next.focus({ preventScroll: true }); }catch(e){} }, 30);
+    }
+  }
+
+  function ggRenderResults(){
+    const r = ggRound;
+    ggProgress.textContent = 'Round complete';
+    const msg = r.score === r.length ? 'A perfect round!' : r.score >= Math.ceil(r.length * 0.7) ? 'Sharp eye.' : r.score >= Math.ceil(r.length * 0.4) ? 'Not bad.' : 'Plenty still to rediscover.';
+    ggContent.innerHTML =
+      '<h2 class="gg-title" id="gg-title">' + r.score + ' / ' + r.length + '</h2>' +
+      '<p class="gg-lede">' + escapeHtml(msg) + '</p>' +
+      '<div class="gg-stats"><div class="gg-stats-head">THIS ROUND</div>' + ggStatsRowsHtml(r.byKind) +
+        '<div class="gg-stat-row"><span>Best streak this round</span><span class="gg-stat-val">' + r.bestStreak + '</span></div>' +
+        '<div class="gg-stat-row"><span>Best streak ever</span><span class="gg-stat-val">' + ggStats.bestStreak + '</span></div></div>' +
+      '<div class="gg-stats"><div class="gg-stats-head">ALL-TIME ACCURACY</div>' + ggStatsRowsHtml(ggStats.cats) + '</div>' +
+      '<button type="button" class="gg-primary" id="gg-again-btn">Play again</button>' +
+      '<div class="gg-actions gg-actions-split"><button type="button" class="gg-ghost" id="gg-change-btn">Change category</button>' +
+      '<button type="button" class="gg-ghost" id="gg-done-btn">Done</button></div>';
+  }
+
+  function ggRender(){
+    if (ggScreen === 'start') ggRenderStart();
+    else if (ggScreen === 'question') ggRenderQuestion();
+    else ggRenderResults();
+    ggScroll.scrollTop = 0;
+  }
+
+  // ---------- running a round ----------
+  function ggStartRound(){
+    const length = Math.min(GG_ROUND_LENGTH, ggAvailablePhotoCount(ggSelectedCat));
+    if (!length) return;
+    ggRound = {
+      category: ggSelectedCat, length, index: 0, score: 0, streak: 0, bestStreak: 0,
+      byKind: { park: { right: 0, total: 0 }, road: { right: 0, total: 0 }, hike: { right: 0, total: 0 }, restaurant: { right: 0, total: 0 } },
+      usedUrls: new Set(), usedPlaces: new Set(), question: null
+    };
+    ggAdvanceOrFinish(true);
+  }
+
+  // Moves to the next question (`counted` = the previous one was answered, so
+  // the question number moves on), or to the results when the round is over.
+  function ggAdvanceOrFinish(counted){
+    const r = ggRound;
+    if (counted && r.question && r.question.answered) r.index++;
+    if (r.index >= r.length){ ggFinishRound(); return; }
+    const q = ggPickQuestion();
+    if (!q){ r.length = r.index; ggFinishRound(); return; } // ran out of fresh photos — end early rather than repeat
+    r.question = q;
+    r.usedUrls.add(q.photo.url);
+    r.usedPlaces.add(q.place);
+    ggScreen = 'question';
+    ggRender();
+  }
+
+  function ggFinishRound(){
+    if (ggRound.length > 0){ ggStats.rounds++; saveGgStats(); }
+    ggScreen = ggRound.length > 0 ? 'results' : 'start';
+    ggRender();
+  }
+
+  function ggAnswer(i){
+    const r = ggRound, q = r.question;
+    if (!q || q.answered) return;
+    q.answered = true;
+    q.picked = i;
+    q.correct = q.options[i] === q.place;
+    r.byKind[q.kind].total++;
+    ggStats.cats[q.kind].total++;
+    if (q.correct){
+      r.score++; r.streak++;
+      r.byKind[q.kind].right++;
+      ggStats.cats[q.kind].right++;
+      if (r.streak > r.bestStreak) r.bestStreak = r.streak;
+      if (r.streak > ggStats.bestStreak) ggStats.bestStreak = r.streak;
+    } else {
+      r.streak = 0;
+    }
+    saveGgStats();
+    ggRenderQuestionKeepScroll();
+  }
+  function ggRenderQuestionKeepScroll(){
+    const y = ggScroll.scrollTop;
+    ggRenderQuestion();
+    ggScroll.scrollTop = y;
+    const fb = document.getElementById('gg-feedback');
+    if (fb && fb.firstChild){ try{ fb.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }catch(e){} }
+  }
+
+  // Opens the place itself. The game stays open underneath — the details panel
+  // sits above it, and going back returns to the question.
+  function ggGoTo(place, photo){
+    if (place.kind === 'hike'){
+      const idx = hikeRows.indexOf(place.row);
+      if (idx === -1) return;
+      switchTopGroup('nature'); switchNatureSubPage('hikes');
+      openHikeDetailsPanel(idx);
+      if (photo && photo.dateId){
+        const section = hikeDetailsPanelInner.querySelector('.hike-date-section[data-date-id="' + photo.dateId + '"]');
+        if (section) section.scrollIntoView({ block: 'start' });
+      }
+    } else if (place.kind === 'park'){
+      const idx = parkRows.indexOf(place.row);
+      if (idx === -1) return;
+      switchTopGroup('nature'); switchNatureSubPage('parks');
+      openParkDetailsPanel(idx);
+    } else if (place.kind === 'road'){
+      const idx = roadRows.indexOf(place.row);
+      if (idx === -1) return;
+      switchTopGroup('nature'); switchNatureSubPage('roads');
+      openRoadDetailsPanel(idx);
+    } else {
+      const idx = restaurantRows.indexOf(place.row);
+      if (idx === -1) return;
+      switchTopGroup('food'); switchFoodSubPage('restaurants');
+      if (photo && photo.visitId) restaurantActiveVisitId = photo.visitId;
+      openRestaurantDetailsPanel(idx);
+    }
+  }
+
+  // ---------- opening / closing ----------
+  function openGuessGame(){
+    if (ggOverlay.classList.contains('open')) return;
+    ggPools = ggBuildPools();
+    ggRound = null;
+    ggScreen = 'start';
+    ggReturnGroup = activeTopGroup;
+    ggReturnFocus = document.activeElement;
+    ggRender();
+    ggOverlay.classList.add('open');          // the back-button observer notices this and adds its history entry
+    ggOverlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('details-open-lock');
+    setTimeout(() => { try{ ggCloseBtn.focus({ preventScroll: true }); }catch(e){} }, 60);
+  }
+
+  function closeGuessGame(){
+    if (!ggOverlay.classList.contains('open')) return;
+    ggOverlay.classList.remove('open');
+    ggOverlay.setAttribute('aria-hidden', 'true');
+    if (countOpenOverlays() === 0) document.body.classList.remove('details-open-lock');
+    ggRound = null;
+    // "Go to it" may have moved the app to another page — land back where the game was launched from.
+    if (ggReturnGroup && activeTopGroup !== ggReturnGroup) switchTopGroup(ggReturnGroup);
+    if (ggReturnFocus && document.contains(ggReturnFocus)){ try{ ggReturnFocus.focus({ preventScroll: true }); }catch(e){} }
+    ggReturnFocus = null;
+  }
+
+  ggLaunchBtn.addEventListener('click', openGuessGame);
+  ggCloseBtn.addEventListener('click', closeGuessGame);
+  ggContent.addEventListener('click', (e) => {
+    const cat = e.target.closest('[data-gg-cat]');
+    if (cat && !cat.disabled){ ggSelectedCat = cat.dataset.ggCat; ggRenderStart(); return; }
+    if (e.target.closest('#gg-start-btn') || e.target.closest('#gg-again-btn')){ ggStartRound(); return; }
+    const opt = e.target.closest('[data-gg-option]');
+    if (opt){ ggAnswer(Number(opt.dataset.ggOption)); return; }
+    if (e.target.closest('#gg-next-btn')){ ggAdvanceOrFinish(true); return; }
+    if (e.target.closest('#gg-goto-btn')){ if (ggRound && ggRound.question) ggGoTo(ggRound.question.place, ggRound.question.photo); return; }
+    if (e.target.closest('#gg-photo-btn')){ if (ggRound && ggRound.question) openPhotoLightbox([ggRound.question.photo.url], 0, null); return; }
+    if (e.target.closest('#gg-change-btn')){ ggRound = null; ggScreen = 'start'; ggRender(); return; }
+    if (e.target.closest('#gg-done-btn')){ closeGuessGame(); return; }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!ggOverlay.classList.contains('open')) return;
+    if (e.key === 'Escape' && !artLightboxOverlay.classList.contains('show')){ closeGuessGame(); return; }
+    if (e.key === 'Tab'){ // keep keyboard focus inside the game while it's open
+      const focusable = Array.from(ggPanel.querySelectorAll('button:not([disabled])')).filter(b => b.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+  // The page-swipe-between-subtabs gesture must never act on touches inside the game.
+  ['touchstart', 'touchend'].forEach(t => ggOverlay.addEventListener(t, (e) => e.stopPropagation(), { passive: true }));
+
+  // The back button treats this like every other overlay.
+  BACK_BUTTON_OVERLAYS.push({ el: ggOverlay, openClass: 'open' });
+  new MutationObserver(handleOverlayClassChange).observe(ggOverlay, { attributes: true, attributeFilter: ['class'] });
+  loadGgStats();
 
   loadDishFullListText();
   loadRoadProgress();
