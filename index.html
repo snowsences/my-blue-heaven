@@ -2893,18 +2893,37 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    /* Nature only: the bar used to shrink to fit its content, leaving empty
+    /* Nature and Art: the bar used to shrink to fit its content, leaving empty
        space beside it while the longer labels got cut off with "…". Now it
        fills the whole row so each of the 4 tabs gets an equal quarter of it
        (less a small gap). If a label still doesn't fit, it's cut off
        cleanly at the tab's edge — no ellipsis. */
-    [id^="nature-sub-tabs-"]{
+    [id^="nature-sub-tabs-"], [id^="art-sub-tabs-"]{
       flex: 1 0 100%;
       gap: 6px;
     }
-    [id^="nature-sub-tabs-"] .group-sub-tab-btn{
+    [id^="nature-sub-tabs-"] .group-sub-tab-btn, [id^="art-sub-tabs-"] .group-sub-tab-btn{
       text-overflow: clip;
-      text-align: left; /* buttons center by default — keep "Hikes" flush with the page's left edge */
+      text-align: left; /* buttons center by default — keep the first label flush with the page's left edge */
+    }
+
+    /* Music and Food: same idea, but with only two tabs each gets half the
+       row, with its label centered in that half. (width, not flex, on the
+       bar: Music's bars sit in a column-direction flex parent, where a flex
+       basis would mean height rather than width.) */
+    [id^="music-sub-tabs"], [id^="food-sub-tabs"]{
+      width: 100%;
+      flex-wrap: nowrap;
+      gap: 6px;
+    }
+    [id^="music-sub-tabs"] .group-sub-tab-btn, [id^="food-sub-tabs"] .group-sub-tab-btn{
+      flex: 1 1 0;
+      min-width: 0;
+      font-size: clamp(12px, 4vw, 17px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+      text-align: center;
     }
 
     /* The details panel's desktop behavior is a sticky side column that
