@@ -3721,6 +3721,21 @@
   }
   .insights-more:hover{ color: var(--amber-dark); }
 
+  /* Restaurant insights — same look as Albums'. Guests see the counts but
+     never anything that spells out ranking: no averages, no "Highest Rated". */
+  body.guest-view-active #rest-cuisine-rated-block{ display: none !important; }
+  body.guest-view-active #restaurant-insights-section .artist-avg:not(.artist-avg-keep){ display: none; }
+  #rest-year-list .artist-row{ cursor: default; }
+  #rest-year-list .artist-row:hover{ background: none; }
+  /* Hike insights: same rules — counts for guests, nothing that spells out ranking */
+  body.guest-view-active #hike-park-rated-block,
+  body.guest-view-active #hike-loc-rated-block{ display: none !important; }
+  body.guest-view-active #hike-insights-section .artist-avg:not(.artist-avg-keep){ display: none; }
+  #hike-year-list .artist-row{ cursor: default; }
+  #hike-year-list .artist-row:hover{ background: none; }
+  #book-decade-list .artist-row{ cursor: default; }
+  #book-decade-list .artist-row:hover{ background: none; }
+
   .toast{
     position: fixed;
     bottom: 24px; left: 50%;
@@ -4655,6 +4670,35 @@
 
       <ol class="results-list" id="restaurant-list"></ol>
 
+      <div class="insights-section" id="restaurant-insights-section">
+        <p class="eyebrow">Insights</p>
+
+        <div class="insights-block" id="rest-cuisine-block">
+          <p class="insights-block-title">By Cuisine — Most Restaurants</p>
+          <div class="artist-list" id="rest-cuisine-list"></div>
+        </div>
+
+        <div class="insights-block" id="rest-cuisine-rated-block">
+          <p class="insights-block-title">By Cuisine — Highest Rated</p>
+          <div class="artist-list" id="rest-cuisine-rated-list"></div>
+        </div>
+
+        <div class="insights-block" id="rest-city-block">
+          <p class="insights-block-title">By City — Most Restaurants</p>
+          <div class="artist-list" id="rest-city-list"></div>
+        </div>
+
+        <div class="insights-block" id="rest-visited-block">
+          <p class="insights-block-title">Most Visited</p>
+          <div class="artist-list" id="rest-visited-list"></div>
+        </div>
+
+        <div class="insights-block" id="rest-year-block">
+          <p class="insights-block-title">Visits by Year</p>
+          <div class="artist-list" id="rest-year-list"></div>
+        </div>
+      </div>
+
       <div class="tiers-panel collapsed" id="restaurant-tiers-panel">
         <div class="tiers-panel-header" id="restaurant-tiers-panel-header">
           <p class="insights-block-title" style="margin:0;">Tiers</p>
@@ -4747,6 +4791,40 @@
       <ol class="results-list" id="hike-list"></ol>
       <div class="hike-full-list-btn-wrap">
         <button class="btn-ghost" id="hike-full-list-btn" type="button">Show Full List</button>
+      </div>
+
+      <div class="insights-section" id="hike-insights-section">
+        <p class="eyebrow">Insights</p>
+
+        <div class="insights-block" id="hike-park-block">
+          <p class="insights-block-title">By Park — Most Hikes</p>
+          <div class="artist-list" id="hike-park-list"></div>
+        </div>
+
+        <div class="insights-block" id="hike-park-rated-block">
+          <p class="insights-block-title">By Park — Highest Rated</p>
+          <div class="artist-list" id="hike-park-rated-list"></div>
+        </div>
+
+        <div class="insights-block" id="hike-loc-block">
+          <p class="insights-block-title">By Location — Most Hikes</p>
+          <div class="artist-list" id="hike-loc-list"></div>
+        </div>
+
+        <div class="insights-block" id="hike-loc-rated-block">
+          <p class="insights-block-title">By Location — Highest Rated</p>
+          <div class="artist-list" id="hike-loc-rated-list"></div>
+        </div>
+
+        <div class="insights-block" id="hike-most-block">
+          <p class="insights-block-title">Most Hiked</p>
+          <div class="artist-list" id="hike-most-list"></div>
+        </div>
+
+        <div class="insights-block" id="hike-year-block">
+          <p class="insights-block-title">Outings by Year</p>
+          <div class="artist-list" id="hike-year-list"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -4854,6 +4932,25 @@
 
       <ol class="results-list grid-mode media-poster-grid" id="book-list"></ol>
       <p class="restaurant-course-empty" id="book-empty-message" style="display:none;">No books yet — add one, or import your list.</p>
+
+      <div class="insights-section" id="book-insights-section">
+        <p class="eyebrow">Insights</p>
+
+        <div class="insights-block" id="book-author-block">
+          <p class="insights-block-title">By Author — Most Books</p>
+          <div class="artist-list" id="book-author-list"></div>
+        </div>
+
+        <div class="insights-block" id="book-author-rated-block">
+          <p class="insights-block-title">By Author — Highest Rated</p>
+          <div class="artist-list" id="book-author-rated-list"></div>
+        </div>
+
+        <div class="insights-block" id="book-decade-block">
+          <p class="insights-block-title">By Decade</p>
+          <div class="artist-list" id="book-decade-list"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -10326,7 +10423,7 @@
       .sort((a, b) => a.year - b.year);
   }
 
-  function renderStatList(container, list, metric, maxShow, labelPlural, onRowClick){
+  function renderStatList(container, list, metric, maxShow, labelPlural, onRowClick, opts){
     const expanded = !!container._expanded;
     const shown = expanded ? list : list.slice(0, maxShow);
     let getPct, getRightLabel;
@@ -10345,6 +10442,9 @@
       getPct = a => Math.max(6, Math.round(100 - ((a.avg - bestAvg) / span) * 100));
       getRightLabel = a => 'avg ' + a.avg.toFixed(1);
     }
+
+    if (opts && opts.rightLabel) getRightLabel = opts.rightLabel;   // e.g. Most Visited shows a rank, not an "avg"
+    const countText = (opts && opts.countText) || (a => a.count + '×');
 
     // Measure the widest name actually being shown and lock every row's name
     // column to that exact pixel width, so every bar in this list starts at
@@ -10367,20 +10467,20 @@
         '<span class="artist-rank">' + (i + 1) + '</span>' +
         '<span class="artist-name">' + escapeHtml(a.name) + '</span>' +
         '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + getPct(a) + '%"></span></span>' +
-        '<span class="artist-count">' + a.count + '×</span>' +
+        '<span class="artist-count">' + countText(a) + '</span>' +
         '<span class="artist-avg">' + getRightLabel(a) + '</span>' +
       '</div>'
     ).join('') + moreHtml;
 
     container.querySelectorAll('.artist-row').forEach((el, i) => {
-      el.addEventListener('click', () => onRowClick(shown[i].name));
+      el.addEventListener('click', () => onRowClick(shown[i].name, shown[i]));
     });
 
     const moreBtn = container.querySelector('.insights-more');
     if (moreBtn){
       moreBtn.addEventListener('click', () => {
         container._expanded = !expanded;
-        renderStatList(container, list, metric, maxShow, labelPlural, onRowClick);
+        renderStatList(container, list, metric, maxShow, labelPlural, onRowClick, opts);
       });
     }
   }
@@ -11211,8 +11311,116 @@
     renderRestaurantsPage();
   });
 
+  // ---------- RESTAURANT INSIGHTS ----------
+  // Bar-chart lists at the bottom of the Restaurants page, in the same style
+  // as Albums' Insights: cuisines, cities, most-visited places and visits by
+  // year. "City" is read from the free-text Location field — whatever comes
+  // before the first comma ("Portland, OR" -> "Portland"). Tapping a
+  // cuisine or city filters the list to it; tapping a most-visited
+  // restaurant opens it. Read-only — nothing here saves anything.
+  function restaurantCityOf(r){
+    return ((r.location || '').split(',')[0] || '').trim();
+  }
+
+  // Groups restaurants by a text key (case-insensitively, so "thai" and "Thai"
+  // are one bar) and works out each group's count and average rank position.
+  function computeRestaurantGroupStats(keyOf){
+    const groups = new Map();
+    restaurantRows.forEach((r, idx) => {
+      const raw = keyOf(r);
+      if (!raw) return;
+      const key = raw.toLowerCase();
+      let g = groups.get(key);
+      if (!g){ g = { spellings: {}, count: 0, sum: 0 }; groups.set(key, g); }
+      g.spellings[raw] = (g.spellings[raw] || 0) + 1;
+      g.count++;
+      g.sum += idx + 1;
+    });
+    return Array.from(groups.values()).map(g => {
+      const name = Object.keys(g.spellings).sort((a, b) => g.spellings[b] - g.spellings[a])[0]; // the spelling used most often
+      return { name, count: g.count, avg: g.sum / g.count };
+    });
+  }
+
+  function filterRestaurantsByAndScroll(text){
+    restaurantSearchFilterInput.value = text;
+    restaurantSearchFilter = text;
+    restaurantSearchFilterClear.style.display = 'flex';
+    renderRestaurantsPage();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderRestaurantInsights(){
+    const section = document.getElementById('restaurant-insights-section');
+    if (!section) return;
+    if (restaurantRearrangeMode || !restaurantRows.length){ section.style.display = 'none'; return; }
+    const show = (id, on) => { document.getElementById(id).style.display = on ? 'block' : 'none'; };
+
+    const cuisine = computeRestaurantGroupStats(r => (r.cuisine || '').trim());
+    const city = computeRestaurantGroupStats(restaurantCityOf);
+
+    show('rest-cuisine-block', cuisine.length > 0);
+    if (cuisine.length){
+      renderStatList(document.getElementById('rest-cuisine-list'),
+        cuisine.slice().sort((a, b) => b.count - a.count || a.avg - b.avg), 'count', 10, 'cuisines', filterRestaurantsByAndScroll);
+    }
+
+    // Highest rated only counts cuisines with 2+ restaurants — one lucky
+    // favorite shouldn't top the list on its own.
+    const rated = cuisine.filter(c => c.count >= 2).sort((a, b) => a.avg - b.avg);
+    show('rest-cuisine-rated-block', rated.length >= 2);
+    if (rated.length >= 2){
+      renderStatList(document.getElementById('rest-cuisine-rated-list'), rated, 'avg', 10, 'cuisines', filterRestaurantsByAndScroll);
+    }
+
+    show('rest-city-block', city.length > 0);
+    if (city.length){
+      renderStatList(document.getElementById('rest-city-list'),
+        city.slice().sort((a, b) => b.count - a.count || a.avg - b.avg), 'count', 10, 'cities', filterRestaurantsByAndScroll);
+    }
+
+    // Most visited: counts the manual "×N" visit count too, same as the list itself does.
+    const visited = restaurantRows
+      .map((r, idx) => ({ name: (r.name || '').trim(), count: restaurantVisitsCount(r), avg: idx + 1, rank: idx + 1, idx }))
+      .filter(x => x.name && x.count >= 2)
+      .sort((a, b) => b.count - a.count || a.rank - b.rank);
+    show('rest-visited-block', visited.length > 0);
+    if (visited.length){
+      renderStatList(document.getElementById('rest-visited-list'), visited, 'count', 10, 'restaurants',
+        (name, rec) => { if (rec) openRestaurantDetailsPanel(rec.idx); },
+        { rightLabel: a => '#' + a.rank, countText: a => a.count + ' visits' });
+    }
+
+    // Visits by year: dated visits only, oldest first — and only worth a chart once there are two years to compare.
+    const years = {};
+    restaurantRows.forEach(r => (Array.isArray(r.visits) ? r.visits : []).forEach(v => {
+      const pd = otdParse(v.date);
+      if (!pd) return;
+      const e = years[pd.y] || (years[pd.y] = { visits: 0, places: new Set() });
+      e.visits++; e.places.add(r);
+    }));
+    const yearList = Object.keys(years).map(Number).sort((a, b) => a - b);
+    show('rest-year-block', yearList.length >= 2);
+    if (yearList.length >= 2){
+      const maxVisits = Math.max.apply(null, yearList.map(y => years[y].visits));
+      document.getElementById('rest-year-list').innerHTML = yearList.map(y => {
+        const e = years[y];
+        const pct = Math.max(6, Math.round((e.visits / maxVisits) * 100));
+        return '<div class="artist-row">' +
+          '<span class="artist-rank year-label">' + y + '</span>' +
+          '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+          '<span class="artist-count">' + e.visits + ' visit' + (e.visits === 1 ? '' : 's') + '</span>' +
+          '<span class="artist-avg artist-avg-keep" style="min-width:74px;">' + e.places.size + ' place' + (e.places.size === 1 ? '' : 's') + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    section.style.display = 'block';
+  }
+
   function renderRestaurantsPage(){
     maybeInitRestaurantTiers(restaurantRows.length);
+    renderRestaurantInsights();
 
     restaurantRearrangeBtn.style.display = restaurantRearrangeMode ? 'none' : 'inline-block';
     restaurantRearrangeSaveBtn.style.display = restaurantRearrangeMode ? 'inline-block' : 'none';
@@ -12159,7 +12367,127 @@
     showToast('Order saved');
   }
 
+  // ---------- HIKE INSIGHTS ----------
+  // Bar-chart lists at the bottom of the Hikes page, same style as Albums'
+  // and Restaurants' Insights: which parks (the "City / Park" field) and which
+  // locations you hike in most, plus your most-hiked trails and outings by
+  // year. A hike's location is its state or province for the US and Canada,
+  // or its country anywhere else — a US/Canada hike with no state entered
+  // has no state to count, so it's left out of that one chart. Tapping a park
+  // or location filters the list; tapping a trail opens it. Read-only.
+  function hikeLocationOf(h){
+    const country = (h.country || '').trim();
+    const state = (h.state || '').trim();
+    if (isUSCountry(country) || isCanadaCountry(country)) return state;
+    return country || state; // any other country: the country itself (or a lone state/region if no country was entered)
+  }
+
+  // Groups hikes by a text key (case-insensitively) with each group's count and
+  // average rank position — the rank being where the hike sits in the ordered list.
+  function computeHikeGroupStats(ordered, keyOf){
+    const groups = new Map();
+    ordered.forEach((h, idx) => {
+      const raw = keyOf(h);
+      if (!raw) return;
+      const key = raw.toLowerCase();
+      let g = groups.get(key);
+      if (!g){ g = { spellings: {}, count: 0, sum: 0 }; groups.set(key, g); }
+      g.spellings[raw] = (g.spellings[raw] || 0) + 1;
+      g.count++;
+      g.sum += idx + 1;
+    });
+    return Array.from(groups.values()).map(g => {
+      const name = Object.keys(g.spellings).sort((a, b) => g.spellings[b] - g.spellings[a])[0];
+      return { name, count: g.count, avg: g.sum / g.count };
+    });
+  }
+
+  function filterHikesByAndScroll(text){
+    hikeSearchFilterInput.value = text;
+    hikeSearchFilter = text;
+    hikeSearchFilterClear.style.display = 'flex';
+    renderHikesPage();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderHikeInsights(){
+    const section = document.getElementById('hike-insights-section');
+    if (!section) return;
+    if (hikeRearrangeMode || !hikeRows.length){ section.style.display = 'none'; return; }
+    const show = (id, on) => { document.getElementById(id).style.display = on ? 'block' : 'none'; };
+    const ordered = getOrderedHikes();
+
+    const parks = computeHikeGroupStats(ordered, h => (h.city || '').trim());
+    show('hike-park-block', parks.length > 0);
+    if (parks.length){
+      renderStatList(document.getElementById('hike-park-list'),
+        parks.slice().sort((a, b) => b.count - a.count || a.avg - b.avg), 'count', 10, 'parks', filterHikesByAndScroll);
+    }
+    // Highest rated only counts places with 2+ hikes — one great hike shouldn't top the list alone.
+    const parksRated = parks.filter(p => p.count >= 2).sort((a, b) => a.avg - b.avg);
+    show('hike-park-rated-block', parksRated.length >= 2);
+    if (parksRated.length >= 2){
+      renderStatList(document.getElementById('hike-park-rated-list'), parksRated, 'avg', 10, 'parks', filterHikesByAndScroll);
+    }
+
+    const locs = computeHikeGroupStats(ordered, hikeLocationOf);
+    show('hike-loc-block', locs.length > 0);
+    if (locs.length){
+      renderStatList(document.getElementById('hike-loc-list'),
+        locs.slice().sort((a, b) => b.count - a.count || a.avg - b.avg), 'count', 10, 'locations', filterHikesByAndScroll);
+    }
+    const locsRated = locs.filter(l => l.count >= 2).sort((a, b) => a.avg - b.avg);
+    show('hike-loc-rated-block', locsRated.length >= 2);
+    if (locsRated.length >= 2){
+      renderStatList(document.getElementById('hike-loc-rated-list'), locsRated, 'avg', 10, 'locations', filterHikesByAndScroll);
+    }
+
+    // Most hiked: trails with 2+ logged outings.
+    const most = ordered
+      .map((h, idx) => ({ name: (h.name || '').trim(), count: (h.dates || []).length, avg: idx + 1, rank: idx + 1, hike: h }))
+      .filter(x => x.name && x.count >= 2)
+      .sort((a, b) => b.count - a.count || a.rank - b.rank);
+    show('hike-most-block', most.length > 0);
+    if (most.length){
+      renderStatList(document.getElementById('hike-most-list'), most, 'count', 10, 'trails',
+        (name, rec) => { const i = hikeRows.indexOf(rec.hike); if (i !== -1) openHikeDetailsPanel(i); },
+        { rightLabel: a => '#' + a.rank, countText: a => a.count + ' outings' });
+    }
+
+    // Outings by year: dated outings only, oldest first — worth a chart once there are two years.
+    const years = {};
+    hikeRows.forEach(h => {
+      const seenDays = new Set(); // two entries on the same day for one trail are one outing
+      (h.dates || []).forEach(d => {
+        const pd = otdParse(d.date);
+        if (!pd || seenDays.has(pd.str)) return;
+        seenDays.add(pd.str);
+        const e = years[pd.y] || (years[pd.y] = { outings: 0, trails: new Set(), miles: 0 });
+        e.outings++; e.trails.add(h); e.miles += yirNum(h.distance);
+      });
+    });
+    const yearList = Object.keys(years).map(Number).sort((a, b) => a - b);
+    show('hike-year-block', yearList.length >= 2);
+    if (yearList.length >= 2){
+      const maxOutings = Math.max.apply(null, yearList.map(y => years[y].outings));
+      document.getElementById('hike-year-list').innerHTML = yearList.map(y => {
+        const e = years[y];
+        const pct = Math.max(6, Math.round((e.outings / maxOutings) * 100));
+        const right = e.miles > 0 ? (Math.round(e.miles * 10) / 10) + ' mi' : e.trails.size + (e.trails.size === 1 ? ' trail' : ' trails');
+        return '<div class="artist-row">' +
+          '<span class="artist-rank year-label">' + y + '</span>' +
+          '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+          '<span class="artist-count">' + e.outings + ' outing' + (e.outings === 1 ? '' : 's') + '</span>' +
+          '<span class="artist-avg artist-avg-keep" style="min-width:74px;">' + escapeHtml(right) + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    section.style.display = 'block';
+  }
+
   function renderHikesPage(){
+    renderHikeInsights();
     hikeRearrangeBtn.style.display = hikeRearrangeMode ? 'none' : 'inline-block';
     hikeRearrangeSaveBtn.style.display = hikeRearrangeMode ? 'inline-block' : 'none';
     hikeRearrangeCancelBtn.style.display = hikeRearrangeMode ? 'inline-block' : 'none';
@@ -13867,7 +14195,87 @@
     return li;
   }
 
+  // ---------- BOOK INSIGHTS ----------
+  // Bar-chart lists at the bottom of the Books page, same style as Albums'
+  // Insights: which authors you read most and rate highest, and which decades
+  // your books come from. Position in the list is the rank, same as everywhere
+  // else for Books. Tapping an author filters the list to them. Read-only.
+  function renderBookInsights(){
+    const section = document.getElementById('book-insights-section');
+    if (!section) return;
+    const state = mediaState.book;
+    if (state.editMode || !state.rows.length){ section.style.display = 'none'; return; }
+    const show = (id, on) => { document.getElementById(id).style.display = on ? 'block' : 'none'; };
+    const ordered = getOrderedMedia('book');
+
+    // Authors, grouped case-insensitively with each one's count and average rank position.
+    const groups = new Map();
+    ordered.forEach((b, idx) => {
+      const raw = (b.author || '').trim();
+      if (!raw) return;
+      const key = raw.toLowerCase();
+      let g = groups.get(key);
+      if (!g){ g = { spellings: {}, count: 0, sum: 0 }; groups.set(key, g); }
+      g.spellings[raw] = (g.spellings[raw] || 0) + 1;
+      g.count++;
+      g.sum += idx + 1;
+    });
+    const authors = Array.from(groups.values()).map(g => ({
+      name: Object.keys(g.spellings).sort((a, b) => g.spellings[b] - g.spellings[a])[0], // the spelling used most often
+      count: g.count, avg: g.sum / g.count
+    }));
+
+    const filterByAuthor = (name) => {
+      const dom = state.dom;
+      dom.searchInput.value = name;
+      state.searchFilter = name.toLowerCase();
+      dom.searchClear.style.display = 'flex';
+      renderMediaPage('book');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    show('book-author-block', authors.length > 0);
+    if (authors.length){
+      renderStatList(document.getElementById('book-author-list'),
+        authors.slice().sort((a, b) => b.count - a.count || a.avg - b.avg), 'count', 10, 'authors', filterByAuthor);
+    }
+    // Highest rated only counts authors with 2+ books — one great book shouldn't top the list alone.
+    const rated = authors.filter(a => a.count >= 2).sort((a, b) => a.avg - b.avg);
+    show('book-author-rated-block', rated.length >= 2);
+    if (rated.length >= 2){
+      renderStatList(document.getElementById('book-author-rated-list'), rated, 'avg', 10, 'authors', filterByAuthor);
+    }
+
+    // Decades from the Year field (anything that isn't a four-digit year is skipped).
+    const decades = {};
+    ordered.forEach((b, idx) => {
+      const m = String(b.year || '').match(/\d{4}/);
+      if (!m) return;
+      const d = Math.floor(Number(m[0]) / 10) * 10;
+      (decades[d] = decades[d] || { count: 0, sum: 0 });
+      decades[d].count++; decades[d].sum += idx + 1;
+    });
+    const decadeList = Object.keys(decades).map(Number).sort((a, b) => a - b);
+    show('book-decade-block', decadeList.length >= 2);
+    if (decadeList.length >= 2){
+      const maxCount = Math.max.apply(null, decadeList.map(d => decades[d].count));
+      document.getElementById('book-decade-list').innerHTML = decadeList.map(d => {
+        const e = decades[d];
+        const pct = Math.max(6, Math.round((e.count / maxCount) * 100));
+        return '<div class="artist-row">' +
+          '<span class="artist-rank year-label" style="min-width:52px;">' + d + 's</span>' +
+          '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+          '<span class="artist-count">' + e.count + ' book' + (e.count === 1 ? '' : 's') + '</span>' +
+          '<span class="artist-avg">avg ' + (e.sum / e.count).toFixed(1) + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    section.style.display = 'block';
+  }
+
   function renderMediaPage(type){
+    if (type === 'book') renderBookInsights();
     const config = MEDIA_CONFIGS[type];
     const dom = mediaState[type].dom;
     const state = mediaState[type];
