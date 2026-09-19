@@ -1861,7 +1861,6 @@
   }
   @media (min-width: 769px){
     #otd-overlay{ display: none !important; }
-    #otd-settings-section{ display: none; }
   }
 
   /* Settings section */
@@ -2101,9 +2100,8 @@
   }
   @media (min-width: 769px){
     #gg-overlay{ display: none !important; }
-    #gg-settings-section{ display: none; }
+    .fun-card-phone-only{ display: none; } /* On This Day and the games are phone/tablet only */
   }
-  body.guest-view-active #gg-settings-section{ display: none; }
   /* Which Year: four short answers fit two across */
   .gg-options-year{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gg-option-year{ text-align: center; font-size: 22px; font-weight: 700; min-height: 64px; }
@@ -2460,11 +2458,37 @@
     cursor: pointer;
   }
   .yir-foot-note{ margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: var(--chalk-dim); }
-  body.guest-view-active #yir-settings-section{ display: none; }
   @media (prefers-reduced-motion: reduce){
     #yir-overlay, .yir-panel{ transition: none !important; }
     .yir-icon-btn.spin svg{ animation: none; }
   }
+
+  /* ---------- FUN TAB ---------- */
+  .fun-page{ max-width: 720px; }
+  .fun-title{ margin: 0 0 12px; }
+  .fun-cards{ display: flex; flex-direction: column; gap: 14px; margin-top: 26px; }
+  .fun-card{
+    padding: 20px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 20px;
+  }
+  .fun-card-icon{ font-size: 34px; line-height: 1; }
+  .fun-card-title{
+    margin: 12px 0 0;
+    font-family: 'Figtree', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--chalk);
+  }
+  .fun-card-text{ margin: 6px 0 16px; font-size: 15px; line-height: 1.5; color: var(--chalk-dim); }
+  .fun-card .btn-primary{ width: 100%; }
+  .otd-fun-settings{ margin-top: 16px; border-top: 1px solid var(--panel-line); }
+  .otd-fun-include{ border-top: 1px solid var(--panel-line); }
+  body.guest-view-active #fun-card-otd{ display: none; } /* On This Day is the owner's — guests don't get it */
+  .fun-guest-only{ display: none; }
+  body.guest-view-active .fun-guest-only{ display: inline; }
+  body.guest-view-active .fun-owner-only{ display: none; }
 
   /* ---------- TOUCH DRAG-TO-REORDER (see setupTouchDrag in the script) ---------- */
   .touch-drag-ghost{
@@ -4274,14 +4298,17 @@
         <button class="top-nav-btn" id="top-nav-food-btn" type="button"><span class="top-nav-icon">🍅</span><span class="top-nav-label">Food</span></button>
         <button class="top-nav-btn" id="top-nav-nature-btn" type="button"><span class="top-nav-icon">🏔️</span><span class="top-nav-label">Nature</span></button>
         <button class="top-nav-btn" id="top-nav-art-btn" type="button"><span class="top-nav-icon">🎭</span><span class="top-nav-label">Art</span></button>
+        <button class="top-nav-btn" id="top-nav-fun-btn" type="button"><span class="top-nav-icon">🎉</span><span class="top-nav-label">Fun</span></button>
       </div>
       <!-- Dedicated to Guest View — hidden entirely otherwise (see the
            body.guest-view-active rules), shown in place of .top-nav rather
            than showing the normal grouped nav with items hidden inside it.
-           Flat (no grouping/sub-tabs) since there's only the two. -->
+           Flat (no grouping/sub-tabs) since there's only the three:
+           Restaurants, Hikes and Fun. -->
       <div class="top-nav guest-top-nav" id="guest-top-nav">
         <button class="top-nav-btn active" id="guest-nav-restaurants-btn" type="button"><span class="top-nav-icon">👨‍🍳</span><span class="top-nav-label">Restaurants</span></button>
         <button class="top-nav-btn" id="guest-nav-hikes-btn" type="button"><span class="top-nav-icon">🏕️</span><span class="top-nav-label">Hikes</span></button>
+        <button class="top-nav-btn" id="guest-nav-fun-btn" type="button"><span class="top-nav-icon">🎉</span><span class="top-nav-label">Fun</span></button>
       </div>
       <button class="top-nav-settings-btn" id="top-nav-settings-btn" type="button" title="Settings"><span class="top-nav-icon">⚙️</span><span class="top-nav-label">Settings</span></button>
     </div>
@@ -4935,6 +4962,65 @@
     </div>
   </div>
 
+  <div id="page-fun" class="top-page">
+    <div class="page-content fun-page">
+      <p class="eyebrow">My Blue Heaven</p>
+      <h1 class="fun-title">Look back.<br>Play around.</h1>
+      <p class="sub">Your year in hikes, meals and photos &mdash; and a few games to see how well you know them.</p>
+
+      <div class="fun-cards">
+        <section class="fun-card" id="fun-card-yir">
+          <div class="fun-card-icon" aria-hidden="true">🗓️</div>
+          <h2 class="fun-card-title">Year in Review</h2>
+          <p class="fun-card-text">A timeline of the hikes, restaurant visits and photos from any year since 2017.</p>
+          <button class="btn-primary" id="yir-launch-btn" type="button">Open Year in Review</button>
+        </section>
+
+        <section class="fun-card fun-card-phone-only" id="fun-card-otd">
+          <div class="fun-card-icon" aria-hidden="true">🕰️</div>
+          <h2 class="fun-card-title">On This Day</h2>
+          <p class="fun-card-text">The hikes, restaurant visits and photos from this date in earlier years. It also pops up on its own once a day, the first time you open the app on this device.</p>
+          <button class="btn-primary" id="otd-show-again-btn" type="button">Show today's</button>
+
+          <div class="otd-fun-settings">
+            <div class="otd-setting-row" style="min-height:56px;">
+              <span style="font-weight:600;">Pop up automatically each day</span>
+              <button type="button" class="otd-switch" id="otd-master-switch" role="switch" aria-checked="true" aria-label="Pop up automatically each day"><span class="otd-switch-knob"></span></button>
+            </div>
+
+            <div class="otd-fun-include">
+              <div class="otd-settings-caption">INCLUDE</div>
+              <label class="otd-setting-row"><span>Hikes</span><input type="checkbox" id="otd-hikes-check" checked></label>
+              <label class="otd-setting-row"><span>Restaurants</span><input type="checkbox" id="otd-restaurants-check" checked></label>
+              <label class="otd-setting-row" style="min-height:56px;"><span style="display:flex; flex-direction:column; gap:2px;"><span>Photos</span><span style="font-size:13px; line-height:1.35; color:var(--chalk-dim);">Matched by the date at the start of each file name, like 20250517_021456</span></span><input type="checkbox" id="otd-photos-check" checked></label>
+            </div>
+
+            <div class="otd-undated-box" id="otd-undated-box" style="display:none;">
+              <div class="otd-undated-title" id="otd-undated-title"></div>
+              <p class="otd-undated-text" id="otd-undated-text"></p>
+              <button type="button" class="otd-undated-toggle" id="otd-undated-toggle">Review undated items</button>
+              <div class="otd-undated-list" id="otd-undated-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="fun-card fun-card-phone-only" id="fun-card-place">
+          <div class="fun-card-icon" aria-hidden="true">📸</div>
+          <h2 class="fun-card-title">Guess the Place</h2>
+          <p class="fun-card-text"><span class="fun-owner-only">Which park, road, hike or restaurant is this photo from? Dish photos included.</span><span class="fun-guest-only">Which hike or restaurant is this photo from? Dish photos included.</span></p>
+          <button class="btn-primary" id="gg-launch-btn" type="button">Play Guessing Game</button>
+        </section>
+
+        <section class="fun-card fun-card-phone-only" id="fun-card-year">
+          <div class="fun-card-icon" aria-hidden="true">⏳</div>
+          <h2 class="fun-card-title">Which Year?</h2>
+          <p class="fun-card-text">Which year was this hike photo taken? Four years to choose from.</p>
+          <button class="btn-primary" id="gg-year-launch-btn" type="button">Play Which Year</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <div id="page-settings" class="top-page">
     <div class="page-content">
       <h1 style="display:none;">Settings</h1>
@@ -5009,47 +5095,6 @@
           <input type="file" id="musicbee-import-file" accept=".csv" style="display:none;">
         </div>
         <p class="footer-note" style="margin-top:10px;">Export from MusicBee: Tools &gt; Additional Tagging Tools &gt; Library Report, with columns Album Artist, Album, Track #, Title, Rating, Love.</p>
-      </div>
-
-      <div class="settings-section" id="otd-settings-section">
-        <h2 class="settings-section-title">On This Day</h2>
-        <p class="footer-note" style="margin:0 0 6px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">A look back at hikes, restaurants and photos from this date in earlier years. It shows once a day, the first time you open the app on this device.</p>
-
-        <div class="otd-setting-row" style="border-top:1px solid var(--panel-line); min-height:56px;">
-          <span style="font-weight:600;">Show On this day</span>
-          <button type="button" class="otd-switch" id="otd-master-switch" role="switch" aria-checked="true" aria-label="Show On this day"><span class="otd-switch-knob"></span></button>
-        </div>
-
-        <div style="border-top:1px solid var(--panel-line);">
-          <div class="otd-settings-caption">INCLUDE</div>
-          <label class="otd-setting-row"><span>Hikes</span><input type="checkbox" id="otd-hikes-check" checked></label>
-          <label class="otd-setting-row"><span>Restaurants</span><input type="checkbox" id="otd-restaurants-check" checked></label>
-          <label class="otd-setting-row" style="min-height:56px;"><span style="display:flex; flex-direction:column; gap:2px;"><span>Photos</span><span style="font-size:13px; line-height:1.35; color:var(--chalk-dim);">Matched by the date at the start of each file name, like 20250517_021456</span></span><input type="checkbox" id="otd-photos-check" checked></label>
-        </div>
-
-        <div class="import-row" style="margin-top:8px;">
-          <button class="btn-ghost" id="otd-show-again-btn" type="button">Show today's again</button>
-        </div>
-
-        <div class="otd-undated-box" id="otd-undated-box" style="display:none;">
-          <div class="otd-undated-title" id="otd-undated-title"></div>
-          <p class="otd-undated-text" id="otd-undated-text"></p>
-          <button type="button" class="otd-undated-toggle" id="otd-undated-toggle">Review undated items</button>
-          <div class="otd-undated-list" id="otd-undated-list"></div>
-        </div>
-      </div>
-
-      <div class="settings-section" id="yir-settings-section">
-        <h2 class="settings-section-title">Year in Review</h2>
-        <p class="footer-note" style="margin:0 0 12px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">A timeline of the hikes, restaurant visits and Photos-tab photos from any year since 2017.</p>
-        <button class="btn-primary" id="yir-launch-btn" type="button">Open Year in Review</button>
-      </div>
-
-      <div class="settings-section" id="gg-settings-section">
-        <h2 class="settings-section-title">Guessing Game</h2>
-        <p class="footer-note" style="margin:0 0 12px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">Guess which park, road, hike or restaurant a photo is from (dish photos included), or which year a hike photo was taken.</p>
-        <button class="btn-primary" id="gg-launch-btn" type="button">Play Guessing Game</button>
-        <button class="btn-primary" id="gg-year-launch-btn" type="button" style="margin-top:10px;">Play Which Year</button>
       </div>
 
       <!-- Future: <div class="settings-section"><h2 class="settings-section-title">Restaurant Ranker Settings</h2>...</div> -->
@@ -5420,6 +5465,7 @@
   const lightboxDeleteBtn = document.getElementById('lightbox-delete-btn');
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
+  const pageFun = document.getElementById('page-fun');
   const topNavSettingsBtn = document.getElementById('top-nav-settings-btn');
   const lastfmStatusText = document.getElementById('lastfm-status-text');
   const lastfmConnectBtn = document.getElementById('lastfm-connect-btn');
@@ -5449,6 +5495,8 @@
   const topNavMusicBtn = document.getElementById('top-nav-music-btn');
   const guestNavRestaurantsBtn = document.getElementById('guest-nav-restaurants-btn');
   const guestNavHikesBtn = document.getElementById('guest-nav-hikes-btn');
+  const guestNavFunBtn = document.getElementById('guest-nav-fun-btn');
+  const topNavFunBtn = document.getElementById('top-nav-fun-btn');
   const topNavFoodBtn = document.getElementById('top-nav-food-btn');
   const topNavNatureBtn = document.getElementById('top-nav-nature-btn');
   const topNavArtBtn = document.getElementById('top-nav-art-btn');
@@ -5713,14 +5761,14 @@
   function applyGuestViewMode(){
     document.body.classList.toggle('guest-view-active', guestViewEnabled);
     if (guestViewEnabled){
-      // Anything outside Restaurants/Hikes/Settings is hidden — if the
+      // Anything outside Restaurants/Hikes/Fun/Settings is hidden — if the
       // currently active page is one of those, jump to Restaurants so
       // there's nothing left showing that Guest View is supposed to hide.
       // Uses switchGuestPage rather than switchTopPage directly so the
       // dedicated guest nav's own button states correctly update too, not
       // just which page div is visible.
       const activeTopPage = document.querySelector('.top-page.active');
-      if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes' && activeTopPage.id !== 'page-settings'){
+      if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes' && activeTopPage.id !== 'page-fun' && activeTopPage.id !== 'page-settings'){
         switchGuestPage('restaurants');
       }
     }
@@ -6257,7 +6305,7 @@
           // to call switchGuestPage (which touches restaurantRows via
           // renderRestaurantsPage).
           const activeTopPage = document.querySelector('.top-page.active');
-          if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes'){
+          if (activeTopPage && activeTopPage.id !== 'page-restaurants' && activeTopPage.id !== 'page-hikes' && activeTopPage.id !== 'page-fun'){
             switchGuestPage('restaurants');
           }
         }
@@ -8466,7 +8514,7 @@
       albums: pageAlbums, songs: pageSongs, restaurants: pageRestaurants, dishes: pageDishes,
       hikes: pageHikes, parks: pageParks, roads: pageRoads, photos: pagePhotos,
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
-      settings: pageSettings
+      fun: pageFun, settings: pageSettings
     };
     Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
 
@@ -8509,7 +8557,7 @@
     if (page === 'parks'){
       renderParksPage();
     }
-    if (page === 'settings'){
+    if (page === 'fun'){
       refreshOtdSettingsUI(); // the undated-items count can change whenever data does
     }
     if (page === 'roads'){
@@ -8538,10 +8586,12 @@
   function switchGuestPage(page){
     guestNavRestaurantsBtn.classList.toggle('active', page === 'restaurants');
     guestNavHikesBtn.classList.toggle('active', page === 'hikes');
+    guestNavFunBtn.classList.toggle('active', page === 'fun');
     switchTopPage(page);
   }
   guestNavRestaurantsBtn.addEventListener('click', () => switchGuestPage('restaurants'));
   guestNavHikesBtn.addEventListener('click', () => switchGuestPage('hikes'));
+  guestNavFunBtn.addEventListener('click', () => switchGuestPage('fun'));
 
   // Top-level group switch — updates which of the 4 group nav buttons (plus
   // Settings, which isn't really a "group" but lives in this same row) is
@@ -8553,11 +8603,13 @@
     topNavFoodBtn.classList.toggle('active', group === 'food');
     topNavNatureBtn.classList.toggle('active', group === 'nature');
     topNavArtBtn.classList.toggle('active', group === 'art');
+    topNavFunBtn.classList.toggle('active', group === 'fun');
     topNavSettingsBtn.classList.toggle('active', group === 'settings');
     if (group === 'music') switchTopPage(activeMusicSubPage);
     else if (group === 'food') switchTopPage(activeFoodSubPage);
     else if (group === 'nature') switchTopPage(activeNatureSubPage);
     else if (group === 'art') switchTopPage(activeArtSubPage);
+    else if (group === 'fun') switchTopPage('fun');
     else if (group === 'settings') switchTopPage('settings');
   }
 
@@ -8597,6 +8649,7 @@
   topNavFoodBtn.addEventListener('click', () => switchTopGroup('food'));
   topNavNatureBtn.addEventListener('click', () => switchTopGroup('nature'));
   topNavArtBtn.addEventListener('click', () => switchTopGroup('art'));
+  topNavFunBtn.addEventListener('click', () => switchTopGroup('fun'));
   topNavSettingsBtn.addEventListener('click', () => switchTopGroup('settings'));
 
   [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('albums')));
@@ -8646,6 +8699,10 @@
     // A details panel (or similar full-screen overlay) sitting on top
     // shouldn't let a swipe change the page underneath it.
     if (document.body.classList.contains('details-open-lock')) return;
+    // Guest View's nav is flat (Restaurants / Hikes / Fun) — there are no
+    // sub-tabs to swipe between, and stepping through the hidden Music group
+    // would land a guest on pages they aren't meant to reach.
+    if (guestViewEnabled) return;
     // Text fields have their own native touch behavior (cursor placement,
     // text selection, opening a picker) that a global swipe shouldn't step on.
     if (e.target.closest('input, textarea, select')) return;
@@ -16575,12 +16632,13 @@
     otdHikesCheck.checked = otdSettings.hikes;
     otdRestaurantsCheck.checked = otdSettings.restaurants;
     otdPhotosCheck.checked = otdSettings.photos;
-    [otdHikesCheck, otdRestaurantsCheck, otdPhotosCheck].forEach(cb => { cb.disabled = !otdSettings.enabled; });
-    otdShowAgainBtn.disabled = !otdSettings.enabled;
+    // The switch only controls the automatic daily pop-up. "Show today's" and
+    // the include filters keep working either way — turning the pop-up off
+    // shouldn't stop you looking whenever you like.
 
     const u = otdFindUndated();
     const total = u.hikes.length + u.restaurants.length + u.photos;
-    otdUndatedBox.style.display = (otdSettings.enabled && total > 0) ? 'block' : 'none';
+    otdUndatedBox.style.display = total > 0 ? 'block' : 'none';
     if (!total) return;
     otdUndatedTitle.textContent = otdPlural(total, 'item', 'items') + " can't appear yet";
     const parts = [];
@@ -16646,6 +16704,20 @@
   // place has no other photo. Wrong answers come from the same category, and
   // up to two of them are lookalikes (same state, or same cuisine) so they're
   // believable. Read-only apart from the stats kept on this device.
+  // Moves the app to a page from the Fun tab (or back to it). Guests use their
+  // own flat nav, the owner the grouped one — either way the right tab lights up.
+  function funShowPage(page){
+    if (guestViewEnabled){ switchGuestPage(page); return; }
+    if (page === 'hikes'){ switchTopGroup('nature'); switchNatureSubPage('hikes'); }
+    else if (page === 'parks'){ switchTopGroup('nature'); switchNatureSubPage('parks'); }
+    else if (page === 'roads'){ switchTopGroup('nature'); switchNatureSubPage('roads'); }
+    else if (page === 'restaurants'){ switchTopGroup('food'); switchFoodSubPage('restaurants'); }
+    else switchTopGroup('fun');
+  }
+  // Guests only see hikes and restaurants — parks and roads aren't reachable
+  // for them anywhere in the app, so the game doesn't ask about them either.
+  function ggKinds(){ return guestViewEnabled ? ['hike', 'restaurant'] : GG_KINDS; }
+
   const GG_STORAGE_KEY = 'guess-game-stats';
   const GG_ROUND_LENGTH = 10;
   const GG_KINDS = ['park', 'road', 'hike', 'restaurant'];
@@ -16677,7 +16749,6 @@
   let ggScreen = 'start';      // 'start' | 'question' | 'results'
   let ggMode = 'place';        // 'place' = Guess the Place, 'year' = Which Year
   let ggSelectedCat = 'all';
-  let ggReturnGroup = null;    // which top-level page to land back on when the game closes
   let ggReturnFocus = null;
   const ggBadUrls = new Set(); // photos that failed to load — never asked about again this session
 
@@ -16839,6 +16910,7 @@
       pool.photoCount = urls.size;
       if (names.size < 4) pool.reason = 'Needs 4 places';
       else if (!pool.withPhotos.length) pool.reason = 'No photos yet';
+      if (!ggKinds().includes(k)){ pool.reason = 'Not available'; pool.photoCount = 0; }
       pool.eligible = !pool.reason;
       if (pool.eligible) uniquePhotos += urls.size;
     });
@@ -16847,7 +16919,7 @@
 
   function ggAvailablePhotoCount(cat){
     if (ggMode === 'year') return ggPools.year.eligible ? ggPools.year.photos.filter(p => !ggBadUrls.has(p.url)).length : 0;
-    const kinds = (cat === 'all' ? GG_KINDS : [cat]).filter(k => ggPools.kinds[k].eligible);
+    const kinds = (cat === 'all' ? ggKinds() : [cat]).filter(k => ggPools.kinds[k].eligible);
     const urls = new Set();
     kinds.forEach(k => ggPools.kinds[k].withPhotos.forEach(p => p.photos.forEach(ph => { if (!ggBadUrls.has(ph.url)) urls.add(ph.url); })));
     return urls.size;
@@ -16907,7 +16979,7 @@
   function ggPickQuestion(){
     if (ggMode === 'year') return ggPickYearQuestion();
     const r = ggRound;
-    const kinds = (r.category === 'all' ? GG_KINDS : [r.category]).filter(k => ggPools.kinds[k].eligible);
+    const kinds = (r.category === 'all' ? ggKinds() : [r.category]).filter(k => ggPools.kinds[k].eligible);
     if (!kinds.length) return null;
     for (let attempt = 0; attempt < 80; attempt++){
       const kind = ggPick(kinds);
@@ -16960,11 +17032,11 @@
 
   function ggRenderStart(){
     if (ggMode === 'year'){ ggRenderYearStart(); return; }
-    const anyEligible = GG_KINDS.some(k => ggPools.kinds[k].eligible);
+    const anyEligible = ggKinds().some(k => ggPools.kinds[k].eligible);
     if (ggSelectedCat !== 'all' && !ggPools.kinds[ggSelectedCat].eligible) ggSelectedCat = 'all';
 
     const cats = [{ key: 'all', label: 'Everything', count: ggPools.uniquePhotos, ok: anyEligible, reason: 'Nothing to ask about yet' }]
-      .concat(GG_KINDS.map(k => ({ key: k, label: GG_INFO[k].plural, count: ggPools.kinds[k].photoCount, ok: ggPools.kinds[k].eligible, reason: ggPools.kinds[k].reason })));
+      .concat(ggKinds().map(k => ({ key: k, label: GG_INFO[k].plural, count: ggPools.kinds[k].photoCount, ok: ggPools.kinds[k].eligible, reason: ggPools.kinds[k].reason })));
     const catsHtml = cats.map(c =>
       '<button type="button" class="gg-cat' + (c.key === ggSelectedCat && c.ok ? ' selected' : '') + '" data-gg-cat="' + c.key + '"' +
         (c.ok ? ' aria-pressed="' + (c.key === ggSelectedCat) + '"' : ' disabled') + '>' +
@@ -16994,8 +17066,8 @@
   function ggRevealHtml(q){
     if (q.kind === 'year') return ggYearRevealHtml(q);
     const pl = q.place;
-    const rankText = pl.rank ? '#' + pl.rank + ' of ' + pl.total : '';
-    const rankHtml = pl.tier
+    const rankText = (pl.rank && !guestViewEnabled) ? '#' + pl.rank + ' of ' + pl.total : ''; // guests never see ranks or tiers
+    const rankHtml = (pl.tier && !guestViewEnabled)
       ? '<span style="color:' + pl.tier.color + ';">' + escapeHtml(pl.tier.name + ' · ' + rankText) + '</span>'
       : escapeHtml(rankText);
     return '<div class="gg-reveal ' + (q.correct ? 'right' : 'wrong') + '">' +
@@ -17025,7 +17097,7 @@
         '<div class="gg-place-name">' + escapeHtml(pl.name) + '</div>' +
         (pl.where ? '<div class="gg-place-where">' + escapeHtml(pl.where) + '</div>' : '') +
         '<div class="gg-place-meta">' +
-          (pl.rank ? '<span class="gg-rank">#' + pl.rank + ' of ' + pl.total + '</span>' : '') +
+          ((pl.rank && !guestViewEnabled) ? '<span class="gg-rank">#' + pl.rank + ' of ' + pl.total + '</span>' : '') +
           '<span>' + escapeHtml('Taken on ' + fullDate) + '</span>' +
         '</div>' +
         '<div class="gg-actions">' +
@@ -17180,7 +17252,7 @@
     if (place.kind === 'hike'){
       const idx = hikeRows.indexOf(place.row);
       if (idx === -1) return;
-      switchTopGroup('nature'); switchNatureSubPage('hikes');
+      funShowPage('hikes');
       openHikeDetailsPanel(idx);
       if (photo && photo.dateId){
         const section = hikeDetailsPanelInner.querySelector('.hike-date-section[data-date-id="' + photo.dateId + '"]');
@@ -17189,17 +17261,17 @@
     } else if (place.kind === 'park'){
       const idx = parkRows.indexOf(place.row);
       if (idx === -1) return;
-      switchTopGroup('nature'); switchNatureSubPage('parks');
+      funShowPage('parks');
       openParkDetailsPanel(idx);
     } else if (place.kind === 'road'){
       const idx = roadRows.indexOf(place.row);
       if (idx === -1) return;
-      switchTopGroup('nature'); switchNatureSubPage('roads');
+      funShowPage('roads');
       openRoadDetailsPanel(idx);
     } else {
       const idx = restaurantRows.indexOf(place.row);
       if (idx === -1) return;
-      switchTopGroup('food'); switchFoodSubPage('restaurants');
+      funShowPage('restaurants');
       if (photo && photo.visitId) restaurantActiveVisitId = photo.visitId;
       openRestaurantDetailsPanel(idx);
     }
@@ -17213,7 +17285,6 @@
     ggPools = ggBuildPools();
     ggRound = null;
     ggScreen = 'start';
-    ggReturnGroup = activeTopGroup;
     ggReturnFocus = document.activeElement;
     ggRender();
     ggOverlay.classList.add('open');          // the back-button observer notices this and adds its history entry
@@ -17229,7 +17300,7 @@
     if (countOpenOverlays() === 0) document.body.classList.remove('details-open-lock');
     ggRound = null;
     // "Go to it" may have moved the app to another page — land back where the game was launched from.
-    if (ggReturnGroup && activeTopGroup !== ggReturnGroup) switchTopGroup(ggReturnGroup);
+    if (!pageFun.classList.contains('active')) funShowPage('fun');
     if (ggReturnFocus && document.contains(ggReturnFocus)){ try{ ggReturnFocus.focus({ preventScroll: true }); }catch(e){} }
     ggReturnFocus = null;
   }
@@ -17669,7 +17740,6 @@
 
   let yirYear = null;         // the year on screen
   let yirItems = [];          // what each tappable card points at
-  let yirReturnGroup = null;  // page to land back on when it closes
   let yirReturnFocus = null;
   let yirSignature = '';      // a fingerprint of what's on screen, to tell whether a refresh changed anything
 
@@ -17789,14 +17859,14 @@
     // Highlights — each only shown when the data actually supports it.
     const hl = [];
     const bestMeal = stats.scored.slice().sort((a, b) => b.avg - a.avg || (a.dateStr < b.dateStr ? 1 : -1))[0];
-    if (bestMeal && stats.scored.length >= 2) hl.push({ label: 'Best meal', big: bestMeal.restaurant.name, sub: bestMeal.avg.toFixed(1) + ' · ' + yirShortDate(bestMeal.dateStr), item: bestMeal });
+    if (bestMeal && stats.scored.length >= 2 && !guestViewEnabled) hl.push({ label: 'Best meal', big: bestMeal.restaurant.name, sub: bestMeal.avg.toFixed(1) + ' · ' + yirShortDate(bestMeal.dateStr), item: bestMeal });
     let longest = null, withMiles = 0;
     list.forEach(dy => dy.hikes.forEach(h => { if (h.miles > 0){ withMiles++; if (!longest || h.miles > longest.miles) longest = h; } }));
     if (longest && withMiles >= 2) hl.push({ label: 'Longest hike', big: longest.hike.name, sub: yirRound1(longest.miles) + ' mi · ' + yirShortDate(longest.dateStr), item: longest });
     const dishes = [];
     list.forEach(dy => dy.restaurants.forEach(rs => { if (rs.topDish && rs.topDish.name) dishes.push({ rs, name: rs.topDish.name, score: rs.topDish.score }); }));
     dishes.sort((a, b) => b.score - a.score);
-    if (dishes.length) hl.push({ label: 'Standout dish', big: dishes[0].name, sub: dishes[0].rs.restaurant.name + (dishes[0].score >= 0 ? ' · ' + dishes[0].score + '/10' : ''), item: dishes[0].rs });
+    if (dishes.length && !guestViewEnabled) hl.push({ label: 'Standout dish', big: dishes[0].name, sub: dishes[0].rs.restaurant.name + (dishes[0].score >= 0 ? ' · ' + dishes[0].score + '/10' : ''), item: dishes[0].rs });
     const busiest = months.slice().sort((a, b) => b.entries - a.entries)[0];
     if (busiest && busiest.entries >= 2) hl.push({ label: 'Busiest month', big: yirMonthName(busiest.m), sub: otdPlural(busiest.entries, 'thing', 'things') + ' logged' });
     const visitCounts = new Map();
@@ -17906,11 +17976,11 @@
     return '<button type="button" class="yir-card" data-yir-item="' + idx + '">' + strip +
       '<span class="yir-card-body">' +
         '<span class="yir-row"><span class="yir-chip">' + yirIcon('food', 12) + 'RESTAURANT</span>' +
-          (m.avg !== null ? '<span class="yir-score">' + m.avg.toFixed(1) + '</span>' : '') + '</span>' +
+          ((m.avg !== null && !guestViewEnabled) ? '<span class="yir-score">' + m.avg.toFixed(1) + '</span>' : '') + '</span>' +
         '<span class="yir-card-name">' + escapeHtml(m.restaurant.name) + '</span>' +
         (m.where ? '<span class="yir-card-where">' + escapeHtml(m.where) + '</span>' : '') +
         (dishText ? '<span class="yir-card-stat">' + escapeHtml(dishText) + '</span>' : '') +
-        (m.star ? '<span class="yir-star">' + yirIcon('star', 13) + escapeHtml(m.star) + '</span>' : '') +
+        ((m.star && !guestViewEnabled) ? '<span class="yir-star">' + yirIcon('star', 13) + escapeHtml(m.star) + '</span>' : '') +
       '</span></button>';
   }
 
@@ -17991,7 +18061,6 @@
     if (yirOverlay.classList.contains('open')) return;
     yirYear = yirDefaultYear();
     yirSignature = '';
-    yirReturnGroup = activeTopGroup;
     yirReturnFocus = document.activeElement;
     yirRender(false);
     yirOverlay.classList.add('open');           // the back-button observer adds its history entry
@@ -18005,7 +18074,7 @@
     yirOverlay.classList.remove('open');
     yirOverlay.setAttribute('aria-hidden', 'true');
     if (countOpenOverlays() === 0) document.body.classList.remove('details-open-lock');
-    if (yirReturnGroup && activeTopGroup !== yirReturnGroup) switchTopGroup(yirReturnGroup); // tapping through to a hike/restaurant moves the app; land back where it started
+    if (!pageFun.classList.contains('active')) funShowPage('fun'); // tapping through to a hike/restaurant moves the app; land back on the Fun tab
     if (yirReturnFocus && document.contains(yirReturnFocus)){ try{ yirReturnFocus.focus({ preventScroll: true }); }catch(e){} }
     yirReturnFocus = null;
   }
@@ -18031,14 +18100,14 @@
     if (item.type === 'hike'){
       const idx = hikeRows.indexOf(item.hike);
       if (idx === -1) return;
-      switchTopGroup('nature'); switchNatureSubPage('hikes');
+      funShowPage('hikes');
       openHikeDetailsPanel(idx);
       const section = hikeDetailsPanelInner.querySelector('.hike-date-section[data-date-id="' + item.dateId + '"]');
       if (section) section.scrollIntoView({ block: 'start' });
     } else if (item.type === 'restaurant'){
       const idx = restaurantRows.indexOf(item.restaurant);
       if (idx === -1) return;
-      switchTopGroup('food'); switchFoodSubPage('restaurants');
+      funShowPage('restaurants');
       restaurantActiveVisitId = item.visitId;
       openRestaurantDetailsPanel(idx);
     }
