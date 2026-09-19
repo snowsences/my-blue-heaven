@@ -2104,6 +2104,367 @@
     #gg-settings-section{ display: none; }
   }
   body.guest-view-active #gg-settings-section{ display: none; }
+  /* Which Year: four short answers fit two across */
+  .gg-options-year{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gg-option-year{ text-align: center; font-size: 22px; font-weight: 700; min-height: 64px; }
+
+  /* ---------- SHARE CARD (see the SHARE CARD block in the script) ---------- */
+  .share-btn{ flex: none; }
+  body.guest-view-active .share-btn{ display: none !important; }
+  #share-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 260; /* above the details panels it opens from (200) and the pop-ups; below the photo viewer (300) */
+    visibility: hidden;
+    pointer-events: none;
+    transition: visibility 0s linear 0.3s;
+  }
+  #share-overlay.open{
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+  .share-backdrop{
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 14, 16, 0.66);
+    opacity: 0;
+    transition: opacity 0.28s ease;
+  }
+  #share-overlay.open .share-backdrop{ opacity: 1; }
+  .share-sheet{
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    max-width: 640px;
+    margin: 0 auto;
+    max-height: calc(100% - 44px);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-bottom: none;
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    overflow: hidden;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  #share-overlay.open .share-sheet{ transform: translateY(0); }
+  .share-grabber{ flex: none; display: flex; justify-content: center; padding-top: 10px; }
+  .share-handle{ width: 40px; height: 4px; border-radius: 999px; background: rgba(241, 236, 222, 0.28); }
+  .share-head{ flex: none; display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 10px 20px; }
+  .share-title{ margin: 0; font-size: 24px; font-weight: 700; font-family: 'Figtree', sans-serif; color: var(--chalk); }
+  .share-close{
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--chalk);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .share-scroll{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 20px 16px;
+  }
+  .share-preview{ position: relative; min-height: 120px; border-radius: 14px; overflow: hidden; background: var(--bg-2); border: 1px solid var(--panel-line); }
+  #share-preview-canvas{ display: block; width: 100%; height: auto; max-width: 420px; margin: 0 auto; }
+  .share-preview-status{ padding: 40px 20px; text-align: center; font-size: 15px; line-height: 1.45; color: var(--chalk-dim); }
+  .share-photos-head{ display: flex; justify-content: space-between; align-items: baseline; margin: 20px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--chalk-dim); }
+  .share-photos-head span:last-child{ letter-spacing: normal; font-weight: 600; font-size: 13px; }
+  .share-thumbs{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .share-thumb{
+    position: relative;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--panel);
+    cursor: pointer;
+  }
+  .share-thumb img{ display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0.45; }
+  .share-thumb.selected{ border-color: var(--amber); }
+  .share-thumb.selected img{ opacity: 1; }
+  .share-thumb-check{
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 22px; height: 22px;
+    border-radius: 999px;
+    background: var(--amber);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+    display: none;
+  }
+  .share-thumb.selected .share-thumb-check{ display: block; }
+  .share-note{ margin: 14px 0 0; font-size: 13px; line-height: 1.45; color: var(--chalk-dim); }
+  .share-footer{ flex: none; padding: 10px 20px calc(16px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--panel-line); background: var(--bg); }
+  .share-go{
+    display: block;
+    width: 100%;
+    height: 52px;
+    border: none;
+    border-radius: 999px;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: 'Figtree', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .share-go:disabled{ opacity: 0.55; cursor: default; }
+  @media (prefers-reduced-motion: reduce){
+    #share-overlay, .share-backdrop, .share-sheet{ transition: none !important; }
+  }
+  .share-actions{ display: flex; align-items: center; gap: 8px; }
+
+  /* ---------- YEAR IN REVIEW (see the YEAR IN REVIEW block in the script) ---------- */
+  #yir-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 190; /* below the details panels (200) so tapping a hike or meal opens it on top, below the photo viewer (300) */
+    visibility: hidden;
+    pointer-events: none;
+    transition: visibility 0s linear 0.3s;
+  }
+  #yir-overlay.open{ visibility: visible; pointer-events: auto; transition-delay: 0s; }
+  .yir-panel{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  #yir-overlay.open .yir-panel{ transform: translateY(0); }
+  .yir-topbar{
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px 8px 20px;
+  }
+  .yir-eyebrow{ display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; color: var(--amber); }
+  .yir-updated{ display: block; margin-top: 2px; font-size: 13px; color: var(--chalk-dim); min-height: 17px; }
+  .yir-top-actions{ display: flex; gap: 8px; }
+  .yir-icon-btn{
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--chalk);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .yir-icon-btn.spin svg{ animation: yirSpin 0.6s linear; }
+  @keyframes yirSpin{ to{ transform: rotate(360deg); } }
+  .yir-years{
+    position: relative; /* makes it the offset parent, so the selected year can be scrolled to the middle */
+    flex: none;
+    display: flex;
+    gap: 8px;
+    padding: 4px 20px 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .yir-years::-webkit-scrollbar{ display: none; }
+  .yir-year{
+    position: relative;
+    flex: none;
+    min-width: 64px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1.5px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--chalk-dim);
+    font-family: 'Figtree', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .yir-year.has-data{ color: var(--chalk); }
+  .yir-year.selected{ background: var(--amber); border-color: var(--amber); color: var(--ink); }
+  .yir-year-dot{ position: absolute; top: 7px; right: 9px; width: 6px; height: 6px; border-radius: 999px; background: var(--amber); }
+  .yir-year.selected .yir-year-dot{ background: var(--ink); }
+  .yir-scroll{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 20px calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+  #yir-content{ max-width: 640px; margin: 0 auto; }
+  .yir-hero{ padding-top: 18px; }
+  .yir-year-big{ font-size: 88px; font-weight: 800; line-height: 0.95; letter-spacing: -0.02em; color: var(--chalk); font-family: 'Figtree', sans-serif; }
+  .yir-tagline{ margin: 8px 0 0; font-size: 16px; color: var(--chalk-dim); }
+  .yir-stats{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+  .yir-stat{ padding: 14px 16px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; }
+  .yir-stat-n{ font-size: 34px; font-weight: 800; line-height: 1; color: var(--amber); }
+  .yir-stat-label{ margin-top: 6px; font-size: 14px; font-weight: 600; }
+  .yir-stat-sub{ margin-top: 2px; font-size: 13px; color: var(--chalk-dim); }
+
+  .yir-eyebrow-sm{ font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--chalk-dim); }
+  .yir-wall, .yir-wall-empty{ margin-top: 26px; }
+  .yir-wall-head{ display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .yir-link{ padding: 6px 0; border: none; background: transparent; color: var(--amber); font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .yir-wall-grid{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .yir-wall-tile{ aspect-ratio: 1 / 1; border-radius: 14px; }
+  .yir-wall-grid.w1{ grid-template-columns: 1fr; }
+  .yir-wall-grid.w1 .yir-wall-tile{ aspect-ratio: 16 / 10; }
+  .yir-wall-grid.w2{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .yir-wall-grid.w3 .yir-wall-tile:nth-child(1), .yir-wall-grid.w5 .yir-wall-tile:nth-child(1), .yir-wall-grid.w9 .yir-wall-tile:nth-child(1){ grid-column: span 2; grid-row: span 2; }
+  .yir-wall-grid.w3 .yir-wall-tile:nth-child(n+2){ grid-column: span 2; aspect-ratio: 2 / 1; }
+  .yir-wall-grid.w4 .yir-wall-tile{ grid-column: span 2; aspect-ratio: 4 / 3; }
+  .yir-wall-empty{ padding: 16px; background: var(--panel); border: 1px dashed rgba(243, 238, 225, 0.28); border-radius: 16px; }
+  .yir-empty-text{ margin: 6px 0 0; font-size: 15px; line-height: 1.45; }
+  .yir-wall-empty .yir-ghost{ margin-top: 14px; }
+  .yir-highlight:last-child:nth-child(odd){ grid-column: 1 / -1; }
+  .yir-empty{ margin-top: 26px; }
+  .yir-empty-sub{ margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--chalk-dim); }
+  .yir-highlights{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 26px; }
+  .yir-highlight{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 16px;
+    text-align: left;
+    font-family: 'Figtree', sans-serif;
+    color: var(--chalk);
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    min-width: 0;
+  }
+  button.yir-highlight{ cursor: pointer; }
+  .yir-highlight-label{ font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--amber); }
+  .yir-highlight-big{ font-size: 18px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+  .yir-highlight-sub{ font-size: 13px; color: var(--chalk-dim); }
+
+  .yir-tile{ position: relative; display: block; padding: 0; border: none; background: #2F4C4A; overflow: hidden; cursor: pointer; }
+  .yir-img{ display: block; width: 100%; height: 100%; object-fit: cover; }
+  .yir-tile-more{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(20, 42, 46, 0.66); color: var(--chalk); font-size: 18px; font-weight: 700; }
+
+  .yir-timeline{ margin-top: 30px; }
+  .yir-timeline-title{ margin: 0 0 4px; font-size: 24px; font-weight: 700; font-family: 'Figtree', sans-serif; color: var(--chalk); }
+  .yir-month{ margin-top: 18px; }
+  .yir-month-head{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .yir-month-name{ font-size: 18px; font-weight: 700; }
+  .yir-month-counts{ font-size: 13px; color: var(--chalk-dim); text-align: right; }
+  .yir-day{ position: relative; display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 12px; padding-top: 16px; }
+  .yir-day::before{ content: ''; position: absolute; left: 22px; top: 62px; bottom: -6px; width: 2px; background: var(--panel-line); }
+  .yir-day:last-child::before{ display: none; }
+  .yir-day-badge{
+    position: relative;
+    z-index: 1;
+    width: 46px; height: 46px;
+    border-radius: 14px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .yir-day-num{ font-size: 17px; font-weight: 800; line-height: 1; }
+  .yir-day-dow{ margin-top: 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--chalk-dim); }
+  .yir-day-cards{ display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 6px; }
+  .yir-card{
+    display: block;
+    width: 100%;
+    padding: 0;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .yir-strip{ display: grid; gap: 2px; grid-template-rows: 96px; height: 96px; overflow: hidden; }
+  .yir-strip.s1{ grid-template-columns: 1fr; }
+  .yir-strip.s2{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .yir-strip.s3{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .yir-strip .yir-img{ height: 96px; background: #2F4C4A; }
+  .yir-card-body{ display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; }
+  .yir-row{ display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .yir-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(232, 163, 61, 0.16);
+    color: var(--amber);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .yir-dim{ font-size: 13px; color: var(--chalk-dim); }
+  .yir-score{ min-width: 38px; padding: 3px 8px; border-radius: 10px; background: var(--bg); border: 1px solid var(--panel-line); text-align: center; font-size: 14px; font-weight: 800; color: var(--amber); }
+  .yir-card-name{ display: block; margin-top: 4px; font-size: 18px; font-weight: 700; line-height: 1.2; }
+  .yir-card-where{ display: block; font-size: 13px; color: var(--chalk-dim); }
+  .yir-card-stat{ display: block; font-size: 13px; line-height: 1.4; color: var(--chalk-dim); }
+  .yir-star{ align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 5px 10px; border-radius: 10px; background: rgba(232, 163, 61, 0.16); color: var(--amber); font-size: 12px; font-weight: 600; }
+  .yir-photos-card{ padding: 12px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; }
+  .yir-photo-grid{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+  .yir-day-tile{ aspect-ratio: 1 / 1; border-radius: 10px; }
+  .yir-foot{ margin-top: 30px; text-align: center; }
+  .yir-ghost{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(243, 238, 225, 0.28);
+    background: transparent;
+    color: var(--chalk);
+    font-family: 'Figtree', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .yir-foot-note{ margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: var(--chalk-dim); }
+  body.guest-view-active #yir-settings-section{ display: none; }
+  @media (prefers-reduced-motion: reduce){
+    #yir-overlay, .yir-panel{ transition: none !important; }
+    .yir-icon-btn.spin svg{ animation: none; }
+  }
 
   /* ---------- TOUCH DRAG-TO-REORDER (see setupTouchDrag in the script) ---------- */
   .touch-drag-ghost{
@@ -4678,10 +5039,17 @@
         </div>
       </div>
 
+      <div class="settings-section" id="yir-settings-section">
+        <h2 class="settings-section-title">Year in Review</h2>
+        <p class="footer-note" style="margin:0 0 12px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">A timeline of the hikes, restaurant visits and Photos-tab photos from any year since 2017.</p>
+        <button class="btn-primary" id="yir-launch-btn" type="button">Open Year in Review</button>
+      </div>
+
       <div class="settings-section" id="gg-settings-section">
         <h2 class="settings-section-title">Guessing Game</h2>
-        <p class="footer-note" style="margin:0 0 12px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">Which park, road, hike or restaurant is this photo from? Uses the photos already attached to your places, including dish photos.</p>
+        <p class="footer-note" style="margin:0 0 12px; padding-top:0; text-align:left; font-size:14px; line-height:1.5;">Guess which park, road, hike or restaurant a photo is from (dish photos included), or which year a hike photo was taken.</p>
         <button class="btn-primary" id="gg-launch-btn" type="button">Play Guessing Game</button>
+        <button class="btn-primary" id="gg-year-launch-btn" type="button" style="margin-top:10px;">Play Which Year</button>
       </div>
 
       <!-- Future: <div class="settings-section"><h2 class="settings-section-title">Restaurant Ranker Settings</h2>...</div> -->
@@ -4765,7 +5133,7 @@
   <div class="gg-panel" id="gg-panel" role="dialog" aria-modal="true" aria-labelledby="gg-title">
     <div class="gg-topbar">
       <div>
-        <span class="gg-eyebrow">GUESS THE PLACE</span>
+        <span class="gg-eyebrow" id="gg-eyebrow">GUESS THE PLACE</span>
         <span class="gg-progress" id="gg-progress"></span>
       </div>
       <button type="button" class="gg-close" id="gg-close-btn" aria-label="Close">
@@ -4773,6 +5141,50 @@
       </button>
     </div>
     <div class="gg-scroll" id="gg-scroll"><div id="gg-content"></div></div>
+  </div>
+</div>
+
+<div class="share-overlay" id="share-overlay" aria-hidden="true">
+  <div class="share-backdrop" id="share-backdrop"></div>
+  <div class="share-sheet" id="share-sheet" role="dialog" aria-modal="true" aria-labelledby="share-title">
+    <div class="share-grabber"><span class="share-handle"></span></div>
+    <div class="share-head">
+      <h2 class="share-title" id="share-title">Share</h2>
+      <button type="button" class="share-close" id="share-close-btn" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div class="share-scroll" id="share-scroll">
+      <div class="share-preview">
+        <div class="share-preview-status" id="share-preview-status">Preparing…</div>
+        <canvas id="share-preview-canvas" style="display:none;"></canvas>
+      </div>
+      <div class="share-photos-head"><span>PHOTOS</span><span id="share-count"></span></div>
+      <div class="share-thumbs" id="share-thumbs"></div>
+      <p class="share-note">Only the name, location and photos are shared — never notes, scores, rankings or dates.</p>
+    </div>
+    <div class="share-footer"><button type="button" class="share-go" id="share-go-btn" disabled>Preparing…</button></div>
+  </div>
+</div>
+
+<div class="yir-overlay" id="yir-overlay" aria-hidden="true">
+  <div class="yir-panel" id="yir-panel" role="dialog" aria-modal="true" aria-labelledby="yir-title">
+    <div class="yir-topbar">
+      <div>
+        <span class="yir-eyebrow">YEAR IN REVIEW</span>
+        <span class="yir-updated" id="yir-updated"></span>
+      </div>
+      <div class="yir-top-actions">
+        <button type="button" class="yir-icon-btn" id="yir-refresh-btn" aria-label="Refresh">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 6.1"></path><path d="M20 4v7h-7"></path></svg>
+        </button>
+        <button type="button" class="yir-icon-btn" id="yir-close-btn" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div class="yir-years" id="yir-years"></div>
+    <div class="yir-scroll" id="yir-scroll"><div id="yir-content"></div></div>
   </div>
 </div>
 
@@ -5533,7 +5945,10 @@
         lastfmApiKey, lastfmUsername,
         lastManualExportAt,
         hikeFullListText, hikeFullListTextSavedAt,
-        dishFullListText, dishFullListTextSavedAt
+        dishFullListText, dishFullListTextSavedAt,
+        dishOrder, dishOrderSavedAt,
+        restaurantTierConfig: restaurantTierRecord,
+        pointsAlgorithm, pointsAlgorithmSavedAt
       });
       const payloadSizeMB = payload.length / 1024 / 1024;
       console.log('Firestore payload size:', payloadSizeMB.toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
@@ -5580,6 +5995,7 @@
   // on anything local was ahead on — safe even when nothing was ahead,
   // since writing back identical data is a harmless no-op.
   async function loadOrSeedFirestoreData(){
+    await localSettingsLoadedPromise; // dish order and tier setup are read separately from the main data — make sure they're in before comparing
     const existing = await readFirestoreData();
     if (!existing){
       writeFirestoreData(); // nothing in Firestore yet — seed it with what's here
@@ -5736,7 +6152,53 @@
       }
     }
 
+    // Dish order, restaurant tier setup and the points choice: each carries
+    // its own timestamp, and the newer side wins — same rule as everything above.
+    if (Array.isArray(existing.dishOrder) && existing.dishOrder.length >= 1){
+      const remoteTime = new Date(existing.dishOrderSavedAt || 0).getTime();
+      const localTime = new Date(dishOrderSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        dishOrder = existing.dishOrder;
+        dishOrderSavedAt = existing.dishOrderSavedAt || null;
+        try{ await window.storage.set(DISH_STORAGE_KEY, JSON.stringify({ order: dishOrder, savedAt: dishOrderSavedAt }), false); }catch(e){ /* best effort */ }
+        renderDishesPage();
+      }
+    }
+    const remoteTiers = existing.restaurantTierConfig;
+    if (remoteTiers && Array.isArray(remoteTiers.boundaries) && remoteTiers.boundaries.length === 3){
+      const remoteTime = new Date(remoteTiers.savedAt || 0).getTime();
+      const localTime = new Date((restaurantTierRecord && restaurantTierRecord.savedAt) || 0).getTime();
+      if (remoteTime > localTime){
+        restaurantTierRecord = { total: remoteTiers.total, boundaries: remoteTiers.boundaries, savedAt: remoteTiers.savedAt || null };
+        try{ await window.storage.set(RESTAURANT_TIER_STORAGE_KEY, JSON.stringify(restaurantTierRecord), false); }catch(e){ /* best effort */ }
+        // The setup only applies to the restaurant count it was made for; if
+        // that's the current count, use it now — otherwise it's stored and
+        // picked up if the count ever matches again (maybeInitRestaurantTiers).
+        if (restaurantTierBoundariesTotal === remoteTiers.total){
+          restaurantTierBoundaries = restaurantClampCascade(remoteTiers.boundaries, remoteTiers.total);
+          renderRestaurantTiersEditor(remoteTiers.total);
+          renderRestaurantsPage();
+        }
+      }
+    }
+    if (existing.pointsAlgorithm === 'standard' || existing.pointsAlgorithm === 'flat'){
+      const remoteTime = new Date(existing.pointsAlgorithmSavedAt || 0).getTime();
+      const localTime = new Date(pointsAlgorithmSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        pointsAlgorithm = existing.pointsAlgorithm;
+        pointsAlgorithmSavedAt = existing.pointsAlgorithmSavedAt || null;
+        try{
+          await window.storage.set(POINTS_ALGO_STORAGE_KEY, pointsAlgorithm, false);
+          await window.storage.set(POINTS_ALGO_SAVED_AT_KEY, pointsAlgorithmSavedAt || '', false);
+        }catch(e){ /* best effort */ }
+        pointsAlgoStandardBtn.classList.toggle('active', pointsAlgorithm === 'standard');
+        pointsAlgoFlatBtn.classList.toggle('active', pointsAlgorithm === 'flat');
+        renderResultsTab();
+      }
+    }
+
     const hasCurrentData = (Array.isArray(items) && items.length >= 2)
+      || (Array.isArray(dishOrder) && dishOrder.length >= 1)
       || (Array.isArray(songItems) && songItems.length >= 2)
       || (Array.isArray(restaurantRows) && restaurantRows.length >= 1)
       || (Array.isArray(hikeRows) && hikeRows.length >= 1)
@@ -5750,6 +6212,7 @@
       || !!hikeFullListText
       || !!dishFullListText;
     if (hasCurrentData) writeFirestoreData();
+    yirRefreshIfOpen(); // if Year in Review is open while the cloud copy lands, show what just arrived
   }
 
   // This specific Google account is permanently locked into Guest View —
@@ -7495,7 +7958,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'song-ranking-progress.json';
+    a.download = mbhBackupFileName();
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -8951,7 +9414,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'ranking-progress.json';
+    a.download = mbhBackupFileName();
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -9714,17 +10177,26 @@
   // of rank 1's score to about 32% of it.
   const POINTS_ALGO_STORAGE_KEY = 'points-algorithm';
   let pointsAlgorithm = 'standard'; // 'standard' | 'flat'
+  const POINTS_ALGO_SAVED_AT_KEY = 'points-algorithm-saved-at';
+  let pointsAlgorithmSavedAt = null; // when it was last changed on any device (a separate key, so the stored value itself stays a plain word)
 
   async function loadPointsAlgorithm(){
     try{
       const res = await window.storage.get(POINTS_ALGO_STORAGE_KEY, false);
       if (res && res.value === 'flat') pointsAlgorithm = 'flat';
+      const at = await window.storage.get(POINTS_ALGO_SAVED_AT_KEY, false);
+      pointsAlgorithmSavedAt = (at && at.value) ? at.value : null;
     }catch(e){ /* default to standard */ }
     pointsAlgoStandardBtn.classList.toggle('active', pointsAlgorithm === 'standard');
     pointsAlgoFlatBtn.classList.toggle('active', pointsAlgorithm === 'flat');
   }
   async function savePointsAlgorithm(){
-    try{ await window.storage.set(POINTS_ALGO_STORAGE_KEY, pointsAlgorithm, false); }catch(e){ /* best effort */ }
+    pointsAlgorithmSavedAt = new Date().toISOString();
+    try{
+      await window.storage.set(POINTS_ALGO_STORAGE_KEY, pointsAlgorithm, false);
+      await window.storage.set(POINTS_ALGO_SAVED_AT_KEY, pointsAlgorithmSavedAt, false);
+    }catch(e){ /* best effort */ }
+    scheduleSyncWrite(); // part of the cloud copy now
   }
   function setPointsAlgorithm(value){
     if (pointsAlgorithm === value) return;
@@ -10419,6 +10891,11 @@
   const RESTAURANT_TIER_STORAGE_KEY = 'restaurant-tiers';
   let restaurantTierBoundaries = null; // [b1, b2, b3] — ending rank of Gold/Silver/Bronze; beyond b3 = no tier
   let restaurantTierBoundariesTotal = 0;
+  // The saved tier setup exactly as stored ({ total, boundaries, savedAt }) —
+  // kept separately from the live boundaries above because the cloud copy
+  // needs the whole record, timestamp included, whatever the current
+  // restaurant count is.
+  let restaurantTierRecord = null;
 
   function restaurantClampCascade(boundaries, total){
     let [b1, b2, b3] = boundaries;
@@ -10444,12 +10921,25 @@
   }
 
   async function saveRestaurantTierConfig(){
+    restaurantTierRecord = {
+      total: restaurantTierBoundariesTotal, boundaries: restaurantTierBoundaries.slice(), savedAt: new Date().toISOString()
+    };
     try{
-      await window.storage.set(RESTAURANT_TIER_STORAGE_KEY, JSON.stringify({
-        total: restaurantTierBoundariesTotal, boundaries: restaurantTierBoundaries
-      }), false);
+      await window.storage.set(RESTAURANT_TIER_STORAGE_KEY, JSON.stringify(restaurantTierRecord), false);
     }catch(e){ /* best effort */ }
     scheduleSyncWrite();
+  }
+
+  async function loadRestaurantTierRecord(){
+    try{
+      const res = await window.storage.get(RESTAURANT_TIER_STORAGE_KEY, false);
+      if (res && res.value){
+        const p = JSON.parse(res.value);
+        if (p && Array.isArray(p.boundaries) && p.boundaries.length === 3){
+          restaurantTierRecord = { total: p.total, boundaries: p.boundaries, savedAt: p.savedAt || null };
+        }
+      }
+    }catch(e){ /* nothing saved */ }
   }
 
   async function loadRestaurantTierConfig(total){
@@ -11214,7 +11704,10 @@
       : (
           '<div class="restaurant-visit-meta-row">' +
             '<span class="restaurant-visit-date-display">' + escapeHtml(formatHikeDate(d.date)) + '</span>' +
-            '<button class="btn-ghost hike-date-edit-btn" data-date-id="' + d.id + '" type="button">Edit</button>' +
+            '<span class="share-actions">' +
+              ((d.photos || []).some(p => p && p.url) ? '<button class="btn-ghost share-btn" data-share-hike-date="' + d.id + '" type="button">Share</button>' : '') +
+              '<button class="btn-ghost hike-date-edit-btn" data-date-id="' + d.id + '" type="button">Edit</button>' +
+            '</span>' +
           '</div>' +
           (d.notes ? '<p class="restaurant-visit-notes-display">' + escapeHtml(d.notes) + '</p>' : '')
         );
@@ -13793,6 +14286,7 @@
   // thing that belongs to Dishes itself is the manual display order.
   const DISH_STORAGE_KEY = 'dish-order';
   let dishOrder = []; // array of course ids, in manually-set display order
+  let dishOrderSavedAt = null; // when it was last changed on any device — how the cloud copy decides which side is newer
   let dishEditMode = false;
   let dishViewMode = 'grid'; // 'list' | 'grid' — forced to a read-only row layout whenever dishEditMode is true, same convention as Albums' resultsViewMode
   let dishRestaurantFilter = '';
@@ -13875,12 +14369,21 @@
   async function loadDishOrder(){
     try{
       const res = await window.storage.get(DISH_STORAGE_KEY, false);
-      dishOrder = (res && res.value) ? JSON.parse(res.value) : [];
-    }catch(e){ dishOrder = []; }
+      const parsed = (res && res.value) ? JSON.parse(res.value) : null;
+      if (Array.isArray(parsed)){        // older format: just the list, no timestamp
+        dishOrder = parsed; dishOrderSavedAt = null;
+      } else if (parsed && Array.isArray(parsed.order)){
+        dishOrder = parsed.order; dishOrderSavedAt = parsed.savedAt || null;
+      } else {
+        dishOrder = []; dishOrderSavedAt = null;
+      }
+    }catch(e){ dishOrder = []; dishOrderSavedAt = null; }
   }
 
   function saveDishOrder(){
-    try{ window.storage.set(DISH_STORAGE_KEY, JSON.stringify(dishOrder), false); }catch(e){ /* best effort */ }
+    dishOrderSavedAt = new Date().toISOString();
+    try{ window.storage.set(DISH_STORAGE_KEY, JSON.stringify({ order: dishOrder, savedAt: dishOrderSavedAt }), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite(); // dish order is part of the cloud copy now
   }
 
   function dishPhotoHtml(course){
@@ -14786,7 +15289,11 @@
             '<button class="view-toggle-btn' + (restaurantVisitThumbnailMode ? ' active' : '') + '" id="restaurant-visit-view-thumb-btn" type="button">Thumbnails</button>' +
           '</div>'
         ) +
-        '<button class="btn-ghost" id="restaurant-visit-edit-btn" type="button">Edit</button>' +
+        '<span class="share-actions">' +
+          (((visit.photos || []).some(Boolean) || (visit.courses || []).some(c => otdCoursePhotos(c).length))
+            ? '<button class="btn-ghost share-btn" data-share-visit="' + visit.id + '" type="button">Share</button>' : '') +
+          '<button class="btn-ghost" id="restaurant-visit-edit-btn" type="button">Edit</button>' +
+        '</span>' +
       '</div>' +
       (visit.notes ? '<p class="restaurant-visit-notes-display">' + escapeHtml(visit.notes) + '</p>' : '')
     );
@@ -15206,6 +15713,16 @@
     performFullExport();
   });
 
+  // Every JSON export is named mbh-backup-<local date>_<local time>.json,
+  // e.g. mbh-backup-2026-09-18_14-32-05.json — no colons, so it's a valid file
+  // name everywhere, and the newest file always sorts last.
+  function mbhBackupFileName(){
+    const d = new Date();
+    const p2 = (n) => String(n).padStart(2, '0');
+    return 'mbh-backup-' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) +
+      '_' + p2(d.getHours()) + '-' + p2(d.getMinutes()) + '-' + p2(d.getSeconds()) + '.json';
+  }
+
   async function performFullExport(){
     const artKeys = Array.from(new Set([...items, ...loadingDock]));
     const art = {};
@@ -15230,7 +15747,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'full-backup.json';
+    a.download = mbhBackupFileName();
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -15327,7 +15844,7 @@
   loadLastfmConfig();
   loadMusicbeeLibrary();
   loadGuestViewSetting();
-  loadDishOrder();
+  const localSettingsLoadedPromise = Promise.all([loadDishOrder(), loadRestaurantTierRecord()]);
   loadHikeProgress();
   loadParkProgress();
   checkExportReminderBanner();
@@ -15401,6 +15918,7 @@
   function closeTopmostBackButtonOverlay(){
     if (modalOverlay.classList.contains('show')){ hideConfirmModal(); return; }
     if (artLightboxOverlay.classList.contains('show')){ closeArtLightbox(); return; }
+    if (shareOverlay.classList.contains('open')){ closeShare(); return; }
     if (hikeFullListPanel.classList.contains('open')){ closeHikeFullListPanel(); return; }
     if (dishFullListPanel.classList.contains('open')){ closeDishFullListPanel(); return; }
     if (restaurantDetailsPanel.classList.contains('open')){ closeRestaurantDetailsPanel(); return; }
@@ -15409,6 +15927,7 @@
     if (parkDetailsPanel.classList.contains('open')){ closeParkDetailsPanel(); return; }
     if (otdOverlay.classList.contains('open')){ closeOnThisDay(); return; }
     if (ggOverlay.classList.contains('open')){ closeGuessGame(); return; }
+    if (yirOverlay.classList.contains('open')){ closeYearInReview(); return; }
   }
 
   window.addEventListener('popstate', () => {
@@ -16111,9 +16630,14 @@
   new MutationObserver(handleOverlayClassChange).observe(otdOverlay, { attributes: true, attributeFilter: ['class'] });
 
   // ---------- GUESSING GAME ----------
-  // "Which park / road / hike / restaurant is this photo from?" A round is 10
-  // photos, four choices each. Launched from the bottom of Settings; phone and
-  // tablet widths only, owner only (guest view never sees it).
+  // Two games share this screen, both launched from the bottom of Settings
+  // (phone and tablet widths only, owner only — guest view never sees them):
+  //   • Guess the Place — "Which park / road / hike / restaurant is this photo
+  //     from?" A round is 10 photos, four choices each.
+  //   • Which Year — "Which year was this photo taken?", hikes only, using
+  //     photos that sit under a hike outing with a real date. Four years to
+  //     choose from, the wrong ones drawn from years around the right one and
+  //     years you actually hiked in.
   //
   // Photos come from what's already attached to each place — hike outing
   // photos, park and road photos, and restaurant dish and visit photos. The
@@ -16139,16 +16663,19 @@
   const ggProgress = document.getElementById('gg-progress');
   const ggCloseBtn = document.getElementById('gg-close-btn');
   const ggLaunchBtn = document.getElementById('gg-launch-btn');
+  const ggLaunchYearBtn = document.getElementById('gg-year-launch-btn');
+  const ggEyebrow = document.getElementById('gg-eyebrow');
 
   function ggEmptyStats(){
     const cats = {};
     GG_KINDS.forEach(k => { cats[k] = { right: 0, total: 0 }; });
-    return { cats, bestStreak: 0, rounds: 0 };
+    return { cats, bestStreak: 0, rounds: 0, year: { right: 0, total: 0 }, bestStreakYear: 0, roundsYear: 0 };
   }
   let ggStats = ggEmptyStats();
   let ggPools = null;          // rebuilt from the current data every time the game opens
   let ggRound = null;          // the round in progress, if any
   let ggScreen = 'start';      // 'start' | 'question' | 'results'
+  let ggMode = 'place';        // 'place' = Guess the Place, 'year' = Which Year
   let ggSelectedCat = 'all';
   let ggReturnGroup = null;    // which top-level page to land back on when the game closes
   let ggReturnFocus = null;
@@ -16166,6 +16693,9 @@
         });
         base.bestStreak = Number(p.bestStreak) || 0;
         base.rounds = Number(p.rounds) || 0;
+        if (p.year) base.year = { right: Number(p.year.right) || 0, total: Number(p.year.total) || 0 };
+        base.bestStreakYear = Number(p.bestStreakYear) || 0;
+        base.roundsYear = Number(p.roundsYear) || 0;
         ggStats = base;
       }
     }catch(e){ /* nothing saved yet */ }
@@ -16275,6 +16805,29 @@
       });
     });
 
+    // Which Year: every photo under a hike outing that has a real date, tagged
+    // with that outing's year. `allYears` is every year with a dated outing —
+    // the believable wrong answers.
+    const yearPhotos = [], yearsAll = new Set(), seenYearUrls = new Set();
+    kinds.hike.all.forEach(place => {
+      (place.row.dates || []).forEach(d => {
+        const pd = otdParse(d.date);
+        if (!pd) return;
+        yearsAll.add(pd.y);
+        (d.photos || []).forEach(ph => {
+          const url = ph && ph.url;
+          if (!url || seenYearUrls.has(url)) return;
+          seenYearUrls.add(url);
+          yearPhotos.push({ url, year: pd.y, dateStr: pd.str, dateId: d.id, place });
+        });
+      });
+    });
+    const year = { photos: yearPhotos, allYears: Array.from(yearsAll).sort((a, b) => a - b), eligible: false, reason: '' };
+    const photoYears = new Set(yearPhotos.map(p => p.year));
+    if (!yearPhotos.length) year.reason = 'No dated hike photos yet';
+    else if (photoYears.size < 2) year.reason = 'Needs dated hike photos from 2 different years';
+    year.eligible = !year.reason;
+
     // A category is playable with at least 4 differently-named places (for
     // the four choices) and at least one of them holding a photo.
     let uniquePhotos = 0;
@@ -16289,10 +16842,11 @@
       pool.eligible = !pool.reason;
       if (pool.eligible) uniquePhotos += urls.size;
     });
-    return { kinds, uniquePhotos };
+    return { kinds, uniquePhotos, year };
   }
 
   function ggAvailablePhotoCount(cat){
+    if (ggMode === 'year') return ggPools.year.eligible ? ggPools.year.photos.filter(p => !ggBadUrls.has(p.url)).length : 0;
     const kinds = (cat === 'all' ? GG_KINDS : [cat]).filter(k => ggPools.kinds[k].eligible);
     const urls = new Set();
     kinds.forEach(k => ggPools.kinds[k].withPhotos.forEach(p => p.photos.forEach(ph => { if (!ggBadUrls.has(ph.url)) urls.add(ph.url); })));
@@ -16318,7 +16872,40 @@
     return ggShuffle([place].concat(picked));
   }
 
+  // Four years: the right one plus three others, drawn from years near it and
+  // years you actually have hikes in (never the future, never before 1990),
+  // shown oldest to newest.
+  function ggYearOptions(correct, allYears){
+    const thisYear = new Date().getFullYear();
+    const ok = (y) => y <= thisYear && y >= 1990 && y !== correct;
+    const pool = new Set(allYears.filter(ok));
+    for (let d = -3; d <= 3; d++) if (ok(correct + d)) pool.add(correct + d);
+    for (let d = 4; pool.size < 3 && d <= 12; d++){ if (ok(correct - d)) pool.add(correct - d); if (ok(correct + d)) pool.add(correct + d); }
+    if (pool.size < 3) return null;
+    const nearest = ggShuffle(Array.from(pool)).sort((a, b) => Math.abs(a - correct) - Math.abs(b - correct));
+    // Choose from the nearest handful rather than always the three closest, so it isn't a pattern.
+    const picked = ggShuffle(nearest.slice(0, Math.max(3, Math.min(6, nearest.length)))).slice(0, 3);
+    return picked.concat([correct]).sort((a, b) => a - b);
+  }
+
+  function ggPickYearQuestion(){
+    const r = ggRound, pool = ggPools.year;
+    if (!pool.eligible) return null;
+    for (let attempt = 0; attempt < 40; attempt++){
+      const candidates = pool.photos.filter(p => !r.usedUrls.has(p.url) && !ggBadUrls.has(p.url));
+      if (!candidates.length) return null;
+      const otherHikes = candidates.filter(p => !r.usedPlaces.has(p.place)); // prefer a hike not asked yet
+      const p = ggPick(otherHikes.length ? otherHikes : candidates);
+      const options = ggYearOptions(p.year, pool.allYears);
+      if (!options) continue;
+      return { kind: 'year', place: p.place, photo: { url: p.url, caption: '', dateId: p.dateId, dateStr: p.dateStr, year: p.year },
+               options, correctYear: p.year, answered: false, picked: -1, correct: false };
+    }
+    return null;
+  }
+
   function ggPickQuestion(){
+    if (ggMode === 'year') return ggPickYearQuestion();
     const r = ggRound;
     const kinds = (r.category === 'all' ? GG_KINDS : [r.category]).filter(k => ggPools.kinds[k].eligible);
     if (!kinds.length) return null;
@@ -16349,7 +16936,30 @@
     }).join('');
   }
 
+  function ggRenderYearStart(){
+    const pool = ggPools.year;
+    const available = ggAvailablePhotoCount('year');
+    const rounds = Math.min(GG_ROUND_LENGTH, available);
+    ggProgress.textContent = '';
+    const c = ggStats.year;
+    ggContent.innerHTML =
+      '<h2 class="gg-title" id="gg-title">Which Year?</h2>' +
+      '<p class="gg-lede">Which year was this hike photo taken? ' + GG_ROUND_LENGTH + ' photos a round, four years to choose from. It uses photos from hike outings that have a date.</p>' +
+      (pool.eligible
+        ? '<p class="gg-note">' + escapeHtml(otdPlural(available, 'dated photo', 'dated photos') + ' across ' + otdPlural(new Set(pool.photos.map(p => p.year)).size, 'year', 'years') + '.') + '</p>' +
+          '<button type="button" class="gg-primary" id="gg-start-btn">Start round</button>' +
+          (rounds < GG_ROUND_LENGTH ? '<p class="gg-note">Only ' + otdPlural(rounds, 'photo', 'photos') + ' to ask about, so this round will be shorter.</p>' : '')
+        : '<p class="gg-note">' + escapeHtml(pool.reason) + '. Photos count once they\'re on a hike outing that has a date.</p>') +
+      (c.total > 0
+        ? '<div class="gg-stats"><div class="gg-stats-head">YOUR RECORD</div>' +
+          '<div class="gg-stat-row"><span>Accuracy</span><span class="gg-stat-val">' + c.right + ' / ' + c.total + ' · ' + Math.round((c.right / c.total) * 100) + '%</span></div>' +
+          '<div class="gg-stat-row"><span>Best streak</span><span class="gg-stat-val">' + ggStats.bestStreakYear + '</span></div>' +
+          '<div class="gg-stat-row"><span>Rounds played</span><span class="gg-stat-val">' + ggStats.roundsYear + '</span></div></div>'
+        : '');
+  }
+
   function ggRenderStart(){
+    if (ggMode === 'year'){ ggRenderYearStart(); return; }
     const anyEligible = GG_KINDS.some(k => ggPools.kinds[k].eligible);
     if (ggSelectedCat !== 'all' && !ggPools.kinds[ggSelectedCat].eligible) ggSelectedCat = 'all';
 
@@ -16373,7 +16983,7 @@
       (anyEligible
         ? '<button type="button" class="gg-primary" id="gg-start-btn">Start round</button>' +
           (rounds < GG_ROUND_LENGTH ? '<p class="gg-note">Only ' + otdPlural(rounds, 'photo', 'photos') + ' to ask about here, so this round will be shorter.</p>' : '')
-        : '<p class="gg-note">To play, you need at least 4 places of one kind (parks, roads, hikes or restaurants), with photos on some of them.</p>') +
+        : '<p class="gg-note">Add photos to at least 4 parks, roads, hikes or restaurants (with 4 or more of that kind saved) to play.</p>') +
       (hasStats
         ? '<div class="gg-stats"><div class="gg-stats-head">YOUR RECORD</div>' + ggStatsRowsHtml(ggStats.cats) +
           '<div class="gg-stat-row"><span>Best streak</span><span class="gg-stat-val">' + ggStats.bestStreak + '</span></div>' +
@@ -16382,6 +16992,7 @@
   }
 
   function ggRevealHtml(q){
+    if (q.kind === 'year') return ggYearRevealHtml(q);
     const pl = q.place;
     const rankText = pl.rank ? '#' + pl.rank + ' of ' + pl.total : '';
     const rankHtml = pl.tier
@@ -16402,25 +17013,48 @@
       '</div>';
   }
 
+  function ggYearRevealHtml(q){
+    const pl = q.place;
+    const d = new Date(q.photo.dateStr + 'T00:00:00');
+    const fullDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    const off = Math.abs(q.options[q.picked] - q.correctYear);
+    const verdict = q.correct ? 'Correct — ' + q.correctYear
+      : 'Not quite — it was ' + q.correctYear + ' (you picked ' + q.options[q.picked] + ', ' + otdPlural(off, 'year', 'years') + ' off)';
+    return '<div class="gg-reveal ' + (q.correct ? 'right' : 'wrong') + '">' +
+        '<div class="gg-verdict">' + escapeHtml(verdict) + '</div>' +
+        '<div class="gg-place-name">' + escapeHtml(pl.name) + '</div>' +
+        (pl.where ? '<div class="gg-place-where">' + escapeHtml(pl.where) + '</div>' : '') +
+        '<div class="gg-place-meta">' +
+          (pl.rank ? '<span class="gg-rank">#' + pl.rank + ' of ' + pl.total + '</span>' : '') +
+          '<span>' + escapeHtml('Taken on ' + fullDate) + '</span>' +
+        '</div>' +
+        '<div class="gg-actions">' +
+          '<button type="button" class="gg-ghost" id="gg-goto-btn">Go to it</button>' +
+          '<button type="button" class="gg-primary gg-next" id="gg-next-btn">' + (ggRound.index + 1 >= ggRound.length ? 'See results' : 'Next') + '</button>' +
+        '</div>' +
+      '</div>';
+  }
+
   function ggRenderQuestion(){
     const r = ggRound, q = r.question;
     ggProgress.textContent = 'Question ' + (r.index + 1) + ' of ' + r.length + (r.streak > 1 ? ' · Streak ' + r.streak : '');
+    const isYear = q.kind === 'year';
     const optionsHtml = q.options.map((o, i) => {
-      let cls = 'gg-option';
+      let cls = 'gg-option' + (isYear ? ' gg-option-year' : '');
       if (q.answered){
-        if (o === q.place) cls += ' correct';
+        if (isYear ? o === q.correctYear : o === q.place) cls += ' correct';
         else if (i === q.picked) cls += ' wrong';
         else cls += ' dim';
       }
       return '<button type="button" class="' + cls + '" data-gg-option="' + i + '"' + (q.answered ? ' disabled' : '') + '>' +
-        escapeHtml(o.name) + '</button>';
+        escapeHtml(isYear ? String(o) : o.name) + '</button>';
     }).join('');
     ggContent.innerHTML =
       '<button type="button" class="gg-photo" id="gg-photo-btn" aria-label="View this photo full size">' +
         '<img id="gg-photo-img" src="' + escapeAttr(cloudinaryThumbUrl(q.photo.url, 1100)) + '" alt="A photo to identify">' +
       '</button>' +
-      '<h2 class="gg-question" id="gg-title">Which ' + GG_INFO[q.kind].noun + ' is this from?</h2>' +
-      '<div class="gg-options">' + optionsHtml + '</div>' +
+      '<h2 class="gg-question" id="gg-title">' + (isYear ? 'Which year was this photo taken?' : 'Which ' + GG_INFO[q.kind].noun + ' is this from?') + '</h2>' +
+      '<div class="gg-options' + (isYear ? ' gg-options-year' : '') + '">' + optionsHtml + '</div>' +
       '<div id="gg-feedback" aria-live="polite">' + (q.answered ? ggRevealHtml(q) : '') + '</div>';
 
     const img = document.getElementById('gg-photo-img');
@@ -16437,6 +17071,7 @@
   }
 
   function ggRenderResults(){
+    if (ggMode === 'year'){ ggRenderYearResults(); return; }
     const r = ggRound;
     ggProgress.textContent = 'Round complete';
     const msg = r.score === r.length ? 'A perfect round!' : r.score >= Math.ceil(r.length * 0.7) ? 'Sharp eye.' : r.score >= Math.ceil(r.length * 0.4) ? 'Not bad.' : 'Plenty still to rediscover.';
@@ -16452,6 +17087,22 @@
       '<button type="button" class="gg-ghost" id="gg-done-btn">Done</button></div>';
   }
 
+  function ggRenderYearResults(){
+    const r = ggRound, c = ggStats.year;
+    ggProgress.textContent = 'Round complete';
+    const msg = r.score === r.length ? 'A perfect round!' : r.score >= Math.ceil(r.length * 0.7) ? 'You know your hikes.' : r.score >= Math.ceil(r.length * 0.4) ? 'Not bad.' : 'Time flies out there.';
+    ggContent.innerHTML =
+      '<h2 class="gg-title" id="gg-title">' + r.score + ' / ' + r.length + '</h2>' +
+      '<p class="gg-lede">' + escapeHtml(msg) + '</p>' +
+      '<div class="gg-stats"><div class="gg-stats-head">THIS ROUND</div>' +
+        '<div class="gg-stat-row"><span>Best streak this round</span><span class="gg-stat-val">' + r.bestStreak + '</span></div>' +
+        '<div class="gg-stat-row"><span>Best streak ever</span><span class="gg-stat-val">' + ggStats.bestStreakYear + '</span></div></div>' +
+      '<div class="gg-stats"><div class="gg-stats-head">ALL-TIME ACCURACY</div>' +
+        '<div class="gg-stat-row"><span>Which Year</span><span class="gg-stat-val">' + c.right + ' / ' + c.total + ' · ' + Math.round((c.right / Math.max(1, c.total)) * 100) + '%</span></div></div>' +
+      '<button type="button" class="gg-primary" id="gg-again-btn">Play again</button>' +
+      '<div class="gg-actions gg-actions-split"><button type="button" class="gg-ghost" id="gg-done-btn">Done</button></div>';
+  }
+
   function ggRender(){
     if (ggScreen === 'start') ggRenderStart();
     else if (ggScreen === 'question') ggRenderQuestion();
@@ -16461,11 +17112,11 @@
 
   // ---------- running a round ----------
   function ggStartRound(){
-    const length = Math.min(GG_ROUND_LENGTH, ggAvailablePhotoCount(ggSelectedCat));
+    const length = Math.min(GG_ROUND_LENGTH, ggAvailablePhotoCount(ggMode === 'year' ? 'year' : ggSelectedCat));
     if (!length) return;
     ggRound = {
-      category: ggSelectedCat, length, index: 0, score: 0, streak: 0, bestStreak: 0,
-      byKind: { park: { right: 0, total: 0 }, road: { right: 0, total: 0 }, hike: { right: 0, total: 0 }, restaurant: { right: 0, total: 0 } },
+      category: ggMode === 'year' ? 'year' : ggSelectedCat, length, index: 0, score: 0, streak: 0, bestStreak: 0,
+      byKind: { park: { right: 0, total: 0 }, road: { right: 0, total: 0 }, hike: { right: 0, total: 0 }, restaurant: { right: 0, total: 0 }, year: { right: 0, total: 0 } },
       usedUrls: new Set(), usedPlaces: new Set(), question: null
     };
     ggAdvanceOrFinish(true);
@@ -16487,7 +17138,7 @@
   }
 
   function ggFinishRound(){
-    if (ggRound.length > 0){ ggStats.rounds++; saveGgStats(); }
+    if (ggRound.length > 0){ if (ggMode === 'year') ggStats.roundsYear++; else ggStats.rounds++; saveGgStats(); }
     ggScreen = ggRound.length > 0 ? 'results' : 'start';
     ggRender();
   }
@@ -16497,15 +17148,18 @@
     if (!q || q.answered) return;
     q.answered = true;
     q.picked = i;
-    q.correct = q.options[i] === q.place;
+    const isYear = q.kind === 'year';
+    q.correct = isYear ? q.options[i] === q.correctYear : q.options[i] === q.place;
+    const bucket = isYear ? ggStats.year : ggStats.cats[q.kind];
     r.byKind[q.kind].total++;
-    ggStats.cats[q.kind].total++;
+    bucket.total++;
     if (q.correct){
       r.score++; r.streak++;
       r.byKind[q.kind].right++;
-      ggStats.cats[q.kind].right++;
+      bucket.right++;
       if (r.streak > r.bestStreak) r.bestStreak = r.streak;
-      if (r.streak > ggStats.bestStreak) ggStats.bestStreak = r.streak;
+      if (isYear){ if (r.streak > ggStats.bestStreakYear) ggStats.bestStreakYear = r.streak; }
+      else if (r.streak > ggStats.bestStreak) ggStats.bestStreak = r.streak;
     } else {
       r.streak = 0;
     }
@@ -16552,8 +17206,10 @@
   }
 
   // ---------- opening / closing ----------
-  function openGuessGame(){
+  function openGuessGame(mode){
     if (ggOverlay.classList.contains('open')) return;
+    ggMode = mode === 'year' ? 'year' : 'place';
+    ggEyebrow.textContent = ggMode === 'year' ? 'WHICH YEAR' : 'GUESS THE PLACE';
     ggPools = ggBuildPools();
     ggRound = null;
     ggScreen = 'start';
@@ -16578,7 +17234,8 @@
     ggReturnFocus = null;
   }
 
-  ggLaunchBtn.addEventListener('click', openGuessGame);
+  ggLaunchBtn.addEventListener('click', () => openGuessGame('place'));
+  ggLaunchYearBtn.addEventListener('click', () => openGuessGame('year'));
   ggCloseBtn.addEventListener('click', closeGuessGame);
   ggContent.addEventListener('click', (e) => {
     const cat = e.target.closest('[data-gg-cat]');
@@ -16610,6 +17267,825 @@
   BACK_BUTTON_OVERLAYS.push({ el: ggOverlay, openClass: 'open' });
   new MutationObserver(handleOverlayClassChange).observe(ggOverlay, { attributes: true, attributeFilter: ['class'] });
   loadGgStats();
+
+  // ---------- SHARE CARD ----------
+  // Turns one hike outing or one restaurant visit into a single image — the
+  // name and location up top, its photos in a grid — and hands it to the
+  // phone's share sheet (or downloads it where there isn't one).
+  // Deliberately limited to what was asked for: name, location and photos.
+  // Restaurants show location only (never cuisine); notes, scores, ranks,
+  // dish names and dates are never drawn. The card is painted onto a canvas
+  // and re-encoded, which also strips the hidden GPS/camera data phone photos
+  // carry — the original files are never sent. Nothing is uploaded and no
+  // link is created; the image goes wherever the person sends it.
+  const SHARE_MAX_PHOTOS = 6;
+  const SHARE_CARD_W = 1080;
+  const SHARE_FONT = 'Figtree, "Helvetica Neue", Arial, sans-serif';
+
+  const shareOverlay = document.getElementById('share-overlay');
+  const shareBackdrop = document.getElementById('share-backdrop');
+  const shareSheet = document.getElementById('share-sheet');
+  const shareCloseBtn = document.getElementById('share-close-btn');
+  const sharePreviewCanvas = document.getElementById('share-preview-canvas');
+  const sharePreviewStatus = document.getElementById('share-preview-status');
+  const shareThumbs = document.getElementById('share-thumbs');
+  const shareCount = document.getElementById('share-count');
+  const shareGoBtn = document.getElementById('share-go-btn');
+
+  let shareState = null;            // the card being built: { title, location, urls, selected, token, blob, filename }
+  let shareReturnFocus = null;
+  const shareImageCache = new Map(); // url -> loaded <img> (or null if it couldn't be loaded)
+
+  function shareCanSendFiles(){
+    try{
+      return !!(navigator.share && navigator.canShare &&
+        navigator.canShare({ files: [new File([new Blob(['x'])], 'x.jpg', { type: 'image/jpeg' })] }));
+    }catch(e){ return false; }
+  }
+
+  // Cross-origin loading is what keeps the canvas readable so it can be
+  // exported; Cloudinary serves images with the headers that allows.
+  function shareLoadImage(url){
+    if (shareImageCache.has(url)) return Promise.resolve(shareImageCache.get(url));
+    return new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { shareImageCache.set(url, img); resolve(img); };
+      img.onerror = () => { shareImageCache.set(url, null); resolve(null); };
+      img.src = cloudinaryThumbUrl(url, 1200);
+    });
+  }
+
+  // ---- drawing ----
+  function shareRoundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function shareDrawCover(ctx, img, x, y, w, h, r){
+    ctx.save();
+    shareRoundRect(ctx, x, y, w, h, r);
+    ctx.clip();
+    ctx.fillStyle = '#1D3B3F';
+    ctx.fillRect(x, y, w, h);
+    const s = Math.max(w / img.naturalWidth, h / img.naturalHeight); // fill the cell, cropping the overflow
+    const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+    ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+    ctx.restore();
+  }
+
+  function shareWrapText(ctx, text, maxWidth, maxLines){
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let cur = '';
+    const fits = (t) => ctx.measureText(t).width <= maxWidth;
+    words.forEach(word => {
+      let w = word;
+      while (!fits(w) && w.length > 1){ // one enormous word: break it rather than run off the card
+        let cut = w.length - 1;
+        while (cut > 1 && !fits(w.slice(0, cut))) cut--;
+        if (cur){ lines.push(cur); cur = ''; }
+        lines.push(w.slice(0, cut));
+        w = w.slice(cut);
+      }
+      const test = cur ? cur + ' ' + w : w;
+      if (fits(test)) cur = test;
+      else { if (cur) lines.push(cur); cur = w; }
+    });
+    if (cur) lines.push(cur);
+    if (lines.length > maxLines){
+      const kept = lines.slice(0, maxLines);
+      let last = kept[maxLines - 1];
+      while (last.length > 1 && !fits(last + '…')) last = last.slice(0, -1);
+      kept[maxLines - 1] = last + '…';
+      return kept;
+    }
+    return lines;
+  }
+
+  // Where each photo goes inside the content area for 1–6 photos.
+  function shareGridCells(imgs, cw){
+    const n = imgs.length, gap = 14;
+    const half = Math.floor((cw - gap) / 2);
+    const third = Math.floor((cw - 2 * gap) / 3);
+    const cells = [];
+    if (n === 1){
+      const ratio = Math.max(0.66, Math.min(1.25, imgs[0].naturalHeight / imgs[0].naturalWidth));
+      cells.push({ x: 0, y: 0, w: cw, h: Math.round(cw * ratio) });
+    } else if (n === 2){
+      const h = Math.round(half * 1.3);
+      cells.push({ x: 0, y: 0, w: half, h }, { x: cw - half, y: 0, w: half, h });
+    } else if (n === 3){
+      const top = Math.round(cw * 0.62), h = Math.round(half * 0.85);
+      cells.push({ x: 0, y: 0, w: cw, h: top }, { x: 0, y: top + gap, w: half, h }, { x: cw - half, y: top + gap, w: half, h });
+    } else if (n === 4){
+      const h = Math.round(half * 0.85);
+      [0, 1].forEach(row => [0, 1].forEach(col => cells.push({ x: col ? cw - half : 0, y: row * (h + gap), w: half, h })));
+    } else if (n === 5){
+      const top = Math.round(cw * 0.62), h = Math.round(half * 0.7);
+      cells.push({ x: 0, y: 0, w: cw, h: top });
+      [0, 1].forEach(row => [0, 1].forEach(col => cells.push({ x: col ? cw - half : 0, y: top + gap + row * (h + gap), w: half, h })));
+    } else {
+      [0, 1].forEach(row => [0, 1, 2].forEach(col => cells.push({ x: col * (third + gap), y: row * (third + gap), w: third, h: third })));
+    }
+    const height = cells.reduce((m, c) => Math.max(m, c.y + c.h), 0);
+    return { cells, height };
+  }
+
+  async function shareDrawCard(title, location, imgs){
+    try{ await Promise.all([document.fonts.load('700 84px Figtree'), document.fonts.load('500 40px Figtree')]); }catch(e){ /* falls back to the system font */ }
+    const PAD = 64, cw = SHARE_CARD_W - PAD * 2;
+    const measure = document.createElement('canvas').getContext('2d');
+
+    // The name shrinks a step or two if it's long, before it's allowed a third line.
+    let titleSize = 84, titleLines = [];
+    for (const size of [84, 72, 60]){
+      measure.font = '700 ' + size + 'px ' + SHARE_FONT;
+      titleSize = size;
+      titleLines = shareWrapText(measure, title, cw, size === 60 ? 3 : 2);
+      if (titleLines.length <= 2) break;
+    }
+    measure.font = '500 40px ' + SHARE_FONT;
+    const locLines = location ? shareWrapText(measure, location, cw, 2) : [];
+    const titleLH = Math.round(titleSize * 1.14), locLH = 52;
+    const grid = shareGridCells(imgs, cw);
+
+    const accentH = 10, afterAccent = 34;
+    const height = PAD + accentH + afterAccent + titleLines.length * titleLH +
+      (locLines.length ? 14 + locLines.length * locLH : 0) + 48 + grid.height + PAD;
+    const canvas = document.createElement('canvas');
+    canvas.width = SHARE_CARD_W;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#142A2E';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let y = PAD;
+    ctx.fillStyle = '#E8A33D';
+    shareRoundRect(ctx, PAD, y, 96, accentH, 5); ctx.fill();
+    y += accentH + afterAccent;
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#F1ECDE';
+    ctx.font = '700 ' + titleSize + 'px ' + SHARE_FONT;
+    titleLines.forEach((line, i) => { ctx.fillText(line, PAD, y + titleSize * 0.86 + i * titleLH); });
+    y += titleLines.length * titleLH;
+
+    if (locLines.length){
+      y += 14;
+      ctx.fillStyle = 'rgba(241, 236, 222, 0.72)';
+      ctx.font = '500 40px ' + SHARE_FONT;
+      locLines.forEach((line, i) => { ctx.fillText(line, PAD, y + 40 * 0.9 + i * locLH); });
+      y += locLines.length * locLH;
+    }
+    y += 48;
+    grid.cells.forEach((c, i) => shareDrawCover(ctx, imgs[i], PAD + c.x, y + c.y, c.w, c.h, 28));
+    return canvas;
+  }
+
+  // ---- the preview sheet ----
+  function shareSlug(s){
+    return (String(s || 'share').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'share').slice(0, 60);
+  }
+
+  function shareRenderThumbs(){
+    const st = shareState;
+    shareThumbs.innerHTML = st.urls.map((u, i) => {
+      const on = st.selected.has(u);
+      return '<button type="button" class="share-thumb' + (on ? ' selected' : '') + '" data-share-index="' + i + '" aria-pressed="' + on + '" aria-label="Photo ' + (i + 1) + (on ? ', included' : ', not included') + '">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy">' +
+        '<span class="share-thumb-check">' + (on ? '✓' : '') + '</span>' +
+      '</button>';
+    }).join('');
+    shareCount.textContent = st.selected.size + ' of ' + Math.min(SHARE_MAX_PHOTOS, st.urls.length) + (st.urls.length > SHARE_MAX_PHOTOS ? ' (max ' + SHARE_MAX_PHOTOS + ')' : '');
+  }
+
+  function shareSetStatus(msg){
+    sharePreviewStatus.textContent = msg || '';
+    sharePreviewStatus.style.display = msg ? 'block' : 'none';
+  }
+
+  async function shareRefresh(){
+    const st = shareState;
+    if (!st) return;
+    const token = ++st.token;
+    st.blob = null;
+    shareGoBtn.disabled = true;
+    shareGoBtn.textContent = 'Preparing…';
+    const chosen = st.urls.filter(u => st.selected.has(u));
+    if (!chosen.length){
+      sharePreviewCanvas.style.display = 'none';
+      shareSetStatus('Pick at least one photo.');
+      shareGoBtn.textContent = st.canSend ? 'Share' : 'Download image';
+      return;
+    }
+    const loaded = await Promise.all(chosen.map(u => shareLoadImage(u)));
+    if (token !== st.token) return; // a newer choice has taken over
+    const imgs = loaded.filter(Boolean);
+    const failed = chosen.length - imgs.length;
+    if (!imgs.length){
+      sharePreviewCanvas.style.display = 'none';
+      shareSetStatus("Those photos couldn't be loaded for sharing. Check your connection and try again.");
+      shareGoBtn.textContent = st.canSend ? 'Share' : 'Download image';
+      return;
+    }
+    let card;
+    try{
+      card = await shareDrawCard(st.title, st.location, imgs);
+    }catch(e){
+      console.error('Share card failed to draw', e);
+      shareSetStatus("Couldn't build the card.");
+      return;
+    }
+    if (token !== st.token) return;
+    sharePreviewCanvas.width = card.width;
+    sharePreviewCanvas.height = card.height;
+    sharePreviewCanvas.getContext('2d').drawImage(card, 0, 0);
+    sharePreviewCanvas.style.display = 'block';
+    shareSetStatus(failed ? (failed === 1 ? "1 photo couldn't be loaded and was left out." : failed + " photos couldn't be loaded and were left out.") : '');
+    try{
+      card.toBlob((blob) => {
+        if (token !== st.token) return;
+        if (!blob){ shareSetStatus("Couldn't prepare the image."); return; }
+        st.blob = blob;
+        shareGoBtn.disabled = false;
+        shareGoBtn.textContent = st.canSend ? 'Share' : 'Download image';
+      }, 'image/jpeg', 0.92);
+    }catch(e){
+      console.error('Share card export failed', e); // e.g. a photo host that doesn't allow the image to be read
+      sharePreviewCanvas.style.display = 'none';
+      shareSetStatus("Couldn't prepare the image — the photos can't be read for sharing.");
+    }
+  }
+
+  function openShare(spec){
+    if (!spec.urls.length) return;
+    shareState = {
+      title: spec.title, location: spec.location, urls: spec.urls, filename: shareSlug(spec.title) + '.jpg',
+      selected: new Set(spec.urls.slice(0, SHARE_MAX_PHOTOS)), token: 0, blob: null, canSend: shareCanSendFiles()
+    };
+    shareReturnFocus = document.activeElement;
+    shareRenderThumbs();
+    sharePreviewCanvas.style.display = 'none';
+    shareSetStatus('Preparing…');
+    shareGoBtn.disabled = true;
+    shareGoBtn.textContent = 'Preparing…';
+    document.getElementById('share-scroll').scrollTop = 0;
+    shareOverlay.classList.add('open');           // the back-button observer adds its history entry
+    shareOverlay.setAttribute('aria-hidden', 'false');
+    setTimeout(() => { try{ shareCloseBtn.focus({ preventScroll: true }); }catch(e){} }, 60);
+    shareRefresh();
+  }
+
+  function closeShare(){
+    if (!shareOverlay.classList.contains('open')) return;
+    shareOverlay.classList.remove('open');
+    shareOverlay.setAttribute('aria-hidden', 'true');
+    if (shareState) shareState.token++;           // drop any card still being built
+    if (shareReturnFocus && document.contains(shareReturnFocus)){ try{ shareReturnFocus.focus({ preventScroll: true }); }catch(e){} }
+    shareReturnFocus = null;
+  }
+
+  function shareDownload(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  async function shareGo(){
+    const st = shareState;
+    if (!st || !st.blob) return;
+    const file = new File([st.blob], st.filename, { type: 'image/jpeg' });
+    if (st.canSend){
+      try{
+        await navigator.share({ files: [file] });
+        closeShare();
+        return;
+      }catch(e){
+        if (e && e.name === 'AbortError') return; // they closed the share sheet — nothing to do
+        showToast("Couldn't open the share sheet — saving the image instead");
+      }
+    }
+    shareDownload(st.blob, st.filename);
+    showToast('Image saved');
+  }
+
+  shareThumbs.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-share-index]');
+    if (!btn || !shareState) return;
+    const url = shareState.urls[Number(btn.dataset.shareIndex)];
+    if (shareState.selected.has(url)) shareState.selected.delete(url);
+    else if (shareState.selected.size >= SHARE_MAX_PHOTOS){ showToast('Up to ' + SHARE_MAX_PHOTOS + ' photos fit on a card'); return; }
+    else shareState.selected.add(url);
+    shareRenderThumbs();
+    shareRefresh();
+  });
+  shareGoBtn.addEventListener('click', shareGo);
+  shareCloseBtn.addEventListener('click', closeShare);
+  shareBackdrop.addEventListener('click', closeShare);
+  document.addEventListener('keydown', (e) => {
+    if (!shareOverlay.classList.contains('open')) return;
+    if (e.key === 'Escape' && !artLightboxOverlay.classList.contains('show')){ closeShare(); return; }
+    if (e.key === 'Tab'){
+      const focusable = Array.from(shareSheet.querySelectorAll('button:not([disabled])')).filter(b => b.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+  ['touchstart', 'touchend'].forEach(t => shareOverlay.addEventListener(t, (e) => e.stopPropagation(), { passive: true }));
+
+  // ---- where it starts from ----
+  // Hike outing: its own photos. Restaurant visit: its dish photos (best-scored
+  // dishes first) and then the visit's other photos.
+  function shareHikeOuting(h, dateId){
+    const d = (h.dates || []).find(x => x.id === dateId);
+    if (!d) return;
+    const urls = [];
+    (d.photos || []).forEach(p => { if (p && p.url && urls.indexOf(p.url) === -1) urls.push(p.url); });
+    openShare({ title: (h.name || 'Hike').trim(), location: [h.city, h.state, h.country].filter(Boolean).join(', '), urls });
+  }
+
+  function shareRestaurantVisit(r, visitId){
+    const v = (Array.isArray(r.visits) ? r.visits : []).find(x => x.id === visitId);
+    if (!v) return;
+    const scoreOf = (c) => (c.score === '' || c.score == null || isNaN(Number(c.score))) ? -1 : Number(c.score);
+    const urls = [];
+    (v.courses || []).slice().sort((a, b) => scoreOf(b) - scoreOf(a)).forEach(c => {
+      otdCoursePhotos(c).forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); });
+    });
+    (v.photos || []).forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); });
+    openShare({ title: (r.name || 'Restaurant').trim(), location: (r.location || '').trim(), urls }); // location only — never cuisine
+  }
+
+  hikeDetailsPanelInner.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-share-hike-date]');
+    if (btn && openHikeIndex !== null && hikeRows[openHikeIndex]) shareHikeOuting(hikeRows[openHikeIndex], btn.dataset.shareHikeDate);
+  });
+  restaurantDetailsPanelInner.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-share-visit]');
+    if (btn && openRestaurantIndex !== null && restaurantRows[openRestaurantIndex]) shareRestaurantVisit(restaurantRows[openRestaurantIndex], btn.dataset.shareVisit);
+  });
+
+  BACK_BUTTON_OVERLAYS.push({ el: shareOverlay, openClass: 'open' });
+  new MutationObserver(handleOverlayClassChange).observe(shareOverlay, { attributes: true, attributeFilter: ['class'] });
+
+  // ---------- YEAR IN REVIEW ----------
+  // A look back at any year from 2017 on: a summary, a photo wall, a few
+  // highlights and a month-by-month timeline of the hikes, restaurant visits
+  // and Photos-tab photos that carry a date in that year. Everything is
+  // computed fresh from the app's data every time it's drawn, so it's never
+  // out of date on open — and because Photos are added to the app over time,
+  // it also redraws when you tap Refresh, when the app comes back to the
+  // foreground, and when a cloud sync finishes while it's open.
+  //   • Hikes        — each outing's date (hike.dates[].date)
+  //   • Restaurants  — each visit's date (restaurant.visits[].date)
+  //   • Photos tab   — the date read from the file name at upload (photoRows[].date)
+  // Parks and Roads have no dates so they aren't part of it, and notes are
+  // never shown. Read-only: opening or refreshing it never saves anything.
+  const YIR_FIRST_YEAR = 2017;
+  const YIR_WALL_MAX = 9;
+
+  const yirOverlay = document.getElementById('yir-overlay');
+  const yirPanel = document.getElementById('yir-panel');
+  const yirScroll = document.getElementById('yir-scroll');
+  const yirContent = document.getElementById('yir-content');
+  const yirYearsEl = document.getElementById('yir-years');
+  const yirUpdated = document.getElementById('yir-updated');
+  const yirRefreshBtn = document.getElementById('yir-refresh-btn');
+  const yirCloseBtn = document.getElementById('yir-close-btn');
+  const yirLaunchBtn = document.getElementById('yir-launch-btn');
+
+  let yirYear = null;         // the year on screen
+  let yirItems = [];          // what each tappable card points at
+  let yirReturnGroup = null;  // page to land back on when it closes
+  let yirReturnFocus = null;
+  let yirSignature = '';      // a fingerprint of what's on screen, to tell whether a refresh changed anything
+
+  function yirNowYear(){ return new Date().getFullYear(); }
+
+  // Counts of dated things per year — drives the dots on the year chips.
+  function yirYearCounts(){
+    const counts = {};
+    const bump = (y, key) => { (counts[y] = counts[y] || { hikes: 0, restaurants: 0, photos: 0 })[key]++; };
+    hikeRows.forEach(h => (h.dates || []).forEach(d => { const p = otdParse(d.date); if (p) bump(p.y, 'hikes'); }));
+    restaurantRows.forEach(r => (Array.isArray(r.visits) ? r.visits : []).forEach(v => { const p = otdParse(v.date); if (p) bump(p.y, 'restaurants'); }));
+    photoRows.forEach(ph => { const p = ph && ph.url ? otdParse(ph.date) : null; if (p) bump(p.y, 'photos'); });
+    return counts;
+  }
+
+  function yirNum(v){
+    const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, ''));
+    return isFinite(n) ? n : 0;
+  }
+  function yirRound1(n){ return Math.round(n * 10) / 10; }
+  function yirMonthName(m){ return new Date(2000, m - 1, 1).toLocaleDateString('en-US', { month: 'long' }); }
+  function yirShortDate(dateStr){ return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+
+  function yirSampleEvenly(arr, k){
+    if (arr.length <= k) return arr.slice();
+    const out = [];
+    for (let i = 0; i < k; i++) out.push(arr[Math.floor(i * arr.length / k)]);
+    return out;
+  }
+
+  // Gathers everything dated in `year` into a per-day timeline plus the numbers for the summary.
+  function yirCollect(year){
+    const days = new Map(); // 'YYYY-MM-DD' -> { date, hikes:[], restaurants:[], photos:[] }
+    const day = (p) => {
+      let d = days.get(p.str);
+      if (!d){ d = { date: p.str, m: p.m, d: p.d, hikes: [], restaurants: [], photos: [] }; days.set(p.str, d); }
+      return d;
+    };
+    const orderedHikes = getOrderedHikes();
+    const stats = { hikes: 0, uniqueHikes: new Set(), miles: 0, feet: 0, newTrails: 0, restaurants: 0, uniqueRestaurants: new Set(), newRestaurants: 0,
+      scored: [], photos: 0, photoDays: 0 };
+
+    hikeRows.forEach(h => {
+      const dated = (h.dates || []).map(d => ({ d, p: otdParse(d.date) })).filter(x => x.p);
+      if (!dated.length || !(h.name || '').trim()) return;
+      const firstYear = Math.min.apply(null, dated.map(x => x.p.y));
+      const inYear = dated.filter(x => x.p.y === year);
+      if (!inYear.length) return;
+      const perDay = new Map(); // two outings the same day on one trail count once
+      inYear.forEach(x => { let e = perDay.get(x.p.str); if (!e){ e = { p: x.p, entries: [] }; perDay.set(x.p.str, e); } e.entries.push(x.d); });
+      perDay.forEach(e => {
+        const photos = [];
+        e.entries.forEach(en => (en.photos || []).forEach(ph => { const u = ph && ph.url; if (u && photos.indexOf(u) === -1) photos.push(u); }));
+        const miles = yirNum(h.distance), feet = yirNum(h.elevation);
+        const item = { type: 'hike', hike: h, dateId: e.entries[0].id, dateStr: e.p.str, photos, miles, feet,
+          where: [h.city, h.state, h.country].filter(Boolean).join(', '), rank: orderedHikes.indexOf(h) + 1 };
+        day(e.p).hikes.push(item);
+        stats.hikes++; stats.uniqueHikes.add(h); stats.miles += miles; stats.feet += feet;
+      });
+      if (firstYear === year) stats.newTrails++;
+    });
+
+    restaurantRows.forEach(r => {
+      const visits = Array.isArray(r.visits) ? r.visits : [];
+      const dated = visits.map(v => ({ v, p: otdParse(v.date) })).filter(x => x.p);
+      if (!dated.length || !(r.name || '').trim()) return;
+      const firstYear = Math.min.apply(null, dated.map(x => x.p.y));
+      const inYear = dated.filter(x => x.p.y === year);
+      if (!inYear.length) return;
+      const perDay = new Map();
+      inYear.forEach(x => { let e = perDay.get(x.p.str); if (!e){ e = { p: x.p, visits: [] }; perDay.set(x.p.str, e); } e.visits.push(x.v); });
+      perDay.forEach(e => {
+        const courses = [];
+        e.visits.forEach(v => (v.courses || []).forEach(c => courses.push(c)));
+        const scoreOf = (c) => (c.score === '' || c.score == null || isNaN(Number(c.score))) ? -1 : Number(c.score);
+        const scored = courses.filter(c => scoreOf(c) >= 0);
+        const avg = scored.length ? Math.round((scored.reduce((a, c) => a + scoreOf(c), 0) / scored.length) * 10) / 10 : null;
+        const photos = [];
+        courses.slice().sort((a, b) => scoreOf(b) - scoreOf(a)).forEach(c => otdCoursePhotos(c).forEach(u => { if (u && photos.indexOf(u) === -1) photos.push(u); }));
+        e.visits.forEach(v => (v.photos || []).forEach(u => { if (u && photos.indexOf(u) === -1) photos.push(u); }));
+        const names = [];
+        courses.forEach(c => { const t = (c.text || '').trim(); if (t && !OTD_TIME_LABEL.test(t) && names.indexOf(t) === -1) names.push(t); });
+        const stars = courses.filter(c => c.score === '12' && !c.hiddenFromDishes);
+        const top = scored.slice().sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+        const topName = top && (top.text || '').trim() && !OTD_TIME_LABEL.test((top.text || '').trim()) ? top.text.trim() : '';
+        const item = { type: 'restaurant', restaurant: r, visitId: e.visits[0].id, dateStr: e.p.str, photos, avg,
+          where: [r.cuisine, r.location].filter(Boolean).join(' · '), dishes: names.slice(0, 3), moreDishes: Math.max(0, names.length - 3),
+          star: stars.length > 1 ? stars.length + ' dishes at 12/10' : stars.length === 1 ? ((stars[0].text || '').trim() && !OTD_TIME_LABEL.test((stars[0].text || '').trim()) ? 'Dish of the night: ' + stars[0].text.trim() + ', 12/10' : 'A 12/10 dish') : '',
+          topDish: top ? { name: topName, score: scoreOf(top) } : null };
+        day(e.p).restaurants.push(item);
+        stats.restaurants++; stats.uniqueRestaurants.add(r);
+        if (avg !== null) stats.scored.push(item);
+      });
+      if (firstYear === year) stats.newRestaurants++;
+    });
+
+    photoRows.forEach(ph => {
+      const p = ph && ph.url ? otdParse(ph.date) : null;
+      if (!p || p.y !== year) return;
+      day(p).photos.push({ url: ph.url, time: ph.time || '' });
+      stats.photos++;
+    });
+    days.forEach(d => { d.photos.sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0); if (d.photos.length) stats.photoDays++; });
+
+    const list = Array.from(days.values()).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    const months = [];
+    list.forEach(dy => {
+      let mo = months[months.length - 1];
+      if (!mo || mo.m !== dy.m){ mo = { m: dy.m, days: [], hikes: 0, restaurants: 0, photos: 0, entries: 0 }; months.push(mo); }
+      mo.days.push(dy);
+      mo.hikes += dy.hikes.length; mo.restaurants += dy.restaurants.length; mo.photos += dy.photos.length;
+      mo.entries += dy.hikes.length + dy.restaurants.length + (dy.photos.length ? 1 : 0);
+    });
+    const allPhotos = [];
+    list.forEach(dy => dy.photos.forEach(p => allPhotos.push(p.url)));
+
+    // Highlights — each only shown when the data actually supports it.
+    const hl = [];
+    const bestMeal = stats.scored.slice().sort((a, b) => b.avg - a.avg || (a.dateStr < b.dateStr ? 1 : -1))[0];
+    if (bestMeal && stats.scored.length >= 2) hl.push({ label: 'Best meal', big: bestMeal.restaurant.name, sub: bestMeal.avg.toFixed(1) + ' · ' + yirShortDate(bestMeal.dateStr), item: bestMeal });
+    let longest = null, withMiles = 0;
+    list.forEach(dy => dy.hikes.forEach(h => { if (h.miles > 0){ withMiles++; if (!longest || h.miles > longest.miles) longest = h; } }));
+    if (longest && withMiles >= 2) hl.push({ label: 'Longest hike', big: longest.hike.name, sub: yirRound1(longest.miles) + ' mi · ' + yirShortDate(longest.dateStr), item: longest });
+    const dishes = [];
+    list.forEach(dy => dy.restaurants.forEach(rs => { if (rs.topDish && rs.topDish.name) dishes.push({ rs, name: rs.topDish.name, score: rs.topDish.score }); }));
+    dishes.sort((a, b) => b.score - a.score);
+    if (dishes.length) hl.push({ label: 'Standout dish', big: dishes[0].name, sub: dishes[0].rs.restaurant.name + (dishes[0].score >= 0 ? ' · ' + dishes[0].score + '/10' : ''), item: dishes[0].rs });
+    const busiest = months.slice().sort((a, b) => b.entries - a.entries)[0];
+    if (busiest && busiest.entries >= 2) hl.push({ label: 'Busiest month', big: yirMonthName(busiest.m), sub: otdPlural(busiest.entries, 'thing', 'things') + ' logged' });
+    const visitCounts = new Map();
+    list.forEach(dy => dy.restaurants.forEach(rs => visitCounts.set(rs.restaurant, (visitCounts.get(rs.restaurant) || 0) + 1)));
+    let most = null;
+    visitCounts.forEach((n, r) => { if (n >= 2 && (!most || n > most.n)) most = { r, n }; });
+    if (most) hl.push({ label: 'Most visited', big: most.r.name, sub: most.n + ' visits' });
+
+    return { year, list, months, allPhotos, stats, highlights: hl.slice(0, 4) };
+  }
+
+  // ---------- drawing ----------
+  function yirIcon(name, size){
+    const s = size || 16;
+    const paths = {
+      hike: '<path d="M3 19l6.5-11 4 6.5 2.5-3.5L21 19z"></path>',
+      food: '<path d="M6 3v6a2.5 2.5 0 0 0 5 0V3"></path><path d="M8.5 3v18"></path><path d="M17 3c-2 1.5-3 4-3 7h3v11"></path>',
+      camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.5" r="3.3"></circle>',
+      chevron: '<path d="M9 6l6 6-6 6"></path>',
+      close: '<path d="M6 6l12 12M18 6L6 18"></path>',
+      refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.1"></path><path d="M20 4v7h-7"></path>'
+    };
+    if (name === 'star') return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"></path></svg>';
+    return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[name] + '</svg>';
+  }
+  function yirReg(item){ yirItems.push(item); return yirItems.length - 1; }
+
+  function yirImg(url, w, alt){
+    return '<img class="yir-img" src="' + escapeAttr(cloudinaryThumbUrl(url, w)) + '" alt="' + escapeAttr(alt || '') + '" loading="lazy" decoding="async">';
+  }
+
+  function yirPhotoSetHtml(urls, cls, max){
+    // A set of tappable photos; if there are more than `max`, the last tile says how many more.
+    const shown = urls.slice(0, max);
+    const token = yirReg({ type: 'photos', urls });
+    return shown.map((u, i) => {
+      const more = urls.length > max && i === max - 1;
+      return '<button type="button" class="yir-tile ' + cls + '" data-yir-photos="' + token + '" data-yir-index="' + i + '" aria-label="' +
+        (more ? 'See all ' + urls.length + ' photos' : 'Open photo ' + (i + 1) + ' of ' + urls.length) + '">' + yirImg(u, 600) +
+        (more ? '<span class="yir-tile-more">+' + (urls.length - max + 1) + '</span>' : '') + '</button>';
+    }).join('');
+  }
+
+  function yirWallHtml(data){
+    const urls = data.allPhotos;
+    if (!urls.length){
+      return '<section class="yir-wall-empty"><div class="yir-eyebrow-sm">PHOTOS</div>' +
+        '<p class="yir-empty-text">No photos from ' + data.year + ' in the Photos tab yet. They\'re matched by the date at the start of the file name, like ' + data.year + '0517_021456.</p>' +
+        '<button type="button" class="yir-ghost" data-yir-action="refresh">Refresh</button></section>';
+    }
+    const picked = yirSampleEvenly(urls, YIR_WALL_MAX);
+    const n = picked.length;
+    const layout = n >= 9 ? 'w9' : n >= 5 ? 'w5' : n === 4 ? 'w4' : n === 3 ? 'w3' : n === 2 ? 'w2' : 'w1';
+    const count = layout === 'w9' ? 9 : layout === 'w5' ? 5 : n;
+    const token = yirReg({ type: 'photos', urls });
+    const tiles = picked.slice(0, count).map((u, i) =>
+      '<button type="button" class="yir-tile yir-wall-tile" data-yir-photos="' + token + '" data-yir-index="' + urls.indexOf(u) + '" aria-label="Open photo">' + yirImg(u, i === 0 ? 900 : 500) + '</button>').join('');
+    return '<section class="yir-wall"><div class="yir-wall-head"><span class="yir-eyebrow-sm">PHOTOS FROM ' + data.year + '</span>' +
+      '<button type="button" class="yir-link" data-yir-photos="' + token + '" data-yir-index="0">See all ' + urls.length + '</button></div>' +
+      '<div class="yir-wall-grid ' + layout + '">' + tiles + '</div></section>';
+  }
+
+  function yirStatsHtml(data){
+    const s = data.stats;
+    const miles = yirRound1(s.miles), feet = Math.round(s.feet);
+    const busyMonths = data.months.length;
+    const tiles = [
+      { n: s.hikes, label: s.hikes === 1 ? 'Hike' : 'Hikes', sub: miles > 0 ? miles + ' mi' + (feet > 0 ? ' · ' + feet.toLocaleString('en-US') + ' ft' : '') : (s.newTrails ? s.newTrails + ' new ' + (s.newTrails === 1 ? 'trail' : 'trails') : (s.uniqueHikes.size ? otdPlural(s.uniqueHikes.size, 'trail', 'trails') : '')) },
+      { n: s.restaurants, label: s.restaurants === 1 ? 'Restaurant visit' : 'Restaurant visits', sub: s.uniqueRestaurants.size ? otdPlural(s.uniqueRestaurants.size, 'place', 'places') + (s.newRestaurants ? ' · ' + s.newRestaurants + ' new' : '') : '' },
+      { n: s.photos, label: s.photos === 1 ? 'Photo' : 'Photos', sub: s.photoDays ? otdPlural(s.photoDays, 'day', 'days') : '' },
+      { n: data.list.length, label: data.list.length === 1 ? 'Active day' : 'Active days', sub: busyMonths ? 'across ' + otdPlural(busyMonths, 'month', 'months') : '' }
+    ];
+    return '<div class="yir-stats">' + tiles.map(t =>
+      '<div class="yir-stat"><div class="yir-stat-n">' + t.n.toLocaleString('en-US') + '</div><div class="yir-stat-label">' + escapeHtml(t.label) + '</div>' +
+      (t.sub ? '<div class="yir-stat-sub">' + escapeHtml(t.sub) + '</div>' : '') + '</div>').join('') + '</div>';
+  }
+
+  function yirHighlightsHtml(data){
+    if (!data.highlights.length) return '';
+    return '<section class="yir-highlights">' + data.highlights.map(h => {
+      const attr = h.item ? ' data-yir-item="' + yirReg(h.item) + '"' : '';
+      const tag = h.item ? 'button' : 'div';
+      return '<' + tag + (h.item ? ' type="button"' : '') + ' class="yir-highlight"' + attr + '>' +
+        '<span class="yir-highlight-label">' + escapeHtml(h.label.toUpperCase()) + '</span>' +
+        '<span class="yir-highlight-big">' + escapeHtml(h.big) + '</span>' +
+        '<span class="yir-highlight-sub">' + escapeHtml(h.sub) + '</span></' + tag + '>';
+    }).join('') + '</section>';
+  }
+
+  function yirHikeCardHtml(m){
+    const idx = yirReg(m);
+    const stat = [m.miles > 0 ? yirRound1(m.miles) + ' mi' : '', m.feet > 0 ? Math.round(m.feet).toLocaleString('en-US') + ' ft gain' : ''].filter(Boolean).join(' · ');
+    const strip = m.photos.length ? '<span class="yir-strip s' + Math.min(3, m.photos.length) + '">' + m.photos.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
+    return '<button type="button" class="yir-card" data-yir-item="' + idx + '">' + strip +
+      '<span class="yir-card-body">' +
+        '<span class="yir-row"><span class="yir-chip">' + yirIcon('hike', 12) + 'HIKE</span>' + (m.photos.length > 3 ? '<span class="yir-dim">' + m.photos.length + ' photos</span>' : '') + '</span>' +
+        '<span class="yir-card-name">' + escapeHtml(m.hike.name) + '</span>' +
+        (m.where ? '<span class="yir-card-where">' + escapeHtml(m.where) + '</span>' : '') +
+        (stat ? '<span class="yir-card-stat">' + escapeHtml(stat) + '</span>' : '') +
+      '</span></button>';
+  }
+
+  function yirRestaurantCardHtml(m){
+    const idx = yirReg(m);
+    const strip = m.photos.length ? '<span class="yir-strip s' + Math.min(3, m.photos.length) + '">' + m.photos.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
+    const dishText = m.dishes.length ? m.dishes.join(' · ') + (m.moreDishes ? ' · +' + m.moreDishes + ' more' : '') : '';
+    return '<button type="button" class="yir-card" data-yir-item="' + idx + '">' + strip +
+      '<span class="yir-card-body">' +
+        '<span class="yir-row"><span class="yir-chip">' + yirIcon('food', 12) + 'RESTAURANT</span>' +
+          (m.avg !== null ? '<span class="yir-score">' + m.avg.toFixed(1) + '</span>' : '') + '</span>' +
+        '<span class="yir-card-name">' + escapeHtml(m.restaurant.name) + '</span>' +
+        (m.where ? '<span class="yir-card-where">' + escapeHtml(m.where) + '</span>' : '') +
+        (dishText ? '<span class="yir-card-stat">' + escapeHtml(dishText) + '</span>' : '') +
+        (m.star ? '<span class="yir-star">' + yirIcon('star', 13) + escapeHtml(m.star) + '</span>' : '') +
+      '</span></button>';
+  }
+
+  function yirTimelineHtml(data){
+    if (!data.list.length) return '';
+    return '<section class="yir-timeline"><h3 class="yir-timeline-title">Timeline</h3>' + data.months.map(mo => {
+      const parts = [];
+      if (mo.hikes) parts.push(otdPlural(mo.hikes, 'hike', 'hikes'));
+      if (mo.restaurants) parts.push(otdPlural(mo.restaurants, 'meal', 'meals'));
+      if (mo.photos) parts.push(otdPlural(mo.photos, 'photo', 'photos'));
+      return '<div class="yir-month"><div class="yir-month-head"><span class="yir-month-name">' + escapeHtml(yirMonthName(mo.m)) + '</span>' +
+        '<span class="yir-month-counts">' + escapeHtml(parts.join(' · ')) + '</span></div>' +
+        mo.days.map(dy => {
+          const dow = new Date(dy.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+          const cards = dy.hikes.map(yirHikeCardHtml).join('') + dy.restaurants.map(yirRestaurantCardHtml).join('') +
+            (dy.photos.length ? '<div class="yir-photos-card"><div class="yir-row"><span class="yir-chip">' + yirIcon('camera', 12) + 'PHOTOS</span><span class="yir-dim">' +
+              escapeHtml(otdPlural(dy.photos.length, 'photo', 'photos')) + '</span></div><div class="yir-photo-grid">' +
+              yirPhotoSetHtml(dy.photos.map(p => p.url), 'yir-day-tile', 6) + '</div></div>' : '');
+          return '<div class="yir-day"><div class="yir-day-badge"><span class="yir-day-num">' + dy.d + '</span><span class="yir-day-dow">' + escapeHtml(dow) + '</span></div>' +
+            '<div class="yir-day-cards">' + cards + '</div></div>';
+        }).join('') + '</div>';
+    }).join('') + '</section>';
+  }
+
+  function yirRenderYears(){
+    const counts = yirYearCounts();
+    const now = yirNowYear();
+    let html = '';
+    for (let y = now; y >= YIR_FIRST_YEAR; y--){
+      const c = counts[y];
+      const has = !!c;
+      html += '<button type="button" class="yir-year' + (y === yirYear ? ' selected' : '') + (has ? ' has-data' : '') + '" data-yir-year="' + y + '" aria-pressed="' + (y === yirYear) + '"' +
+        ' aria-label="' + y + (has ? '' : ', nothing logged') + '">' + y + (has ? '<span class="yir-year-dot"></span>' : '') + '</button>';
+    }
+    yirYearsEl.innerHTML = html;
+    const sel = yirYearsEl.querySelector('.selected');
+    if (sel) yirYearsEl.scrollLeft = Math.max(0, sel.offsetLeft - (yirYearsEl.clientWidth - sel.offsetWidth) / 2);
+  }
+
+  function yirSignatureOf(data){
+    return [data.year, data.stats.hikes, data.stats.restaurants, data.stats.photos, data.list.length].join('|');
+  }
+
+  function yirRender(keepScroll){
+    const y = keepScroll ? yirScroll.scrollTop : 0;
+    yirItems = [];
+    const data = yirCollect(yirYear);
+    const now = yirNowYear();
+    const empty = !data.list.length;
+    yirRenderYears();
+    yirContent.innerHTML =
+      '<section class="yir-hero"><div class="yir-year-big" id="yir-title">' + data.year + '</div>' +
+      '<p class="yir-tagline">' + (data.year === now ? 'So far this year' : 'Your year in hikes, meals and photos') + '</p>' +
+      (empty ? '' : yirStatsHtml(data)) + '</section>' +
+      (empty
+        ? '<section class="yir-empty"><p class="yir-empty-text">Nothing logged for ' + data.year + ' yet.</p>' +
+          '<p class="yir-empty-sub">Hikes and restaurant visits appear once they have a date in ' + data.year + ', and photos once their file name starts with the date, like ' + data.year + '0517_021456.</p></section>'
+        : yirWallHtml(data) + yirHighlightsHtml(data) + yirTimelineHtml(data)) +
+      '<div class="yir-foot"><button type="button" class="yir-ghost" data-yir-action="refresh">' + yirIcon('refresh', 16) + 'Refresh</button>' +
+      '<p class="yir-foot-note">This is built from what\'s in the app right now. Photos are matched by the date in their file name — refresh after adding more.</p></div>';
+    yirScroll.scrollTop = y;
+    yirUpdated.textContent = 'Updated ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    yirContent.querySelectorAll('.yir-img').forEach(img => img.addEventListener('error', () => img.remove()));
+    const before = yirSignature;
+    yirSignature = yirSignatureOf(data);
+    return { data, changed: before !== '' && before !== yirSignature, before };
+  }
+
+  function yirDefaultYear(){
+    const counts = yirYearCounts();
+    const now = yirNowYear();
+    for (let y = now; y >= YIR_FIRST_YEAR; y--) if (counts[y]) return y;
+    return now;
+  }
+
+  // ---------- opening / refreshing / closing ----------
+  function openYearInReview(){
+    if (yirOverlay.classList.contains('open')) return;
+    yirYear = yirDefaultYear();
+    yirSignature = '';
+    yirReturnGroup = activeTopGroup;
+    yirReturnFocus = document.activeElement;
+    yirRender(false);
+    yirOverlay.classList.add('open');           // the back-button observer adds its history entry
+    yirOverlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('details-open-lock');
+    setTimeout(() => { try{ yirCloseBtn.focus({ preventScroll: true }); }catch(e){} }, 60);
+  }
+
+  function closeYearInReview(){
+    if (!yirOverlay.classList.contains('open')) return;
+    yirOverlay.classList.remove('open');
+    yirOverlay.setAttribute('aria-hidden', 'true');
+    if (countOpenOverlays() === 0) document.body.classList.remove('details-open-lock');
+    if (yirReturnGroup && activeTopGroup !== yirReturnGroup) switchTopGroup(yirReturnGroup); // tapping through to a hike/restaurant moves the app; land back where it started
+    if (yirReturnFocus && document.contains(yirReturnFocus)){ try{ yirReturnFocus.focus({ preventScroll: true }); }catch(e){} }
+    yirReturnFocus = null;
+  }
+
+  // Redraws in place, keeping the year and scroll position. `quiet` = it was
+  // automatic (foreground / sync), so no toast unless something actually changed.
+  function yirRefresh(quiet){
+    if (!yirOverlay.classList.contains('open')) return;
+    const beforeCounts = yirSignature;
+    const res = yirRender(true);
+    if (res.changed){
+      const parts = beforeCounts.split('|');
+      const added = res.data.stats.photos - Number(parts[3] || 0);
+      showToast(added > 0 ? 'Updated — ' + otdPlural(added, 'new photo', 'new photos') : 'Updated');
+    } else if (!quiet){
+      showToast('Already up to date');
+    }
+  }
+  function yirRefreshIfOpen(){ try{ yirRefresh(true); }catch(e){ console.error('Year in Review refresh failed', e); } }
+
+  function yirOpenItem(item){
+    if (!item) return;
+    if (item.type === 'hike'){
+      const idx = hikeRows.indexOf(item.hike);
+      if (idx === -1) return;
+      switchTopGroup('nature'); switchNatureSubPage('hikes');
+      openHikeDetailsPanel(idx);
+      const section = hikeDetailsPanelInner.querySelector('.hike-date-section[data-date-id="' + item.dateId + '"]');
+      if (section) section.scrollIntoView({ block: 'start' });
+    } else if (item.type === 'restaurant'){
+      const idx = restaurantRows.indexOf(item.restaurant);
+      if (idx === -1) return;
+      switchTopGroup('food'); switchFoodSubPage('restaurants');
+      restaurantActiveVisitId = item.visitId;
+      openRestaurantDetailsPanel(idx);
+    }
+  }
+
+  yirLaunchBtn.addEventListener('click', openYearInReview);
+  yirCloseBtn.addEventListener('click', closeYearInReview);
+  yirRefreshBtn.addEventListener('click', () => {
+    yirRefreshBtn.classList.add('spin');
+    setTimeout(() => yirRefreshBtn.classList.remove('spin'), 600);
+    yirRefresh(false);
+  });
+  yirYearsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-yir-year]');
+    if (!b) return;
+    yirYear = Number(b.dataset.yirYear);
+    yirSignature = '';
+    yirRender(false);
+  });
+  yirContent.addEventListener('click', (e) => {
+    if (e.target.closest('[data-yir-action="refresh"]')){ yirRefresh(false); return; }
+    const ph = e.target.closest('[data-yir-photos]');
+    if (ph){
+      const set = yirItems[Number(ph.dataset.yirPhotos)];
+      if (set) openPhotoLightbox(set.urls, Number(ph.dataset.yirIndex) || 0, null);
+      return;
+    }
+    const card = e.target.closest('[data-yir-item]');
+    if (card) yirOpenItem(yirItems[Number(card.dataset.yirItem)]);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!yirOverlay.classList.contains('open')) return;
+    if (e.key === 'Escape' && !artLightboxOverlay.classList.contains('show')){ closeYearInReview(); return; }
+    if (e.key === 'Tab'){
+      const focusable = Array.from(yirPanel.querySelectorAll('button:not([disabled])')).filter(b => b.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+  // Coming back to the app is a natural moment to pick up anything new.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') yirRefreshIfOpen(); });
+  ['touchstart', 'touchend'].forEach(t => yirOverlay.addEventListener(t, (e) => e.stopPropagation(), { passive: true }));
+
+  BACK_BUTTON_OVERLAYS.push({ el: yirOverlay, openClass: 'open' });
+  new MutationObserver(handleOverlayClassChange).observe(yirOverlay, { attributes: true, attributeFilter: ['class'] });
 
   loadDishFullListText();
   loadRoadProgress();
