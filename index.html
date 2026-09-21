@@ -3845,10 +3845,15 @@
   /* Restaurant insights — same look as Albums'. Guests see the counts but
      never anything that spells out ranking: no averages, no "Highest Rated". */
   body.guest-view-active #rest-cuisine-rated-block,
-  body.guest-view-active #rest-topdish-block{ display: none !important; }
+  body.guest-view-active #rest-topdish-block,
+  body.guest-view-active #rest-stars-block{ display: none !important; }
   body.guest-view-active #restaurant-insights-section .artist-avg:not(.artist-avg-keep){ display: none; }
   #rest-year-list .artist-row{ cursor: default; }
   #rest-year-list .artist-row:hover{ background: none; }
+  /* Michelin comparison: each star level is a bar plus a small line underneath with the counts */
+  .rest-star .artist-row{ cursor: default; }
+  .rest-star .artist-row:hover{ background: none; }
+  .rest-star-sub{ margin: -2px 0 8px 76px; font-size: 12px; line-height: 1.4; color: var(--chalk-dim); }
   /* Hike insights: same rules — counts for guests, nothing that spells out ranking */
   body.guest-view-active #hike-park-rated-block,
   body.guest-view-active #hike-loc-rated-block{ display: none !important; }
@@ -4833,6 +4838,11 @@
         <div class="insights-block" id="rest-year-block">
           <p class="insights-block-title">Visits by Year</p>
           <div class="artist-list" id="rest-year-list"></div>
+        </div>
+
+        <div class="insights-block" id="rest-stars-block">
+          <p class="insights-block-title">Michelin Stars — Average Dish Score</p>
+          <div class="artist-list" id="rest-stars-list"></div>
         </div>
       </div>
 
@@ -11630,6 +11640,47 @@
           '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
           '<span class="artist-count">' + e.visits + ' visit' + (e.visits === 1 ? '' : 's') + '</span>' +
           '<span class="artist-avg artist-avg-keep" style="min-width:74px;">' + e.places.size + ' place' + (e.places.size === 1 ? '' : 's') + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Michelin stars vs. your scores: for restaurants with 1, 2 and 3 stars, the
+    // average score of all their dishes (every scored course from every visit,
+    // each dish counting equally), how many restaurants sit at each level, and
+    // how each level compares with the one below it. Bars use the true 0–12
+    // scale rather than stretching to the best one, so a small gap looks small.
+    const starLevels = [3, 2, 1].map(n => ({ stars: n, restaurants: 0, dishes: 0, sum: 0 }));
+    restaurantRows.forEach(r => {
+      const lvl = starLevels.find(l => l.stars === restaurantStarsCount(r));
+      if (!lvl) return;
+      lvl.restaurants++;
+      (Array.isArray(r.visits) ? r.visits : []).forEach(v => (v.courses || []).forEach(c => {
+        if (c.score === '' || c.score == null || isNaN(Number(c.score))) return;
+        lvl.dishes++;
+        lvl.sum += Number(c.score);
+      }));
+    });
+    starLevels.forEach(l => { l.avg = l.dishes ? l.sum / l.dishes : null; });
+    const anyStarred = starLevels.some(l => l.restaurants > 0);
+    show('rest-stars-block', anyStarred);
+    if (anyStarred){
+      document.getElementById('rest-stars-list').innerHTML = starLevels.map(l => {
+        const below = starLevels.find(x => x.stars === l.stars - 1);
+        let compare = '';
+        if (below && l.avg !== null && below.avg !== null){
+          const diff = l.avg - below.avg;
+          compare = ' · ' + (diff >= 0 ? '+' : '−') + Math.abs(diff).toFixed(1) + ' vs ' + below.stars + '⭐';
+        }
+        const sub = otdPlural(l.restaurants, 'restaurant', 'restaurants') + ' · ' +
+          (l.dishes ? otdPlural(l.dishes, 'dish', 'dishes') + ' scored' : 'no dishes scored yet') + compare;
+        const pct = l.avg === null ? 0 : Math.max(4, Math.round((l.avg / 12) * 100));
+        return '<div class="rest-star">' +
+          '<div class="artist-row">' +
+            '<span class="artist-rank year-label" style="min-width:64px;">' + '⭐'.repeat(l.stars) + '</span>' +
+            '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+            '<span class="artist-count" style="min-width:64px; text-align:right;">' + (l.avg === null ? '—' : l.avg.toFixed(2) + ' avg') + '</span>' +
+          '</div>' +
+          '<div class="rest-star-sub">' + escapeHtml(sub) + '</div>' +
         '</div>';
       }).join('');
     }
