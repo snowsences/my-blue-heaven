@@ -618,6 +618,12 @@
     font-size: 28px;
     opacity: 0.35;
   }
+  /* A course with no photo yet: just a slim 40px strip to tap or drop an image
+     on, instead of holding a full 4:3 block of space open for nothing. The
+     moment a photo is added the course re-renders at full size. */
+  .restaurant-course-photo-drop.is-empty{ aspect-ratio: auto; height: 40px; }
+  .restaurant-course-photo-drop.is-empty .art-drop-hint{ font-size: 18px; }
+  .restaurant-course-photo-drop.is-empty .restaurant-course-photo-add-btn{ bottom: 7px; }
   /* Small overlay controls for multi-photo courses — a counter (bottom-left)
      when more than one photo exists, and an explicit "add another" button
      (bottom-right) so adding more doesn't rely on remembering that drag-drop
@@ -15820,7 +15826,7 @@
             : '<button class="restaurant-course-pairing-btn" type="button" data-add-pairing-index="' + i + '" title="Add a drink pairing">🍷</button>';
           return (
             '<div class="restaurant-course-card">' +
-              '<div class="restaurant-course-photo-drop" data-course-photo-index="' + i + '"' +
+              '<div class="restaurant-course-photo-drop' + (firstPhoto ? '' : ' is-empty') + '" data-course-photo-index="' + i + '"' +
                 (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
                 (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 700)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">📷</span>') +
                 countBadgeHtml +
