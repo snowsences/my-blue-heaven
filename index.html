@@ -3846,10 +3846,22 @@
      never anything that spells out ranking: no averages, no "Highest Rated". */
   body.guest-view-active #rest-cuisine-rated-block,
   body.guest-view-active #rest-topdish-block,
-  body.guest-view-active #rest-stars-block{ display: none !important; }
+  body.guest-view-active #rest-stars-block,
+  body.guest-view-active #rest-value-block{ display: none !important; }
   body.guest-view-active #restaurant-insights-section .artist-avg:not(.artist-avg-keep){ display: none; }
   #rest-year-list .artist-row{ cursor: default; }
   #rest-year-list .artist-row:hover{ background: none; }
+  /* Best value: name and how far ahead on one line, a bar, then the two ranks in words */
+  .rest-value{ padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+  .rest-value:hover{ background: var(--bg-2); }
+  .rest-value-top{ display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .rest-value-name{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+  .rest-value-price{ margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--chalk-dim); }
+  .rest-value-ahead{ flex: none; font-size: 13px; font-weight: 700; color: var(--amber); }
+  .rest-value-track{ height: 8px; margin: 7px 0 5px; border-radius: 999px; background: rgba(241, 236, 222, 0.07); overflow: hidden; }
+  .rest-value-track .artist-bar-fill{ display: block; height: 100%; }
+  .rest-value-sub{ font-size: 12px; color: var(--chalk-dim); }
+  .rest-value-note{ margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--chalk-dim); }
   /* Michelin comparison: each star level is a bar plus a small line underneath with the counts */
   .rest-star .artist-row{ cursor: default; }
   .rest-star .artist-row:hover{ background: none; }
@@ -4810,11 +4822,6 @@
       <div class="insights-section" id="restaurant-insights-section">
         <p class="eyebrow">Insights</p>
 
-        <div class="insights-block" id="rest-cuisine-block">
-          <p class="insights-block-title">By Cuisine — Most Restaurants</p>
-          <div class="artist-list" id="rest-cuisine-list"></div>
-        </div>
-
         <div class="insights-block" id="rest-cuisine-rated-block">
           <p class="insights-block-title">By Cuisine — Highest Rated</p>
           <div class="artist-list" id="rest-cuisine-rated-list"></div>
@@ -4838,6 +4845,12 @@
         <div class="insights-block" id="rest-year-block">
           <p class="insights-block-title">Visits by Year</p>
           <div class="artist-list" id="rest-year-list"></div>
+        </div>
+
+        <div class="insights-block" id="rest-value-block">
+          <p class="insights-block-title">Best Value — Ranked Above Their Price</p>
+          <div class="artist-list" id="rest-value-list"></div>
+          <p class="rest-value-note">Price isn't part of your ranking. Each restaurant's rank is compared with where a typical restaurant at its price ranks; these are the standouts, ranked well above what their price would suggest.</p>
         </div>
 
         <div class="insights-block" id="rest-stars-block">
@@ -11546,6 +11559,20 @@
     });
   }
 
+  // A price as a number. Prices here are always dollar amounts, typed bare or
+  // with a dollar sign ("45", "$45", "1,200"), or as a range ("45-60", taken as
+  // its midpoint). Anything without a number in it — blank, "free", or any
+  // stray text — has no price and is left out of the comparison.
+  function restaurantPriceValue(raw){
+    const t = String(raw == null ? '' : raw).trim();
+    if (!t) return null;
+    const nums = t.replace(/,/g, '').match(/\d+(\.\d+)?/g);
+    if (!nums) return null;
+    const vals = nums.slice(0, 2).map(Number);
+    const v = vals.length === 2 ? (vals[0] + vals[1]) / 2 : vals[0];
+    return v > 0 ? v : null;
+  }
+
   function filterRestaurantsByAndScroll(text){
     restaurantSearchFilterInput.value = text;
     restaurantSearchFilter = text;
@@ -11562,12 +11589,6 @@
 
     const cuisine = computeRestaurantGroupStats(r => (r.cuisine || '').trim());
     const city = computeRestaurantGroupStats(restaurantCityOf);
-
-    show('rest-cuisine-block', cuisine.length > 0);
-    if (cuisine.length){
-      renderStatList(document.getElementById('rest-cuisine-list'),
-        cuisine.slice().sort((a, b) => b.count - a.count || a.avg - b.avg), 'count', 10, 'cuisines', filterRestaurantsByAndScroll);
-    }
 
     // Highest rated only counts cuisines with 2+ restaurants — one lucky
     // favorite shouldn't top the list on its own.
@@ -11642,6 +11663,64 @@
           '<span class="artist-avg artist-avg-keep" style="min-width:74px;">' + e.places.size + ' place' + (e.places.size === 1 ? '' : 's') + '</span>' +
         '</div>';
       }).join('');
+    }
+
+    // Best value — restaurants that rank well above where their price would
+    // predict. Price isn't part of the ranking, so this is a genuine outlier
+    // check: each restaurant gets a price percentile (among priced ones) and a
+    // quality percentile from its rank, a straight line is fitted through
+    // quality against price, and the restaurants furthest above that line —
+    // ranked higher than a typical restaurant at their price — are listed,
+    // with how many places ahead of "typical" they sit. Needs 6+ priced
+    // restaurants with at least two different prices to mean anything.
+    const priced = restaurantRows
+      .map((r, idx) => ({ r, idx, rank: idx + 1, value: restaurantPriceValue(r.price) }))
+      .filter(x => x.value !== null);
+    let valueRows = [];
+    if (priced.length >= 6 && new Set(priced.map(x => x.value)).size >= 2){
+      const total = restaurantRows.length;
+      priced.forEach(x => {
+        const cheaper = priced.filter(y => y.value < x.value).length;
+        const same = priced.filter(y => y.value === x.value).length;
+        x.pricePct = (cheaper + same / 2) / priced.length;   // 0 = cheapest, 1 = priciest
+        x.quality = 1 - (x.rank - 0.5) / total;               // 1 = ranked first
+      });
+      const mean = (f) => priced.reduce((a, x) => a + f(x), 0) / priced.length;
+      const mx = mean(x => x.pricePct), my = mean(x => x.quality);
+      let sxx = 0, sxy = 0;
+      priced.forEach(x => { sxx += (x.pricePct - mx) * (x.pricePct - mx); sxy += (x.pricePct - mx) * (x.quality - my); });
+      const slope = sxx ? sxy / sxx : 0, icpt = my - slope * mx;
+      priced.forEach(x => {
+        const fitted = icpt + slope * x.pricePct;
+        x.resid = x.quality - fitted; // how far above (+) or below (−) the price-predicted quality
+        const expectedQuality = Math.min(1, Math.max(0, fitted));
+        x.expectedRank = Math.min(total, Math.max(1, Math.round((1 - expectedQuality) * total + 0.5)));
+        x.ahead = x.expectedRank - x.rank;
+      });
+      // An outlier = more than one standard deviation above the trend, and at
+      // least two places ahead of typical (so a tiny data set doesn't crown a
+      // near-miss). Best-first, at most ten.
+      const sd = Math.sqrt(priced.reduce((a, x) => a + x.resid * x.resid, 0) / priced.length);
+      valueRows = priced.filter(x => x.resid >= sd && x.ahead >= 2).sort((a, b) => b.resid - a.resid).slice(0, 10);
+    }
+    show('rest-value-block', valueRows.length > 0);
+    if (valueRows.length){
+      const maxAhead = Math.max.apply(null, valueRows.map(x => x.ahead));
+      const listEl = document.getElementById('rest-value-list');
+      listEl.innerHTML = valueRows.map((x, i) => {
+        const priceLabel = formatRestaurantPrice(x.r.price);
+        const pct = Math.max(6, Math.round((x.ahead / maxAhead) * 100));
+        return '<div class="rest-value" data-value-index="' + i + '">' +
+          '<div class="rest-value-top"><span class="rest-value-name">' + escapeHtml((x.r.name || '').trim()) +
+            '<span class="rest-value-price">' + escapeHtml(priceLabel) + '</span></span>' +
+            '<span class="rest-value-ahead">+' + x.ahead + (x.ahead === 1 ? ' place' : ' places') + '</span></div>' +
+          '<div class="rest-value-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></div>' +
+          '<div class="rest-value-sub">Ranked #' + x.rank + ' · typical at ' + escapeHtml(priceLabel) + ' is around #' + x.expectedRank + '</div>' +
+        '</div>';
+      }).join('');
+      listEl.querySelectorAll('[data-value-index]').forEach(el => {
+        el.addEventListener('click', () => openRestaurantDetailsPanel(valueRows[Number(el.dataset.valueIndex)].idx));
+      });
     }
 
     // Michelin stars vs. your scores: for restaurants with 1, 2 and 3 stars, the
