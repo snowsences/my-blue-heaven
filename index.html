@@ -2590,7 +2590,7 @@
   .trip-counts{ margin: 12px 0 0; font-size: 14px; color: var(--chalk-dim); }
   .trip-add-row{ margin-top: 14px; }
   .trip-add-row .btn-primary{ width: 100%; }
-  .trip-suggest{ margin-top: 14px; padding: 14px 16px; background: rgba(232, 163, 61, 0.12); border: 1px solid rgba(232, 163, 61, 0.4); border-radius: 16px; }
+  .trip-suggest{ margin-bottom: 16px; padding: 14px 16px; background: rgba(232, 163, 61, 0.12); border: 1px solid rgba(232, 163, 61, 0.4); border-radius: 16px; }
   .trip-suggest p{ margin: 0 0 12px; font-size: 14px; line-height: 1.45; }
   .trip-suggest-btns{ display: flex; gap: 10px; }
   .trip-highlights{ margin-top: 22px; }
@@ -2602,6 +2602,10 @@
   .trip-hl-ph{ display: flex; align-items: center; justify-content: center; height: 96px; font-size: 32px; opacity: 0.5; }
   .trip-hl-name{ display: block; margin: 8px 10px 0; font-size: 14px; font-weight: 700; line-height: 1.2; }
   .trip-hl-where{ display: block; margin: 2px 10px 0; font-size: 12px; color: var(--chalk-dim); }
+  .trip-toolbar-row{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; }
+  .trip-toolbar-row .trip-view-toggle{ margin-top: 0; }
+  .trip-memory-btn{ flex: none; }
+  @media (max-width: 420px){ .trip-memory-btn span{ display: none; } .trip-memory-btn{ padding: 0 14px; } }
   .trip-view-toggle{ margin-top: 22px; }
   .trip-timeline{ margin-top: 8px; }
   .trip-memory-btn{ margin: 8px 0 4px; }
@@ -2674,6 +2678,11 @@
   .tf-cover{ flex: none; width: 64px; height: 64px; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 12px; background: var(--panel); color: var(--chalk-dim); font-family: 'Figtree', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; }
   .tf-cover img{ display: block; width: 100%; height: 100%; object-fit: cover; }
   .tf-cover.on{ border-color: var(--amber); }
+  .af-photos{ flex-wrap: wrap; overflow-x: visible; }
+  .af-photo{ position: relative; flex: none; width: 72px; height: 72px; border-radius: 12px; overflow: hidden; background: var(--panel); }
+  .af-photo img{ display: block; width: 100%; height: 100%; object-fit: cover; }
+  .af-photo .trip-gx{ top: 3px; right: 3px; width: 22px; height: 22px; font-size: 11px; }
+  .af-photo-add{ flex: none; width: 72px; height: 72px; border: 1px dashed var(--panel-line); border-radius: 12px; background: transparent; color: var(--chalk-dim); font-size: 26px; cursor: pointer; }
   .trip-menu, .trip-choose{ display: flex; flex-direction: column; gap: 8px; }
   .trip-menu-row, .trip-choose-row{ display: flex; align-items: center; gap: 14px; width: 100%; min-height: 56px; padding: 10px 16px; text-align: left; border: 1px solid var(--panel-line); border-radius: 14px; background: var(--panel); color: var(--chalk); font-family: 'Figtree', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; }
   .trip-menu-row span:first-child{ font-size: 22px; }
@@ -14496,6 +14505,14 @@
     t.pins = (t.pins && typeof t.pins === 'object') ? t.pins : {};
     t.pins.visits = Array.isArray(t.pins.visits) ? t.pins.visits : [];
     t.pins.hikes = Array.isArray(t.pins.hikes) ? t.pins.hikes : [];
+    t.pins.activities = Array.isArray(t.pins.activities) ? t.pins.activities : [];
+    // An activity lives only inside its trip — a museum, a tour, a class, anything
+    // that isn't a restaurant visit or a hike. Its photos are its own, each an
+    // upload just like a trip-only photo.
+    t.activities = (Array.isArray(t.activities) ? t.activities : []).map(a => ({
+      id: a.id || tripNewId('act'), name: a.name || '', date: a.date || '',
+      photos: (Array.isArray(a.photos) ? a.photos : []).map(p => (p && p.url) ? p : { url: p }).filter(p => p.url)
+    }));
     t.coverPhoto = t.coverPhoto || '';
     t.endDate = t.endDate || '';
     return t;
@@ -14591,6 +14608,9 @@
   function tripHikePhotos(d){
     return (d.photos || []).map(p => p && p.url).filter(Boolean);
   }
+  function tripActivityPhotos(act){
+    return (act.photos || []).map(p => p && p.url).filter(Boolean);
+  }
 
   // What counts as notable — automatic, or pinned by hand. Restaurant: Best
   // Flavor 10 or more (that score runs 8–12). Hike: Best Scenery 12 or more
@@ -14614,6 +14634,7 @@
     linked.hikes.forEach(x => tripHikePhotos(x.d).forEach(u => add(u, x.date, 'hike')));
     linked.photos.forEach(x => add(x.p.url, x.date, 'photos', x.p.id));
     (t.photos || []).forEach(p => { const pp = otdParse(p.date); add(p.url, pp ? pp.str : '', 'trip', p.id); });
+    (t.activities || []).forEach(act => { const pp = otdParse(act.date); (act.photos || []).forEach((ph, i) => { if (ph && ph.url) add(ph.url, pp ? pp.str : '', 'activity', act.id + ':' + i); }); });
     const seen = new Set();
     const unique = entries.filter(e => { if (seen.has(e.url)) return false; seen.add(e.url); return true; });
     unique.sort((a, b) => {
@@ -19226,7 +19247,8 @@
       camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.5" r="3.3"></circle>',
       chevron: '<path d="M9 6l6 6-6 6"></path>',
       close: '<path d="M6 6l12 12M18 6L6 18"></path>',
-      refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.1"></path><path d="M20 4v7h-7"></path>'
+      refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.1"></path><path d="M20 4v7h-7"></path>',
+      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>'
     };
     if (name === 'star') return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"></path></svg>';
     return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[name] + '</svg>';
@@ -19837,12 +19859,12 @@
     '</div>';
   }
 
-  function tripItemActions(t, kind, id, anchorType, pinned, placeName, keys){
+  function tripItemActions(t, kind, id, anchorType, pinned, placeName, keys, removable){
     return '<div class="trip-item-actions trip-owner">' +
       (t.places.length ? '<button type="button" class="trip-mini" data-trip-act="place" data-keys="' + escapeAttr(keys) + '">📍 ' + escapeHtml(placeName || 'Place') + '</button>' : '') +
       '<button type="button" class="trip-mini" data-trip-act="note" data-anchor-type="' + anchorType + '" data-anchor-id="' + escapeAttr(id) + '">💬 Memory</button>' +
       '<button type="button" class="trip-mini' + (pinned ? ' on' : '') + '" data-trip-act="pin" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '">' + (pinned ? '★ Pinned' : '☆ Pin') + '</button>' +
-      '<button type="button" class="trip-mini" data-trip-act="unlink" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '">Remove</button>' +
+      (removable === false ? '' : '<button type="button" class="trip-mini" data-trip-act="unlink" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '">Remove</button>') +
     '</div>';
   }
 
@@ -19856,7 +19878,7 @@
           (tripVisitNotable(t, x) ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
           '<span class="yir-card-name">' + escapeHtml(x.r.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span></button>' +
-      tripItemActions(t, 'visit', x.v.id, 'visit', t.pins.visits.indexOf(x.v.id) !== -1, placeName, 'v:' + x.v.id) + noteHtml + '</div>';
+      tripItemActions(t, 'visit', x.v.id, 'visit', t.pins.visits.indexOf(x.v.id) !== -1, placeName, 'v:' + x.v.id, true) + noteHtml + '</div>';
   }
   function tripHikeCardHtml(t, x, noteHtml, placeName){
     const urls = tripHikePhotos(x.d);
@@ -19868,7 +19890,18 @@
           (tripHikeNotable(t, x) ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
           '<span class="yir-card-name">' + escapeHtml(x.h.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span></button>' +
-      tripItemActions(t, 'hike', x.d.id, 'hike', t.pins.hikes.indexOf(x.d.id) !== -1, placeName, 'h:' + x.d.id) + noteHtml + '</div>';
+      tripItemActions(t, 'hike', x.d.id, 'hike', t.pins.hikes.indexOf(x.d.id) !== -1, placeName, 'h:' + x.d.id, true) + noteHtml + '</div>';
+  }
+
+  function tripActivityCardHtml(t, act, noteHtml, placeName){
+    const urls = tripActivityPhotos(act);
+    const strip = urls.length ? '<span class="yir-strip s' + Math.min(3, urls.length) + '">' + urls.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
+    return '<div class="trip-item">' +
+      '<button type="button" class="yir-card" data-trip-open="activity" data-id="' + escapeAttr(act.id) + '">' + strip +
+        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('activity', 12) + 'ACTIVITY</span>' +
+          (t.pins.activities.indexOf(act.id) !== -1 ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
+          '<span class="yir-card-name">' + escapeHtml(act.name || '') + '</span></span></button>' +
+      tripItemActions(t, 'activity', act.id, 'activity', t.pins.activities.indexOf(act.id) !== -1, placeName, 'a:' + act.id, false) + noteHtml + '</div>';
   }
 
   // The timeline. With places, each place is a heading in route order and holds
@@ -19889,7 +19922,7 @@
     const dayOf = (pid, key) => {
       if (!groups.has(pid)) groups.set(pid, new Map());
       const g = groups.get(pid);
-      if (!g.has(key)) g.set(key, { visits: [], hikes: [], photos: [] });
+      if (!g.has(key)) g.set(key, { visits: [], hikes: [], activities: [], photos: [] });
       return g.get(key);
     };
     const dayNotePlace = (date) => hasPlaces ? tripPlaceOf(t, null, date, '') : '';
@@ -19897,6 +19930,7 @@
     linked.hikes.forEach(x => dayOf(hasPlaces ? tripPlaceOf(t, 'h:' + x.d.id, x.date, x.h.city) : '', x.date).hikes.push(x));
     linked.photos.forEach(x => dayOf(hasPlaces ? tripPlaceOf(t, 'p:' + x.p.id, x.date, '') : '', x.date).photos.push(x.p));
     t.photos.forEach(p => { const pp = otdParse(p.date), k = pp ? pp.str : ''; dayOf(hasPlaces ? tripPlaceOf(t, 'p:' + p.id, k, '') : '', k).photos.push(p); });
+    t.activities.forEach(act => { const pp = otdParse(act.date), k = pp ? pp.str : ''; dayOf(hasPlaces ? tripPlaceOf(t, 'a:' + act.id, k, '') : '', k).activities.push(act); });
     notes.forEach(n => { if (n.anchor && n.anchor.type === 'day' && n.anchor.date) dayOf(dayNotePlace(n.anchor.date), n.anchor.date); });
 
     const daysHtml = (pid) => {
@@ -19908,7 +19942,8 @@
       return keys.map((key, ki) => {
         const d = g.get(key);
         const cards = d.visits.map(x => tripVisitCardHtml(t, x, noteBlock(forAnchor('visit', x.v.id)), pname)).join('') +
-          d.hikes.map(x => tripHikeCardHtml(t, x, noteBlock(forAnchor('hike', x.d.id)), pname)).join('');
+          d.hikes.map(x => tripHikeCardHtml(t, x, noteBlock(forAnchor('hike', x.d.id)), pname)).join('') +
+          d.activities.map(act => tripActivityCardHtml(t, act, noteBlock(forAnchor('activity', act.id)), pname)).join('');
         const photoUrls = d.photos.map(p => p.url);
         const photosCard = photoUrls.length ? '<div class="yir-photos-card"><div class="yir-row"><span class="yir-chip">' + yirIcon('camera', 12) + 'PHOTOS</span><span class="yir-dim">' +
           escapeHtml(otdPlural(photoUrls.length, 'photo', 'photos')) + '</span>' +
@@ -19961,9 +19996,8 @@
     const orphans = notes.filter(n => !shown.has(n.id));
     if (orphans.length) top += '<div class="trip-notes-block"><div class="yir-eyebrow-sm">MORE MEMORIES</div>' + noteBlock(orphans) + '</div>';
 
-    const memoryBtn = owner ? '<button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="">💬 Add a memory</button>' : '';
     const empty = (!body && !top) ? '<p class="cal-hint">' + (owner ? 'Nothing here yet — use “+ Add to trip” to bring in restaurant visits, hikes and photos.' : 'Nothing here yet.') + '</p>' : '';
-    return '<section class="trip-timeline">' + memoryBtn + top + body + empty + '</section>';
+    return '<section class="trip-timeline">' + top + body + empty + '</section>';
   }
 
   // Choose the place for one item (or a day's photos): "Automatic" clears any choice made by hand.
@@ -19992,7 +20026,7 @@
     if (!gallery.length) return '<p class="cal-hint">No photos yet.</p>';
     return '<section class="trip-gallery">' + gallery.map((g, i) =>
       '<div class="trip-gtile"><button type="button" class="yir-tile trip-gimg" data-trip-photo="' + i + '" aria-label="Open photo ' + (i + 1) + ' of ' + gallery.length + '">' + yirImg(g.url, 500) + '</button>' +
-      ((owner && (g.src === 'trip' || g.src === 'photos')) ? '<button type="button" class="trip-gx trip-owner" data-trip-gremove="' + i + '" aria-label="Remove from trip">✕</button>' : '') + '</div>').join('') + '</section>';
+      ((owner && (g.src === 'trip' || g.src === 'photos' || g.src === 'activity')) ? '<button type="button" class="trip-gx trip-owner" data-trip-gremove="' + i + '" aria-label="Remove from trip">✕</button>' : '') + '</div>').join('') + '</section>';
   }
 
   function tripRender(){
@@ -20004,36 +20038,31 @@
     const gallery = tripGallery(t, linked);
     tripCurrentGallery = gallery;
     const cover = tripCoverUrl(t, gallery);
-    const cands = owner ? tripCandidates(t) : { visits: [], hikes: [], photos: [] };
-    const nCand = cands.visits.length + cands.hikes.length + cands.photos.length;
-
-    const counts = tripCountsText(linked, gallery.length);
-
-    const suggest = nCand ? '<div class="trip-suggest trip-owner"><p>Found ' + tripCountsText(cands, cands.photos.length).replace(/ · /g, ', ') + ' from these dates that aren\'t in a trip yet.</p>' +
-      '<div class="trip-suggest-btns"><button type="button" class="btn-primary" data-trip-suggest="all">Add all ' + nCand + '</button><button type="button" class="btn-ghost" data-trip-suggest="review">Review</button></div></div>' : '';
-
     const hlV = linked.visits.filter(x => tripVisitNotable(t, x));
     const hlH = linked.hikes.filter(x => tripHikeNotable(t, x));
+    const hlA = t.activities.filter(act => t.pins.activities.indexOf(act.id) !== -1);
     const hlCard = (kind, id, urls, name, where) =>
       '<button type="button" class="trip-hl-card" data-trip-open="' + kind + '" data-id="' + escapeAttr(id) + '">' +
-        '<span class="trip-hl-photo">' + (urls.length ? yirImg(urls[0], 400) : '<span class="trip-hl-ph">' + (kind === 'visit' ? '🍽️' : '🥾') + '</span>') + '</span>' +
+        '<span class="trip-hl-photo">' + (urls.length ? yirImg(urls[0], 400) : '<span class="trip-hl-ph">' + (kind === 'visit' ? '🍽️' : kind === 'hike' ? '🥾' : '🎟️') + '</span>') + '</span>' +
         '<span class="trip-hl-name">' + escapeHtml(name) + '</span>' + (where ? '<span class="trip-hl-where">' + escapeHtml(where) + '</span>' : '') + '</button>';
-    const highlights = (hlV.length || hlH.length)
+    const highlights = (hlV.length || hlH.length || hlA.length)
       ? '<section class="trip-highlights"><div class="yir-eyebrow-sm">HIGHLIGHTS</div><div class="trip-hl-row">' +
         hlV.map(x => hlCard('visit', x.v.id, tripVisitPhotos(x.v), x.r.name || '', restaurantCityOf(x.r))).join('') +
-        hlH.map(x => hlCard('hike', x.d.id, tripHikePhotos(x.d), x.h.name || '', x.h.city || '')).join('') + '</div></section>' : '';
+        hlH.map(x => hlCard('hike', x.d.id, tripHikePhotos(x.d), x.h.name || '', x.h.city || '')).join('') +
+        hlA.map(act => hlCard('activity', act.id, tripActivityPhotos(act), act.name || '', '')).join('') + '</div></section>' : '';
 
     const toggle = '<div class="view-toggle trip-view-toggle"><button type="button" class="view-toggle-btn' + (tripView === 'timeline' ? ' active' : '') + '" data-trip-view="timeline">Timeline</button>' +
       '<button type="button" class="view-toggle-btn' + (tripView === 'gallery' ? ' active' : '') + '" data-trip-view="gallery">Gallery</button></div>';
+    const memoryBtn = owner ? '<button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="">💬 Add a memory</button>' : '';
+    const toolbarRow = '<div class="trip-toolbar-row">' + toggle + memoryBtn + '</div>';
 
     tripContent.innerHTML =
       '<section class="trip-hero"><div class="trip-hero-photo">' +
         (cover ? '<img class="trip-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 1200)) + '" alt="">' : '<span class="trip-hero-ph" aria-hidden="true">🧳</span>') +
         '<div class="trip-hero-shade"></div><div class="trip-hero-text"><h2 class="trip-title" id="trip-title">' + escapeHtml(t.name || 'Untitled trip') + '</h2>' +
         '<p class="trip-dates">' + escapeHtml(tripDateLabel(t)) + '</p></div></div></section>' +
-      '<p class="trip-counts">' + escapeHtml(counts || 'Nothing linked yet') + '</p>' +
       (owner ? '<div class="trip-add-row trip-owner"><button type="button" class="btn-primary" data-trip-add="1">+ Add to trip</button></div>' : '') +
-      suggest + highlights + toggle +
+      highlights + toolbarRow +
       (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripTimelineHtml(t, linked, owner));
     tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
     tripScroll.scrollTop = prevTop;
@@ -20122,7 +20151,7 @@
     tripRefresh();
   }
   function tripTogglePin(t, kind, id){
-    const list = kind === 'visit' ? t.pins.visits : t.pins.hikes;
+    const list = kind === 'visit' ? t.pins.visits : kind === 'hike' ? t.pins.hikes : t.pins.activities;
     const i = list.indexOf(id);
     if (i === -1) list.push(id); else list.splice(i, 1);
     saveTripProgress();
@@ -20140,21 +20169,13 @@
       return;
     }
     if ((el = e.target.closest('[data-trip-open]'))){
-      if (el.dataset.tripOpen === 'visit') tripOpenVisit(el.dataset.id); else tripOpenHike(el.dataset.id);
+      if (el.dataset.tripOpen === 'visit') tripOpenVisit(el.dataset.id);
+      else if (el.dataset.tripOpen === 'hike') tripOpenHike(el.dataset.id);
+      else { const act = t.activities.find(a => a.id === el.dataset.id); if (act && !guestViewEnabled) tripOpenActivityForm(t, act); }
       return;
     }
     if (guestViewEnabled) return; // everything below changes something — the owner's alone
     if (e.target.closest('[data-trip-add]')){ tripOpenAddMenu(t); return; }
-    if ((el = e.target.closest('[data-trip-suggest]'))){
-      const cands = tripCandidates(t);
-      if (el.dataset.tripSuggest === 'all'){
-        const n = tripLinkItems(t, { visits: cands.visits.map(x => x.v.id), hikes: cands.hikes.map(x => x.d.id), photos: cands.photos.map(x => x.p.id) });
-        showToast('Added ' + otdPlural(n, 'item', 'items') + ' to the trip');
-      } else {
-        tripOpenReview(t);
-      }
-      return;
-    }
     if ((el = e.target.closest('[data-trip-act]'))){
       const act = el.dataset.tripAct;
       if (act === 'note') tripOpenNoteSheet(t, { anchor: { type: el.dataset.anchorType, id: el.dataset.anchorId || '' } });
@@ -20182,6 +20203,12 @@
         showConfirmModal('Delete this photo?', 'It only exists in this trip, so it will be gone for good.', () => { t.photos = t.photos.filter(p => p.id !== g.id); delete t.assign['p:' + g.id]; saveTripProgress(); tripRefresh(); });
       } else if (g.src === 'photos'){
         showConfirmModal('Remove from this trip?', 'The photo stays in your Photos tab.', () => tripUnlinkItem(t, 'photo', g.id));
+      } else if (g.src === 'activity'){
+        showConfirmModal('Delete this photo?', 'It only exists in this trip, so it will be gone for good.', () => {
+          const [actId, idx] = g.id.split(':');
+          const act = t.activities.find(a => a.id === actId);
+          if (act){ act.photos.splice(Number(idx), 1); saveTripProgress(); tripRefresh(); }
+        });
       }
       return;
     }
@@ -20228,22 +20255,35 @@
 
   // ---------- Add to trip ----------
   function tripOpenAddMenu(t){
+    // The "found nearby" nudge only shows up here, when the owner is actually
+    // adding something to the trip — not every time the trip is opened, which
+    // would keep nagging about items already looked through and left out on purpose.
+    const cands = tripCandidates(t);
+    const nCand = cands.visits.length + cands.hikes.length + cands.photos.length;
+    const suggest = nCand ? '<div class="trip-suggest"><p>Found ' + tripCountsText(cands, cands.photos.length).replace(/ · /g, ', ') + ' from these dates that aren\'t in the trip yet.</p>' +
+      '<div class="trip-suggest-btns"><button type="button" class="btn-primary" data-trip-suggest="all">Add all ' + nCand + '</button><button type="button" class="btn-ghost" data-trip-suggest="review">Review</button></div></div>' : '';
     tsheetOpen({
       title: 'Add to this trip',
-      bodyHtml: '<div class="trip-menu">' +
+      bodyHtml: suggest + '<div class="trip-menu">' +
         '<button type="button" class="trip-menu-row" data-menu="visit"><span>🍽️</span><span>Restaurant visits</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="hike"><span>🥾</span><span>Hikes</span></button>' +
+        '<button type="button" class="trip-menu-row" data-menu="activity"><span>🎟️</span><span>An activity</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="photo"><span>📷</span><span>Photos from the Photos tab</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="upload"><span>⬆️</span><span>Upload photos just for this trip</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="note"><span>💬</span><span>A memory</span></button></div>',
-      onOpen: (body) => body.querySelector('.trip-menu').addEventListener('click', (e) => {
-        const b = e.target.closest('[data-menu]');
-        if (!b) return;
-        const m = b.dataset.menu;
-        if (m === 'upload'){ tsheetClose(); tripUploadPhotos(t); }
-        else if (m === 'note') tripOpenNoteSheet(t, {});
-        else tripOpenPicker(t, m, false);
-      })
+      onOpen: (body) => {
+        if (nCand) body.querySelector('[data-trip-suggest="all"]').addEventListener('click', () => { const n = tripLinkItems(t, { visits: cands.visits.map(x => x.v.id), hikes: cands.hikes.map(x => x.d.id), photos: cands.photos.map(x => x.p.id) }); tsheetClose(); showToast('Added ' + otdPlural(n, 'item', 'items') + ' to the trip'); });
+        if (nCand) body.querySelector('[data-trip-suggest="review"]').addEventListener('click', () => tripOpenReview(t));
+        body.querySelector('.trip-menu').addEventListener('click', (e) => {
+          const b = e.target.closest('[data-menu]');
+          if (!b) return;
+          const m = b.dataset.menu;
+          if (m === 'upload'){ tsheetClose(); tripUploadPhotos(t); }
+          else if (m === 'note') tripOpenNoteSheet(t, {});
+          else if (m === 'activity') tripOpenActivityForm(t, null);
+          else tripOpenPicker(t, m, false);
+        });
+      }
     });
   }
 
@@ -20414,10 +20454,11 @@
     const linked = tripLinked(t);
     const opts = {
       trip: 'The trip as a whole', day: 'A day', place: 'A place',
-      visit: 'A restaurant visit', hike: 'A hike'
+      visit: 'A restaurant visit', hike: 'A hike', activity: 'An activity'
     };
     const visitOpts = linked.visits.map(x => ({ id: x.v.id, label: (x.r.name || '') + (x.date ? ' — ' + tripShortDate(x.date) : '') }));
     const hikeOpts = linked.hikes.map(x => ({ id: x.d.id, label: (x.h.name || '') + (x.date ? ' — ' + tripShortDate(x.date) : '') }));
+    const activityOpts = t.activities.map(a => ({ id: a.id, label: (a.name || '') + (a.date ? ' — ' + tripShortDate(a.date) : '') }));
     const placeOpts = t.places.map(p => ({ id: p.id, label: p.name }));
     const selectHtml = (id, list, current) => '<select class="tf-input" id="' + id + '">' + list.map(o => '<option value="' + escapeAttr(o.id) + '"' + (o.id === current ? ' selected' : '') + '>' + escapeHtml(o.label) + '</option>').join('') + '</select>';
     const range = tripRange(t);
@@ -20429,7 +20470,8 @@
         '<div id="nt-day" class="nt-sub" style="display:none;"><label class="tf-label" for="nt-day-input">Which day?</label><input type="date" class="tf-input" id="nt-day-input" value="' + escapeAttr(anchor.type === 'day' && anchor.date ? anchor.date : (range.startKey || '')) + '"></div>' +
         '<div id="nt-place" class="nt-sub" style="display:none;">' + (placeOpts.length ? '<label class="tf-label">Which place?</label>' + selectHtml('nt-place-input', placeOpts, anchor.type === 'place' ? anchor.id : '') : '<p class="tf-hint">Add a place to the trip first (edit the trip).</p>') + '</div>' +
         '<div id="nt-visit" class="nt-sub" style="display:none;">' + (visitOpts.length ? '<label class="tf-label">Which visit?</label>' + selectHtml('nt-visit-input', visitOpts, anchor.type === 'visit' ? anchor.id : '') : '<p class="tf-hint">No restaurant visits are in this trip yet.</p>') + '</div>' +
-        '<div id="nt-hike" class="nt-sub" style="display:none;">' + (hikeOpts.length ? '<label class="tf-label">Which hike?</label>' + selectHtml('nt-hike-input', hikeOpts, anchor.type === 'hike' ? anchor.id : '') : '<p class="tf-hint">No hikes are in this trip yet.</p>') + '</div>',
+        '<div id="nt-hike" class="nt-sub" style="display:none;">' + (hikeOpts.length ? '<label class="tf-label">Which hike?</label>' + selectHtml('nt-hike-input', hikeOpts, anchor.type === 'hike' ? anchor.id : '') : '<p class="tf-hint">No hikes are in this trip yet.</p>') + '</div>' +
+        '<div id="nt-activity" class="nt-sub" style="display:none;">' + (activityOpts.length ? '<label class="tf-label">Which activity?</label>' + selectHtml('nt-activity-input', activityOpts, anchor.type === 'activity' ? anchor.id : '') : '<p class="tf-hint">No activities are in this trip yet.</p>') + '</div>',
       actions: [
         { label: 'Cancel', onClick: tsheetClose },
         { label: 'Save', primary: true, onClick: () => {
@@ -20441,7 +20483,7 @@
               const d = document.getElementById('nt-day-input').value;
               if (!d){ showToast('Pick a day'); return; }
               a = { type: 'day', date: d };
-            } else if (type === 'place' || type === 'visit' || type === 'hike'){
+            } else if (type === 'place' || type === 'visit' || type === 'hike' || type === 'activity'){
               const sel = document.getElementById('nt-' + type + '-input');
               if (!sel){ showToast(type === 'place' ? 'Add a place to the trip first' : 'Nothing of that kind is in the trip yet'); return; }
               a = { type, id: sel.value };
@@ -20455,7 +20497,7 @@
       ],
       onOpen: (body) => {
         const typeSel = body.querySelector('#nt-type');
-        const sync = () => ['day', 'place', 'visit', 'hike'].forEach(k => { body.querySelector('#nt-' + k).style.display = typeSel.value === k ? 'block' : 'none'; });
+        const sync = () => ['day', 'place', 'visit', 'hike', 'activity'].forEach(k => { body.querySelector('#nt-' + k).style.display = typeSel.value === k ? 'block' : 'none'; });
         typeSel.addEventListener('change', sync);
         sync();
         setTimeout(() => { const ta = body.querySelector('#nt-text'); if (ta) ta.focus(); }, 80);
@@ -20583,6 +20625,90 @@
     });
   }
 
+  // ---------- adding, editing and deleting an activity (a museum, tour, class… anything that isn't a visit or a hike) ----------
+  function tripOpenActivityForm(t, activity){
+    const isNew = !activity;
+    const draft = {
+      name: activity ? activity.name : '',
+      date: activity ? activity.date : '',
+      place: (activity && t.assign['a:' + activity.id] && t.places.some(p => p.id === t.assign['a:' + activity.id])) ? t.assign['a:' + activity.id] : '',
+      photos: activity ? activity.photos.map(p => ({ url: p.url })) : []
+    };
+    const placeOpts = t.places.map(p => '<option value="' + escapeAttr(p.id) + '"' + (p.id === draft.place ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('');
+    const photosHtml = () => '<div class="tf-covers af-photos">' + draft.photos.map((p, i) =>
+      '<div class="af-photo"><img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 200)) + '" alt="" loading="lazy">' +
+        '<button type="button" class="trip-gx" data-af-photo-x="' + i + '" aria-label="Remove photo">✕</button></div>').join('') +
+      '<button type="button" class="af-photo-add" id="af-photo-add" aria-label="Add photos">+</button></div>';
+    tsheetOpen({
+      title: isNew ? 'New activity' : 'Edit activity',
+      bodyHtml:
+        '<label class="tf-label" for="af-name">Name</label><input type="text" class="tf-input" id="af-name" maxlength="80" placeholder="e.g. The Roman Forum" value="' + escapeAttr(draft.name) + '" autocomplete="off">' +
+        '<label class="tf-label" for="af-date">Date</label><input type="date" class="tf-input" id="af-date" value="' + escapeAttr(draft.date) + '">' +
+        (t.places.length ? '<label class="tf-label" for="af-place">Place</label><select class="tf-input" id="af-place"><option value="">Automatic</option>' + placeOpts + '</select>' : '') +
+        '<label class="tf-label">Photos</label><div id="af-photos-wrap">' + photosHtml() + '</div>',
+      actions: [
+        !isNew ? { label: 'Delete activity', danger: true, onClick: () => tripConfirmDeleteActivity(t, activity) } : null,
+        { label: 'Cancel', onClick: tsheetClose },
+        { label: 'Save', primary: true, onClick: () => {
+            const name = document.getElementById('af-name').value.trim();
+            const date = document.getElementById('af-date').value;
+            if (!name){ showToast('Give the activity a name'); return; }
+            if (!date){ showToast('Pick a date'); return; }
+            const placeSel = document.getElementById('af-place');
+            let a = activity;
+            if (isNew){ a = { id: tripNewId('act'), name: '', date: '', photos: [] }; t.activities.push(a); }
+            a.name = name; a.date = date; a.photos = draft.photos;
+            const key = 'a:' + a.id;
+            if (placeSel && placeSel.value) t.assign[key] = placeSel.value; else delete t.assign[key];
+            saveTripProgress();
+            tsheetClose();
+            tripRefresh();
+            showToast(isNew ? 'Activity added' : 'Activity saved');
+          } }
+      ].filter(Boolean),
+      onOpen: (body) => {
+        const wrap = body.querySelector('#af-photos-wrap');
+        const redraw = () => { wrap.innerHTML = photosHtml(); };
+        wrap.addEventListener('click', (e) => {
+          const x = e.target.closest('[data-af-photo-x]');
+          if (x){ draft.photos.splice(Number(x.dataset.afPhotoX), 1); redraw(); return; }
+          if (e.target.closest('#af-photo-add')){
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+            input.addEventListener('change', async () => {
+              const files = Array.from(input.files || []);
+              if (!files.length) return;
+              showToast(files.length === 1 ? 'Uploading photo…' : 'Uploading ' + files.length + ' photos…');
+              for (const f of files){
+                const url = await uploadRestaurantPhoto(f, 'RankHeaven/TripPhotos');
+                if (url) draft.photos.push({ url });
+              }
+              redraw();
+            });
+            input.click();
+          }
+        });
+        if (isNew) setTimeout(() => { try{ body.querySelector('#af-name').focus(); }catch(e){} }, 80);
+      }
+    });
+  }
+
+  function tripConfirmDeleteActivity(t, activity){
+    const hasPhotos = activity.photos.length > 0;
+    showConfirmModal('Delete “' + (activity.name || 'this activity') + '”?', (hasPhotos ? otdPlural(activity.photos.length, 'photo', 'photos') + ' added to it will be gone for good. ' : '') + 'This can\'t be undone.', () => {
+      t.activities = t.activities.filter(a => a.id !== activity.id);
+      delete t.assign['a:' + activity.id];
+      t.pins.activities = t.pins.activities.filter(id => id !== activity.id);
+      t.notes.forEach(n => { if (n.anchor && n.anchor.type === 'activity' && n.anchor.id === activity.id) n.anchor = { type: 'trip', id: '' }; });
+      saveTripProgress();
+      tsheetClose();
+      tripRefresh();
+      showToast('Activity deleted');
+    });
+  }
+
   function tripConfirmDelete(t){
     const linked = tripLinked(t);
     const parts = [];
@@ -20590,8 +20716,12 @@
     if (linked.hikes.length) parts.push(otdPlural(linked.hikes.length, 'hike', 'hikes'));
     if (linked.photos.length) parts.push(otdPlural(linked.photos.length, 'photo', 'photos'));
     const unlink = parts.length ? parts.join(', ') + ' will be taken out of the trip but kept where they are. ' : '';
-    const own = t.photos.length ? otdPlural(t.photos.length, 'photo', 'photos') + ' added only to this trip will be deleted. ' : '';
-    showConfirmModal('Delete “' + (t.name || 'this trip') + '”?', (unlink + own + 'This can\'t be undone.').trim(), () => {
+    const ownPhotoCount = t.photos.length + t.activities.reduce((n, a) => n + a.photos.length, 0);
+    const ownParts = [];
+    if (t.activities.length) ownParts.push(otdPlural(t.activities.length, 'activity', 'activities'));
+    if (ownPhotoCount) ownParts.push(otdPlural(ownPhotoCount, 'photo', 'photos'));
+    const ownLine = ownParts.length ? ownParts.join(' and ') + ' added only to this trip will be deleted. ' : '';
+    showConfirmModal('Delete “' + (t.name || 'this trip') + '”?', (unlink + ownLine + 'This can\'t be undone.').trim(), () => {
       restaurantRows.forEach(r => (r.visits || []).forEach(v => { if (v.tripId === t.id) delete v.tripId; }));
       hikeRows.forEach(h => (h.dates || []).forEach(d => { if (d.tripId === t.id) delete d.tripId; }));
       photoRows.forEach(p => { if (p.tripId === t.id) delete p.tripId; });
