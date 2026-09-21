@@ -2625,6 +2625,16 @@
   .row-trip-btn{ flex: none; width: 36px; height: 36px; padding: 0; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; font-size: 16px; opacity: 0.55; cursor: pointer; }
   .row-trip-btn.has-trip{ opacity: 1; border-color: var(--amber); background: rgba(232, 163, 61, 0.16); }
 
+  .li-choose{ width: 100%; }
+  .li-read{ width: 100%; margin-top: 8px; }
+  .li-dates, .li-places{ display: flex; flex-direction: column; gap: 8px; }
+  .li-radio, .li-place{ display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--panel-line); border-radius: 12px; background: var(--panel); cursor: pointer; }
+  .li-radio input, .li-place input{ flex: none; width: 20px; height: 20px; margin-top: 1px; accent-color: var(--amber); }
+  .li-radio-main{ display: block; font-size: 15px; font-weight: 600; }
+  .li-radio-sub{ display: block; font-size: 12px; font-weight: 500; color: var(--chalk-dim); }
+  .trip-actions-row{ justify-content: space-between; }
+  body.guest-view-active .trip-actions-row, body.guest-view-active #trip-import-btn{ display: none !important; }
+
   /* the small bottom sheet (form, pickers, memories) */
   #tsheet-overlay{ z-index: 265; }
   .tsheet-inner{ padding-bottom: 6px; }
@@ -5362,6 +5372,7 @@
   <div id="page-trips" class="top-page">
     <div class="page-content">
       <div class="trip-actions-row">
+        <button class="btn-ghost" id="trip-import-btn" type="button" aria-label="Import a trip from Lambus">Import</button>
         <button class="btn-primary" id="trip-new-btn" type="button" aria-label="New trip">+ New</button>
       </div>
       <div class="trip-grid" id="trip-grid"></div>
@@ -20481,6 +20492,192 @@
       showToast('Trip deleted');
     });
   }
+
+  // ---------- TRIPS: import from Lambus ----------
+  // Lambus can export a trip as a PDF (plan + map + daily pages). Only the
+  // trip's name, its dates and its stops (the cities/parks it passed through)
+  // are read from it — the rest is a plan, not a memory. The PDF's text comes
+  // out in reading order, so it's read as plain lines:
+  //   title / "Exported on…" / the trip's dates / five little statistics /
+  //   then each stop: its name, its date (or date range), "N mi to …", and
+  //   the places noted under it; then the "Daily Plan: …" pages, which are ignored.
+  function tripParseLambusText(text){
+    const lines = String(text == null ? '' : text).replace(/\r/g, '').split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const D = '(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\\d{2})/(\\d{2})/(\\d{4})';
+    const stopDate = new RegExp('^' + D + '(?: - ' + D + ')?$');
+    const headerRange = /^(\d{2})\/(\d{2})\/(\d{4}) - (\d{2})\/(\d{2})\/(\d{4})$/;
+    const valid = (y, m, d) => { const dt = new Date(Number(y), Number(m) - 1, Number(d)); return dt.getFullYear() === Number(y) && dt.getMonth() === Number(m) - 1 && dt.getDate() === Number(d); };
+
+    let name = '';
+    for (const l of lines){
+      if (/^Exported on/i.test(l) || headerRange.test(l)) continue;
+      name = l; break;
+    }
+    let header = null;
+    for (let i = 0; i < Math.min(lines.length, 12); i++){
+      const m = lines[i].match(headerRange);
+      if (m && valid(m[3], m[1], m[2]) && valid(m[6], m[4], m[5])){ header = { start: m[3] + '-' + m[1] + '-' + m[2], end: m[6] + '-' + m[4] + '-' + m[5] }; break; }
+    }
+    const stats = {};
+    const labels = { travelers: 'travelers', days: 'days', stops: 'stops', countries: 'countries', distance: 'distance' };
+    for (let i = 1; i < Math.min(lines.length, 24); i++){
+      const key = labels[lines[i].toLowerCase()];
+      if (key && stats[key] === undefined){
+        const n = parseFloat(lines[i - 1].replace(/,/g, ''));
+        if (!isNaN(n)) stats[key] = n;
+      }
+    }
+
+    // Stops: a name line directly followed by a "Wed, 08/06/2025" (or "Wed, … - Thu, …") line.
+    const stops = [];
+    for (let i = 0; i + 1 < lines.length; i++){
+      if (/^Daily Plan:/i.test(lines[i])) break;
+      const m = lines[i + 1].match(stopDate);
+      if (!m || stopDate.test(lines[i]) || headerRange.test(lines[i])) continue;
+      if (!valid(m[3], m[1], m[2])) continue;
+      const start = m[3] + '-' + m[1] + '-' + m[2];
+      let end = start;
+      if (m[6] && valid(m[6], m[4], m[5])) end = m[6] + '-' + m[4] + '-' + m[5];
+      stops.push({ name: lines[i], start, end });
+    }
+    if (!stops.length && !header) return { ok: false };
+
+    // Each place once, in order. A round trip starts and ends in the same city — probably home.
+    const places = [];
+    stops.forEach(s => { if (!places.some(p => p.name.toLowerCase() === s.name.toLowerCase())) places.push({ name: s.name, home: false }); });
+    if (stops.length > 1 && stops[0].name.toLowerCase() === stops[stops.length - 1].name.toLowerCase()){
+      places.forEach(p => { if (p.name.toLowerCase() === stops[0].name.toLowerCase()) p.home = true; });
+    }
+    let stopsRange = null;
+    if (stops.length){
+      stopsRange = { start: stops.map(s => s.start).sort()[0], end: stops.map(s => s.end).sort().slice(-1)[0] };
+    }
+    return { ok: true, name, header, stopsRange, stats, places, stopCount: stops.length };
+  }
+
+  let tripPdfJsPromise = null;
+  function tripLoadPdfJs(){
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (tripPdfJsPromise) return tripPdfJsPromise;
+    const base = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    tripPdfJsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = base + 'pdf.min.js';
+      s.onload = () => {
+        if (window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js'; resolve(window.pdfjsLib); }
+        else { tripPdfJsPromise = null; reject(new Error('The PDF reader did not start')); }
+      };
+      s.onerror = () => { tripPdfJsPromise = null; reject(new Error('Could not load the PDF reader — it needs an internet connection')); };
+      document.head.appendChild(s);
+    });
+    return tripPdfJsPromise;
+  }
+  // The PDF's text in the order it was written (which is reading order for a
+  // Lambus export), starting a new line whenever the text moves down the page.
+  async function tripPdfText(file){
+    const lib = await tripLoadPdfJs();
+    const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const out = [];
+    for (let p = 1; p <= pdf.numPages; p++){
+      const content = await (await pdf.getPage(p)).getTextContent();
+      let line = '', lastY = null;
+      content.items.forEach(it => {
+        const y = it.transform ? it.transform[5] : 0;
+        if (line && lastY !== null && Math.abs(y - lastY) > 2){ out.push(line); line = ''; }
+        line += it.str;
+        lastY = y;
+        if (it.hasEOL){ out.push(line); line = ''; }
+      });
+      if (line) out.push(line);
+    }
+    return out.join('\n');
+  }
+
+  function tripOpenImport(){
+    if (guestViewEnabled) return;
+    tsheetOpen({
+      title: 'Import from Lambus',
+      bodyHtml: '<p class="tf-hint">In Lambus, export your trip as a PDF, then choose it here. The trip\'s name, dates and stops are read from it — you\'ll see them first and can change anything before it\'s saved.</p>' +
+        '<button type="button" class="btn-primary li-choose" id="li-choose">Choose the PDF</button>' +
+        '<label class="tf-label" for="li-text">Or paste its text</label>' +
+        '<textarea class="tf-input tf-area" id="li-text" rows="4" placeholder="Paste the text from the export"></textarea>' +
+        '<button type="button" class="btn-ghost li-read" id="li-read">Read the pasted text</button>' +
+        '<p class="tf-hint" id="li-status" role="status"></p>',
+      actions: [{ label: 'Cancel', onClick: tsheetClose }],
+      onOpen: (body) => {
+        const status = body.querySelector('#li-status');
+        const finish = (text) => {
+          const parsed = tripParseLambusText(text);
+          if (!parsed.ok){ status.textContent = 'That doesn\'t look like a Lambus export — I couldn\'t find the trip\'s stops.'; return; }
+          tripOpenImportPreview(parsed);
+        };
+        body.querySelector('#li-choose').addEventListener('click', () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'application/pdf,.pdf';
+          input.addEventListener('change', async () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            status.textContent = 'Reading the PDF…';
+            try{ finish(await tripPdfText(file)); }
+            catch(e){ status.textContent = (e && e.message ? e.message : 'Couldn\'t read that PDF') + '. You can paste its text instead.'; }
+          });
+          input.click();
+        });
+        body.querySelector('#li-read').addEventListener('click', () => {
+          const t = body.querySelector('#li-text').value;
+          if (!t.trim()){ status.textContent = 'Paste the text first.'; return; }
+          finish(t);
+        });
+      }
+    });
+  }
+
+  function tripOpenImportPreview(parsed){
+    const fromStops = parsed.stopsRange, fromHeader = parsed.header;
+    const same = !!(fromStops && fromHeader && fromStops.start === fromHeader.start && fromStops.end === fromHeader.end);
+    const choices = [];
+    if (fromStops) choices.push({ key: 'stops', range: fromStops, note: fromHeader && !same ? 'from the stops' : '' });
+    if (fromHeader && !same) choices.push({ key: 'header', range: fromHeader, note: 'Lambus\'s trip dates' });
+    const label = (r) => tripDateLabel({ startDate: r.start, endDate: r.end === r.start ? '' : r.end });
+    const existing = tripRows.find(t => (t.name || '').trim().toLowerCase() === (parsed.name || '').trim().toLowerCase());
+    const facts = [parsed.stopCount ? otdPlural(parsed.stopCount, 'stop', 'stops') : '', parsed.stats.countries ? otdPlural(parsed.stats.countries, 'country', 'countries') : '',
+      parsed.stats.distance ? Math.round(parsed.stats.distance).toLocaleString('en-US') + ' mi' : ''].filter(Boolean).join(' · ');
+    tsheetOpen({
+      title: 'Import from Lambus',
+      bodyHtml:
+        '<label class="tf-label" for="li-name">Trip name</label><input type="text" class="tf-input" id="li-name" maxlength="80" value="' + escapeAttr(parsed.name || '') + '" autocomplete="off">' +
+        (existing ? '<p class="tf-hint">You already have a trip called “' + escapeHtml(existing.name) + '” — this will add a second one.</p>' : '') +
+        '<label class="tf-label">When</label><div class="li-dates">' +
+        (choices.length ? choices.map((c, i) => '<label class="li-radio"><input type="radio" name="li-when" value="' + c.key + '"' + (i === 0 ? ' checked' : '') + '><span><span class="li-radio-main">' + escapeHtml(label(c.range)) + '</span>' + (c.note ? '<span class="li-radio-sub">' + escapeHtml(c.note) + '</span>' : '') + '</span></label>').join('') : '<p class="tf-hint">No dates found.</p>') + '</div>' +
+        (fromHeader && fromStops && !same ? '<p class="tf-hint">The dates at the top of the export don\'t match the dates of its stops. The stops\' dates are ticked — choose whichever matches when you travelled.</p>' : '') +
+        '<label class="tf-label">Places</label>' + (facts ? '<p class="tf-hint">' + escapeHtml(facts) + ' in the export.</p>' : '') +
+        '<div class="li-places">' + parsed.places.map((p, i) => '<label class="li-place"><input type="checkbox" data-place="' + i + '"' + (p.home ? '' : ' checked') + '><span>' + escapeHtml(p.name) + (p.home ? '<span class="li-radio-sub">where the trip starts and ends — home?</span>' : '') + '</span></label>').join('') + '</div>',
+      actions: [
+        { label: 'Back', onClick: tripOpenImport },
+        { label: 'Create trip', primary: true, onClick: () => {
+            const nm = document.getElementById('li-name').value.trim();
+            if (!nm){ showToast('Give the trip a name'); return; }
+            const pick = document.querySelector('input[name="li-when"]:checked');
+            const chosen = pick ? choices.find(c => c.key === pick.value) : null;
+            if (!chosen){ showToast('There are no dates to use'); return; }
+            const places = Array.from(document.querySelectorAll('.li-places input[data-place]')).filter(cb => cb.checked).map(cb => ({ id: tripNewId('pl'), name: parsed.places[Number(cb.dataset.place)].name }));
+            const trip = tripNormalize({ id: tripNewId('t') });
+            trip.name = nm;
+            trip.startDate = chosen.range.start;
+            trip.endDate = chosen.range.end === chosen.range.start ? '' : chosen.range.end;
+            trip.places = places;
+            tripRows.push(trip);
+            saveTripProgress();
+            tsheetClose();
+            renderTripsPage();
+            openTrip(trip.id);
+            showToast('Trip created from Lambus');
+          } }
+      ]
+    });
+  }
+  document.getElementById('trip-import-btn').addEventListener('click', tripOpenImport);
 
   // Back button: the little sheet closes first, then (below the details panels) the trip itself.
   BACK_BUTTON_OVERLAYS.push({ el: tripOverlay, openClass: 'open' });
