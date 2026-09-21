@@ -4850,7 +4850,7 @@
         <div class="insights-block" id="rest-value-block">
           <p class="insights-block-title">Best Value — Ranked Above Their Price</p>
           <div class="artist-list" id="rest-value-list"></div>
-          <p class="rest-value-note">Price isn't part of your ranking. Each restaurant's rank is compared with where a typical restaurant at its price ranks; these are the standouts, ranked well above what their price would suggest.</p>
+          <p class="rest-value-note">Price isn't part of your ranking. Each restaurant's rank is compared with where a typical restaurant at its price ranks. Higher-ranked restaurants count for more, so a #10 that's 40 places ahead of typical sits above a #50 that's 60 ahead; the bars show that combined score.</p>
         </div>
 
         <div class="insights-block" id="rest-stars-block">
@@ -11699,17 +11699,24 @@
       });
       // An outlier = more than one standard deviation above the trend, and at
       // least two places ahead of typical (so a tiny data set doesn't crown a
-      // near-miss). Best-first, at most ten.
+      // near-miss). Among those, the order rewards HOW HIGH a restaurant is
+      // ranked as much as how far ahead of typical it sits: the score is
+      // places-ahead divided by rank, so a #10 that's 40 places ahead (4.0)
+      // sits well above a #50 that's 60 places ahead (1.2) — being far ahead
+      // of expectations at a lower rank counts for less than being ahead
+      // near the very top. At most ten.
       const sd = Math.sqrt(priced.reduce((a, x) => a + x.resid * x.resid, 0) / priced.length);
-      valueRows = priced.filter(x => x.resid >= sd && x.ahead >= 2).sort((a, b) => b.resid - a.resid).slice(0, 10);
+      valueRows = priced.filter(x => x.resid >= sd && x.ahead >= 2);
+      valueRows.forEach(x => { x.valueScore = x.ahead / x.rank; });
+      valueRows = valueRows.sort((a, b) => b.valueScore - a.valueScore || a.rank - b.rank).slice(0, 10);
     }
     show('rest-value-block', valueRows.length > 0);
     if (valueRows.length){
-      const maxAhead = Math.max.apply(null, valueRows.map(x => x.ahead));
+      const maxScore = valueRows[0].valueScore; // bars show the same combined score the list is ordered by
       const listEl = document.getElementById('rest-value-list');
       listEl.innerHTML = valueRows.map((x, i) => {
         const priceLabel = formatRestaurantPrice(x.r.price);
-        const pct = Math.max(6, Math.round((x.ahead / maxAhead) * 100));
+        const pct = Math.max(6, Math.round((x.valueScore / maxScore) * 100));
         return '<div class="rest-value" data-value-index="' + i + '">' +
           '<div class="rest-value-top"><span class="rest-value-name">' + escapeHtml((x.r.name || '').trim()) +
             '<span class="rest-value-price">' + escapeHtml(priceLabel) + '</span></span>' +
