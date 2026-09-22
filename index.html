@@ -2689,6 +2689,7 @@
   .tf-cover{ flex: none; width: 64px; height: 64px; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 12px; background: var(--panel); color: var(--chalk-dim); font-family: 'Figtree', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; }
   .tf-cover img{ display: block; width: 100%; height: 100%; object-fit: cover; }
   .tf-cover.on{ border-color: var(--amber); }
+  .af-desc{ min-height: 64px; }
   .af-photos{ flex-wrap: wrap; overflow-x: visible; }
   .af-photo{ position: relative; flex: none; width: 72px; height: 72px; border-radius: 12px; overflow: hidden; background: var(--panel); }
   .af-photo img{ display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -14527,6 +14528,7 @@
     // upload just like a trip-only photo.
     t.activities = (Array.isArray(t.activities) ? t.activities : []).map(a => ({
       id: a.id || tripNewId('act'), name: a.name || '', date: a.date || '',
+      description: (a.description || '').slice(0, 140),
       photos: (Array.isArray(a.photos) ? a.photos : []).map(p => (p && p.url) ? p : { url: p }).filter(p => p.url)
     }));
     t.coverPhoto = t.coverPhoto || '';
@@ -19911,7 +19913,7 @@
     return '<div class="trip-item" data-drag-key="v:' + escapeAttr(x.v.id) + '">' +
       '<div class="yir-card" role="button" tabindex="0" data-trip-open="visit" data-id="' + escapeAttr(x.v.id) + '">' + strip +
         '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('food', 12) + 'RESTAURANT</span>' +
-          (tripVisitNotable(t, x) ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
+          (tripVisitNotable(t, x) ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
           '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(x.r.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span>' +
           tripItemActions(t, 'visit', x.v.id, 'visit', t.pins.visits.indexOf(x.v.id) !== -1, placeName, 'v:' + x.v.id, true) + '</span></span>' +
@@ -19924,7 +19926,7 @@
     return '<div class="trip-item" data-drag-key="h:' + escapeAttr(x.d.id) + '">' +
       '<div class="yir-card" role="button" tabindex="0" data-trip-open="hike" data-id="' + escapeAttr(x.d.id) + '">' + strip +
         '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('hike', 12) + 'HIKE</span>' +
-          (tripHikeNotable(t, x) ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
+          (tripHikeNotable(t, x) ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
           '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(x.h.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span>' +
           tripItemActions(t, 'hike', x.d.id, 'hike', t.pins.hikes.indexOf(x.d.id) !== -1, placeName, 'h:' + x.d.id, true) + '</span></span>' +
@@ -19937,8 +19939,9 @@
     return '<div class="trip-item" data-drag-key="a:' + escapeAttr(act.id) + '">' +
       '<div class="yir-card" role="button" tabindex="0" data-trip-open="activity" data-id="' + escapeAttr(act.id) + '">' + strip +
         '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('activity', 12) + 'ACTIVITY</span>' +
-          (t.pins.activities.indexOf(act.id) !== -1 ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
-          '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(act.name || '') + '</span></span>' +
+          (t.pins.activities.indexOf(act.id) !== -1 ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
+          '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(act.name || '') + '</span>' +
+          (act.description ? '<span class="yir-card-where">' + escapeHtml(act.description) + '</span>' : '') + '</span>' +
           tripItemActions(t, 'activity', act.id, 'activity', t.pins.activities.indexOf(act.id) !== -1, placeName, 'a:' + act.id, false) + '</span></span>' +
       '</div>' + noteHtml + '</div>';
   }
@@ -20734,6 +20737,7 @@
     const isNew = !activity;
     const draft = {
       name: activity ? activity.name : '',
+      description: activity ? activity.description : '',
       date: activity ? activity.date : '',
       place: (activity && t.assign['a:' + activity.id] && t.places.some(p => p.id === t.assign['a:' + activity.id])) ? t.assign['a:' + activity.id] : '',
       photos: activity ? activity.photos.map(p => ({ url: p.url })) : []
@@ -20747,6 +20751,7 @@
       title: isNew ? 'New activity' : 'Edit activity',
       bodyHtml:
         '<label class="tf-label" for="af-name">Name</label><input type="text" class="tf-input" id="af-name" maxlength="80" placeholder="e.g. The Roman Forum" value="' + escapeAttr(draft.name) + '" autocomplete="off">' +
+        '<label class="tf-label" for="af-description">Description</label><textarea class="tf-input tf-area af-desc" id="af-description" rows="2" maxlength="140" placeholder="A short line about it, e.g. its cuisine or what it\'s known for">' + escapeHtml(draft.description) + '</textarea>' +
         '<label class="tf-label" for="af-date">Date</label><input type="date" class="tf-input" id="af-date" value="' + escapeAttr(draft.date) + '">' +
         (t.places.length ? '<label class="tf-label" for="af-place">Place</label><select class="tf-input" id="af-place"><option value="">Automatic</option>' + placeOpts + '</select>' : '') +
         '<label class="tf-label">Photos</label><div id="af-photos-wrap">' + photosHtml() + '</div>',
@@ -20755,13 +20760,14 @@
         { label: 'Cancel', onClick: tsheetClose },
         { label: 'Save', primary: true, onClick: () => {
             const name = document.getElementById('af-name').value.trim();
+            const description = document.getElementById('af-description').value.trim().slice(0, 140);
             const date = document.getElementById('af-date').value;
             if (!name){ showToast('Give the activity a name'); return; }
             if (!date){ showToast('Pick a date'); return; }
             const placeSel = document.getElementById('af-place');
             let a = activity;
-            if (isNew){ a = { id: tripNewId('act'), name: '', date: '', photos: [] }; t.activities.push(a); }
-            a.name = name; a.date = date; a.photos = draft.photos;
+            if (isNew){ a = { id: tripNewId('act'), name: '', description: '', date: '', photos: [] }; t.activities.push(a); }
+            a.name = name; a.description = description; a.date = date; a.photos = draft.photos;
             const key = 'a:' + a.id;
             if (placeSel && placeSel.value) t.assign[key] = placeSel.value; else delete t.assign[key];
             saveTripProgress();
