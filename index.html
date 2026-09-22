@@ -2591,15 +2591,6 @@
   .trip-suggest{ margin-bottom: 16px; padding: 14px 16px; background: rgba(232, 163, 61, 0.12); border: 1px solid rgba(232, 163, 61, 0.4); border-radius: 16px; }
   .trip-suggest p{ margin: 0 0 12px; font-size: 14px; line-height: 1.45; }
   .trip-suggest-btns{ display: flex; gap: 10px; }
-  .trip-highlights{ margin-top: 22px; }
-  .trip-hl-row{ display: flex; gap: 10px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
-  .trip-hl-row::-webkit-scrollbar{ display: none; }
-  .trip-hl-card{ flex: none; width: 150px; padding: 0 0 10px; overflow: hidden; text-align: left; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 14px; cursor: pointer; }
-  .trip-hl-photo{ display: block; height: 96px; background: #2F4C4A; overflow: hidden; }
-  .trip-hl-photo .yir-img{ height: 96px; }
-  .trip-hl-ph{ display: flex; align-items: center; justify-content: center; height: 96px; font-size: 32px; opacity: 0.5; }
-  .trip-hl-name{ display: block; margin: 8px 10px 0; font-size: 14px; font-weight: 700; line-height: 1.2; }
-  .trip-hl-where{ display: block; margin: 2px 10px 0; font-size: 12px; color: var(--chalk-dim); }
   .trip-toolbar-row{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; }
   .trip-toolbar-row .trip-view-toggle{ margin-top: 0; }
   .trip-memory-btn{ flex: none; width: 40px; height: 40px; padding: 0; font-size: 18px; }
@@ -2626,7 +2617,6 @@
   .trip-item-actions{ display: flex; flex-wrap: wrap; gap: 6px; }
   .trip-mini{ padding: 5px 10px; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); font-family: 'Figtree', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
   .trip-mini.on{ color: var(--amber); border-color: rgba(232, 163, 61, 0.5); }
-  .trip-notable{ padding: 2px 8px; border-radius: 999px; background: rgba(232, 163, 61, 0.16); color: var(--amber); font-size: 11px; font-weight: 700; }
   .trip-gallery{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
   .trip-gtile{ position: relative; }
   .trip-gimg{ width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; }
@@ -14539,11 +14529,6 @@
     t.assign = (t.assign && typeof t.assign === 'object') ? t.assign : {};
     t.notes = Array.isArray(t.notes) ? t.notes : [];
     t.photos = Array.isArray(t.photos) ? t.photos : [];
-    t.pins = (t.pins && typeof t.pins === 'object') ? t.pins : {};
-    t.pins.visits = Array.isArray(t.pins.visits) ? t.pins.visits : [];
-    t.pins.hikes = Array.isArray(t.pins.hikes) ? t.pins.hikes : [];
-    t.pins.activities = Array.isArray(t.pins.activities) ? t.pins.activities : [];
-    t.pins.roads = Array.isArray(t.pins.roads) ? t.pins.roads : [];
     // Manual card order within a place+day (drag-to-reorder on the timeline).
     // Key: "<placeId>|<date>" (either half may be blank); value: the item keys
     // ('v:'/'h:'/'a:' + id) in the order chosen. Anything not listed keeps its
@@ -14664,18 +14649,6 @@
   }
   function tripActivityPhotos(act){
     return (act.photos || []).map(p => p && p.url).filter(Boolean);
-  }
-
-  // What counts as notable — automatic, or pinned by hand. Restaurant: Best
-  // Flavor 10 or more (that score runs 8–13). Hike: Best Scenery 12 or more
-  // (it runs 1–15). Adjust the two numbers here if you'd like a higher or lower bar.
-  const TRIP_NOTABLE_FLAVOR = 10;
-  const TRIP_NOTABLE_SCENERY = 12;
-  function tripVisitNotable(t, x){
-    return Number(x.r.bestFlavor) >= TRIP_NOTABLE_FLAVOR || t.pins.visits.indexOf(x.v.id) !== -1;
-  }
-  function tripHikeNotable(t, x){
-    return Number(x.h.bestScenery) >= TRIP_NOTABLE_SCENERY || t.pins.hikes.indexOf(x.d.id) !== -1;
   }
 
   // Every photo of the trip, oldest first, each once: photos from linked
@@ -19928,14 +19901,13 @@
 
   // A small "more" button on the card replaces the old row of four buttons —
   // it opens a short sheet with the same actions (Place, Memory, Pin, Remove).
-  function tripItemActions(t, kind, id, anchorType, pinned, placeName, keys, removable){
-    return '<button type="button" class="trip-item-kebab trip-owner" data-trip-kebab="1" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '" data-anchor-type="' + anchorType + '" data-keys="' + escapeAttr(keys) + '" data-place="' + escapeAttr(placeName || '') + '" data-pinned="' + (pinned ? '1' : '0') + '" data-removable="' + (removable === false ? '0' : '1') + '" aria-label="More actions">⋯</button>';
+  function tripItemActions(t, kind, id, anchorType, placeName, keys, removable){
+    return '<button type="button" class="trip-item-kebab trip-owner" data-trip-kebab="1" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '" data-anchor-type="' + anchorType + '" data-keys="' + escapeAttr(keys) + '" data-place="' + escapeAttr(placeName || '') + '" data-removable="' + (removable === false ? '0' : '1') + '" aria-label="More actions">⋯</button>';
   }
-  function tripOpenItemMenu(t, kind, id, anchorType, pinned, keys, placeName, removable){
+  function tripOpenItemMenu(t, kind, id, anchorType, keys, placeName, removable){
     const row = (act, icon, label) => '<button type="button" class="trip-menu-row" data-item-act="' + act + '"><span>' + icon + '</span><span>' + escapeHtml(label) + '</span></button>';
     const rows = (t.places.length ? row('place', '📍', placeName || 'Place') : '') +
       row('note', '💬', 'Memory') +
-      row('pin', pinned ? '★' : '☆', pinned ? 'Pinned' : 'Pin') +
       (removable ? row('unlink', '🗑️', 'Remove') : '');
     tsheetOpen({
       title: 'More',
@@ -19947,7 +19919,6 @@
         tsheetClose();
         if (act === 'place') tripOpenPlaceChooser(t, keys.split(',').filter(Boolean));
         else if (act === 'note') tripOpenNoteSheet(t, { anchor: { type: anchorType, id } });
-        else if (act === 'pin') tripTogglePin(t, kind, id);
         else if (act === 'unlink'){
           showConfirmModal('Remove from this trip?', 'It stays in your ' + (kind === 'visit' ? 'restaurants' : kind === 'hike' ? 'hikes' : 'roads') + '. Any memories you attached to it stay with the trip.', () => tripUnlinkItem(t, kind, id));
         }
@@ -19961,11 +19932,10 @@
     const where = [x.r.cuisine, x.r.location].filter(Boolean).join(' · ');
     return '<div class="trip-item" data-drag-key="v:' + escapeAttr(x.v.id) + '">' +
       '<div class="yir-card" role="button" tabindex="0" data-trip-open="visit" data-id="' + escapeAttr(x.v.id) + '">' + strip +
-        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('food', 12) + 'RESTAURANT</span>' +
-          (tripVisitNotable(t, x) ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
+        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('food', 12) + 'RESTAURANT</span></span>' +
           '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(x.r.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span>' +
-          tripItemActions(t, 'visit', x.v.id, 'visit', t.pins.visits.indexOf(x.v.id) !== -1, placeName, 'v:' + x.v.id, true) + '</span></span>' +
+          tripItemActions(t, 'visit', x.v.id, 'visit', placeName, 'v:' + x.v.id, true) + '</span></span>' +
       '</div>' + noteHtml + '</div>';
   }
   function tripHikeCardHtml(t, x, noteHtml, placeName){
@@ -19974,11 +19944,10 @@
     const where = [x.h.city, x.h.state].filter(Boolean).join(', ');
     return '<div class="trip-item" data-drag-key="h:' + escapeAttr(x.d.id) + '">' +
       '<div class="yir-card" role="button" tabindex="0" data-trip-open="hike" data-id="' + escapeAttr(x.d.id) + '">' + strip +
-        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('hike', 12) + 'HIKE</span>' +
-          (tripHikeNotable(t, x) ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
+        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('hike', 12) + 'HIKE</span></span>' +
           '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(x.h.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span>' +
-          tripItemActions(t, 'hike', x.d.id, 'hike', t.pins.hikes.indexOf(x.d.id) !== -1, placeName, 'h:' + x.d.id, true) + '</span></span>' +
+          tripItemActions(t, 'hike', x.d.id, 'hike', placeName, 'h:' + x.d.id, true) + '</span></span>' +
       '</div>' + noteHtml + '</div>';
   }
 
@@ -19987,11 +19956,10 @@
     const strip = urls.length ? '<span class="yir-strip s' + Math.min(3, urls.length) + '">' + urls.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
     return '<div class="trip-item" data-drag-key="a:' + escapeAttr(act.id) + '">' +
       '<div class="yir-card" role="button" tabindex="0" data-trip-open="activity" data-id="' + escapeAttr(act.id) + '">' + strip +
-        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('activity', 12) + 'ACTIVITY</span>' +
-          (t.pins.activities.indexOf(act.id) !== -1 ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
+        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('activity', 12) + 'ACTIVITY</span></span>' +
           '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(act.name || '') + '</span>' +
           (act.description ? '<span class="yir-card-where">' + escapeHtml(act.description) + '</span>' : '') + '</span>' +
-          tripItemActions(t, 'activity', act.id, 'activity', t.pins.activities.indexOf(act.id) !== -1, placeName, 'a:' + act.id, false) + '</span></span>' +
+          tripItemActions(t, 'activity', act.id, 'activity', placeName, 'a:' + act.id, false) + '</span></span>' +
       '</div>' + noteHtml + '</div>';
   }
 
@@ -20002,11 +19970,10 @@
     const where = [rd.state, rd.country].filter(Boolean).join(', ');
     return '<div class="trip-item" data-drag-key="r:' + escapeAttr(rd.id) + '">' +
       '<div class="yir-card" role="button" tabindex="0" data-trip-open="road" data-id="' + escapeAttr(rd.id) + '">' + strip +
-        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('road', 12) + 'ROAD</span>' +
-          (t.pins.roads.indexOf(rd.id) !== -1 ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
+        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('road', 12) + 'ROAD</span></span>' +
           '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(rd.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span>' +
-          tripItemActions(t, 'road', rd.id, 'road', t.pins.roads.indexOf(rd.id) !== -1, placeName, 'r:' + rd.id, true) + '</span></span>' +
+          tripItemActions(t, 'road', rd.id, 'road', placeName, 'r:' + rd.id, true) + '</span></span>' +
       '</div>' + noteHtml + '</div>';
   }
 
@@ -20158,22 +20125,6 @@
     const gallery = tripGallery(t, linked);
     tripCurrentGallery = gallery;
     const cover = tripCoverUrl(t, gallery);
-    const hlV = linked.visits.filter(x => tripVisitNotable(t, x));
-    const hlH = linked.hikes.filter(x => tripHikeNotable(t, x));
-    const hlR = linked.roads.filter(x => t.pins.roads.indexOf(x.rd.id) !== -1);
-    const hlA = t.activities.filter(act => t.pins.activities.indexOf(act.id) !== -1);
-    const hlIcon = { visit: '🍽️', hike: '🥾', road: '🏎️', activity: '🎟️' };
-    const hlCard = (kind, id, urls, name, where) =>
-      '<button type="button" class="trip-hl-card" data-trip-open="' + kind + '" data-id="' + escapeAttr(id) + '">' +
-        '<span class="trip-hl-photo">' + (urls.length ? yirImg(urls[0], 400) : '<span class="trip-hl-ph">' + hlIcon[kind] + '</span>') + '</span>' +
-        '<span class="trip-hl-name">' + escapeHtml(name) + '</span>' + (where ? '<span class="trip-hl-where">' + escapeHtml(where) + '</span>' : '') + '</button>';
-    const highlights = (hlV.length || hlH.length || hlR.length || hlA.length)
-      ? '<section class="trip-highlights"><div class="yir-eyebrow-sm">HIGHLIGHTS</div><div class="trip-hl-row">' +
-        hlV.map(x => hlCard('visit', x.v.id, tripVisitPhotos(x.v), x.r.name || '', restaurantCityOf(x.r))).join('') +
-        hlH.map(x => hlCard('hike', x.d.id, tripHikePhotos(x.d), x.h.name || '', x.h.city || '')).join('') +
-        hlR.map(x => hlCard('road', x.rd.id, tripRoadPhotos(x.rd), x.rd.name || '', [x.rd.state, x.rd.country].filter(Boolean).join(', '))).join('') +
-        hlA.map(act => hlCard('activity', act.id, tripActivityPhotos(act), act.name || '', '')).join('') + '</div></section>' : '';
-
     const toggle = '<div class="view-toggle trip-view-toggle"><button type="button" class="view-toggle-btn' + (tripView === 'timeline' ? ' active' : '') + '" data-trip-view="timeline">Timeline</button>' +
       '<button type="button" class="view-toggle-btn' + (tripView === 'gallery' ? ' active' : '') + '" data-trip-view="gallery">Gallery</button></div>';
     const memoryBtn = owner ? '<button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="" aria-label="Add a memory">💬</button>' : '';
@@ -20184,7 +20135,7 @@
         (cover ? '<img class="trip-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 1200)) + '" alt="">' : '<span class="trip-hero-ph" aria-hidden="true">🧳</span>') +
         '<div class="trip-hero-shade"></div><div class="trip-hero-text"><h2 class="trip-title" id="trip-title">' + escapeHtml(t.name || 'Untitled trip') + '</h2>' +
         '<p class="trip-dates">' + escapeHtml(tripDateLabel(t)) + '</p></div></div></section>' +
-      highlights + toolbarRow +
+      toolbarRow +
       (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripTimelineHtml(t, linked, owner));
     tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
     tripWireItemDrag(t);
@@ -20312,28 +20263,18 @@
     if (kind === 'visit'){
       restaurantRows.forEach(r => (r.visits || []).forEach(v => { if (v.id === id && v.tripId === t.id) delete v.tripId; }));
       saveRestaurantProgress();
-      t.pins.visits = t.pins.visits.filter(x => x !== id);
     } else if (kind === 'hike'){
       hikeRows.forEach(h => (h.dates || []).forEach(d => { if (d.id === id && d.tripId === t.id) delete d.tripId; }));
       saveHikeProgress();
-      t.pins.hikes = t.pins.hikes.filter(x => x !== id);
     } else if (kind === 'road'){
       roadRows.forEach(rd => { if (rd.id === id && rd.tripId === t.id) delete rd.tripId; });
       saveRoadProgress();
-      t.pins.roads = t.pins.roads.filter(x => x !== id);
     } else if (kind === 'photo'){
       photoRows.forEach(p => { if (p.id === id && p.tripId === t.id) delete p.tripId; });
       savePhotoProgress();
     }
     saveTripProgress();
     tripRefresh();
-  }
-  function tripTogglePin(t, kind, id){
-    const list = kind === 'visit' ? t.pins.visits : kind === 'hike' ? t.pins.hikes : kind === 'road' ? t.pins.roads : t.pins.activities;
-    const i = list.indexOf(id);
-    if (i === -1) list.push(id); else list.splice(i, 1);
-    saveTripProgress();
-    tripRender();
   }
 
   // ---------- the trip screen's taps ----------
@@ -20354,7 +20295,7 @@
       return;
     }
     if ((el = e.target.closest('[data-trip-kebab]'))){
-      if (!guestViewEnabled) tripOpenItemMenu(t, el.dataset.kind, el.dataset.id, el.dataset.anchorType, el.dataset.pinned === '1', el.dataset.keys || '', el.dataset.place, el.dataset.removable !== '0');
+      if (!guestViewEnabled) tripOpenItemMenu(t, el.dataset.kind, el.dataset.id, el.dataset.anchorType, el.dataset.keys || '', el.dataset.place, el.dataset.removable !== '0');
       return;
     }
     if ((el = e.target.closest('[data-trip-open]'))){
@@ -20369,7 +20310,6 @@
     if ((el = e.target.closest('[data-trip-act]'))){
       const act = el.dataset.tripAct;
       if (act === 'note') tripOpenNoteSheet(t, { anchor: { type: el.dataset.anchorType, id: el.dataset.anchorId || '' } });
-      else if (act === 'pin') tripTogglePin(t, el.dataset.kind, el.dataset.id);
       else if (act === 'place') tripOpenPlaceChooser(t, (el.dataset.keys || '').split(',').filter(Boolean));
       else if (act === 'unlink'){
         showConfirmModal('Remove from this trip?', 'It stays in your ' + (el.dataset.kind === 'visit' ? 'restaurants' : el.dataset.kind === 'hike' ? 'hikes' : 'roads') + '. Any memories you attached to it stay with the trip.', () => tripUnlinkItem(t, el.dataset.kind, el.dataset.id));
@@ -20783,7 +20723,7 @@
         const addPlace = () => {
           const name = placeInput.value.trim();
           if (!name) return;
-          if (!draft.places.some(p => p.name.toLowerCase() === name.toLowerCase())) draft.places.push({ id: tripNewId('pl'), name, days: [] });
+          draft.places.push({ id: tripNewId('pl'), name, days: [] }); // the same place can appear twice — e.g. a round trip through the same city at the start and the end
           placeInput.value = '';
           placesEl.innerHTML = placesHtml();
         };
@@ -20907,7 +20847,6 @@
     showConfirmModal('Delete “' + (activity.name || 'this activity') + '”?', (hasPhotos ? otdPlural(activity.photos.length, 'photo', 'photos') + ' added to it will be gone for good. ' : '') + 'This can\'t be undone.', () => {
       t.activities = t.activities.filter(a => a.id !== activity.id);
       delete t.assign['a:' + activity.id];
-      t.pins.activities = t.pins.activities.filter(id => id !== activity.id);
       t.notes.forEach(n => { if (n.anchor && n.anchor.type === 'activity' && n.anchor.id === activity.id) n.anchor = { type: 'trip', id: '' }; });
       saveTripProgress();
       tsheetClose();
