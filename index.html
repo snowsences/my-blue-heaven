@@ -2558,7 +2558,7 @@
   .cal-detail .yir-day-cards{ padding-bottom: 0; }
 
   /* ---------- TRIPS (see the TRIPS blocks in the script) ---------- */
-  .trip-actions-row{ display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .trip-actions-row{ display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 14px; }
   .trip-grid{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
   @media (min-width: 640px){ .trip-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .trip-card{
@@ -2588,8 +2588,6 @@
   .trip-chip.auto{ background: transparent; color: var(--chalk-dim); font-weight: 500; }
   .trip-chip-x{ padding: 0 0 0 2px; border: none; background: transparent; color: var(--chalk-dim); font-size: 12px; cursor: pointer; }
   .trip-counts{ margin: 12px 0 0; font-size: 14px; color: var(--chalk-dim); }
-  .trip-add-row{ margin-top: 14px; }
-  .trip-add-row .btn-primary{ width: 100%; }
   .trip-suggest{ margin-bottom: 16px; padding: 14px 16px; background: rgba(232, 163, 61, 0.12); border: 1px solid rgba(232, 163, 61, 0.4); border-radius: 16px; }
   .trip-suggest p{ margin: 0 0 12px; font-size: 14px; line-height: 1.45; }
   .trip-suggest-btns{ display: flex; gap: 10px; }
@@ -2636,6 +2634,8 @@
   /* owner-only bits vanish in Guest View, which is read-only */
   body.guest-view-active .trip-owner, body.guest-view-active #trip-new-btn, body.guest-view-active #trip-edit-btn,
   body.guest-view-active .trip-link-btn, body.guest-view-active .row-trip-btn{ display: none !important; }
+  .trip-link-row{ margin: 6px 0 10px; }
+  body.guest-view-active .trip-link-row{ display: none; }
   .trip-link-btn{ max-width: 100%; min-height: 34px; padding: 4px 14px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-trip-btn{ flex: none; width: 36px; height: 36px; padding: 0; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; font-size: 16px; opacity: 0.55; cursor: pointer; }
   .row-trip-btn.has-trip{ opacity: 1; border-color: var(--amber); background: rgba(232, 163, 61, 0.16); }
@@ -2664,7 +2664,6 @@
   .li-radio input, .li-place input{ flex: none; width: 20px; height: 20px; margin-top: 1px; accent-color: var(--amber); }
   .li-radio-main{ display: block; font-size: 15px; font-weight: 600; }
   .li-radio-sub{ display: block; font-size: 12px; font-weight: 500; color: var(--chalk-dim); }
-  .trip-actions-row{ justify-content: space-between; }
   body.guest-view-active .trip-actions-row, body.guest-view-active #trip-import-btn{ display: none !important; }
 
   /* the small bottom sheet (form, pickers, memories) */
@@ -5732,6 +5731,9 @@
     <div class="yir-topbar">
       <div><span class="yir-eyebrow">TRIP</span></div>
       <div class="yir-top-actions">
+        <button type="button" class="yir-icon-btn trip-owner" id="trip-add-btn" data-trip-add="1" aria-label="Add to trip">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
         <button type="button" class="yir-icon-btn" id="trip-edit-btn" aria-label="Edit trip">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"></path><path d="M14.5 7.5l3 3"></path></svg>
         </button>
@@ -6642,6 +6644,7 @@
       const localTime = new Date(roadLastSavedAt || 0).getTime();
       if (remoteTime > localTime){
         roadRows = existing.roadRows;
+        roadEnsureIds();
         roadLastSavedAt = existing.roadSavedAt || null;
         try{ await window.storage.set(ROAD_STORAGE_KEY, JSON.stringify({ roadRows, savedAt: roadLastSavedAt }), false); }catch(e){ /* best effort */ }
         renderRoadsPage();
@@ -6952,6 +6955,7 @@
     }catch(e){ /* no local road save */ }
     if (localRoadParsed && Array.isArray(localRoadParsed.roadRows) && localRoadParsed.roadRows.length){
       roadRows = localRoadParsed.roadRows;
+      roadEnsureIds();
       roadLastSavedAt = localRoadParsed.savedAt || null;
     }
 
@@ -12029,7 +12033,7 @@
         }
         const sub = otdPlural(l.restaurants, 'restaurant', 'restaurants') + ' · ' +
           (l.dishes ? otdPlural(l.dishes, 'dish', 'dishes') + ' scored' : 'no dishes scored yet') + compare;
-        const pct = l.avg === null ? 0 : Math.max(4, Math.round((l.avg / 12) * 100));
+        const pct = l.avg === null ? 0 : Math.max(4, Math.round((l.avg / 13) * 100));
         return '<div class="rest-star">' +
           '<div class="artist-row">' +
             '<span class="artist-rank year-label" style="min-width:64px;">' + '⭐'.repeat(l.stars) + '</span>' +
@@ -13917,13 +13921,23 @@
   let roadEditMode = false;
   let roadRearrangeMode = false;
 
+  // Every road needs a stable id so a trip can link to it — older saves (and
+  // any road created before this existed) predate that, so this backfills
+  // one wherever roadRows gets loaded or replaced wholesale, not just here.
+  function roadEnsureIds(){
+    let changed = false;
+    roadRows.forEach(r => { if (!r.id){ r.id = 'rd' + Date.now().toString(36) + Math.random().toString(36).slice(2); changed = true; } });
+    return changed;
+  }
   async function loadRoadProgress(){
     try{
       const res = await window.storage.get(ROAD_STORAGE_KEY, false);
       if (res && res.value){
         const parsed = JSON.parse(res.value);
         roadRows = Array.isArray(parsed.roadRows) ? parsed.roadRows : [];
+        const backfilled = roadEnsureIds();
         roadLastSavedAt = parsed.savedAt || null;
+        if (backfilled) saveRoadProgress(); // persist the new ids right away, not only whenever something else next saves
       }
     }catch(e){ /* nothing saved yet */ }
   }
@@ -14041,7 +14055,7 @@
     }
 
     if (newRoadDraft){
-      roadRows.push({ name, state, country, drivingScore: '', sceneryScore: '', coverPhoto: '', photos: [] });
+      roadRows.push({ id: 'rd' + Date.now().toString(36) + Math.random().toString(36).slice(2), name, state, country, drivingScore: '', sceneryScore: '', coverPhoto: '', photos: [] });
       newRoadDraft = null;
       openRoadIndex = roadRows.length - 1;
       saveRoadProgress();
@@ -14220,6 +14234,7 @@
       '<div class="details-content" style="padding-top:20px;">' +
         '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + '</h2>' +
         (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
+        (guestViewEnabled ? '' : '<div class="trip-link-row"><button class="btn-ghost trip-link-btn" data-trip-road-link="' + escapeAttr(r.id) + '" type="button" aria-label="Trip">' + tripChipHtml(r.tripId) + '</button></div>') +
         renderRoadScoresRowHtml(r) +
       '</div>' +
       renderRoadPhotosContentHtml(r);
@@ -14518,6 +14533,7 @@
     t.pins.visits = Array.isArray(t.pins.visits) ? t.pins.visits : [];
     t.pins.hikes = Array.isArray(t.pins.hikes) ? t.pins.hikes : [];
     t.pins.activities = Array.isArray(t.pins.activities) ? t.pins.activities : [];
+    t.pins.roads = Array.isArray(t.pins.roads) ? t.pins.roads : [];
     // Manual card order within a place+day (drag-to-reorder on the timeline).
     // Key: "<placeId>|<date>" (either half may be blank); value: the item keys
     // ('v:'/'h:'/'a:' + id) in the order chosen. Anything not listed keeps its
@@ -14595,7 +14611,7 @@
 
   // Everything (visits, hike dates, Photos-tab photos) that `match(tripId, dateKey)` accepts.
   function tripCollect(match){
-    const out = { visits: [], hikes: [], photos: [] };
+    const out = { visits: [], hikes: [], roads: [], photos: [] };
     restaurantRows.forEach(r => (Array.isArray(r.visits) ? r.visits : []).forEach(v => {
       const p = otdParse(v.date), key = p ? p.str : '';
       if (match(v.tripId || '', key)) out.visits.push({ r, v, date: key });
@@ -14604,13 +14620,20 @@
       const p = otdParse(d.date), key = p ? p.str : '';
       if (match(d.tripId || '', key)) out.hikes.push({ h, d, date: key });
     }));
+    // A road has no date of its own — it links to a trip directly, and
+    // always sorts as "no date" within its place, same as a road with no
+    // date would anywhere else in the app. This also means it never shows
+    // up as a date-based "found nearby" suggestion — only explicit linking.
+    roadRows.forEach(rd => {
+      if (match(rd.tripId || '', '')) out.roads.push({ rd, date: '' });
+    });
     photoRows.forEach(ph => {
       if (!ph || !ph.url) return;
       const p = otdParse(ph.date), key = p ? p.str : '';
       if (match(ph.tripId || '', key)) out.photos.push({ p: ph, date: key });
     });
     const byDate = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
-    out.visits.sort(byDate); out.hikes.sort(byDate); out.photos.sort(byDate);
+    out.visits.sort(byDate); out.hikes.sort(byDate); out.roads.sort(byDate); out.photos.sort(byDate);
     return out;
   }
   function tripLinked(t){ return tripCollect(id => id === t.id); }
@@ -14626,12 +14649,15 @@
   function tripHikePhotos(d){
     return (d.photos || []).map(p => p && p.url).filter(Boolean);
   }
+  function tripRoadPhotos(rd){
+    return (rd.photos || []).map(p => p && p.url).filter(Boolean);
+  }
   function tripActivityPhotos(act){
     return (act.photos || []).map(p => p && p.url).filter(Boolean);
   }
 
   // What counts as notable — automatic, or pinned by hand. Restaurant: Best
-  // Flavor 10 or more (that score runs 8–12). Hike: Best Scenery 12 or more
+  // Flavor 10 or more (that score runs 8–13). Hike: Best Scenery 12 or more
   // (it runs 1–15). Adjust the two numbers here if you'd like a higher or lower bar.
   const TRIP_NOTABLE_FLAVOR = 10;
   const TRIP_NOTABLE_SCENERY = 12;
@@ -14650,6 +14676,7 @@
     const add = (url, date, src, id) => { if (url) entries.push({ url, date: date || '', src, id: id || '', order: order++ }); };
     linked.visits.forEach(x => tripVisitPhotos(x.v).forEach(u => add(u, x.date, 'visit')));
     linked.hikes.forEach(x => tripHikePhotos(x.d).forEach(u => add(u, x.date, 'hike')));
+    linked.roads.forEach(x => tripRoadPhotos(x.rd).forEach(u => add(u, x.date, 'road')));
     linked.photos.forEach(x => add(x.p.url, x.date, 'photos', x.p.id));
     (t.photos || []).forEach(p => { const pp = otdParse(p.date); add(p.url, pp ? pp.str : '', 'trip', p.id); });
     (t.activities || []).forEach(act => { const pp = otdParse(act.date); (act.photos || []).forEach((ph, i) => { if (ph && ph.url) add(ph.url, pp ? pp.str : '', 'activity', act.id + ':' + i); }); });
@@ -16383,8 +16410,8 @@
   // cards and the Best Flavor / Flavor Variety selects near the heading.
   // 12/18 (the top of each range) come first in the option list — matches
   // the established "most likely score gets easiest access" convention.
-  const RESTAURANT_COURSE_SCORES = [12, 11, 10, 9, 8, 7, 6];
-  const RESTAURANT_BEST_FLAVOR_SCORES = [12, 11, 10, 9, 8];
+  const RESTAURANT_COURSE_SCORES = [13, 12, 11, 10, 9, 8, 7, 6];
+  const RESTAURANT_BEST_FLAVOR_SCORES = [13, 12, 11, 10, 9, 8];
   const RESTAURANT_FLAVOR_VARIETY_SCORES = [18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
 
   function buildScoreSelectHtml(options, currentValue, extraAttrs){
@@ -17217,6 +17244,7 @@
       }
       if (Array.isArray(parsed.roadRows) && parsed.roadRows.length){
         roadRows = parsed.roadRows;
+        roadEnsureIds();
         saveRoadProgress();
         renderRoadsPage();
         restoredParts.push(parsed.roadRows.length + ' road' + (parsed.roadRows.length === 1 ? '' : 's'));
@@ -19266,7 +19294,8 @@
       chevron: '<path d="M9 6l6 6-6 6"></path>',
       close: '<path d="M6 6l12 12M18 6L6 18"></path>',
       refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.1"></path><path d="M20 4v7h-7"></path>',
-      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>'
+      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>',
+      road: '<path d="M8 3L4 21"></path><path d="M16 3l4 18"></path><path d="M11.3 9h1.4M10.5 13h3M9.7 17h4.6"></path>'
     };
     if (name === 'star') return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"></path></svg>';
     return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[name] + '</svg>';
@@ -19819,6 +19848,7 @@
   const tripPanel = document.getElementById('trip-panel');
   const tripScroll = document.getElementById('trip-scroll');
   const tripContent = document.getElementById('trip-content');
+  const tripAddBtn = document.getElementById('trip-add-btn');
   const tripEditBtn = document.getElementById('trip-edit-btn');
   const tripCloseBtn = document.getElementById('trip-close-btn');
   const tsheetOverlay = document.getElementById('tsheet-overlay');
@@ -19837,6 +19867,7 @@
     const parts = [];
     if (linked.visits.length) parts.push(otdPlural(linked.visits.length, 'restaurant visit', 'restaurant visits'));
     if (linked.hikes.length) parts.push(otdPlural(linked.hikes.length, 'hike', 'hikes'));
+    if (linked.roads && linked.roads.length) parts.push(otdPlural(linked.roads.length, 'road', 'roads'));
     if (galleryCount) parts.push(otdPlural(galleryCount, 'photo', 'photos'));
     return parts.join(' · ');
   };
@@ -19900,7 +19931,7 @@
         else if (act === 'note') tripOpenNoteSheet(t, { anchor: { type: anchorType, id } });
         else if (act === 'pin') tripTogglePin(t, kind, id);
         else if (act === 'unlink'){
-          showConfirmModal('Remove from this trip?', 'It stays in your ' + (kind === 'visit' ? 'restaurants' : 'hikes') + '. Any memories you attached to it stay with the trip.', () => tripUnlinkItem(t, kind, id));
+          showConfirmModal('Remove from this trip?', 'It stays in your ' + (kind === 'visit' ? 'restaurants' : kind === 'hike' ? 'hikes' : 'roads') + '. Any memories you attached to it stay with the trip.', () => tripUnlinkItem(t, kind, id));
         }
       })
     });
@@ -19946,6 +19977,21 @@
       '</div>' + noteHtml + '</div>';
   }
 
+  function tripRoadCardHtml(t, x, noteHtml, placeName){
+    const rd = x.rd;
+    const urls = tripRoadPhotos(rd);
+    const strip = urls.length ? '<span class="yir-strip s' + Math.min(3, urls.length) + '">' + urls.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
+    const where = [rd.state, rd.country].filter(Boolean).join(', ');
+    return '<div class="trip-item" data-drag-key="r:' + escapeAttr(rd.id) + '">' +
+      '<div class="yir-card" role="button" tabindex="0" data-trip-open="road" data-id="' + escapeAttr(rd.id) + '">' + strip +
+        '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('road', 12) + 'ROAD</span>' +
+          (t.pins.roads.indexOf(rd.id) !== -1 ? '<span class="trip-notable">⭐ Highlight</span>' : '') + '</span>' +
+          '<span class="yir-card-title-row"><span class="yir-card-texts"><span class="yir-card-name">' + escapeHtml(rd.name || '') + '</span>' +
+          (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span>' +
+          tripItemActions(t, 'road', rd.id, 'road', t.pins.roads.indexOf(rd.id) !== -1, placeName, 'r:' + rd.id, true) + '</span></span>' +
+      '</div>' + noteHtml + '</div>';
+  }
+
   // The timeline. With places, each place is a heading in route order and holds
   // its own dated rows (the date column stays on the left); anything that
   // doesn't land in a place goes under "Other". Without places it is just the
@@ -19964,12 +20010,13 @@
     const dayOf = (pid, key) => {
       if (!groups.has(pid)) groups.set(pid, new Map());
       const g = groups.get(pid);
-      if (!g.has(key)) g.set(key, { visits: [], hikes: [], activities: [], photos: [] });
+      if (!g.has(key)) g.set(key, { visits: [], hikes: [], roads: [], activities: [], photos: [] });
       return g.get(key);
     };
     const dayNotePlace = (date) => hasPlaces ? tripPlaceOf(t, null, date, '') : '';
     linked.visits.forEach(x => dayOf(hasPlaces ? tripPlaceOf(t, 'v:' + x.v.id, x.date, restaurantCityOf(x.r)) : '', x.date).visits.push(x));
     linked.hikes.forEach(x => dayOf(hasPlaces ? tripPlaceOf(t, 'h:' + x.d.id, x.date, x.h.city) : '', x.date).hikes.push(x));
+    linked.roads.forEach(x => dayOf(hasPlaces ? tripPlaceOf(t, 'r:' + x.rd.id, x.date, x.rd.state) : '', x.date).roads.push(x));
     linked.photos.forEach(x => dayOf(hasPlaces ? tripPlaceOf(t, 'p:' + x.p.id, x.date, '') : '', x.date).photos.push(x.p));
     t.photos.forEach(p => { const pp = otdParse(p.date), k = pp ? pp.str : ''; dayOf(hasPlaces ? tripPlaceOf(t, 'p:' + p.id, k, '') : '', k).photos.push(p); });
     t.activities.forEach(act => { const pp = otdParse(act.date), k = pp ? pp.str : ''; dayOf(hasPlaces ? tripPlaceOf(t, 'a:' + act.id, k, '') : '', k).activities.push(act); });
@@ -19986,6 +20033,7 @@
         let cardItems = [].concat(
           d.visits.map(x => ({ k: 'v:' + x.v.id, html: tripVisitCardHtml(t, x, noteBlock(forAnchor('visit', x.v.id)), pname) })),
           d.hikes.map(x => ({ k: 'h:' + x.d.id, html: tripHikeCardHtml(t, x, noteBlock(forAnchor('hike', x.d.id)), pname) })),
+          d.roads.map(x => ({ k: 'r:' + x.rd.id, html: tripRoadCardHtml(t, x, noteBlock(forAnchor('road', x.rd.id)), pname) })),
           d.activities.map(act => ({ k: 'a:' + act.id, html: tripActivityCardHtml(t, act, noteBlock(forAnchor('activity', act.id)), pname) }))
         );
         const groupKey = pid + '|' + key;
@@ -20094,15 +20142,18 @@
     const cover = tripCoverUrl(t, gallery);
     const hlV = linked.visits.filter(x => tripVisitNotable(t, x));
     const hlH = linked.hikes.filter(x => tripHikeNotable(t, x));
+    const hlR = linked.roads.filter(x => t.pins.roads.indexOf(x.rd.id) !== -1);
     const hlA = t.activities.filter(act => t.pins.activities.indexOf(act.id) !== -1);
+    const hlIcon = { visit: '🍽️', hike: '🥾', road: '🏎️', activity: '🎟️' };
     const hlCard = (kind, id, urls, name, where) =>
       '<button type="button" class="trip-hl-card" data-trip-open="' + kind + '" data-id="' + escapeAttr(id) + '">' +
-        '<span class="trip-hl-photo">' + (urls.length ? yirImg(urls[0], 400) : '<span class="trip-hl-ph">' + (kind === 'visit' ? '🍽️' : kind === 'hike' ? '🥾' : '🎟️') + '</span>') + '</span>' +
+        '<span class="trip-hl-photo">' + (urls.length ? yirImg(urls[0], 400) : '<span class="trip-hl-ph">' + hlIcon[kind] + '</span>') + '</span>' +
         '<span class="trip-hl-name">' + escapeHtml(name) + '</span>' + (where ? '<span class="trip-hl-where">' + escapeHtml(where) + '</span>' : '') + '</button>';
-    const highlights = (hlV.length || hlH.length || hlA.length)
+    const highlights = (hlV.length || hlH.length || hlR.length || hlA.length)
       ? '<section class="trip-highlights"><div class="yir-eyebrow-sm">HIGHLIGHTS</div><div class="trip-hl-row">' +
         hlV.map(x => hlCard('visit', x.v.id, tripVisitPhotos(x.v), x.r.name || '', restaurantCityOf(x.r))).join('') +
         hlH.map(x => hlCard('hike', x.d.id, tripHikePhotos(x.d), x.h.name || '', x.h.city || '')).join('') +
+        hlR.map(x => hlCard('road', x.rd.id, tripRoadPhotos(x.rd), x.rd.name || '', [x.rd.state, x.rd.country].filter(Boolean).join(', '))).join('') +
         hlA.map(act => hlCard('activity', act.id, tripActivityPhotos(act), act.name || '', '')).join('') + '</div></section>' : '';
 
     const toggle = '<div class="view-toggle trip-view-toggle"><button type="button" class="view-toggle-btn' + (tripView === 'timeline' ? ' active' : '') + '" data-trip-view="timeline">Timeline</button>' +
@@ -20115,7 +20166,6 @@
         (cover ? '<img class="trip-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 1200)) + '" alt="">' : '<span class="trip-hero-ph" aria-hidden="true">🧳</span>') +
         '<div class="trip-hero-shade"></div><div class="trip-hero-text"><h2 class="trip-title" id="trip-title">' + escapeHtml(t.name || 'Untitled trip') + '</h2>' +
         '<p class="trip-dates">' + escapeHtml(tripDateLabel(t)) + '</p></div></div></section>' +
-      (owner ? '<div class="trip-add-row trip-owner"><button type="button" class="btn-primary" data-trip-add="1">+ Add to trip</button></div>' : '') +
       highlights + toolbarRow +
       (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripTimelineHtml(t, linked, owner));
     tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
@@ -20193,6 +20243,7 @@
     renderTripsPage();
   }
   tripCloseBtn.addEventListener('click', closeTrip);
+  tripAddBtn.addEventListener('click', () => { const t = tripFind(tripOpenId); if (t && !guestViewEnabled) tripOpenAddMenu(t); });
   tripEditBtn.addEventListener('click', () => { const t = tripFind(tripOpenId); if (t && !guestViewEnabled) tripOpenForm(t); });
 
   function tripOpenVisit(vid){
@@ -20209,10 +20260,15 @@
     const section = hikeDetailsPanelInner.querySelector('.hike-date-section[data-date-id="' + did + '"]');
     if (section) section.scrollIntoView({ block: 'start' });
   }
+  function tripOpenRoad(rid){
+    const ri = roadRows.findIndex(r => r.id === rid);
+    if (ri === -1) return;
+    openRoadDetailsPanel(ri);
+  }
 
   // ---------- linking, unlinking, pinning ----------
   function tripLinkItems(t, picks){
-    // picks: { visits:[visitId], hikes:[dateId], photos:[photoId] } — set the link, save what changed.
+    // picks: { visits:[visitId], hikes:[dateId], roads:[roadId], photos:[photoId] } — set the link, save what changed.
     let n = 0;
     if (picks.visits && picks.visits.length){
       restaurantRows.forEach(r => (r.visits || []).forEach(v => { if (picks.visits.indexOf(v.id) !== -1){ v.tripId = t.id; n++; } }));
@@ -20222,6 +20278,10 @@
       hikeRows.forEach(h => (h.dates || []).forEach(d => { if (picks.hikes.indexOf(d.id) !== -1){ d.tripId = t.id; n++; } }));
       saveHikeProgress();
     }
+    if (picks.roads && picks.roads.length){
+      roadRows.forEach(rd => { if (picks.roads.indexOf(rd.id) !== -1){ rd.tripId = t.id; n++; } });
+      saveRoadProgress();
+    }
     if (picks.photos && picks.photos.length){
       photoRows.forEach(p => { if (picks.photos.indexOf(p.id) !== -1){ p.tripId = t.id; n++; } });
       savePhotoProgress();
@@ -20230,7 +20290,7 @@
     return n;
   }
   function tripUnlinkItem(t, kind, id){
-    delete t.assign[(kind === 'visit' ? 'v:' : kind === 'hike' ? 'h:' : 'p:') + id];
+    delete t.assign[(kind === 'visit' ? 'v:' : kind === 'hike' ? 'h:' : kind === 'road' ? 'r:' : 'p:') + id];
     if (kind === 'visit'){
       restaurantRows.forEach(r => (r.visits || []).forEach(v => { if (v.id === id && v.tripId === t.id) delete v.tripId; }));
       saveRestaurantProgress();
@@ -20239,6 +20299,10 @@
       hikeRows.forEach(h => (h.dates || []).forEach(d => { if (d.id === id && d.tripId === t.id) delete d.tripId; }));
       saveHikeProgress();
       t.pins.hikes = t.pins.hikes.filter(x => x !== id);
+    } else if (kind === 'road'){
+      roadRows.forEach(rd => { if (rd.id === id && rd.tripId === t.id) delete rd.tripId; });
+      saveRoadProgress();
+      t.pins.roads = t.pins.roads.filter(x => x !== id);
     } else if (kind === 'photo'){
       photoRows.forEach(p => { if (p.id === id && p.tripId === t.id) delete p.tripId; });
       savePhotoProgress();
@@ -20247,7 +20311,7 @@
     tripRefresh();
   }
   function tripTogglePin(t, kind, id){
-    const list = kind === 'visit' ? t.pins.visits : kind === 'hike' ? t.pins.hikes : t.pins.activities;
+    const list = kind === 'visit' ? t.pins.visits : kind === 'hike' ? t.pins.hikes : kind === 'road' ? t.pins.roads : t.pins.activities;
     const i = list.indexOf(id);
     if (i === -1) list.push(id); else list.splice(i, 1);
     saveTripProgress();
@@ -20278,6 +20342,7 @@
     if ((el = e.target.closest('[data-trip-open]'))){
       if (el.dataset.tripOpen === 'visit') tripOpenVisit(el.dataset.id);
       else if (el.dataset.tripOpen === 'hike') tripOpenHike(el.dataset.id);
+      else if (el.dataset.tripOpen === 'road') tripOpenRoad(el.dataset.id);
       else { const act = t.activities.find(a => a.id === el.dataset.id); if (act && !guestViewEnabled) tripOpenActivityForm(t, act); }
       return;
     }
@@ -20289,7 +20354,7 @@
       else if (act === 'pin') tripTogglePin(t, el.dataset.kind, el.dataset.id);
       else if (act === 'place') tripOpenPlaceChooser(t, (el.dataset.keys || '').split(',').filter(Boolean));
       else if (act === 'unlink'){
-        showConfirmModal('Remove from this trip?', 'It stays in your ' + (el.dataset.kind === 'visit' ? 'restaurants' : 'hikes') + '. Any memories you attached to it stay with the trip.', () => tripUnlinkItem(t, el.dataset.kind, el.dataset.id));
+        showConfirmModal('Remove from this trip?', 'It stays in your ' + (el.dataset.kind === 'visit' ? 'restaurants' : el.dataset.kind === 'hike' ? 'hikes' : 'roads') + '. Any memories you attached to it stay with the trip.', () => tripUnlinkItem(t, el.dataset.kind, el.dataset.id));
       }
       return;
     }
@@ -20374,6 +20439,7 @@
       bodyHtml: suggest + '<div class="trip-menu">' +
         '<button type="button" class="trip-menu-row" data-menu="visit"><span>🍽️</span><span>Restaurant visits</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="hike"><span>🥾</span><span>Hikes</span></button>' +
+        '<button type="button" class="trip-menu-row" data-menu="road"><span>🏎️</span><span>Roads</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="activity"><span>🎟️</span><span>An activity</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="photo"><span>📷</span><span>Photos from the Photos tab</span></button>' +
         '<button type="button" class="trip-menu-row" data-menu="upload"><span>⬆️</span><span>Upload photos just for this trip</span></button>' +
@@ -20443,6 +20509,7 @@
     const rows = [];
     if (kind === 'visit') all.visits.forEach(x => rows.push({ id: x.v.id, label: x.r.name || '', sub: [x.date ? tripShortDate(x.date) + ', ' + x.date.slice(0, 4) : 'No date', restaurantCityOf(x.r)].filter(Boolean).join(' · '), date: x.date, taken: x.v.tripId || '' }));
     if (kind === 'hike') all.hikes.forEach(x => rows.push({ id: x.d.id, label: x.h.name || '', sub: [x.date ? tripShortDate(x.date) + ', ' + x.date.slice(0, 4) : 'No date', x.h.city].filter(Boolean).join(' · '), date: x.date, taken: x.d.tripId || '' }));
+    if (kind === 'road') all.roads.forEach(x => rows.push({ id: x.rd.id, label: x.rd.name || '', sub: [x.rd.state, x.rd.country].filter(Boolean).join(', '), date: '', taken: x.rd.tripId || '' }));
     if (kind === 'photo') all.photos.forEach(x => rows.push({ id: x.p.id, url: x.p.url, label: x.date ? tripShortDate(x.date) : '', date: x.date, taken: x.p.tripId || '' }));
     const avail = rows.filter(r => r.taken !== t.id).map(r => Object.assign(r, { inRange: tripContainsDate(t, r.date), blocked: !!r.taken }));
     avail.sort((a, b) => {
@@ -20455,7 +20522,7 @@
     const LIMIT = kind === 'photo' ? 150 : 250;
     let query = '';
 
-    const titles = { visit: 'Add restaurant visits', hike: 'Add hikes', photo: 'Add photos' };
+    const titles = { visit: 'Add restaurant visits', hike: 'Add hikes', road: 'Add roads', photo: 'Add photos' };
     const draw = () => {
       const q = query.trim().toLowerCase();
       const list = avail.filter(r => !q || (r.label + ' ' + (r.sub || '')).toLowerCase().includes(q));
@@ -20503,7 +20570,7 @@
         { label: 'Add', primary: true, id: 'trip-pick-add', onClick: () => {
             const ids = Array.from(selected);
             if (!ids.length) return;
-            const n = tripLinkItems(t, { visits: kind === 'visit' ? ids : [], hikes: kind === 'hike' ? ids : [], photos: kind === 'photo' ? ids : [] });
+            const n = tripLinkItems(t, { visits: kind === 'visit' ? ids : [], hikes: kind === 'hike' ? ids : [], roads: kind === 'road' ? ids : [], photos: kind === 'photo' ? ids : [] });
             tsheetClose();
             showToast('Added ' + otdPlural(n, 'item', 'items') + ' to the trip');
           } }
@@ -20824,6 +20891,7 @@
     const parts = [];
     if (linked.visits.length) parts.push(otdPlural(linked.visits.length, 'restaurant visit', 'restaurant visits'));
     if (linked.hikes.length) parts.push(otdPlural(linked.hikes.length, 'hike', 'hikes'));
+    if (linked.roads.length) parts.push(otdPlural(linked.roads.length, 'road', 'roads'));
     if (linked.photos.length) parts.push(otdPlural(linked.photos.length, 'photo', 'photos'));
     const unlink = parts.length ? parts.join(', ') + ' will be taken out of the trip but kept where they are. ' : '';
     const ownPhotoCount = t.photos.length + t.activities.reduce((n, a) => n + a.photos.length, 0);
@@ -20834,9 +20902,11 @@
     showConfirmModal('Delete “' + (t.name || 'this trip') + '”?', (unlink + ownLine + 'This can\'t be undone.').trim(), () => {
       restaurantRows.forEach(r => (r.visits || []).forEach(v => { if (v.tripId === t.id) delete v.tripId; }));
       hikeRows.forEach(h => (h.dates || []).forEach(d => { if (d.tripId === t.id) delete d.tripId; }));
+      roadRows.forEach(rd => { if (rd.tripId === t.id) delete rd.tripId; });
       photoRows.forEach(p => { if (p.tripId === t.id) delete p.tripId; });
       if (linked.visits.length) saveRestaurantProgress();
       if (linked.hikes.length) saveHikeProgress();
+      if (linked.roads.length) saveRoadProgress();
       if (linked.photos.length) savePhotoProgress();
       tripRows = tripRows.filter(x => x.id !== t.id);
       saveTripProgress();
@@ -21100,6 +21170,24 @@
         if (id) found.d.tripId = id; else delete found.d.tripId;
         saveHikeProgress();
         renderHikeDetailsContent();
+        renderTripsPage();
+        if (tripOpenId) tripRender();
+      }
+    });
+  });
+
+  roadDetailsPanelInner.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-trip-road-link]');
+    if (!btn || guestViewEnabled) return;
+    const rid = btn.dataset.tripRoadLink;
+    const rd = roadRows.find(x => x.id === rid);
+    if (!rd) return;
+    tripOpenChooser({
+      title: 'Add this road to a trip', currentId: rd.tripId || '', dateKey: '',
+      onChoose: (id) => {
+        if (id) rd.tripId = id; else delete rd.tripId;
+        saveRoadProgress();
+        renderRoadDetailsContent();
         renderTripsPage();
         if (tripOpenId) tripRender();
       }
