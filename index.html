@@ -2604,16 +2604,18 @@
   .trip-hl-where{ display: block; margin: 2px 10px 0; font-size: 12px; color: var(--chalk-dim); }
   .trip-toolbar-row{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; }
   .trip-toolbar-row .trip-view-toggle{ margin-top: 0; }
-  .trip-memory-btn{ flex: none; }
-  @media (max-width: 420px){ .trip-memory-btn span{ display: none; } .trip-memory-btn{ padding: 0 14px; } }
+  .trip-memory-btn{ flex: none; width: 40px; height: 40px; padding: 0; font-size: 18px; }
   .trip-view-toggle{ margin-top: 22px; }
   .trip-timeline{ margin-top: 8px; }
-  .trip-memory-btn{ margin: 8px 0 4px; }
   .trip-notes-block{ margin-top: 16px; }
-  .trip-note{ margin-top: 8px; padding: 12px 14px; background: rgba(232, 163, 61, 0.1); border-left: 3px solid var(--amber); border-radius: 0 12px 12px 0; }
+  .trip-note{ margin: 8px 0 0 20px; padding: 12px 14px; background: rgba(232, 163, 61, 0.1); border-left: 3px solid var(--amber); border-radius: 0 12px 12px 0; }
   .trip-note-text{ margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
   .trip-note-meta{ display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--chalk-dim); }
   .trip-item{ display: flex; flex-direction: column; gap: 6px; }
+  .trip-item.dragging{ opacity: 0.4; }
+  .trip-item-row{ display: flex; align-items: stretch; gap: 8px; }
+  .trip-item-row .yir-card{ flex: 1; min-width: 0; }
+  .trip-item-kebab{ flex: none; align-self: flex-start; width: 34px; height: 34px; margin-top: 2px; border-radius: 999px; border: 1px solid var(--panel-line); background: var(--panel); color: var(--chalk-dim); font-family: 'Figtree', sans-serif; font-size: 20px; line-height: 1; cursor: pointer; }
   .trip-item-actions{ display: flex; flex-wrap: wrap; gap: 6px; }
   .trip-mini{ padding: 5px 10px; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); font-family: 'Figtree', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
   .trip-mini.on{ color: var(--amber); border-color: rgba(232, 163, 61, 0.5); }
@@ -14506,6 +14508,11 @@
     t.pins.visits = Array.isArray(t.pins.visits) ? t.pins.visits : [];
     t.pins.hikes = Array.isArray(t.pins.hikes) ? t.pins.hikes : [];
     t.pins.activities = Array.isArray(t.pins.activities) ? t.pins.activities : [];
+    // Manual card order within a place+day (drag-to-reorder on the timeline).
+    // Key: "<placeId>|<date>" (either half may be blank); value: the item keys
+    // ('v:'/'h:'/'a:' + id) in the order chosen. Anything not listed keeps its
+    // normal place at the end, in the usual visits-then-hikes-then-activities order.
+    t.order = (t.order && typeof t.order === 'object') ? t.order : {};
     // An activity lives only inside its trip — a museum, a tour, a class, anything
     // that isn't a restaurant visit or a hike. Its photos are its own, each an
     // upload just like a trip-only photo.
@@ -19859,49 +19866,69 @@
     '</div>';
   }
 
+  // A small "more" button on the card replaces the old row of four buttons —
+  // it opens a short sheet with the same actions (Place, Memory, Pin, Remove).
   function tripItemActions(t, kind, id, anchorType, pinned, placeName, keys, removable){
-    return '<div class="trip-item-actions trip-owner">' +
-      (t.places.length ? '<button type="button" class="trip-mini" data-trip-act="place" data-keys="' + escapeAttr(keys) + '">📍 ' + escapeHtml(placeName || 'Place') + '</button>' : '') +
-      '<button type="button" class="trip-mini" data-trip-act="note" data-anchor-type="' + anchorType + '" data-anchor-id="' + escapeAttr(id) + '">💬 Memory</button>' +
-      '<button type="button" class="trip-mini' + (pinned ? ' on' : '') + '" data-trip-act="pin" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '">' + (pinned ? '★ Pinned' : '☆ Pin') + '</button>' +
-      (removable === false ? '' : '<button type="button" class="trip-mini" data-trip-act="unlink" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '">Remove</button>') +
-    '</div>';
+    return '<button type="button" class="trip-item-kebab trip-owner" data-trip-kebab="1" data-kind="' + kind + '" data-id="' + escapeAttr(id) + '" data-anchor-type="' + anchorType + '" data-keys="' + escapeAttr(keys) + '" data-place="' + escapeAttr(placeName || '') + '" data-pinned="' + (pinned ? '1' : '0') + '" data-removable="' + (removable === false ? '0' : '1') + '" aria-label="More actions">⋯</button>';
+  }
+  function tripOpenItemMenu(t, kind, id, anchorType, pinned, keys, placeName, removable){
+    const row = (act, icon, label) => '<button type="button" class="trip-menu-row" data-item-act="' + act + '"><span>' + icon + '</span><span>' + escapeHtml(label) + '</span></button>';
+    const rows = (t.places.length ? row('place', '📍', placeName || 'Place') : '') +
+      row('note', '💬', 'Memory') +
+      row('pin', pinned ? '★' : '☆', pinned ? 'Pinned' : 'Pin') +
+      (removable ? row('unlink', '🗑️', 'Remove') : '');
+    tsheetOpen({
+      title: 'More',
+      bodyHtml: '<div class="trip-menu">' + rows + '</div>',
+      onOpen: (body) => body.querySelector('.trip-menu').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-item-act]');
+        if (!b) return;
+        const act = b.dataset.itemAct;
+        tsheetClose();
+        if (act === 'place') tripOpenPlaceChooser(t, keys.split(',').filter(Boolean));
+        else if (act === 'note') tripOpenNoteSheet(t, { anchor: { type: anchorType, id } });
+        else if (act === 'pin') tripTogglePin(t, kind, id);
+        else if (act === 'unlink'){
+          showConfirmModal('Remove from this trip?', 'It stays in your ' + (kind === 'visit' ? 'restaurants' : 'hikes') + '. Any memories you attached to it stay with the trip.', () => tripUnlinkItem(t, kind, id));
+        }
+      })
+    });
   }
 
   function tripVisitCardHtml(t, x, noteHtml, placeName){
     const urls = tripVisitPhotos(x.v);
     const strip = urls.length ? '<span class="yir-strip s' + Math.min(3, urls.length) + '">' + urls.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
     const where = [x.r.cuisine, x.r.location].filter(Boolean).join(' · ');
-    return '<div class="trip-item">' +
+    return '<div class="trip-item" data-drag-key="v:' + escapeAttr(x.v.id) + '"><div class="trip-item-row">' +
       '<button type="button" class="yir-card" data-trip-open="visit" data-id="' + escapeAttr(x.v.id) + '">' + strip +
         '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('food', 12) + 'RESTAURANT</span>' +
           (tripVisitNotable(t, x) ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
           '<span class="yir-card-name">' + escapeHtml(x.r.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span></button>' +
-      tripItemActions(t, 'visit', x.v.id, 'visit', t.pins.visits.indexOf(x.v.id) !== -1, placeName, 'v:' + x.v.id, true) + noteHtml + '</div>';
+      tripItemActions(t, 'visit', x.v.id, 'visit', t.pins.visits.indexOf(x.v.id) !== -1, placeName, 'v:' + x.v.id, true) + '</div>' + noteHtml + '</div>';
   }
   function tripHikeCardHtml(t, x, noteHtml, placeName){
     const urls = tripHikePhotos(x.d);
     const strip = urls.length ? '<span class="yir-strip s' + Math.min(3, urls.length) + '">' + urls.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
     const where = [x.h.city, x.h.state].filter(Boolean).join(', ');
-    return '<div class="trip-item">' +
+    return '<div class="trip-item" data-drag-key="h:' + escapeAttr(x.d.id) + '"><div class="trip-item-row">' +
       '<button type="button" class="yir-card" data-trip-open="hike" data-id="' + escapeAttr(x.d.id) + '">' + strip +
         '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('hike', 12) + 'HIKE</span>' +
           (tripHikeNotable(t, x) ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
           '<span class="yir-card-name">' + escapeHtml(x.h.name || '') + '</span>' +
           (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') + '</span></button>' +
-      tripItemActions(t, 'hike', x.d.id, 'hike', t.pins.hikes.indexOf(x.d.id) !== -1, placeName, 'h:' + x.d.id, true) + noteHtml + '</div>';
+      tripItemActions(t, 'hike', x.d.id, 'hike', t.pins.hikes.indexOf(x.d.id) !== -1, placeName, 'h:' + x.d.id, true) + '</div>' + noteHtml + '</div>';
   }
 
   function tripActivityCardHtml(t, act, noteHtml, placeName){
     const urls = tripActivityPhotos(act);
     const strip = urls.length ? '<span class="yir-strip s' + Math.min(3, urls.length) + '">' + urls.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
-    return '<div class="trip-item">' +
+    return '<div class="trip-item" data-drag-key="a:' + escapeAttr(act.id) + '"><div class="trip-item-row">' +
       '<button type="button" class="yir-card" data-trip-open="activity" data-id="' + escapeAttr(act.id) + '">' + strip +
         '<span class="yir-card-body"><span class="yir-row"><span class="yir-chip">' + yirIcon('activity', 12) + 'ACTIVITY</span>' +
           (t.pins.activities.indexOf(act.id) !== -1 ? '<span class="trip-notable">⭐ Notable</span>' : '') + '</span>' +
           '<span class="yir-card-name">' + escapeHtml(act.name || '') + '</span></span></button>' +
-      tripItemActions(t, 'activity', act.id, 'activity', t.pins.activities.indexOf(act.id) !== -1, placeName, 'a:' + act.id, false) + noteHtml + '</div>';
+      tripItemActions(t, 'activity', act.id, 'activity', t.pins.activities.indexOf(act.id) !== -1, placeName, 'a:' + act.id, false) + '</div>' + noteHtml + '</div>';
   }
 
   // The timeline. With places, each place is a heading in route order and holds
@@ -19941,9 +19968,21 @@
       const pname = pid ? placeNameOf(pid) : '';
       return keys.map((key, ki) => {
         const d = g.get(key);
-        const cards = d.visits.map(x => tripVisitCardHtml(t, x, noteBlock(forAnchor('visit', x.v.id)), pname)).join('') +
-          d.hikes.map(x => tripHikeCardHtml(t, x, noteBlock(forAnchor('hike', x.d.id)), pname)).join('') +
-          d.activities.map(act => tripActivityCardHtml(t, act, noteBlock(forAnchor('activity', act.id)), pname)).join('');
+        let cardItems = [].concat(
+          d.visits.map(x => ({ k: 'v:' + x.v.id, html: tripVisitCardHtml(t, x, noteBlock(forAnchor('visit', x.v.id)), pname) })),
+          d.hikes.map(x => ({ k: 'h:' + x.d.id, html: tripHikeCardHtml(t, x, noteBlock(forAnchor('hike', x.d.id)), pname) })),
+          d.activities.map(act => ({ k: 'a:' + act.id, html: tripActivityCardHtml(t, act, noteBlock(forAnchor('activity', act.id)), pname) }))
+        );
+        const groupKey = pid + '|' + key;
+        const order = t.order[groupKey];
+        if (order && order.length){
+          const rank = new Map(order.map((k, i) => [k, i]));
+          cardItems = cardItems
+            .map((it, i) => ({ it, sort: rank.has(it.k) ? rank.get(it.k) : 1000 + i }))
+            .sort((a, b) => a.sort - b.sort)
+            .map(x => x.it);
+        }
+        const cards = cardItems.map(it => it.html).join('');
         const photoUrls = d.photos.map(p => p.url);
         const photosCard = photoUrls.length ? '<div class="yir-photos-card"><div class="yir-row"><span class="yir-chip">' + yirIcon('camera', 12) + 'PHOTOS</span><span class="yir-dim">' +
           escapeHtml(otdPlural(photoUrls.length, 'photo', 'photos')) + '</span>' +
@@ -19967,7 +20006,7 @@
         } else {
           badge = '<span class="yir-day-num">—</span><span class="yir-day-dow">no date</span>';
         }
-        return monthHead + '<div class="yir-day"><div class="yir-day-badge">' + badge + '</div><div class="yir-day-cards">' + cards + photosCard + dayNoteHtml + '</div></div>';
+        return monthHead + '<div class="yir-day"><div class="yir-day-badge">' + badge + '</div><div class="yir-day-cards" data-group-key="' + escapeAttr(pid + '|' + key) + '">' + cards + photosCard + dayNoteHtml + '</div></div>';
       }).join('');
     };
 
@@ -19980,7 +20019,7 @@
         const inner = daysHtml(p.id);
         body += '<section class="trip-place"><div class="trip-place-head"><span class="trip-place-name"><span aria-hidden="true">📍</span> ' + escapeHtml(p.name) + '</span>' +
           (span ? '<span class="trip-place-dates">' + escapeHtml(span) + '</span>' : '') +
-          (owner ? '<button type="button" class="trip-mini trip-owner" data-trip-act="note" data-anchor-type="place" data-anchor-id="' + escapeAttr(p.id) + '">💬 Memory</button>' : '') + '</div>' +
+          (owner ? '<button type="button" class="trip-mini trip-owner" data-trip-act="note" data-anchor-type="place" data-anchor-id="' + escapeAttr(p.id) + '" aria-label="Add a memory for ' + escapeAttr(p.name) + '">💬</button>' : '') + '</div>' +
           placeNotes + inner + ((!inner && !placeNotes && owner) ? '<p class="trip-place-empty trip-owner">Nothing here yet.</p>' : '') + '</section>';
       });
       const other = daysHtml('');
@@ -20053,7 +20092,7 @@
 
     const toggle = '<div class="view-toggle trip-view-toggle"><button type="button" class="view-toggle-btn' + (tripView === 'timeline' ? ' active' : '') + '" data-trip-view="timeline">Timeline</button>' +
       '<button type="button" class="view-toggle-btn' + (tripView === 'gallery' ? ' active' : '') + '" data-trip-view="gallery">Gallery</button></div>';
-    const memoryBtn = owner ? '<button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="">💬 Add a memory</button>' : '';
+    const memoryBtn = owner ? '<button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="" aria-label="Add a memory">💬</button>' : '';
     const toolbarRow = '<div class="trip-toolbar-row">' + toggle + memoryBtn + '</div>';
 
     tripContent.innerHTML =
@@ -20065,7 +20104,49 @@
       highlights + toolbarRow +
       (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripTimelineHtml(t, linked, owner));
     tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
+    tripWireItemDrag(t);
     tripScroll.scrollTop = prevTop;
+  }
+
+  // Drag-and-drop reordering of restaurant/hike/activity cards within a day's
+  // group. Each ".trip-item" already carries its attached memory (rendered
+  // inside the same div), so dragging the card carries the note along with
+  // it automatically. Standard HTML5 drag events — the app's touch layer
+  // (see setupTouchDrag) turns a finger's press-and-hold-then-move into the
+  // same events, so this works on a phone without any extra wiring here.
+  function tripWireItemDrag(t){
+    if (guestViewEnabled || tripView !== 'timeline') return;
+    let dragEl = null;
+    tripContent.querySelectorAll('.yir-day-cards').forEach(container => {
+      const items = Array.from(container.children).filter(el => el.classList.contains('trip-item'));
+      if (items.length < 2) return; // nothing to reorder
+      items.forEach(item => {
+        item.setAttribute('draggable', 'true');
+        item.addEventListener('dragstart', (e) => {
+          dragEl = item;
+          item.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', item.dataset.dragKey || '');
+        });
+        item.addEventListener('dragend', () => {
+          item.classList.remove('dragging');
+          if (!dragEl) return;
+          dragEl = null;
+          const keys = Array.from(container.children).filter(el => el.classList.contains('trip-item')).map(el => el.dataset.dragKey).filter(Boolean);
+          t.order[container.dataset.groupKey] = keys;
+          saveTripProgress();
+          tripRender();
+        });
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (!dragEl || dragEl === item || !item.parentNode) return;
+          if (isBeforeInDom(dragEl, item)) item.parentNode.insertBefore(dragEl, item.nextSibling);
+          else item.parentNode.insertBefore(dragEl, item);
+        });
+        item.addEventListener('drop', (e) => { e.preventDefault(); });
+      });
+    });
   }
 
   function openTrip(id){
@@ -20176,6 +20257,10 @@
     }
     if (guestViewEnabled) return; // everything below changes something — the owner's alone
     if (e.target.closest('[data-trip-add]')){ tripOpenAddMenu(t); return; }
+    if ((el = e.target.closest('[data-trip-kebab]'))){
+      tripOpenItemMenu(t, el.dataset.kind, el.dataset.id, el.dataset.anchorType, el.dataset.pinned === '1', el.dataset.keys || '', el.dataset.place, el.dataset.removable !== '0');
+      return;
+    }
     if ((el = e.target.closest('[data-trip-act]'))){
       const act = el.dataset.tripAct;
       if (act === 'note') tripOpenNoteSheet(t, { anchor: { type: el.dataset.anchorType, id: el.dataset.anchorId || '' } });
