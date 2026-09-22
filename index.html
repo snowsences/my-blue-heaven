@@ -2559,8 +2559,15 @@
 
   /* ---------- TRIPS (see the TRIPS blocks in the script) ---------- */
   .trip-actions-row{ display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 14px; }
-  .trip-grid{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  @media (min-width: 640px){ .trip-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .trip-grid{ position: relative; }
+  .trip-tl-year{ display: flex; align-items: center; gap: 16px; height: 34px; position: relative; }
+  .trip-tl-year:first-child{ height: 26px; }
+  .trip-tl-spine-col{ width: 22px; flex: none; align-self: stretch; position: relative; display: flex; justify-content: center; }
+  .trip-tl-spine-col::before{ content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: rgba(241, 236, 222, 0.14); }
+  .trip-tl-year-label{ font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); background: var(--bg); padding-right: 8px; }
+  .trip-tl-row{ display: flex; gap: 16px; position: relative; padding-bottom: 20px; }
+  .trip-tl-row:last-child .trip-tl-spine-col::before{ bottom: auto; height: 38px; }
+  .trip-tl-dot{ position: relative; top: 36px; width: 12px; height: 12px; flex: none; border-radius: 999px; background: var(--amber); box-shadow: 0 0 0 5px var(--bg); z-index: 2; }
   .trip-card{
     position: relative; display: block; width: 100%; padding: 0; overflow: hidden;
     aspect-ratio: 16 / 10; border: 1px solid var(--panel-line); border-radius: 18px;
@@ -7251,18 +7258,36 @@
   });
 
   // Cloudinary's free plan hard-caps image uploads at 10MB — phone camera
-  // photos routinely exceed this. Downscales dimensions first (this app
-  // never displays a photo anywhere near this large — even the lightbox,
-  // its biggest use, is comfortably served by 2000px on the long side),
-  // then re-encodes as JPEG, stepping quality down further only if still
-  // needed. Small files pass through completely untouched — re-encoding a
-  // JPEG that doesn't need it just loses quality for no reason.
+  // photos routinely exceed this. But FILE SIZE alone is not a safe signal
+  // to skip resizing on: a very high-megapixel photo (modern phones easily
+  // shoot 48MP+) can still be a modest number of bytes if it compresses
+  // well, while still being far too many PIXELS for the browser to hold
+  // as a canvas or decode for an <img> — that mismatch is what was
+  // crashing the tab (Android Chrome's "Aw, Snap") on some photos even
+  // though the same crash never showed up in testing here, since it only
+  // bites once dimensions get large enough. So this always decodes the
+  // photo to check its actual dimensions, and only then decides whether
+  // a resize is needed — never skips based on byte size alone. Re-encodes
+  // as JPEG, stepping quality down further only if still needed. A photo
+  // that's already small on both axes passes through completely
+  // untouched — re-encoding a JPEG that doesn't need it just loses
+  // quality for no reason.
   const CLOUDINARY_TARGET_BYTES = 9.5 * 1024 * 1024; // small safety margin under Cloudinary's exact 10MB cap
   const CLOUDINARY_MAX_DIMENSION = 2000;
+  // Photos that never reach Cloudinary (not configured, or its upload
+  // failed) are instead held as base64 data URLs — directly in this
+  // app's own storage and in cloud sync, and rendered straight into
+  // <img src> tags. Those need to stay considerably smaller than
+  // Cloudinary's own budget: a data URL is ~33% bigger than the file it
+  // encodes, and unlike a Cloudinary URL there's no separate "request a
+  // smaller version" — whatever size is stored is the size every <img>
+  // of it decodes, every time it's shown.
+  const LOCAL_TARGET_BYTES = 1.5 * 1024 * 1024;
+  const LOCAL_MAX_DIMENSION = 1600;
 
-  function compressImageForCloudinary(file){
+  function compressImage(file, maxDimension, targetBytes){
     return new Promise((resolve) => {
-      if (!file || file.size <= CLOUDINARY_TARGET_BYTES){
+      if (!file){
         resolve(file);
         return;
       }
@@ -7271,8 +7296,12 @@
       img.onload = () => {
         URL.revokeObjectURL(objectUrl);
         let { width, height } = img;
-        if (width > CLOUDINARY_MAX_DIMENSION || height > CLOUDINARY_MAX_DIMENSION){
-          const scale = CLOUDINARY_MAX_DIMENSION / Math.max(width, height);
+        if (width <= maxDimension && height <= maxDimension && file.size <= targetBytes){
+          resolve(file); // small enough on every axis already — leave it alone
+          return;
+        }
+        if (width > maxDimension || height > maxDimension){
+          const scale = maxDimension / Math.max(width, height);
           width = Math.round(width * scale);
           height = Math.round(height * scale);
         }
@@ -7288,7 +7317,7 @@
               resolve(file); // encoding failed for some reason — fall back to the original rather than losing the photo entirely
               return;
             }
-            if (blob.size <= CLOUDINARY_TARGET_BYTES || quality <= 0.4){
+            if (blob.size <= targetBytes || quality <= 0.4){
               resolve(blob);
             } else {
               tryQuality(quality - 0.15);
@@ -7304,6 +7333,8 @@
       img.src = objectUrl;
     });
   }
+  function compressImageForCloudinary(file){ return compressImage(file, CLOUDINARY_MAX_DIMENSION, CLOUDINARY_TARGET_BYTES); }
+  function compressImageForLocalStorage(file){ return compressImage(file, LOCAL_MAX_DIMENSION, LOCAL_TARGET_BYTES); }
 
   // Requests a resized, auto-compressed, auto-formatted version of a photo
   // via Cloudinary's URL-transformation syntax, rather than always loading
@@ -7390,7 +7421,8 @@
       }
     }
     try{
-      return await fileToDataUrl(file);
+      const compact = await compressImageForLocalStorage(file);
+      return await fileToDataUrl(compact);
     }catch(e){
       showToast("Couldn't read that image");
       return null;
@@ -19864,22 +19896,33 @@
   };
 
   // ---------- the list of trips ----------
+  // The list as a vertical timeline: a single line runs down the left with a
+  // dot at each trip, and a year label breaks in wherever the year changes —
+  // scrolling down reads like paging back through past trips.
   function renderTripsPage(){
     const trips = tripSorted();
     tripEmptyMsg.style.display = trips.length ? 'none' : 'block';
-    tripGridEl.innerHTML = trips.map(t => {
+    let html = '';
+    let lastYear = null;
+    trips.forEach((t, i) => {
+      const year = String(t.startDate || '').slice(0, 4);
+      if (year && year !== lastYear){
+        html += '<div class="trip-tl-year"><span class="trip-tl-spine-col"></span><span class="trip-tl-year-label">' + escapeHtml(year) + '</span></div>';
+        lastYear = year;
+      }
       const linked = tripLinked(t);
       const gallery = tripGallery(t, linked);
       const cover = tripCoverUrl(t, gallery);
-      const counts = tripCountsText(linked, gallery.length);
-      return '<button type="button" class="trip-card" data-trip-id="' + escapeAttr(t.id) + '">' +
-        (cover ? '<img class="trip-card-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 800)) + '" alt="" loading="lazy" decoding="async">' : '<span class="trip-card-ph" aria-hidden="true">🧳</span>') +
-        '<span class="trip-card-shade"></span>' +
-        '<span class="trip-card-text"><span class="trip-card-name">' + escapeHtml(t.name || 'Untitled trip') + '</span>' +
-          '<span class="trip-card-date">' + escapeHtml(tripDateLabel(t)) + '</span>' +
-          (counts ? '<span class="trip-card-counts">' + escapeHtml(counts) + '</span>' : '') + '</span>' +
-      '</button>';
-    }).join('');
+      html += '<div class="trip-tl-row">' +
+        '<span class="trip-tl-spine-col"><span class="trip-tl-dot"></span></span>' +
+        '<button type="button" class="trip-card" data-trip-id="' + escapeAttr(t.id) + '">' +
+          (cover ? '<img class="trip-card-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 800)) + '" alt="" loading="lazy" decoding="async">' : '<span class="trip-card-ph" aria-hidden="true">🧳</span>') +
+          '<span class="trip-card-shade"></span>' +
+          '<span class="trip-card-text"><span class="trip-card-name">' + escapeHtml(t.name || 'Untitled trip') + '</span>' +
+            '<span class="trip-card-date">' + escapeHtml(tripDateLabel(t)) + '</span></span>' +
+        '</button></div>';
+    });
+    tripGridEl.innerHTML = html;
     tripGridEl.querySelectorAll('.trip-card-img').forEach(img => img.addEventListener('error', () => img.remove()));
   }
   tripGridEl.addEventListener('click', (e) => {
