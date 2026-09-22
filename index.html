@@ -2650,12 +2650,16 @@
   .trip-place.other .trip-place-name{ color: var(--chalk-dim); font-size: 16px; }
   .trip-photos-place{ margin-left: auto; }
   .tf-places{ display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .tf-place-item-wrap{ display: flex; flex-direction: column; }
   .tf-place-item{ display: flex; align-items: center; gap: 8px; }
   .tf-place-btns{ flex: none; display: flex; flex-direction: column; gap: 2px; }
   .tf-arrow{ width: 34px; height: 22px; padding: 0; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel); color: var(--chalk); font-size: 10px; line-height: 1; cursor: pointer; }
   .tf-arrow:disabled{ opacity: 0.3; cursor: default; }
-  .tf-place-main{ flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .tf-place-days{ font-size: 12px; color: var(--chalk-dim); padding-left: 4px; }
+  .tf-place-main{ flex: 1; min-width: 0; display: flex; gap: 6px; }
+  .tf-place-name{ flex: 1; min-width: 0; }
+  .tf-place-main .tf-place-date{ flex: none; width: 132px; padding: 0 8px; font-size: 13px; }
+  .tf-place-days{ margin: 2px 0 0 42px; font-size: 12px; color: var(--chalk-dim); }
+  @media (max-width: 380px){ .tf-place-main .tf-place-date{ width: 116px; } }
   .tf-place-x{ flex: none; width: 34px; height: 34px; font-size: 14px; }
   .li-choose{ width: 100%; }
   .li-read{ width: 100%; margin-top: 8px; }
@@ -5008,7 +5012,7 @@
         </div>
 
         <div class="insights-block" id="rest-topdish-block">
-          <p class="insights-block-title">11–12/10 Dishes per Visit</p>
+          <p class="insights-block-title">11–13/10 Dishes per Visit</p>
           <div class="artist-list" id="rest-topdish-list"></div>
         </div>
 
@@ -11890,7 +11894,7 @@
         { rightLabel: a => '#' + a.rank, countText: a => a.count + ' visits' });
     }
 
-    // 11–12/10 dishes per visit: how many of a place's dishes scored 11 or 12,
+    // 11–13/10 dishes per visit: how many of a place's dishes scored 11, 12 or 13,
     // divided by the visits that have scored dishes logged. A rate rather than
     // a total, so a restaurant visited once with two standouts isn't buried by
     // one you've been to ten times — the visit count sits alongside so
@@ -20083,7 +20087,7 @@
         body += '<section class="trip-place"><div class="trip-place-head"><span class="trip-place-name"><span aria-hidden="true">📍</span> ' + escapeHtml(p.name) + '</span>' +
           (span ? '<span class="trip-place-dates">' + escapeHtml(span) + '</span>' : '') +
           (owner ? '<button type="button" class="trip-mini trip-owner" data-trip-act="note" data-anchor-type="place" data-anchor-id="' + escapeAttr(p.id) + '" aria-label="Add a memory for ' + escapeAttr(p.name) + '">💬</button>' : '') + '</div>' +
-          placeNotes + inner + ((!inner && !placeNotes && owner) ? '<p class="trip-place-empty trip-owner">Nothing here yet.</p>' : '') + '</section>';
+          placeNotes + inner + '</section>';
       });
       const other = daysHtml('');
       if (other) body += '<section class="trip-place other"><div class="trip-place-head"><span class="trip-place-name">Other</span></div>' + other + '</section>';
@@ -20694,12 +20698,16 @@
     const gallery = t ? tripGallery(t, tripLinked(t)).slice(0, 30) : [];
     // Places are rows you can rename, move up or down (that order is the order of the timeline) or remove.
     const placesHtml = () => draft.places.map((p, i) =>
-      '<div class="tf-place-item"><span class="tf-place-btns">' +
+      '<div class="tf-place-item-wrap"><div class="tf-place-item"><span class="tf-place-btns">' +
         '<button type="button" class="tf-arrow" data-place-up="' + i + '"' + (i === 0 ? ' disabled' : '') + ' aria-label="Move ' + escapeAttr(p.name) + ' up">▲</button>' +
         '<button type="button" class="tf-arrow" data-place-down="' + i + '"' + (i === draft.places.length - 1 ? ' disabled' : '') + ' aria-label="Move ' + escapeAttr(p.name) + ' down">▼</button></span>' +
-      '<span class="tf-place-main"><input type="text" class="tf-input tf-place-name" data-place-name="' + i + '" value="' + escapeAttr(p.name) + '" aria-label="Place name" autocomplete="off">' +
-        (p.days.length ? '<span class="tf-place-days">' + escapeHtml(tripSpanLabel(p.days)) + '</span>' : '') + '</span>' +
-      '<button type="button" class="trip-chip-x tf-place-x" data-place-x="' + i + '" aria-label="Remove ' + escapeAttr(p.name) + '">✕</button></div>').join('');
+      '<span class="tf-place-main">' +
+        '<input type="text" class="tf-input tf-place-name" data-place-name="' + i + '" value="' + escapeAttr(p.name) + '" aria-label="Place name" autocomplete="off">' +
+        '<input type="date" class="tf-input tf-place-date" data-place-date="' + i + '" value="' + escapeAttr(p.days.length ? p.days.slice().sort()[0] : '') + '" aria-label="Date for ' + escapeAttr(p.name) + '">' +
+      '</span>' +
+      '<button type="button" class="trip-chip-x tf-place-x" data-place-x="' + i + '" aria-label="Remove ' + escapeAttr(p.name) + '">✕</button></div>' +
+      (p.days.length > 1 ? '<span class="tf-place-days">' + escapeHtml(tripSpanLabel(p.days)) + ' currently — editing the date sets a single day</span>' : '') +
+      '</div>').join('');
     tsheetOpen({
       title: isNew ? 'New trip' : 'Edit trip',
       bodyHtml:
@@ -20778,7 +20786,15 @@
         });
         placesEl.addEventListener('input', (e) => {
           const n = e.target.closest('[data-place-name]');
-          if (n) draft.places[Number(n.dataset.placeName)].name = n.value;
+          if (n){ draft.places[Number(n.dataset.placeName)].name = n.value; return; }
+          const d = e.target.closest('[data-place-date]');
+          if (d){
+            const idx = Number(d.dataset.placeDate);
+            draft.places[idx].days = d.value ? [d.value] : [];
+            // The multi-day hint under the row only makes sense before it's edited down to one day — drop it without a full redraw so focus isn't lost.
+            const hint = d.closest('.tf-place-item').nextElementSibling;
+            if (hint && hint.classList.contains('tf-place-days')) hint.remove();
+          }
         });
         const covers = body.querySelector('#tf-covers');
         if (covers){
