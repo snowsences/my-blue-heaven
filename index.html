@@ -2560,13 +2560,22 @@
   /* ---------- TRIPS (see the TRIPS blocks in the script) ---------- */
   .trip-actions-row{ display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 14px; }
   .trip-grid{ position: relative; }
-  .trip-tl-year{ display: flex; align-items: center; gap: 16px; height: 34px; position: relative; }
+  .trip-tl-year{ display: flex; align-items: center; gap: 16px; height: 34px; position: relative; margin-bottom: 20px; }
   .trip-tl-year:first-child{ height: 26px; }
   .trip-tl-spine-col{ width: 22px; flex: none; align-self: stretch; position: relative; display: flex; justify-content: center; }
-  .trip-tl-spine-col::before{ content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: rgba(241, 236, 222, 0.14); }
+  /* One continuous line, built from typed segments so it starts exactly at
+     the first trip's dot and ends exactly at the last trip's dot — never
+     above the first or below the last. Each row draws only the piece of
+     line that belongs to it; "-full" bridges into the row's own trailing
+     margin so consecutive segments touch with no gap. The dot sits 36px
+     down plus half its own 12px, i.e. 42px — every segment's start/stop
+     point lines up with that same number. */
+  .trip-tl-line{ position: absolute; left: 50%; width: 2px; margin-left: -1px; background: rgba(241, 236, 222, 0.14); }
+  .trip-tl-line-full{ top: 0; bottom: -20px; }
+  .trip-tl-line-fromdot{ top: 42px; bottom: -20px; }
+  .trip-tl-line-todot{ top: 0; height: 42px; }
   .trip-tl-year-label{ font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); background: var(--bg); padding-right: 8px; }
-  .trip-tl-row{ display: flex; gap: 16px; position: relative; padding-bottom: 20px; }
-  .trip-tl-row:last-child .trip-tl-spine-col::before{ bottom: auto; height: 38px; }
+  .trip-tl-row{ display: flex; gap: 16px; position: relative; margin-bottom: 20px; }
   .trip-tl-dot{ position: relative; top: 36px; width: 12px; height: 12px; flex: none; border-radius: 999px; background: var(--amber); box-shadow: 0 0 0 5px var(--bg); z-index: 2; }
   .trip-card{
     position: relative; display: block; width: 100%; padding: 0; overflow: hidden;
@@ -5564,6 +5573,15 @@
         <p class="footer-note" style="margin-top:10px;">Export from MusicBee: Tools &gt; Additional Tagging Tools &gt; Library Report, with columns Album Artist, Album, Track #, Title, Rating, Love.</p>
       </div>
 
+      <div class="settings-section">
+        <h2 class="settings-section-title">Photo Cleanup</h2>
+        <p class="footer-note" style="margin-top:0;">Photos saved before a fix to how they're resized may still be stored at full size, which can make the app crash when they're shown. This checks every restaurant, hike, park, road, photo and trip and shrinks any that are still oversized — it can take a few minutes with a lot of photos, and it's safe to run more than once.</p>
+        <div class="import-row" style="margin-top:10px;">
+          <span id="photo-cleanup-status-text">Not run yet</span>
+          <button class="btn-ghost" id="photo-cleanup-btn" type="button">Check &amp; Shrink Photos</button>
+        </div>
+      </div>
+
       <!-- Future: <div class="settings-section"><h2 class="settings-section-title">Restaurant Ranker Settings</h2>...</div> -->
     </div>
   </div>
@@ -7428,6 +7446,113 @@
       return null;
     }
   }
+
+  // ---------- Photo Cleanup (Settings): shrink any photo already stored at
+  // full size from before the dimension check above existed. Only touches
+  // locally-stored data-URL photos — anything hosted on Cloudinary is
+  // already served resized on the fly (cloudinaryThumbUrl) and is untouched
+  // here. Processes one photo at a time, on purpose: decoding several huge
+  // photos at once is the same memory spike this whole fix exists to avoid.
+  async function shrinkStoredPhotoIfNeeded(url){
+    if (!url || typeof url !== 'string' || url.indexOf('data:image') !== 0) return null;
+    try{
+      const blob = await (await fetch(url)).blob();
+      const fixed = await compressImageForLocalStorage(blob);
+      if (fixed === blob) return null; // already within the size/dimension target
+      return await fileToDataUrl(fixed);
+    }catch(e){
+      return null; // leave it alone rather than risk losing the photo
+    }
+  }
+
+  async function runPhotoCleanup(){
+    if (guestViewEnabled) return;
+    const btn = document.getElementById('photo-cleanup-btn');
+    const statusEl = document.getElementById('photo-cleanup-status-text');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    let checked = 0, fixed = 0;
+    const touched = new Set();
+    const setStatus = (msg) => { statusEl.textContent = msg; };
+    setStatus('Checking photos\u2026');
+
+    const process = async (getUrl, setUrl, tag) => {
+      const url = getUrl();
+      checked++;
+      if (checked % 4 === 0) setStatus('Checked ' + checked + ' photos, shrunk ' + fixed + '\u2026');
+      const newUrl = await shrinkStoredPhotoIfNeeded(url);
+      if (newUrl){ setUrl(newUrl); fixed++; touched.add(tag); }
+    };
+
+    for (const r of restaurantRows){
+      if (r.coverPhoto) await process(() => r.coverPhoto, (u) => { r.coverPhoto = u; }, 'restaurant');
+      for (const v of (r.visits || [])){
+        for (const c of (v.courses || [])){
+          const arr = ensureCoursePhotosArray(c);
+          for (let i = 0; i < arr.length; i++) await process(() => arr[i], (u) => { arr[i] = u; }, 'restaurant');
+        }
+        const vp = v.photos || [];
+        for (let i = 0; i < vp.length; i++) await process(() => vp[i], (u) => { vp[i] = u; }, 'restaurant');
+      }
+    }
+
+    for (const h of hikeRows){
+      if (h.coverPhoto) await process(() => h.coverPhoto, (u) => { h.coverPhoto = u; }, 'hike');
+      for (const d of (h.dates || [])){
+        for (const p of (d.photos || [])){
+          if (!p) continue;
+          await process(() => p.url, (u) => { p.url = u; }, 'hike');
+        }
+      }
+    }
+
+    for (const pk of parkRows){
+      if (pk.coverPhoto) await process(() => pk.coverPhoto, (u) => { pk.coverPhoto = u; }, 'park');
+      for (const p of (pk.photos || [])){
+        if (!p) continue;
+        await process(() => p.url, (u) => { p.url = u; }, 'park');
+      }
+    }
+
+    for (const rd of roadRows){
+      if (rd.coverPhoto) await process(() => rd.coverPhoto, (u) => { rd.coverPhoto = u; }, 'road');
+      for (const p of (rd.photos || [])){
+        if (!p) continue;
+        await process(() => p.url, (u) => { p.url = u; }, 'road');
+      }
+    }
+
+    for (const p of photoRows){
+      if (!p) continue;
+      await process(() => p.url, (u) => { p.url = u; }, 'photo');
+    }
+
+    for (const t of tripRows){
+      if (t.coverPhoto) await process(() => t.coverPhoto, (u) => { t.coverPhoto = u; }, 'trip');
+      for (const p of (t.photos || [])){
+        if (!p) continue;
+        await process(() => p.url, (u) => { p.url = u; }, 'trip');
+      }
+      for (const act of (t.activities || [])){
+        for (const p of (act.photos || [])){
+          if (!p) continue;
+          await process(() => p.url, (u) => { p.url = u; }, 'trip');
+        }
+      }
+    }
+
+    if (touched.has('restaurant')){ saveRestaurantProgress(); renderRestaurantsPage(); if (openRestaurantIndex !== null) renderRestaurantDetailsContent(); }
+    if (touched.has('hike')){ saveHikeProgress(); renderHikesPage(); if (openHikeIndex !== null) renderHikeDetailsContent(); }
+    if (touched.has('park')){ saveParkProgress(); renderParksPage(); }
+    if (touched.has('road')){ saveRoadProgress(); renderRoadsPage(); }
+    if (touched.has('photo')){ savePhotoProgress(); renderPhotosPage(); }
+    if (touched.has('trip')){ saveTripProgress(); renderTripsPage(); if (tripOpenId) tripRender(); }
+
+    btn.disabled = false;
+    setStatus(fixed ? ('Shrunk ' + fixed + ' of ' + checked + ' photo' + (checked === 1 ? '' : 's') + ' checked.') : ('Checked ' + checked + ' photo' + (checked === 1 ? '' : 's') + ' \u2014 none needed shrinking.'));
+    showToast(fixed ? ('Shrunk ' + fixed + ' oversized photo' + (fixed === 1 ? '' : 's')) : 'No oversized photos found');
+  }
+  document.getElementById('photo-cleanup-btn').addEventListener('click', runPhotoCleanup);
 
   loadCloudinaryConfig();
 
@@ -19904,17 +20029,28 @@
     tripEmptyMsg.style.display = trips.length ? 'none' : 'block';
     let html = '';
     let lastYear = null;
+    let spineStarted = false; // becomes true once the first trip's dot has been drawn
     trips.forEach((t, i) => {
       const year = String(t.startDate || '').slice(0, 4);
       if (year && year !== lastYear){
-        html += '<div class="trip-tl-year"><span class="trip-tl-spine-col"></span><span class="trip-tl-year-label">' + escapeHtml(year) + '</span></div>';
+        // A marker before any trip has appeared sits above the first dot — no line there.
+        // Every later marker is sandwiched between two trips, so its line always runs full.
+        const markerLine = spineStarted ? '<span class="trip-tl-line trip-tl-line-full"></span>' : '';
+        html += '<div class="trip-tl-year"><span class="trip-tl-spine-col">' + markerLine + '</span><span class="trip-tl-year-label">' + escapeHtml(year) + '</span></div>';
         lastYear = year;
       }
+      const isLast = i === trips.length - 1;
+      // A single-trip list needs no line at all — nothing to connect to on either side.
+      let lineClass = 'trip-tl-line-full';
+      if (!spineStarted && isLast) lineClass = '';
+      else if (!spineStarted) lineClass = 'trip-tl-line-fromdot';
+      else if (isLast) lineClass = 'trip-tl-line-todot';
+      spineStarted = true;
       const linked = tripLinked(t);
       const gallery = tripGallery(t, linked);
       const cover = tripCoverUrl(t, gallery);
       html += '<div class="trip-tl-row">' +
-        '<span class="trip-tl-spine-col"><span class="trip-tl-dot"></span></span>' +
+        '<span class="trip-tl-spine-col">' + (lineClass ? '<span class="trip-tl-line ' + lineClass + '"></span>' : '') + '<span class="trip-tl-dot"></span></span>' +
         '<button type="button" class="trip-card" data-trip-id="' + escapeAttr(t.id) + '">' +
           (cover ? '<img class="trip-card-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 800)) + '" alt="" loading="lazy" decoding="async">' : '<span class="trip-card-ph" aria-hidden="true">🧳</span>') +
           '<span class="trip-card-shade"></span>' +
