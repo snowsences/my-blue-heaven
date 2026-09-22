@@ -7591,7 +7591,10 @@
     artLightboxOverlay.classList.add('multi');
     artLightboxOverlay.classList.add('show');
     lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
-    lightboxDeleteBtn.classList.toggle('show', !!lightboxCoverContext);
+    // A trip's gallery mixes photos from several different sources (visits,
+    // hikes, roads, activities, trip-only uploads, the Photos tab) — there's
+    // no single safe "delete" for that mix, so only the cover picker applies here.
+    lightboxDeleteBtn.classList.toggle('show', !!lightboxCoverContext && lightboxCoverContext.tripId === undefined);
     updateLightboxCounter();
     updateLightboxCoverToggle();
     updateLightboxCaption();
@@ -7622,6 +7625,9 @@
     }
     if (context.parkIndex !== undefined){
       return { row: parkRows[context.parkIndex], index: context.parkIndex, setCover: setParkCoverPhoto, deletePhoto: deleteParkPhoto, gatherPhotos: gatherAllParkLightboxPhotos };
+    }
+    if (context.tripId !== undefined){
+      return { row: tripFind(context.tripId), index: context.tripId, setCover: setTripCoverPhoto, deletePhoto: null, gatherPhotos: null };
     }
     return null;
   }
@@ -7740,7 +7746,7 @@
     e.stopPropagation();
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     const handler = resolveLightboxCoverHandler(lightboxCoverContext);
-    if (!handler) return;
+    if (!handler || typeof handler.deletePhoto !== 'function') return;
     const url = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
     handler.deletePhoto(handler.index, url);
     showToast('Photo deleted');
@@ -14692,6 +14698,14 @@
     });
     return unique;
   }
+  function setTripCoverPhoto(tripId, url){
+    if (guestViewEnabled) return;
+    const t = tripFind(tripId);
+    if (!t) return;
+    t.coverPhoto = url;
+    saveTripProgress();
+    tripRefresh();
+  }
   function tripCoverUrl(t, gallery){
     if (t.coverPhoto && gallery.some(g => g.url === t.coverPhoto)) return t.coverPhoto;
     return gallery.length ? gallery[0].url : '';
@@ -20336,7 +20350,7 @@
     let el;
     if ((el = e.target.closest('[data-trip-view]'))){ tripView = el.dataset.tripView; tripRender(); return; }
     if ((el = e.target.closest('[data-trip-photo]'))){
-      openPhotoLightbox(tripCurrentGallery.map(g => g.url), Number(el.dataset.tripPhoto) || 0, null);
+      openPhotoLightbox(tripCurrentGallery.map(g => g.url), Number(el.dataset.tripPhoto) || 0, guestViewEnabled ? null : { tripId: t.id });
       return;
     }
     if ((el = e.target.closest('[data-trip-kebab]'))){
