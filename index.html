@@ -316,6 +316,23 @@
   #park-details-panel.open{
     width: 600px;
   }
+
+  /* Cover-art tint (see DETAILS PANEL TINT in the script): a wash of the
+     cover's main color starting right under the cover image (--tint-start,
+     its measured height) and fading into the normal panel color. Registered
+     as a <color> so changing covers fades instead of snapping; `local`
+     makes the wash scroll with the content. */
+  @property --panel-tint{
+    syntax: '<color>';
+    inherits: false;
+    initial-value: #1D3B3F;
+  }
+  #details-panel, #restaurant-details-panel, #hike-details-panel,
+  #road-details-panel, #artist-details-panel, #park-details-panel{
+    background: linear-gradient(to bottom, var(--panel-tint) var(--tint-start, 0px), var(--panel) calc(var(--tint-start, 0px) + 520px)) var(--panel);
+    background-attachment: local;
+    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
+  }
   .park-linked-hikes-section{ margin-top: 24px; }
   .park-linked-hike-row{
     display: flex;
@@ -4320,7 +4337,7 @@
       max-height: 100vh;
       z-index: 200;
       transform: translateX(100%);
-      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
       visibility: hidden;
     }
     #details-panel.open{
@@ -4343,7 +4360,7 @@
       max-height: 100vh;
       z-index: 200;
       transform: translateX(100%);
-      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
       visibility: hidden;
     }
     #restaurant-details-panel.open{
@@ -4363,7 +4380,7 @@
       max-height: 100vh;
       z-index: 200;
       transform: translateX(100%);
-      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
       visibility: hidden;
     }
     #hike-details-panel.open{
@@ -4379,7 +4396,7 @@
       max-height: 100vh;
       z-index: 200;
       transform: translateX(100%);
-      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
       visibility: hidden;
     }
     #road-details-panel.open{
@@ -4395,7 +4412,7 @@
       max-height: 100vh;
       z-index: 200;
       transform: translateX(100%);
-      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
       visibility: hidden;
     }
     #artist-details-panel.open{
@@ -4411,7 +4428,7 @@
       max-height: 100vh;
       z-index: 200;
       transform: translateX(100%);
-      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
       visibility: hidden;
     }
     #park-details-panel.open{
@@ -7441,12 +7458,124 @@
       img.classList.add('img-loaded');
     }
   }, true);
+  // A dead image link (a deleted Cloudinary upload, a moved URL) would
+  // otherwise show the browser's broken-image icon — swap in a neutral
+  // placeholder tile instead. Images with their own error handling (Year in
+  // Review, trips, On This Day, the guessing game) still get their own
+  // handler afterwards, since this capture-phase listener runs first.
+  const BROKEN_IMG_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">' +
+      '<rect width="100" height="100" fill="#1D3B3F"/>' +
+      '<g fill="none" stroke="#F1ECDE" stroke-opacity="0.35" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="32" y="36" width="36" height="28" rx="3"/><path d="M36 60l9-10 7 7 5-5 7 8"/>' +
+      '</g>' +
+      '<circle cx="59" cy="44" r="3" fill="#F1ECDE" fill-opacity="0.35"/>' +
+    '</svg>');
   document.addEventListener('error', (e) => {
     const img = e.target;
-    if (img && img.tagName === 'IMG' && (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb'))){
+    if (!img || img.tagName !== 'IMG') return;
+    if (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb')){
       img.classList.add('img-loaded'); // stops the shimmer even on failure, rather than animating forever on a broken image
     }
+    if (!img.dataset.brokenFallback){ // only once, so a failing placeholder can never loop
+      img.dataset.brokenFallback = '1';
+      img.src = BROKEN_IMG_PLACEHOLDER;
+    }
   }, true);
+
+  // ---------- DETAILS PANEL TINT ----------
+  // Each details panel picks up a soft wash of its cover art's main color
+  // at the top, fading into the normal panel background. Watches the
+  // panels for re-renders instead of hooking every render function: any
+  // time a panel's cover image appears or changes, it's re-tinted; a panel
+  // with no cover (or an edit form) goes back to the plain background.
+  const TINTED_PANEL_IDS = ['details-panel', 'restaurant-details-panel', 'hike-details-panel', 'road-details-panel', 'artist-details-panel', 'park-details-panel'];
+  const coverTintCache = new Map(); // image URL → CSS color, or null when it can't be read
+
+  // Reads a small copy of the image and averages its pixels, weighted
+  // toward colorful mid-tones so a mostly-grey photo with a red jacket
+  // still reads red. The result is kept dark and muted enough that the
+  // panel's light text stays easy to read on top of it. Cross-origin
+  // images need CORS to be readable (Cloudinary allows it); ones that
+  // don't just stay untinted.
+  function getCoverTint(url){
+    if (coverTintCache.has(url)) return Promise.resolve(coverTintCache.get(url));
+    return new Promise((resolve) => {
+      const probe = new Image();
+      probe.crossOrigin = 'anonymous';
+      probe.onload = () => {
+        let color = null;
+        try{
+          const size = 24;
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = size;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(probe, 0, 0, size, size);
+          const px = ctx.getImageData(0, 0, size, size).data;
+          let r = 0, g = 0, b = 0, total = 0;
+          for (let i = 0; i < px.length; i += 4){
+            const pr = px[i] / 255, pg = px[i + 1] / 255, pb = px[i + 2] / 255;
+            const max = Math.max(pr, pg, pb), min = Math.min(pr, pg, pb);
+            const light = (max + min) / 2;
+            const sat = max === min ? 0 : (max - min) / (1 - Math.abs(2 * light - 1));
+            const w = (sat * sat + 0.05) * (light > 0.08 && light < 0.92 ? 1 : 0.1) * (px[i + 3] / 255);
+            r += pr * w; g += pg * w; b += pb * w; total += w;
+          }
+          if (total > 0){
+            const [h, sat] = rgbToHsl(r / total, g / total, b / total);
+            color = 'hsl(' + Math.round(h) + ', ' + Math.round(Math.min(sat * 0.9, 0.55) * 100) + '%, 28%)';
+          }
+        }catch(e){ /* cross-origin without CORS — leave untinted */ }
+        coverTintCache.set(url, color);
+        resolve(color);
+      };
+      probe.onerror = () => { coverTintCache.set(url, null); resolve(null); };
+      probe.src = url;
+    });
+  }
+
+  function rgbToHsl(r, g, b){
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    if (max === min) return [0, 0, l];
+    const d = max - min;
+    const s = d / (1 - Math.abs(2 * l - 1));
+    let h;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    return [(h * 60 + 360) % 360, s, l];
+  }
+
+  function updateTintStart(panel){
+    const wrap = panel.querySelector('.details-art-wrap');
+    panel.style.setProperty('--tint-start', (wrap ? wrap.offsetHeight : 0) + 'px');
+  }
+
+  function updatePanelTint(panel){
+    updateTintStart(panel);
+    const img = panel.querySelector('.details-art-wrap img');
+    const url = (img && !img.dataset.brokenFallback && img.getAttribute('src')) || '';
+    if (panel.dataset.tintUrl === url) return; // already tinted (or tinting) for this cover
+    panel.dataset.tintUrl = url;
+    if (!url){ panel.style.removeProperty('--panel-tint'); return; }
+    getCoverTint(url).then((color) => {
+      if (panel.dataset.tintUrl !== url) return; // the cover changed while this was being read
+      if (color) panel.style.setProperty('--panel-tint', color);
+      else panel.style.removeProperty('--panel-tint');
+    });
+  }
+
+  TINTED_PANEL_IDS.forEach((id) => {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    new MutationObserver(() => updatePanelTint(panel))
+      .observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+    // The cover's height changes as its image loads and when the panel
+    // slides open or the window resizes.
+    if (window.ResizeObserver) new ResizeObserver(() => updateTintStart(panel)).observe(panel);
+    panel.addEventListener('load', () => updateTintStart(panel), true);
+  });
 
   // Native <datalist> shows every option immediately on focus, before any
   // typing — for a filter with dozens of values that's a wall of
@@ -11919,11 +12048,11 @@
     return parseRestaurantNotes(r.notes).stars;
   }
 
-  // Same migration pattern as restaurantStarsCount above: prefer the
-  // explicit field (set via the Edit form's new Visits input) over the
-  // older notes-embedded "xN" pattern, so a restaurant edited before this
-  // field existed keeps showing its already-known visit count rather than
-  // resetting to 1 the first time it's opened.
+  // Historical visit count from the original data import — prefers the
+  // explicit field (set by the Edit form's old Visits input, since removed)
+  // over the older notes-embedded "xN" pattern. Read-only now: nothing
+  // writes it anymore, but existing values are kept and still count
+  // toward the badge below.
   function restaurantManualVisitCount(r){
     if (r.manualVisitCount !== undefined && r.manualVisitCount !== null && r.manualVisitCount !== ''){
       const n = Number(r.manualVisitCount);
@@ -17250,8 +17379,6 @@
     const cuisine = restaurantDetailsPanelInner.querySelector('#restaurant-edit-cuisine').value.trim();
     const location = restaurantDetailsPanelInner.querySelector('#restaurant-edit-location').value.trim();
     const stars = restaurantDetailsPanelInner.querySelector('#restaurant-edit-stars').value;
-    const rawVisits = Number(restaurantDetailsPanelInner.querySelector('#restaurant-edit-visits').value);
-    const manualVisitCount = (!isNaN(rawVisits) && rawVisits >= 1) ? Math.floor(rawVisits) : 1;
     const website = restaurantDetailsPanelInner.querySelector('#restaurant-edit-website').value.trim();
     const price = restaurantDetailsPanelInner.querySelector('#restaurant-edit-price').value.trim();
 
@@ -17264,7 +17391,7 @@
       // Appended to the end — unranked/untiered by default, same as any
       // fresh entry with no established score yet.
       restaurantRows.push({
-        name, cuisine, location, stars, manualVisitCount, website, price,
+        name, cuisine, location, stars, website, price,
         notes: '', bestFlavor: '', flavorVariety: '', total: '', year: '', bests: '',
         photos: [], courses: []
       });
@@ -17281,7 +17408,6 @@
         rest.cuisine = cuisine;
         rest.location = location;
         rest.stars = stars;
-        rest.manualVisitCount = manualVisitCount;
         rest.website = website;
         rest.price = price;
       });
@@ -17573,7 +17699,6 @@
     const isNew = !!newRestaurantDraft;
     const r = isNew ? newRestaurantDraft : restaurantRows[openRestaurantIndex];
     const starsVal = isNew ? (r.stars === '' ? 0 : r.stars) : restaurantStarsCount(r);
-    const visitCountVal = isNew ? 1 : restaurantManualVisitCount(r);
 
     restaurantDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
@@ -17592,8 +17717,6 @@
           '<select class="restaurant-edit-input" id="restaurant-edit-stars">' +
             [0, 1, 2, 3].map(n => '<option value="' + n + '"' + (String(starsVal) === String(n) ? ' selected' : '') + '>' + n + (n === 0 ? ' (none)' : '') + '</option>').join('') +
           '</select>' +
-          '<label class="restaurant-edit-label">Visits</label>' +
-          '<input type="number" class="restaurant-edit-input" id="restaurant-edit-visits" min="1" step="1" value="' + escapeAttr(visitCountVal) + '">' +
           '<label class="restaurant-edit-label">Website</label>' +
           '<input type="text" class="restaurant-edit-input" id="restaurant-edit-website" placeholder="restaurant-website.com" value="' + escapeAttr(r.website || '') + '">' +
           '<label class="restaurant-edit-label">Price</label>' +
