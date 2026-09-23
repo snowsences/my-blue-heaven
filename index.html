@@ -4666,7 +4666,7 @@
   body.guest-view-active .restaurant-cover-drop img,
   body.guest-view-active .restaurant-course-photo-drop img{ cursor: pointer; }
 
-  /* One specific, hard-coded Google account (see LOCKED_GUEST_EMAIL) — on
+  /* One specific, hard-coded Google account (see LOCKED_GUEST_UID) — on
      top of everything guest-view-active already hides (this account always
      has that set too, forced on sign-in), this additionally removes their
      only path to the Settings tab, which still holds other sensitive
@@ -7004,7 +7004,9 @@
   // This specific Google account is permanently locked into Guest View —
   // no toggle, no Settings tab, no way back. This is now the ONLY way
   // Guest View is ever entered — there's no owner-facing toggle anymore.
-  const LOCKED_GUEST_EMAIL = 'meganec96@gmail.com';
+  // Matched by Firebase UID (stable, unlike an email) — must match the
+  // guest UID in the Firestore security rules' read condition.
+  const LOCKED_GUEST_UID = 'iDLf8r8mPVSYMJlEkMvBrZwB6Jg1';
   // Fill this in with the OWNER's own Firebase UID — found in the Firebase
   // console under Authentication → Users, next to the owner's Google
   // account. This is what lets the guest account read the owner's actual
@@ -7020,7 +7022,7 @@
     fb.onAuthStateChanged(fb.auth, async (user) => {
       firebaseUser = user;
       updateFirebaseUI();
-      isLockedGuestAccount = !!(user && user.email === LOCKED_GUEST_EMAIL);
+      isLockedGuestAccount = !!(user && user.uid === LOCKED_GUEST_UID);
       document.body.classList.toggle('locked-guest-account', isLockedGuestAccount);
       if (isLockedGuestAccount){
         // Sets state and the body class directly, WITHOUT calling
