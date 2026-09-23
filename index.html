@@ -1580,6 +1580,11 @@
     animation: cardIn 0.3s ease both;
     cursor: pointer;
   }
+  /* Long lists: rows scrolled well out of view skip layout, paint and their
+     entrance animation until they come near the viewport, so a full list
+     re-render only pays for what's on screen. `auto` makes each row keep
+     its real measured height once it has rendered. */
+  .results-list li{ content-visibility: auto; contain-intrinsic-size: auto 72px; }
   .grid-card[draggable="true"]{ cursor: grab; }
   .results-list li.dragging,
   .grid-card.dragging{ opacity: 0.4; }
@@ -4680,7 +4685,7 @@
     getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc
+    getFirestore, doc, getDoc, setDoc, deleteDoc
   } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -4704,7 +4709,7 @@
     auth: firebaseAuth,
     db: firestoreDb,
     GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
-    doc, getDoc, setDoc
+    doc, getDoc, setDoc, deleteDoc
   };
   // Module scripts always run deferred (after the whole document is parsed),
   // but the main app below is a classic script that runs immediately when
@@ -5915,7 +5920,6 @@
   <button class="lightbox-hide-dish-btn" id="lightbox-hide-dish-btn" type="button">Hide from Dishes</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function(){
   // ============================================================
@@ -6614,13 +6618,17 @@
   function scheduleSyncWrite(){
     if (!firebaseUser) return;
     clearTimeout(firestoreWriteTimer);
-    firestoreWriteTimer = setTimeout(writeFirestoreData, 600);
+    // Until this sign-in's cloud read has succeeded, nothing may be written:
+    // local data could be older than the cloud's, and writing it would
+    // overwrite the newer copy. Retry the read instead — once it has merged
+    // it pushes whatever local was ahead on, this change included.
+    firestoreWriteTimer = setTimeout(cloudReadOk ? writeFirestoreData : runCloudLoad, 600);
   }
 
-  // The payload is split across numbered chunk documents (below), each
-  // safely under Firestore's 1MB-per-document cap by construction — so
-  // this is no longer a wall to warn about, just an FYI once it's big
-  // enough to be worth mentioning at all.
+  // The payload is split across part documents (below), each safely under
+  // Firestore's 1MB-per-document cap by construction — so this is no
+  // longer a wall to warn about, just an FYI once it's big enough to be
+  // worth mentioning at all.
   function updateFirestoreSizeDisplay(sizeMB, chunkCount){
     if (sizeMB < 0.7){
       firestoreSizeNote.style.display = 'none';
@@ -6633,29 +6641,92 @@
   }
 
   // Splits one big JSON string into pieces safely under Firestore's 1MB
-  // cap — same approach as MusicBee's own chunked storage below, now
-  // applied to the main payload too, since a restaurant's (or any other
-  // domain's) locally-stored photos can push the whole thing well past a
-  // single document's budget on their own. .length here is UTF-16 code
-  // units, not exact UTF-8 bytes, but the 800KB target leaves enough
-  // margin under the 1MB cap that the difference never matters in
-  // practice — the same approximation MusicBee's chunker already makes.
-  const FIRESTORE_CHUNK_TARGET_CHARS = 800 * 1024;
+  // cap. .length is UTF-16 code units, and Firestore stores UTF-8 — up to
+  // 3 bytes per code unit — so 300K units can never exceed ~900KB. Never
+  // cuts between the two halves of a surrogate pair (emoji etc.): a lone
+  // half isn't valid UTF-8 and wouldn't survive the round trip.
+  const FIRESTORE_CHUNK_TARGET_CHARS = 300 * 1024;
   function chunkJsonString(str){
     const chunks = [];
-    for (let i = 0; i < str.length; i += FIRESTORE_CHUNK_TARGET_CHARS) chunks.push(str.slice(i, i + FIRESTORE_CHUNK_TARGET_CHARS));
+    let i = 0;
+    while (i < str.length){
+      let end = Math.min(i + FIRESTORE_CHUNK_TARGET_CHARS, str.length);
+      const lastCode = str.charCodeAt(end - 1);
+      if (end < str.length && lastCode >= 0xD800 && lastCode <= 0xDBFF) end--;
+      chunks.push(str.slice(i, end));
+      i = end;
+    }
     return chunks.length ? chunks : [''];
   }
 
+  // Cloud sync state for the current sign-in. The data is stored as
+  // separate parts (albums, art, restaurants, …) so a change only uploads
+  // the part it touched, instead of the whole collection — album art
+  // alone can be megabytes. Layout under users/{uid}:
+  //   appData/main             manifest: { version: 2, parts: { name: { rev, count, chars } }, savedAt }
+  //   syncParts/{name}~{rev}~{i}   chunk i of that part's JSON
+  // Each write of a part uses a fresh rev, and the manifest is only
+  // switched over once all its chunks are written, so a reader never sees
+  // a half-written part. Superseded revs are deleted afterwards.
+  let cloudReadOk = false;     // true once this sign-in's cloud read has succeeded (or found nothing)
+  let syncedParts = {};        // part name → { rev, count, chars } as the cloud manifest records it
+  let syncedPartJson = {};     // part name → JSON last read from / written to the cloud, to spot changes
+  let firestoreWriteInFlight = null;
+  let firestoreWritePending = false;
+  let cloudLoadInFlight = null;
+
+  function resetCloudSyncState(){
+    cloudReadOk = false;
+    syncedParts = {};
+    syncedPartJson = {};
+  }
+
+  // The albums part is compared without its savedAt — that's stamped only
+  // when the albums content itself actually changes (see writeFirestoreData).
+  function buildSyncParts(art){
+    return {
+      albums: { items, history, isComplete, finalRanking, loadingDock, tierBoundaries, tierBoundariesTotal },
+      art: { art },
+      songs: { songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt },
+      restaurants: { restaurantRows, restaurantSavedAt: restaurantLastSavedAt, restaurantTierConfig: restaurantTierRecord },
+      hikes: { hikeRows, hikeSavedAt: hikeLastSavedAt, hikeFullListText, hikeFullListTextSavedAt },
+      roads: { roadRows, roadSavedAt: roadLastSavedAt },
+      parks: { parkRows, parkSavedAt: parkLastSavedAt },
+      photos: { photoRows, photoSavedAt: photoLastSavedAt },
+      trips: { tripRows, tripSavedAt: tripLastSavedAt },
+      artists: { artistRows, artistSavedAt: artistLastSavedAt },
+      media: {
+        bookRows: mediaState.book.rows, bookSavedAt: mediaState.book.lastSavedAt,
+        movieRows: mediaState.movie.rows, movieSavedAt: mediaState.movie.lastSavedAt,
+        gameRows: mediaState.game.rows, gameSavedAt: mediaState.game.lastSavedAt,
+        showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt
+      },
+      dishes: { dishFullListText, dishFullListTextSavedAt, dishOrder, dishOrderSavedAt },
+      settings: { lastfmApiKey, lastfmUsername, lastManualExportAt, pointsAlgorithm, pointsAlgorithmSavedAt }
+    };
+  }
+
+  function syncPartRef(fb, uid, name, rev, i){
+    return fb.doc(fb.db, 'users', uid, 'syncParts', name + '~' + rev + '~' + i);
+  }
+
+  // One write at a time — a change landing mid-write queues exactly one
+  // follow-up, which picks up everything that changed in the meantime.
   async function writeFirestoreData(){
+    if (firestoreWriteInFlight){ firestoreWritePending = true; return; }
+    firestoreWriteInFlight = writeChangedSyncParts();
+    try{ await firestoreWriteInFlight; }finally{ firestoreWriteInFlight = null; }
+    if (firestoreWritePending){ firestoreWritePending = false; writeFirestoreData(); }
+  }
+
+  async function writeChangedSyncParts(){
     const fb = window.__firebase;
-    if (!fb || !firebaseUser) return;
+    if (!fb || !firebaseUser || !cloudReadOk) return;
     // Hard guard, not just a UI-level restriction — this account must never
-    // write under any circumstance, including the read-fails/seed-write
-    // path in loadOrSeedFirestoreData below, which would otherwise risk
-    // overwriting the owner's real data with this account's own (empty)
-    // local state the moment its read comes up empty for any reason.
+    // write under any circumstance, which would otherwise risk overwriting
+    // the owner's real data with this account's own (empty) local state.
     if (isLockedGuestAccount) return;
+    const uid = firebaseUser.uid;
     try{
       const artKeys = Array.from(new Set([...items, ...loadingDock]));
       const art = {};
@@ -6666,85 +6737,115 @@
           if (res && res.value) art[raw] = res.value;
         }catch(e){ /* no art for this item */ }
       }));
-      const payload = JSON.stringify({
-        items, history, isComplete, finalRanking, loadingDock, art,
-        tierBoundaries, tierBoundariesTotal, savedAt: new Date().toISOString(),
-        songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt,
-        restaurantRows, restaurantSavedAt: restaurantLastSavedAt,
-        hikeRows, hikeSavedAt: hikeLastSavedAt,
-        roadRows, roadSavedAt: roadLastSavedAt,
-        parkRows, parkSavedAt: parkLastSavedAt,
-        photoRows, photoSavedAt: photoLastSavedAt,
-        tripRows, tripSavedAt: tripLastSavedAt,
-        artistRows, artistSavedAt: artistLastSavedAt,
-        bookRows: mediaState.book.rows, bookSavedAt: mediaState.book.lastSavedAt,
-        movieRows: mediaState.movie.rows, movieSavedAt: mediaState.movie.lastSavedAt,
-        gameRows: mediaState.game.rows, gameSavedAt: mediaState.game.lastSavedAt,
-        showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt,
-        lastfmApiKey, lastfmUsername,
-        lastManualExportAt,
-        hikeFullListText, hikeFullListTextSavedAt,
-        dishFullListText, dishFullListTextSavedAt,
-        dishOrder, dishOrderSavedAt,
-        restaurantTierConfig: restaurantTierRecord,
-        pointsAlgorithm, pointsAlgorithmSavedAt
-      });
-      const payloadSizeMB = payload.length / 1024 / 1024;
-      const chunks = chunkJsonString(payload);
-      console.log('Firestore payload size:', payloadSizeMB.toFixed(2), 'MB, split across', chunks.length, 'document(s) (each kept under Firestore\'s 1MB-per-document cap)');
-      updateFirestoreSizeDisplay(payloadSizeMB, chunks.length);
-      const savedAtStamp = new Date().toISOString();
-      const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
-      await fb.setDoc(manifestRef, { chunkCount: chunks.length, savedAt: savedAtStamp });
-      await Promise.all(chunks.map((chunk, i) => {
-        const chunkRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'mainChunks', String(i));
-        return fb.setDoc(chunkRef, { json: chunk });
-      }));
+      const parts = buildSyncParts(art);
+      const changed = {};
+      for (const name of Object.keys(parts)){
+        const json = JSON.stringify(parts[name]);
+        if (json !== syncedPartJson[name]) changed[name] = json;
+      }
+      const changedNames = Object.keys(changed);
+      if (!changedNames.length) return;
+
+      const rev = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const newParts = Object.assign({}, syncedParts);
+      const chunkWrites = [];
+      for (const name of changedNames){
+        const stored = name === 'albums'
+          ? JSON.stringify(Object.assign({}, parts.albums, { savedAt: new Date().toISOString() }))
+          : changed[name];
+        const chunks = chunkJsonString(stored);
+        chunks.forEach((chunk, i) => chunkWrites.push(fb.setDoc(syncPartRef(fb, uid, name, rev, i), { json: chunk })));
+        newParts[name] = { rev, count: chunks.length, chars: stored.length };
+      }
+      await Promise.all(chunkWrites);
+      // Only now point the manifest at the new chunks — see the layout comment above.
+      await fb.setDoc(fb.doc(fb.db, 'users', uid, 'appData', 'main'), { version: 2, parts: newParts, savedAt: new Date().toISOString() });
+      const oldParts = syncedParts;
+      syncedParts = newParts;
+      Object.assign(syncedPartJson, changed);
+
+      const staleDeletes = [];
+      for (const name of changedNames){
+        const old = oldParts[name];
+        if (!old) continue;
+        for (let i = 0; i < old.count; i++) staleDeletes.push(fb.deleteDoc(syncPartRef(fb, uid, name, old.rev, i)));
+      }
+      await Promise.all(staleDeletes).catch(() => { /* leftovers are unreferenced and harmless */ });
+
+      let totalChars = 0, totalChunks = 0;
+      for (const p of Object.values(newParts)){ totalChars += p.chars || 0; totalChunks += p.count || 0; }
+      updateFirestoreSizeDisplay(totalChars / 1024 / 1024, totalChunks);
     }catch(e){
       console.error('Firestore write failed:', e);
       showToast("⚠️ Couldn't sync to Firebase (" + (e && e.code ? e.code : 'unknown error') + ") — see console, will retry on the next change");
     }
   }
 
+  // Returns { data, parts, partJson }: data is the merged cloud copy, or
+  // null when there's genuinely nothing stored yet. THROWS on any failure
+  // (offline, permissions, a missing chunk) — a failed read must never be
+  // mistaken for "nothing stored", or the seed write that follows would
+  // overwrite the real cloud data with this device's copy.
   async function readFirestoreData(){
     const fb = window.__firebase;
-    if (!fb || !firebaseUser) return null;
-    try{
-      // The locked guest account reads the OWNER's document(s), not its own —
-      // its own uid-keyed path has never had anything written to it (see
-      // the write guard above), so reading that would always come up
-      // empty. This is what actually lets it see the owner's data at all;
-      // it requires a matching Firestore security rule granting this
-      // specific read — for both the manifest AND the mainChunks
-      // subcollection now that the payload lives across both (see this
-      // session's chat for the exact rule).
-      const targetUid = isLockedGuestAccount ? OWNER_FIREBASE_UID : firebaseUser.uid;
-      const manifestRef = fb.doc(fb.db, 'users', targetUid, 'appData', 'main');
-      const snap = await fb.getDoc(manifestRef);
-      if (!snap.exists()) return null;
-      const manifest = snap.data();
-      if (!manifest) return null;
-      // Backward compatible with the old single-document shape (the
-      // payload lived directly on this doc as `.json`) — a device that
-      // hasn't written since the chunked split still leaves the manifest
-      // in that shape until its next save.
-      if (manifest.json) return JSON.parse(manifest.json);
-      if (!manifest.chunkCount) return null;
-      const chunkSnaps = await Promise.all(Array.from({ length: manifest.chunkCount }, (_, i) => {
-        const chunkRef = fb.doc(fb.db, 'users', targetUid, 'mainChunks', String(i));
-        return fb.getDoc(chunkRef);
+    // The locked guest account reads the OWNER's document(s), not its own —
+    // its own uid-keyed path has never had anything written to it (see
+    // the write guard above), so reading that would always come up
+    // empty. This requires the matching Firestore security rule granting
+    // this account read access.
+    const targetUid = isLockedGuestAccount ? OWNER_FIREBASE_UID : firebaseUser.uid;
+    const empty = { data: null, parts: {}, partJson: {} };
+    const snap = await fb.getDoc(fb.doc(fb.db, 'users', targetUid, 'appData', 'main'));
+    if (!snap.exists()) return empty;
+    const manifest = snap.data() || {};
+
+    if (manifest.version === 2 && manifest.parts){
+      const names = Object.keys(manifest.parts);
+      const jsons = await Promise.all(names.map(async (name) => {
+        const { rev, count } = manifest.parts[name];
+        const chunkSnaps = await Promise.all(Array.from({ length: count }, (_, i) => fb.getDoc(syncPartRef(fb, targetUid, name, rev, i))));
+        return chunkSnaps.map((s, i) => {
+          if (!s.exists()) throw new Error('Missing cloud chunk ' + name + ' #' + i);
+          return (s.data() || {}).json || '';
+        }).join('');
       }));
-      let json = '';
-      for (const chunkSnap of chunkSnaps){
-        if (!chunkSnap.exists()) return null; // a missing chunk means it can't be safely reassembled — treat as no remote data rather than parsing something corrupt
-        const chunkData = chunkSnap.data();
-        json += (chunkData && chunkData.json) || '';
-      }
-      return JSON.parse(json);
-    }catch(e){
-      console.error('Firestore read failed:', e);
-      return null;
+      const data = {};
+      const partJson = {};
+      names.forEach((name, i) => {
+        const parsed = JSON.parse(jsons[i]);
+        Object.assign(data, parsed);
+        if (name === 'albums'){
+          const content = Object.assign({}, parsed);
+          delete content.savedAt;
+          partJson[name] = JSON.stringify(content);
+        } else {
+          partJson[name] = jsons[i];
+        }
+      });
+      return { data, parts: manifest.parts, partJson };
     }
+
+    // Older single-payload formats — either directly on this document as
+    // `.json`, or split across mainChunks/{i}. The next write converts to
+    // parts; the old mainChunks documents are left in place untouched.
+    if (manifest.json) return { data: JSON.parse(manifest.json), parts: {}, partJson: {} };
+    if (!manifest.chunkCount) return empty;
+    const chunkSnaps = await Promise.all(Array.from({ length: manifest.chunkCount }, (_, i) =>
+      fb.getDoc(fb.doc(fb.db, 'users', targetUid, 'mainChunks', String(i)))));
+    const json = chunkSnaps.map((s, i) => {
+      if (!s.exists()) throw new Error('Missing cloud chunk #' + i);
+      return (s.data() || {}).json || '';
+    }).join('');
+    return { data: JSON.parse(json), parts: {}, partJson: {} };
+  }
+
+  // Only one cloud load runs at a time; a retry requested while one is in
+  // flight just waits on it.
+  function runCloudLoad(){
+    if (!cloudLoadInFlight){
+      cloudLoadInFlight = loadOrSeedFirestoreData().finally(() => { cloudLoadInFlight = null; });
+    }
+    return cloudLoadInFlight;
   }
 
   // Runs on every page load (Firebase's signed-in session persists across
@@ -6759,8 +6860,20 @@
   // since writing back identical data is a harmless no-op.
   async function loadOrSeedFirestoreData(){
     await localSettingsLoadedPromise; // dish order and tier setup are read separately from the main data — make sure they're in before comparing
-    const existing = await readFirestoreData();
+    if (!firebaseUser) return;
+    let result;
+    try{
+      result = await readFirestoreData();
+    }catch(e){
+      console.error('Firestore read failed:', e);
+      showToast("⚠️ Couldn't load your cloud data (" + (e && e.code ? e.code : 'unknown error') + ") — cloud saving is paused so nothing gets overwritten; it retries on your next change");
+      return;
+    }
+    syncedParts = result.parts;
+    syncedPartJson = result.partJson;
+    const existing = result.data;
     if (!existing){
+      cloudReadOk = true;
       writeFirestoreData(); // nothing in Firestore yet — seed it with what's here
       return;
     }
@@ -6996,6 +7109,9 @@
       || (Array.isArray(mediaState.show.rows) && mediaState.show.rows.length >= 1)
       || !!hikeFullListText
       || !!dishFullListText;
+    // Only now that everything newer from the cloud has been merged in is
+    // this device allowed to write (see scheduleSyncWrite).
+    cloudReadOk = true;
     if (hasCurrentData) writeFirestoreData();
     yirRefreshIfOpen(); // if Year in Review is open while the cloud copy lands, show what just arrived
     calRefreshIfOpen();
@@ -7021,6 +7137,7 @@
     if (!fb) return;
     fb.onAuthStateChanged(fb.auth, async (user) => {
       firebaseUser = user;
+      resetCloudSyncState();
       updateFirebaseUI();
       isLockedGuestAccount = !!(user && user.uid === LOCKED_GUEST_UID);
       document.body.classList.toggle('locked-guest-account', isLockedGuestAccount);
@@ -7049,7 +7166,7 @@
             switchGuestPage('restaurants');
           }
         }
-        await loadOrSeedFirestoreData();
+        await runCloudLoad();
         resolveCloudSettled();
         if (!isLockedGuestAccount){
           // MusicBee data is Albums-only, and Albums is entirely hidden for
@@ -7230,9 +7347,8 @@
     // source, or typed as "&amp;" out of habit) back to real characters, so
     // the app's own — correct — escaping when displaying text never ends up
     // double-encoding something that was already an entity.
-    const d = document.createElement('div');
-    d.innerHTML = str;
-    return d.textContent;
+    // DOMParser builds an inert document — nothing in it loads or runs.
+    return new DOMParser().parseFromString(str, 'text/html').documentElement.textContent;
   }
 
   function parseItems(raw){
@@ -8504,13 +8620,14 @@
     if (!fb || !firebaseUser) return;
     try{
       const chunks = chunkMusicbeeTracks(musicbeeTracks);
-      console.log('MusicBee library split into', chunks.length, 'chunk(s) for Firestore (', musicbeeTracks.length, 'tracks )');
-      const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
-      await fb.setDoc(manifestRef, { chunkCount: chunks.length, importedAt: musicbeeImportedAt });
+      // Chunks first, manifest last — so a reader never sees the new chunk
+      // count before the chunks it describes exist.
       await Promise.all(chunks.map((chunk, i) => {
         const chunkRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'musicbeeChunks', String(i));
         return fb.setDoc(chunkRef, { json: JSON.stringify(chunk) });
       }));
+      const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
+      await fb.setDoc(manifestRef, { chunkCount: chunks.length, importedAt: musicbeeImportedAt });
     }catch(e){
       console.error('Firestore MusicBee write failed:', e);
       showToast("⚠️ Couldn't sync MusicBee library to Firebase (" + (e && e.code ? e.code : 'unknown error') + ") — see console. Your library still works locally either way.");
@@ -8520,18 +8637,15 @@
   // Reads just the manifest — enough to compare timestamps — without
   // pulling any chunk data. Callers fetch the actual chunks separately,
   // only once they've confirmed the remote copy is actually newer.
+  // Returns null only when nothing is stored; THROWS on a failed read, so
+  // that's never mistaken for "nothing stored" and seeded over.
   async function readMusicbeeManifest(){
     const fb = window.__firebase;
-    if (!fb || !firebaseUser) return null;
-    try{
-      const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
-      const snap = await fb.getDoc(manifestRef);
-      if (!snap.exists()) return null;
-      return snap.data();
-    }catch(e){
-      console.error('Firestore MusicBee manifest read failed:', e);
-      return null;
-    }
+    if (!fb || !firebaseUser) throw new Error('Not signed in');
+    const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'musicbee');
+    const snap = await fb.getDoc(manifestRef);
+    if (!snap.exists()) return null;
+    return snap.data();
   }
 
   async function readMusicbeeChunks(chunkCount){
@@ -8544,7 +8658,7 @@
       }));
       let tracks = [];
       for (const snap of chunkSnaps){
-        if (!snap.exists()) continue;
+        if (!snap.exists()) return []; // a missing chunk means a partial library — keep the local one instead
         const data = snap.data();
         if (data && data.json) tracks = tracks.concat(JSON.parse(data.json));
       }
@@ -8559,7 +8673,13 @@
   // importedAt rather than the main document's savedAt — this is a
   // genuinely separate sync running independently, not a sub-part of it.
   async function loadOrSeedMusicbeeFirestore(){
-    const manifest = await readMusicbeeManifest();
+    let manifest;
+    try{
+      manifest = await readMusicbeeManifest();
+    }catch(e){
+      console.error('Firestore MusicBee manifest read failed:', e);
+      return; // don't seed over a cloud copy that just couldn't be read
+    }
     if (!manifest || !manifest.chunkCount){
       if (musicbeeTracks.length) writeMusicbeeFirestore(); // nothing remote yet — seed it with what's here
       return;
@@ -8588,6 +8708,33 @@
     musicbeeStatusText.textContent = count
       ? ('✅ MusicBee: ' + count.toLocaleString() + ' tracks imported (' + lovedCount.toLocaleString() + ' loved, ' + groupedCount.toLocaleString() + ' grouped)')
       : 'MusicBee: not imported yet';
+  }
+
+  // SheetJS (spreadsheet import/export) is ~900KB and only needed when one
+  // of those actually runs, so it's fetched on first use rather than
+  // blocking every page load. Every XLSX caller awaits this first.
+  const XLSX_SRC = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+  let xlsxLoadPromise = null;
+  function loadXlsx(){
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (!xlsxLoadPromise){
+      xlsxLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = XLSX_SRC;
+        script.onload = () => resolve(window.XLSX);
+        script.onerror = () => {
+          xlsxLoadPromise = null; // let the next attempt try again
+          script.remove();
+          reject(new Error('xlsx load failed'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return xlsxLoadPromise;
+  }
+  async function ensureXlsx(){
+    try{ await loadXlsx(); return true; }
+    catch(e){ showToast("Couldn't load the spreadsheet tools — check your connection and try again"); return false; }
   }
 
   // Column detection is keyword-based rather than exact-string, and Love
@@ -8638,6 +8785,7 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      if (!(await ensureXlsx())) return;
       let tracks;
       try{
         tracks = parseMusicbeeCsv(evt.target.result);
@@ -8821,7 +8969,7 @@
   function songArtHtml(albumRaw){
     const art = albumRaw ? artCache[albumRaw] : null;
     const cls = 'art-drop song-art-readonly' + (art ? ' has-art' : '');
-    const inner = art ? '<img class="art-img" src="' + cloudinaryThumbUrl(art, 120) + '" alt="" draggable="false" loading="lazy">' : '<span class="art-drop-hint">🎵</span>';
+    const inner = art ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(art, 120)) + '" alt="" draggable="false" loading="lazy" decoding="async">' : '<span class="art-drop-hint">🎵</span>';
     return '<div class="' + cls + '">' + inner + '</div>';
   }
 
@@ -9396,7 +9544,7 @@
   function artDropZoneHtml(raw, extraClass, skipTitle, width){
     const art = artCache[raw];
     const cls = 'art-drop' + (extraClass ? ' ' + extraClass : '') + (art ? ' has-art' : '');
-    const inner = art ? '<img class="art-img" src="' + cloudinaryThumbUrl(art, width || 120) + '" alt="" draggable="false" loading="lazy">' : '<span class="art-drop-hint">🎵</span>';
+    const inner = art ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(art, width || 120)) + '" alt="" draggable="false" loading="lazy" decoding="async">' : '<span class="art-drop-hint">🎵</span>';
     const titleAttr = skipTitle ? '' : ' title="Drag an image here, or click to browse"';
     return '<div class="' + cls + '"' + titleAttr + '>' + inner + '</div>';
   }
@@ -10562,7 +10710,8 @@
     if (!file) return;
     const isXlsx = /\.xlsx$/i.test(file.name);
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
+      if (isXlsx && !(await ensureXlsx())) return;
       try{
         const parsed = isXlsx ? parseImportedXlsx(evt.target.result) : parseImportedTxt(evt.target.result);
         confirmReplaceList(parsed);
@@ -11500,7 +11649,8 @@
     return { data, cols };
   }
 
-  excelBtn.addEventListener('click', () => {
+  excelBtn.addEventListener('click', async () => {
+    if (!(await ensureXlsx())) return;
     const wb = XLSX.utils.book_new();
 
     const ranked = buildSheetData(displayedRanking, true);
@@ -11567,7 +11717,8 @@
     };
   }
 
-  songExcelBtn.addEventListener('click', () => {
+  songExcelBtn.addEventListener('click', async () => {
+    if (!(await ensureXlsx())) return;
     const wb = XLSX.utils.book_new();
     const ranked = buildSongSheetData(songDisplayedRanking);
     const ws = XLSX.utils.json_to_sheet(ranked.data);
@@ -11582,7 +11733,8 @@
     if (!file) return;
     const isXlsx = /\.xlsx$/i.test(file.name);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
+      if (isXlsx && !(await ensureXlsx())) return;
       let parsedList = [];
       try{
         if (isXlsx){
@@ -12528,7 +12680,7 @@
             '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
             tierBadgeHtml +
             (effectiveCover
-              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy" decoding="async">'
               : '<span class="art-drop-hint">📷</span>') +
             '<div class="restaurant-gold-card-overlay">' +
               '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
@@ -13020,7 +13172,7 @@
     const photos = d.photos || [];
     const rowHtml = photos.map((p, i) =>
       '<div class="restaurant-photo-thumb hike-date-photo-thumb" data-photo-index="' + i + '">' +
-        '<img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 350)) + '" alt="" loading="lazy">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 350)) + '" alt="" loading="lazy" decoding="async">' +
         '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
       '</div>'
     ).join('');
@@ -13621,7 +13773,7 @@
           '<div class="restaurant-gold-card" data-hike-index="' + realIndex + '">' +
             '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
             (effectiveCover
-              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy" decoding="async">'
               : '<span class="art-drop-hint">🏔️</span>') +
             '<div class="restaurant-gold-card-overlay">' +
               '<div class="restaurant-gold-card-name">' + escapeHtml(h.name) + '</div>' +
@@ -14046,7 +14198,7 @@
     const photos = p.photos || [];
     const gridHtml = photos.map((photo, i) =>
       '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
-        '<img src="' + escapeAttr(cloudinaryThumbUrl(photo.url, 350)) + '" alt="" loading="lazy">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(photo.url, 350)) + '" alt="" loading="lazy" decoding="async">' +
         '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
       '</div>'
     ).join('');
@@ -14285,7 +14437,7 @@
         '<div class="restaurant-gold-card" data-park-id="' + p.id + '" data-park-index="' + idx + '">' +
           '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
           (effectiveCover
-            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy">'
+            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 500)) + '" alt="" loading="lazy" decoding="async">'
             : '<span class="art-drop-hint">🏞️</span>') +
           '<div class="restaurant-gold-card-overlay">' +
             '<div class="restaurant-gold-card-name">' + escapeHtml(p.name) + '</div>' +
@@ -14465,14 +14617,14 @@
       const a = info.albums[i];
       const art = a ? artCache[a.raw] : null;
       cells.push('<span class="artist-collage-cell">' +
-        (art ? '<img src="' + escapeAttr(cloudinaryThumbUrl(art, width)) + '" alt="" draggable="false" loading="lazy">' : '') +
+        (art ? '<img src="' + escapeAttr(cloudinaryThumbUrl(art, width)) + '" alt="" draggable="false" loading="lazy" decoding="async">' : '') +
       '</span>');
     }
     return '<span class="artist-collage">' + cells.join('') + '</span>';
   }
   function artistCoverHtml(row, info, width){
     return row.coverPhoto
-      ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(row.coverPhoto, width)) + '" alt="" draggable="false" loading="lazy">'
+      ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(row.coverPhoto, width)) + '" alt="" draggable="false" loading="lazy" decoding="async">'
       : artistCollageHtml(info, Math.round(width / 2));
   }
 
@@ -14614,7 +14766,7 @@
       const art = artCache[a.raw];
       const grouping = findMusicbeeGroupingForAlbum(info.name, a.album);
       return '<div class="artist-album-row">' +
-        '<span class="artist-album-thumb">' + (art ? '<img src="' + escapeAttr(cloudinaryThumbUrl(art, 120)) + '" alt="" loading="lazy">' : '🎵') + '</span>' +
+        '<span class="artist-album-thumb">' + (art ? '<img src="' + escapeAttr(cloudinaryThumbUrl(art, 120)) + '" alt="" loading="lazy" decoding="async">' : '🎵') + '</span>' +
         '<span class="artist-album-text"><span class="artist-album-name">' + escapeHtml(a.album) + '</span>' +
           '<span class="artist-album-meta">' + escapeHtml([a.year, grouping].filter(Boolean).join(' · ')) + '</span></span>' +
         '<span class="artist-album-rank">#' + a.rank + '</span>' +
@@ -14966,7 +15118,7 @@
     const photos = r.photos || [];
     const gridHtml = photos.map((p, i) =>
       '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
-        '<img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 350)) + '" alt="" loading="lazy">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 350)) + '" alt="" loading="lazy" decoding="async">' +
         '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
       '</div>'
     ).join('');
@@ -15228,7 +15380,7 @@
         '<div class="restaurant-gold-card" data-road-index="' + realIndex + '">' +
           '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
           (effectiveCover
-            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="" loading="lazy">'
+            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="" loading="lazy" decoding="async">'
             : '<span class="art-drop-hint">🏎️</span>') +
           '<div class="restaurant-gold-card-overlay">' +
             '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
@@ -15517,7 +15669,7 @@
       const card = document.createElement('div');
       card.className = 'grid-card';
       card.dataset.photoId = p.id;
-      card.innerHTML = '<div class="art-drop" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 500)) + '" alt="" loading="lazy"></div>';
+      card.innerHTML = '<div class="art-drop" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 500)) + '" alt="" loading="lazy" decoding="async"></div>';
       photoGrid.appendChild(card);
       makePhotoDraggable(card);
       card.addEventListener('click', () => {
@@ -15554,7 +15706,7 @@
       const li = document.createElement('li');
       li.dataset.photoId = p.id;
       li.innerHTML =
-        '<div class="art-drop has-art" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 200)) + '" alt="" loading="lazy"></div>' +
+        '<div class="art-drop has-art" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 200)) + '" alt="" loading="lazy" decoding="async"></div>' +
         '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '" aria-label="Position">' +
         '<span class="rank-item"><span class="rank-album">' + escapeHtml(label.main) + '</span>' +
           (label.meta ? '<span class="rank-meta">' + escapeHtml(label.meta) + '</span>' : '') + '</span>' +
@@ -16081,7 +16233,7 @@
         '<div class="restaurant-gold-card" data-media-id="' + item.id + '" data-media-index="' + realIndex + '">' +
           '<span class="restaurant-gold-card-rank">#' + rank + '</span>' +
           (cover
-            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 350)) + '" alt="" loading="lazy">'
+            ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 350)) + '" alt="" loading="lazy" decoding="async">'
             : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
           '<div class="restaurant-gold-card-overlay">' +
             '<div class="restaurant-gold-card-name">' + escapeHtml(item.title || '') + '</div>' +
@@ -16139,7 +16291,7 @@
         ? ('<div class="grid-card" data-media-id="' + item.id + '" title="' + escapeAttr(item.title || '') + '">' +
             '<div class="art-drop" style="cursor:pointer;">' +
               (item.coverPhoto
-                ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(item.coverPhoto, 500)) + '" alt="" loading="lazy">'
+                ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(item.coverPhoto, 500)) + '" alt="" loading="lazy" decoding="async">'
                 : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
             '</div>' +
             '<div class="restaurant-gold-card-overlay">' +
@@ -16275,7 +16427,7 @@
           '<span class="grid-card-rank">#' + (idx + 1) + '</span>' +
           '<div class="art-drop" style="cursor:pointer;">' +
             (item.coverPhoto
-              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(item.coverPhoto, 500)) + '" alt="" loading="lazy">'
+              ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(item.coverPhoto, 500)) + '" alt="" loading="lazy" decoding="async">'
               : '<span class="art-drop-hint">' + config.emptyIcon + '</span>') +
           '</div>' +
           overlayHtml;
@@ -16602,7 +16754,7 @@
 
   function dishPhotoHtml(course){
     const photo = getDishCoverPhoto(course);
-    return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(photo, 120)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+    return '<div class="art-drop" style="cursor:default;">' + (photo ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(photo, 120)) + '" alt="" loading="lazy" decoding="async">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
   }
 
   // Datalist built from the full, unfiltered dish list — same convention as
@@ -16736,7 +16888,7 @@
         card.dataset.dishId = d.id;
         card.title = d.course.text || d.restaurant.name || '';
         card.innerHTML = '<span class="grid-card-rank">#' + (idx + 1) + '</span>' +
-          '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 500)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
+          '<div class="art-drop" style="cursor:pointer;">' + (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 500)) + '" alt="" loading="lazy" decoding="async">' : '<span class="art-drop-hint">🍽️</span>') + '</div>';
         dishResultsList.appendChild(card);
         makeDishDraggable(card, d.id);
         card.addEventListener('click', () => openDishLightbox(d, displayDishes));
@@ -17284,7 +17436,7 @@
       const captionHtml = course.text ? '<span class="restaurant-course-thumb-caption">' + escapeHtml(course.text) + '</span>' : '';
       return (
         '<div class="restaurant-course-thumb-tile" data-course-id="' + escapeAttr(ensureCourseId(course)) + '"' + (firstPhoto ? ' data-course-photo-index="' + i + '" title="View in the gallery"' : '') + '>' +
-          (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 350)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">📷</span>') +
+          (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 350)) + '" alt="" loading="lazy" decoding="async">' : '<span class="art-drop-hint">📷</span>') +
           captionHtml +
         '</div>'
       );
@@ -17294,7 +17446,7 @@
     // to caption and no drag key, so course reordering never touches them.
     const otherTilesHtml = otherPhotos.map((url, i) =>
       '<div class="restaurant-course-thumb-tile restaurant-visit-photo-thumb-tile" data-visit-photo-index="' + i + '" title="View in the gallery">' +
-        '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 350)) + '" alt="" loading="lazy">' +
+        '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 350)) + '" alt="" loading="lazy" decoding="async">' +
       '</div>'
     ).join('');
     return '<div class="restaurant-course-thumb-grid">' + courseTilesHtml + otherTilesHtml + '</div>';
@@ -17318,7 +17470,7 @@
             '<div class="restaurant-course-card">' +
               '<div class="restaurant-course-photo-drop' + (firstPhoto ? '' : ' is-empty') + '" data-course-photo-index="' + i + '"' +
                 (firstPhoto ? ' title="Click to view in the gallery, or drag an image here to add another"' : ' title="Drag an image here, or click to browse"') + '>' +
-                (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 700)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">📷</span>') +
+                (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 700)) + '" alt="" loading="lazy" decoding="async">' : '<span class="art-drop-hint">📷</span>') +
                 countBadgeHtml +
                 '<button class="restaurant-course-photo-add-btn" type="button" data-add-photo-course-index="' + i + '" title="Add another photo">+</button>' +
               '</div>' +
@@ -17338,7 +17490,7 @@
     const otherPhotos = visit.photos || [];
     const otherPhotosGridHtml = otherPhotos.map((url, i) =>
       '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
-        '<img src="' + escapeAttr(cloudinaryThumbUrl(url, 350)) + '" alt="" loading="lazy">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(url, 350)) + '" alt="" loading="lazy" decoding="async">' +
         '<button class="restaurant-photo-remove-btn" type="button" data-remove-photo-index="' + i + '" title="Remove">✕</button>' +
       '</div>'
     ).join('');
@@ -18540,7 +18692,7 @@
   function otdHeroHtml(url, icon, chipText){
     return '<span class="otd-hero">' +
       '<span class="otd-hero-icon">' + otdIcon(icon, 44) + '</span>' +
-      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 640)) + '" alt="" loading="lazy" decoding="async">' : '') +
+      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 640)) + '" alt="" loading="lazy" decoding="async" decoding="async">' : '') +
       (chipText ? '<span class="otd-hero-chip">' + escapeHtml(chipText) + '</span>' : '') +
     '</span>';
   }
@@ -18548,7 +18700,7 @@
   function otdThumbHtml(url, icon){
     return '<span class="otd-thumb">' +
       '<span class="otd-hero-icon">' + otdIcon(icon, 28) + '</span>' +
-      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 240)) + '" alt="" loading="lazy" decoding="async">' : '') +
+      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 240)) + '" alt="" loading="lazy" decoding="async" decoding="async">' : '') +
     '</span>';
   }
 
@@ -18632,7 +18784,7 @@
       const isMore = urls.length > 4 && i === 3;
       return '<button type="button" class="otd-tile" data-otd-photos="' + token + '" data-otd-index="' + i + '" aria-label="' +
         (isMore ? 'See all ' + urls.length + ' photos' : 'Open photo ' + (i + 1) + ' of ' + urls.length) + '">' +
-        '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy" decoding="async">' +
+        '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy" decoding="async" decoding="async">' +
         (isMore ? '<span class="otd-tile-more">+' + (urls.length - 3) + '</span>' : '') +
       '</button>';
     }).join('');
@@ -19777,7 +19929,7 @@
     shareThumbs.innerHTML = st.urls.map((u, i) => {
       const on = st.selected.has(u);
       return '<button type="button" class="share-thumb' + (on ? ' selected' : '') + '" data-share-index="' + i + '" aria-pressed="' + on + '" aria-label="Photo ' + (i + 1) + (on ? ', included' : ', not included') + '">' +
-        '<img src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy">' +
+        '<img src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy" decoding="async">' +
         '<span class="share-thumb-check">' + (on ? '✓' : '') + '</span>' +
       '</button>';
     }).join('');
@@ -20145,7 +20297,7 @@
   function yirReg(item){ yirItems.push(item); return yirItems.length - 1; }
 
   function yirImg(url, w, alt){
-    return '<img class="yir-img" src="' + escapeAttr(cloudinaryThumbUrl(url, w)) + '" alt="' + escapeAttr(alt || '') + '" loading="lazy" decoding="async">';
+    return '<img class="yir-img" src="' + escapeAttr(cloudinaryThumbUrl(url, w)) + '" alt="' + escapeAttr(alt || '') + '" loading="lazy" decoding="async" decoding="async">';
   }
 
   function yirPhotoSetHtml(urls, cls, max){
@@ -20746,7 +20898,7 @@
       html += '<div class="trip-tl-row">' +
         '<span class="trip-tl-spine-col">' + (lineClass ? '<span class="trip-tl-line ' + lineClass + '"></span>' : '') + '<span class="trip-tl-dot"></span></span>' +
         '<button type="button" class="trip-card" data-trip-id="' + escapeAttr(t.id) + '">' +
-          (cover ? '<img class="trip-card-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 800)) + '" alt="" loading="lazy" decoding="async">' : '<span class="trip-card-ph" aria-hidden="true">🧳</span>') +
+          (cover ? '<img class="trip-card-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 800)) + '" alt="" loading="lazy" decoding="async" decoding="async">' : '<span class="trip-card-ph" aria-hidden="true">🧳</span>') +
           '<span class="trip-card-shade"></span>' +
           '<span class="trip-card-text"><span class="trip-card-name">' + escapeHtml(t.name || 'Untitled trip') + '</span>' +
             '<span class="trip-card-date">' + escapeHtml(tripDateLabel(t)) + '</span></span>' +
@@ -21373,7 +21525,7 @@
         const takenName = r.taken ? (tripFind(r.taken) || {}).name || 'another trip' : '';
         if (kind === 'photo'){
           html += '<button type="button" class="trip-pick-photo' + (selected.has(r.id) ? ' on' : '') + (r.blocked ? ' blocked' : '') + '" data-pick="' + escapeAttr(r.id) + '"' + (r.blocked ? ' disabled' : '') + ' aria-pressed="' + selected.has(r.id) + '">' +
-            '<img src="' + escapeAttr(cloudinaryThumbUrl(r.url, 240)) + '" alt="" loading="lazy"><span class="trip-pick-check">' + (selected.has(r.id) ? '✓' : '') + '</span>' +
+            '<img src="' + escapeAttr(cloudinaryThumbUrl(r.url, 240)) + '" alt="" loading="lazy" decoding="async"><span class="trip-pick-check">' + (selected.has(r.id) ? '✓' : '') + '</span>' +
             '<span class="trip-pick-cap">' + escapeHtml(r.blocked ? 'In ' + takenName : r.label) + '</span></button>';
         } else {
           html += '<label class="trip-pick-row' + (r.blocked ? ' blocked' : '') + '"><input type="checkbox" data-pick="' + escapeAttr(r.id) + '"' + (selected.has(r.id) ? ' checked' : '') + (r.blocked ? ' disabled' : '') + '>' +
@@ -21627,7 +21779,7 @@
         if (covers){
           const drawCovers = () => {
             covers.innerHTML = '<button type="button" class="tf-cover auto' + (!draft.cover ? ' on' : '') + '" data-cover="">Auto</button>' +
-              gallery.map(g => '<button type="button" class="tf-cover' + (draft.cover === g.url ? ' on' : '') + '" data-cover="' + escapeAttr(g.url) + '" aria-label="Use as cover"><img src="' + escapeAttr(cloudinaryThumbUrl(g.url, 160)) + '" alt="" loading="lazy"></button>').join('');
+              gallery.map(g => '<button type="button" class="tf-cover' + (draft.cover === g.url ? ' on' : '') + '" data-cover="' + escapeAttr(g.url) + '" aria-label="Use as cover"><img src="' + escapeAttr(cloudinaryThumbUrl(g.url, 160)) + '" alt="" loading="lazy" decoding="async"></button>').join('');
           };
           drawCovers();
           covers.addEventListener('click', (e) => {
@@ -21654,7 +21806,7 @@
     };
     const placeOpts = t.places.map(p => '<option value="' + escapeAttr(p.id) + '"' + (p.id === draft.place ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('');
     const photosHtml = () => '<div class="tf-covers af-photos">' + draft.photos.map((p, i) =>
-      '<div class="af-photo"><img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 200)) + '" alt="" loading="lazy">' +
+      '<div class="af-photo"><img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 200)) + '" alt="" loading="lazy" decoding="async">' +
         '<button type="button" class="trip-gx" data-af-photo-x="' + i + '" aria-label="Remove photo">✕</button></div>').join('') +
       '<button type="button" class="af-photo-add" id="af-photo-add" aria-label="Add photos">+</button></div>';
     tsheetOpen({
@@ -22047,6 +22199,15 @@
   loadMediaProgress('show');
   loadPointsAlgorithm().then(checkSavedProgress);
   otdStartupFlow().catch(err => console.error('On This Day could not start', err));
+
+  // Offline support and cached libraries for the installed app — see sw.js.
+  // Only when served over HTTPS as the real site, not inside the artifact
+  // runtime or opened from disk.
+  if (IS_STANDALONE && 'serviceWorker' in navigator && location.protocol === 'https:'){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service worker registration failed', err));
+    });
+  }
 })();
 </script>
 
