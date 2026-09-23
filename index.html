@@ -282,6 +282,23 @@
   #road-details-panel.open{
     width: 600px;
   }
+  #artist-details-panel{
+    width: 0;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: var(--desktop-nav-height);
+    min-height: calc(100vh - var(--desktop-nav-height));
+    max-height: calc(100vh - var(--desktop-nav-height));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+  }
+  #artist-details-panel.open{
+    width: 600px;
+  }
   #park-details-panel{
     width: 0;
     flex-shrink: 0;
@@ -3038,6 +3055,42 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
+  /* ---------- ARTISTS ---------- */
+  .artist-empty-msg{ color: var(--chalk-dim); font-size: 14px; text-align: center; padding: 40px 12px; }
+  .restaurant-gold-card.dragging{ opacity: 0.4; }
+  .restaurant-gold-card.file-drag-over{ border-color: var(--amber); }
+  /* Stand-in cover until a photo is uploaded: the artist's top 4 albums as
+     a 2x2 grid. An artist with only 3 ranked albums leaves the 4th square
+     blank on purpose rather than repeating one. */
+  .artist-collage{
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    background: var(--panel-line);
+  }
+  .artist-collage-cell{ position: relative; overflow: hidden; background: var(--bg-2); }
+  .artist-collage-cell img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+  .details-art-wrap .artist-cover-drop{ position: relative; }
+  .artist-album-row{ display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--panel-line); }
+  .artist-album-row:last-child{ border-bottom: none; }
+  .artist-album-thumb{ width: 44px; height: 44px; flex: none; border-radius: 6px; overflow: hidden; background: var(--bg-2); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .artist-album-thumb img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+  .artist-album-text{ flex: 1; min-width: 0; }
+  .artist-album-name{ display: block; font-size: 14px; font-weight: 700; color: var(--chalk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .artist-album-meta{ display: block; font-size: 12px; color: var(--chalk-dim); margin-top: 2px; }
+  .artist-album-rank{ flex: none; font-size: 12px; font-weight: 800; color: var(--amber); }
+  .artist-concert-row{ display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--panel-line); }
+  .artist-concert-date{ flex: none; font-size: 13px; font-weight: 700; color: var(--chalk); min-width: 96px; }
+  .artist-concert-location{ flex: 1; min-width: 0; font-size: 13px; line-height: 1.35; color: var(--chalk-dim); overflow-wrap: anywhere; }
+  .artist-concert-remove{ flex: none; width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); cursor: pointer; font-size: 12px; }
+  .artist-concert-empty{ font-size: 13px; color: var(--chalk-dim); padding: 4px 0 8px; }
+  .artist-concert-form{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .artist-concert-form input[type="date"]{ flex: none; width: 150px; }
+  .artist-concert-form input[type="text"]{ flex: 1; min-width: 140px; }
+  .artist-concert-form .restaurant-edit-input{ margin: 0; }
   .media-poster-grid .restaurant-gold-card{
     aspect-ratio: 48 / 75;
   }
@@ -4329,6 +4382,22 @@
       transform: translateX(0);
       visibility: visible;
     }
+    #artist-details-panel{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      min-height: 100vh;
+      max-height: 100vh;
+      z-index: 200;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.37, 0, 0.63, 1);
+      visibility: hidden;
+    }
+    #artist-details-panel.open{
+      width: 100%;
+      transform: translateX(0);
+      visibility: visible;
+    }
     #park-details-panel{
       position: fixed;
       inset: 0;
@@ -4687,6 +4756,7 @@
   <div class="group-sub-tabs" id="music-sub-tabs">
     <button class="group-sub-tab-btn active" id="music-subtab-albums-btn" type="button"><span class="group-sub-tab-icon">💿</span>Albums</button>
     <button class="group-sub-tab-btn" id="music-subtab-songs-btn" type="button"><span class="group-sub-tab-icon">🎵</span>Songs</button>
+    <button class="group-sub-tab-btn" id="music-subtab-artists-btn" type="button"><span class="group-sub-tab-icon">🎤</span>Artists</button>
   </div>
 
   <!-- SCREEN 1: INPUT -->
@@ -4864,6 +4934,7 @@
   <div class="group-sub-tabs" id="music-sub-tabs-songs">
     <button class="group-sub-tab-btn" id="music-subtab-albums-btn-2" type="button"><span class="group-sub-tab-icon">💿</span>Albums</button>
     <button class="group-sub-tab-btn active" id="music-subtab-songs-btn-2" type="button"><span class="group-sub-tab-icon">🎵</span>Songs</button>
+    <button class="group-sub-tab-btn" id="music-subtab-artists-btn-2" type="button"><span class="group-sub-tab-icon">🎤</span>Artists</button>
   </div>
 
     <section class="screen active" id="song-screen-input">
@@ -4994,6 +5065,20 @@
     </section>
 
   </div>
+  </div>
+
+  <div id="page-artists" class="top-page">
+    <div class="page-content">
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="music-sub-tabs-artists">
+          <button class="group-sub-tab-btn" id="music-subtab-albums-btn-3" type="button"><span class="group-sub-tab-icon">💿</span>Albums</button>
+          <button class="group-sub-tab-btn" id="music-subtab-songs-btn-3" type="button"><span class="group-sub-tab-icon">🎵</span>Songs</button>
+          <button class="group-sub-tab-btn active" id="music-subtab-artists-btn-3" type="button"><span class="group-sub-tab-icon">🎤</span>Artists</button>
+        </div>
+      </div>
+      <p class="artist-empty-msg" id="artist-empty-msg" style="display:none;">Any artist with 3 or more albums in your ranked Albums list shows up here automatically.</p>
+      <div class="restaurant-gold-grid road-large-grid" id="artist-grid"></div>
+    </div>
   </div>
 
   <div id="page-restaurants" class="top-page">
@@ -5628,6 +5713,10 @@
   <div class="restaurant-details-panel-inner" id="road-details-panel-inner"></div>
 </aside>
 
+<aside id="artist-details-panel">
+  <div class="restaurant-details-panel-inner" id="artist-details-panel-inner"></div>
+</aside>
+
 <aside id="hike-full-list-panel">
   <div class="restaurant-details-panel-inner" id="hike-full-list-panel-inner">
     <div class="details-art-wrap">
@@ -6046,6 +6135,9 @@
   const musicbeeImportBtn = document.getElementById('musicbee-import-btn');
   const musicbeeImportFile = document.getElementById('musicbee-import-file');
   const pageSongs = document.getElementById('page-songs');
+  const pageArtists = document.getElementById('page-artists');
+  const artistGridEl = document.getElementById('artist-grid');
+  const artistEmptyMsg = document.getElementById('artist-empty-msg');
   const pageRestaurants = document.getElementById('page-restaurants');
   const pageDishes = document.getElementById('page-dishes');
   const pageHikes = document.getElementById('page-hikes');
@@ -6082,6 +6174,11 @@
   const musicSubtabAlbumsBtn2 = document.getElementById('music-subtab-albums-btn-2');
   const musicSubtabSongsBtn = document.getElementById('music-subtab-songs-btn');
   const musicSubtabSongsBtn2 = document.getElementById('music-subtab-songs-btn-2');
+  const musicSubtabAlbumsBtn3 = document.getElementById('music-subtab-albums-btn-3');
+  const musicSubtabSongsBtn3 = document.getElementById('music-subtab-songs-btn-3');
+  const musicSubtabArtistsBtn = document.getElementById('music-subtab-artists-btn');
+  const musicSubtabArtistsBtn2 = document.getElementById('music-subtab-artists-btn-2');
+  const musicSubtabArtistsBtn3 = document.getElementById('music-subtab-artists-btn-3');
   const foodSubtabRestaurantsBtn = document.getElementById('food-subtab-restaurants-btn');
   const foodSubtabRestaurantsBtn2 = document.getElementById('food-subtab-restaurants-btn-2');
   const foodSubtabDishesBtn = document.getElementById('food-subtab-dishes-btn');
@@ -6192,6 +6289,8 @@
   const roadSearchFilterClear = document.getElementById('road-search-filter-clear');
   const roadDetailsPanel = document.getElementById('road-details-panel');
   const roadDetailsPanelInner = document.getElementById('road-details-panel-inner');
+  const artistDetailsPanel = document.getElementById('artist-details-panel');
+  const artistDetailsPanelInner = document.getElementById('artist-details-panel-inner');
   const roadGoldGridEl = document.getElementById('road-gold-grid');
   const roadList = document.getElementById('road-list');
   const roadRearrangeBtn = document.getElementById('road-rearrange-btn');
@@ -6577,6 +6676,7 @@
         parkRows, parkSavedAt: parkLastSavedAt,
         photoRows, photoSavedAt: photoLastSavedAt,
         tripRows, tripSavedAt: tripLastSavedAt,
+        artistRows, artistSavedAt: artistLastSavedAt,
         bookRows: mediaState.book.rows, bookSavedAt: mediaState.book.lastSavedAt,
         movieRows: mediaState.movie.rows, movieSavedAt: mediaState.movie.lastSavedAt,
         gameRows: mediaState.game.rows, gameSavedAt: mediaState.game.lastSavedAt,
@@ -6753,6 +6853,16 @@
         tripLastSavedAt = existing.tripSavedAt || null;
         try{ await window.storage.set(TRIP_STORAGE_KEY, JSON.stringify({ tripRows, savedAt: tripLastSavedAt }), false); }catch(e){ /* best effort */ }
         tripRefresh();
+      }
+    }
+    if (Array.isArray(existing.artistRows) && existing.artistRows.length >= 1){
+      const remoteTime = new Date(existing.artistSavedAt || 0).getTime();
+      const localTime = new Date(artistLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        artistRows = existing.artistRows.map(artistNormalize);
+        artistLastSavedAt = existing.artistSavedAt || null;
+        try{ await window.storage.set(ARTIST_STORAGE_KEY, JSON.stringify({ artistRows, savedAt: artistLastSavedAt }), false); }catch(e){ /* best effort */ }
+        if (pageArtists.classList.contains('active')) renderArtistsPage();
       }
     }
     const mediaFirestoreFields = {
@@ -7062,6 +7172,16 @@
     if (localTripParsed && Array.isArray(localTripParsed.tripRows) && localTripParsed.tripRows.length){
       tripRows = localTripParsed.tripRows.map(tripNormalize);
       tripLastSavedAt = localTripParsed.savedAt || null;
+    }
+
+    let localArtistParsed = null;
+    try{
+      const res = await window.storage.get(ARTIST_STORAGE_KEY, false);
+      if (res && res.value) localArtistParsed = JSON.parse(res.value);
+    }catch(e){ /* no local artist save */ }
+    if (localArtistParsed && Array.isArray(localArtistParsed.artistRows) && localArtistParsed.artistRows.length){
+      artistRows = localArtistParsed.artistRows.map(artistNormalize);
+      artistLastSavedAt = localArtistParsed.savedAt || null;
     }
 
     for (const type of ['book', 'movie', 'game', 'show']){
@@ -7615,6 +7735,10 @@
     if (touched.has('park')){ saveParkProgress(); renderParksPage(); }
     if (touched.has('road')){ saveRoadProgress(); renderRoadsPage(); }
     if (touched.has('photo')){ savePhotoProgress(); renderPhotosPage(); }
+    for (const ar of artistRows){
+      if (ar.coverPhoto) await process(() => ar.coverPhoto, (u) => { ar.coverPhoto = u; }, 'artist');
+    }
+    if (touched.has('artist')){ saveArtistProgress(); if (pageArtists.classList.contains('active')) renderArtistsPage(); }
     if (touched.has('trip')){ saveTripProgress(); renderTripsPage(); if (tripOpenId) tripRender(); }
 
     btn.disabled = false;
@@ -7703,6 +7827,8 @@
     renderResultsTab();
     renderDockTab();
     renderSongResultsTab(); // songs display the same albums' art, keyed the same way
+    if (pageArtists.classList.contains('active')) renderArtistsPage(); // artists' stand-in covers are made of these same albums' art
+    if (openArtistKey !== null && !artistEditMode) renderArtistDetailsContent();
   }
 
   async function handleArtFile(raw, file){
@@ -9338,7 +9464,7 @@
     // got passed in.
     if (isLockedGuestAccount && page === 'settings') page = 'restaurants';
     const pages = {
-      albums: pageAlbums, songs: pageSongs, restaurants: pageRestaurants, dishes: pageDishes,
+      albums: pageAlbums, songs: pageSongs, artists: pageArtists, restaurants: pageRestaurants, dishes: pageDishes,
       hikes: pageHikes, parks: pageParks, roads: pageRoads, photos: pagePhotos,
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
       trips: pageTrips, fun: pageFun, settings: pageSettings
@@ -9368,6 +9494,12 @@
     }
     if (page !== 'parks' && openParkIndex !== null){
       closeParkDetailsPanel();
+    }
+    if (page !== 'artists' && openArtistKey !== null){
+      closeArtistDetailsPanel();
+    }
+    if (page === 'artists'){
+      renderArtistsPage();
     }
     if (page === 'songs'){
       renderSongsPage();
@@ -9453,8 +9585,9 @@
   // this file's HTML for why) before delegating to switchTopPage.
   function switchMusicSubPage(page){
     activeMusicSubPage = page;
-    [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2].forEach(b => b.classList.toggle('active', page === 'albums'));
-    [musicSubtabSongsBtn, musicSubtabSongsBtn2].forEach(b => b.classList.toggle('active', page === 'songs'));
+    [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2, musicSubtabAlbumsBtn3].forEach(b => b.classList.toggle('active', page === 'albums'));
+    [musicSubtabSongsBtn, musicSubtabSongsBtn2, musicSubtabSongsBtn3].forEach(b => b.classList.toggle('active', page === 'songs'));
+    [musicSubtabArtistsBtn, musicSubtabArtistsBtn2, musicSubtabArtistsBtn3].forEach(b => b.classList.toggle('active', page === 'artists'));
     switchTopPage(page);
   }
   function switchFoodSubPage(page){
@@ -9495,8 +9628,9 @@
   [toolsSubtabFunBtn, toolsSubtabFunBtn2].forEach(b => b.addEventListener('click', () => switchToolsSubPage('fun')));
   [toolsSubtabSettingsBtn, toolsSubtabSettingsBtn2].forEach(b => b.addEventListener('click', () => switchToolsSubPage('settings')));
 
-  [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('albums')));
-  [musicSubtabSongsBtn, musicSubtabSongsBtn2].forEach(b => b.addEventListener('click', () => switchMusicSubPage('songs')));
+  [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2, musicSubtabAlbumsBtn3].forEach(b => b.addEventListener('click', () => switchMusicSubPage('albums')));
+  [musicSubtabSongsBtn, musicSubtabSongsBtn2, musicSubtabSongsBtn3].forEach(b => b.addEventListener('click', () => switchMusicSubPage('songs')));
+  [musicSubtabArtistsBtn, musicSubtabArtistsBtn2, musicSubtabArtistsBtn3].forEach(b => b.addEventListener('click', () => switchMusicSubPage('artists')));
   [foodSubtabRestaurantsBtn, foodSubtabRestaurantsBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('restaurants')));
   [foodSubtabDishesBtn, foodSubtabDishesBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('dishes')));
   [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3, natureSubtabHikesBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
@@ -9514,7 +9648,7 @@
   // already has each sub-tab directly clickable and a swipe gesture there
   // would just be an unexpected, unsupported thing to try.
   const GROUP_SUBPAGES = {
-    music: ['albums', 'songs'],
+    music: ['albums', 'songs', 'artists'],
     food: ['restaurants', 'dishes'],
     nature: ['hikes', 'parks', 'roads', 'photos'],
     art: ['books', 'movies', 'games', 'shows'],
@@ -14218,6 +14352,378 @@
   }
 
   // Same auto-sort-with-manual-tie-break convention as getOrderedHikes.
+  // ---------- ARTISTS ----------
+  // Nothing here is added or removed by hand: any artist with at least 3
+  // albums in the ranked Albums list (Loading Dock not included) shows up
+  // automatically. What IS stored is only what can't be derived — your
+  // chosen order, an uploaded cover photo, the country, and the Seen Live
+  // log — keyed by the artist's name ignoring capitalization. An artist who
+  // drops below 3 albums is hidden, not deleted, so all of that comes back
+  // (in the same spot) if they return. Genre isn't stored either: it's the
+  // albums' own Grouping, the same field shown as a tag in the Albums list.
+  const ARTIST_STORAGE_KEY = 'artist-list';
+  const ARTIST_MIN_ALBUMS = 3;
+  let artistRows = []; // [{ key, name, country, coverPhoto, concerts:[{ id, date, location }] }], in the user's order
+  let artistLastSavedAt = null;
+  let openArtistKey = null;
+  let artistEditMode = false;
+  let artistDragEl = null;
+
+  function artistKeyOf(name){ return String(name || '').trim().toLowerCase(); }
+  function artistNormalize(r){
+    return {
+      key: r.key || artistKeyOf(r.name),
+      name: r.name || '',
+      country: r.country || '',
+      coverPhoto: r.coverPhoto || '',
+      concerts: (Array.isArray(r.concerts) ? r.concerts : []).filter(c => c && c.date).map(c => ({ id: c.id || tripNewId('gig'), date: c.date, location: c.location || '' }))
+    };
+  }
+
+  async function loadArtistProgress(){
+    try{
+      const res = await window.storage.get(ARTIST_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        artistRows = (Array.isArray(parsed.artistRows) ? parsed.artistRows : []).map(artistNormalize);
+        artistLastSavedAt = parsed.savedAt || null;
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+  function saveArtistProgress(){
+    artistLastSavedAt = new Date().toISOString();
+    try{ window.storage.set(ARTIST_STORAGE_KEY, JSON.stringify({ artistRows, savedAt: artistLastSavedAt }), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  // The ranked list only — the same list, in the same order, the Albums
+  // Results tab shows (final ranking once finished, the live estimate while
+  // duels are still in progress).
+  function artistAlbumMap(){
+    const ranking = isComplete ? finalRanking : (items.length ? computeLiveEstimate() : []);
+    const map = new Map();
+    ranking.forEach((raw, idx) => {
+      const p = parseEntry(raw);
+      if (!p.artist) return;
+      const key = artistKeyOf(p.artist);
+      if (!map.has(key)) map.set(key, { name: p.artist, albums: [] });
+      map.get(key).albums.push({ raw, rank: idx + 1, album: p.album, year: p.year });
+    });
+    return map;
+  }
+
+  // Adds a row for anyone who's newly reached 3 albums — at the bottom,
+  // never slotted in by rank — and keeps each name's capitalization in step
+  // with how it's written in the Albums list.
+  function syncArtistRows(map){
+    let changed = false;
+    const known = new Map(artistRows.map(r => [r.key, r]));
+    map.forEach((info, key) => {
+      if (info.albums.length < ARTIST_MIN_ALBUMS) return;
+      const row = known.get(key);
+      if (!row){
+        artistRows.push(artistNormalize({ key, name: info.name }));
+        changed = true;
+      } else if (row.name !== info.name){
+        row.name = info.name;
+        changed = true;
+      }
+    });
+    if (changed) saveArtistProgress();
+  }
+
+  function visibleArtists(map){
+    return artistRows.filter(r => { const info = map.get(r.key); return info && info.albums.length >= ARTIST_MIN_ALBUMS; });
+  }
+
+  // Most common Grouping across the artist's ranked albums; a tie goes to
+  // whichever of those groupings their highest-ranked album has.
+  function artistGenre(info){
+    const counts = new Map();
+    let firstSeen = [];
+    info.albums.forEach(a => {
+      const g = findMusicbeeGroupingForAlbum(info.name, a.album);
+      if (!g) return;
+      if (!counts.has(g)){ counts.set(g, 0); firstSeen.push(g); }
+      counts.set(g, counts.get(g) + 1);
+    });
+    let best = '', bestCount = 0;
+    firstSeen.forEach(g => { if (counts.get(g) > bestCount){ best = g; bestCount = counts.get(g); } });
+    return best;
+  }
+  function artistMetaText(row, info){
+    return [artistGenre(info), row.country].filter(Boolean).join(' • ');
+  }
+
+  // The stand-in cover: their top 4 albums as a 2x2. With only 3 albums the
+  // 4th square is left blank; an album with no art yet shows a faint note.
+  function artistCollageHtml(info, width){
+    const cells = [];
+    for (let i = 0; i < 4; i++){
+      const a = info.albums[i];
+      const art = a ? artCache[a.raw] : null;
+      cells.push('<span class="artist-collage-cell">' +
+        (art ? '<img src="' + escapeAttr(cloudinaryThumbUrl(art, width)) + '" alt="" draggable="false" loading="lazy">' : '') +
+      '</span>');
+    }
+    return '<span class="artist-collage">' + cells.join('') + '</span>';
+  }
+  function artistCoverHtml(row, info, width){
+    return row.coverPhoto
+      ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(row.coverPhoto, width)) + '" alt="" draggable="false" loading="lazy">'
+      : artistCollageHtml(info, Math.round(width / 2));
+  }
+
+  async function uploadArtistCover(row, file){
+    if (!file || guestViewEnabled) return;
+    const url = await uploadRestaurantPhoto(file, 'RankHeaven/ArtistCovers');
+    if (!url) return;
+    row.coverPhoto = url;
+    saveArtistProgress();
+    renderArtistsPage();
+    if (openArtistKey === row.key) renderArtistDetailsContent();
+    showToast('Cover photo saved');
+  }
+  function pickArtistCoverFile(row){
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', () => uploadArtistCover(row, input.files && input.files[0]));
+    input.click();
+  }
+  function wireArtistFileDrop(el, row){
+    el.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('file-drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('file-drag-over'));
+    el.addEventListener('drop', (e) => {
+      if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      el.classList.remove('file-drag-over');
+      uploadArtistCover(row, e.dataTransfer.files[0]);
+    });
+  }
+
+  function renderArtistsPage(){
+    if (!artistGridEl) return;
+    const map = artistAlbumMap();
+    syncArtistRows(map);
+    const shown = visibleArtists(map);
+    // Art for everyone's top 4 — fire-and-forget; loadArtForItems re-renders this page once it's in.
+    const needArt = [];
+    shown.forEach(r => map.get(r.key).albums.slice(0, 4).forEach(a => needArt.push(a.raw)));
+    loadArtForItems(needArt);
+
+    artistEmptyMsg.style.display = shown.length ? 'none' : 'block';
+    artistGridEl.innerHTML = shown.map((r, i) => {
+      const info = map.get(r.key);
+      const meta = artistMetaText(r, info);
+      return '<div class="restaurant-gold-card artist-card" data-artist-key="' + escapeAttr(r.key) + '">' +
+        '<span class="restaurant-gold-card-rank">#' + (i + 1) + '</span>' +
+        artistCoverHtml(r, info, 600) +
+        '<div class="restaurant-gold-card-overlay">' +
+          '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
+          (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    const byKey = new Map(shown.map(r => [r.key, r]));
+    artistGridEl.querySelectorAll('.artist-card').forEach(card => {
+      const row = byKey.get(card.dataset.artistKey);
+      card.addEventListener('click', () => openArtistDetailsPanel(row.key));
+      if (guestViewEnabled) return;
+      wireArtistFileDrop(card, row);
+      if (shown.length < 2) return;
+      card.setAttribute('draggable', 'true');
+      card.addEventListener('dragstart', (e) => {
+        artistDragEl = card;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', row.key);
+      });
+      card.addEventListener('dragend', commitArtistDragOrder);
+      card.addEventListener('dragover', (e) => {
+        if (!artistDragEl) return; // a file being dragged in, not a card
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (artistDragEl === card || !card.parentNode) return;
+        if (isBeforeInDom(artistDragEl, card)) card.parentNode.insertBefore(artistDragEl, card.nextSibling);
+        else card.parentNode.insertBefore(artistDragEl, card);
+      });
+      card.addEventListener('drop', (e) => { if (artistDragEl) e.preventDefault(); });
+    });
+  }
+
+  // Only the visible artists were dragged, so they're written back into the
+  // same positions they already held — hidden artists (below 3 albums right
+  // now) keep their own place in the order untouched.
+  function commitArtistDragOrder(){
+    const dragged = artistDragEl;
+    artistDragEl = null;
+    if (!dragged) return;
+    dragged.classList.remove('dragging');
+    const newKeys = Array.from(artistGridEl.querySelectorAll('.artist-card')).map(c => c.dataset.artistKey);
+    const visibleSet = new Set(newKeys);
+    const slots = [];
+    artistRows.forEach((r, i) => { if (visibleSet.has(r.key)) slots.push(i); });
+    if (slots.length !== newKeys.length) return;
+    const byKey = new Map(artistRows.map(r => [r.key, r]));
+    const oldOrder = slots.map(i => artistRows[i].key).join('|');
+    if (oldOrder === newKeys.join('|')) return; // dropped back where it started
+    slots.forEach((slot, n) => { artistRows[slot] = byKey.get(newKeys[n]); });
+    saveArtistProgress();
+    renderArtistsPage();
+  }
+
+  function openArtistDetailsPanel(key){
+    openArtistKey = key;
+    artistEditMode = false;
+    artistDetailsPanel.classList.add('open');
+    document.body.classList.add('details-open-lock');
+    renderArtistDetailsContent();
+  }
+  function closeArtistDetailsPanel(){
+    openArtistKey = null;
+    artistEditMode = false;
+    artistDetailsPanel.classList.remove('open');
+    if (countOpenOverlays() === 0) document.body.classList.remove('details-open-lock');
+  }
+
+  function artistConcertDateLabel(key){
+    const d = new Date(key + 'T00:00:00');
+    return isNaN(d) ? key : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function renderArtistDetailsContent(){
+    if (openArtistKey === null) return;
+    const map = artistAlbumMap();
+    const row = artistRows.find(r => r.key === openArtistKey);
+    const info = map.get(openArtistKey);
+    if (!row || !info){ closeArtistDetailsPanel(); return; }
+    if (artistEditMode){ renderArtistEditForm(row); return; }
+
+    const shown = visibleArtists(map);
+    const rank = shown.indexOf(row) + 1;
+    const meta = artistMetaText(row, info);
+    const albumsHtml = info.albums.map(a => {
+      const art = artCache[a.raw];
+      const grouping = findMusicbeeGroupingForAlbum(info.name, a.album);
+      return '<div class="artist-album-row">' +
+        '<span class="artist-album-thumb">' + (art ? '<img src="' + escapeAttr(cloudinaryThumbUrl(art, 120)) + '" alt="" loading="lazy">' : '🎵') + '</span>' +
+        '<span class="artist-album-text"><span class="artist-album-name">' + escapeHtml(a.album) + '</span>' +
+          '<span class="artist-album-meta">' + escapeHtml([a.year, grouping].filter(Boolean).join(' · ')) + '</span></span>' +
+        '<span class="artist-album-rank">#' + a.rank + '</span>' +
+      '</div>';
+    }).join('');
+    const concerts = row.concerts.slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+    const concertsHtml = concerts.length
+      ? concerts.map(c => '<div class="artist-concert-row">' +
+          '<span class="artist-concert-date">' + escapeHtml(artistConcertDateLabel(c.date)) + '</span>' +
+          '<span class="artist-concert-location">' + escapeHtml(c.location) + '</span>' +
+          (guestViewEnabled ? '' : '<button class="artist-concert-remove" type="button" data-concert-remove="' + escapeAttr(c.id) + '" aria-label="Remove this date">✕</button>') +
+        '</div>').join('')
+      : '<p class="artist-concert-empty">Not seen live yet.</p>';
+
+    artistDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<div class="art-drop restaurant-cover-drop artist-cover-drop' + (row.coverPhoto ? ' has-art' : '') + '" title="' + (row.coverPhoto ? 'Click to view the photo' : 'Click or drop an image to add a cover photo') + '">' +
+          artistCoverHtml(row, info, 900) +
+        '</div>' +
+        (guestViewEnabled ? '' : '<button class="details-edit-btn" type="button" title="Edit">✎</button>') +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(row.name) + '</h2>' +
+        (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
+        '<div class="restaurant-other-photos-section">' +
+          '<span class="restaurant-other-photos-label">Albums · ' + info.albums.length + '</span>' +
+          albumsHtml +
+        '</div>' +
+        '<div class="restaurant-other-photos-section">' +
+          '<span class="restaurant-other-photos-label">Seen Live' + (concerts.length ? ' · ' + concerts.length : '') + '</span>' +
+          concertsHtml +
+          (guestViewEnabled ? '' :
+            '<div class="artist-concert-form">' +
+              '<input type="date" class="restaurant-edit-input" id="artist-concert-date" aria-label="Date seen live">' +
+              '<input type="text" class="restaurant-edit-input" id="artist-concert-location" placeholder="Where (venue, city)" aria-label="Location" autocomplete="off">' +
+              '<button class="btn-primary" type="button" id="artist-concert-add-btn">Add</button>' +
+            '</div>') +
+        '</div>' +
+      '</div>';
+
+    artistDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeArtistDetailsPanel);
+    const cover = artistDetailsPanelInner.querySelector('.artist-cover-drop');
+    cover.addEventListener('click', () => {
+      if (row.coverPhoto) openArtLightbox(row.coverPhoto);
+      else if (!guestViewEnabled) pickArtistCoverFile(row);
+    });
+    if (guestViewEnabled) return;
+    wireArtistFileDrop(cover, row);
+    artistDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', () => { artistEditMode = true; renderArtistDetailsContent(); });
+    artistDetailsPanelInner.querySelectorAll('[data-concert-remove]').forEach(btn => btn.addEventListener('click', () => {
+      row.concerts = row.concerts.filter(c => c.id !== btn.dataset.concertRemove);
+      saveArtistProgress();
+      renderArtistDetailsContent();
+    }));
+    const addConcert = () => {
+      const date = artistDetailsPanelInner.querySelector('#artist-concert-date').value;
+      const location = artistDetailsPanelInner.querySelector('#artist-concert-location').value.trim();
+      if (!date){ showToast('Pick the date you saw them'); return; }
+      if (!location){ showToast('Add where you saw them'); return; }
+      row.concerts.push({ id: tripNewId('gig'), date, location });
+      saveArtistProgress();
+      renderArtistDetailsContent();
+      showToast('Added to Seen Live');
+    };
+    artistDetailsPanelInner.querySelector('#artist-concert-add-btn').addEventListener('click', addConcert);
+    artistDetailsPanelInner.querySelector('#artist-concert-location').addEventListener('keydown', (e) => { if (e.key === 'Enter') addConcert(); });
+  }
+
+  function renderArtistEditForm(row){
+    artistDetailsPanelInner.innerHTML =
+      '<div class="details-art-wrap">' +
+        '<button class="details-close-btn" type="button" title="Close">✕</button>' +
+      '</div>' +
+      '<div class="details-content" style="padding-top:20px;">' +
+        '<h2 class="details-album">Edit ' + escapeHtml(row.name) + '</h2>' +
+        '<div class="restaurant-edit-form">' +
+          '<label class="restaurant-edit-label">Country</label>' +
+          '<input type="text" class="restaurant-edit-input" id="artist-edit-country" value="' + escapeAttr(row.country) + '" autocomplete="off">' +
+          '<label class="restaurant-edit-label">Cover photo</label>' +
+          '<div class="restaurant-edit-actions" style="margin-top:0;">' +
+            '<button class="btn-ghost" id="artist-edit-photo-btn" type="button">' + (row.coverPhoto ? 'Replace photo' : 'Upload photo') + '</button>' +
+            (row.coverPhoto ? '<button class="btn-ghost" id="artist-edit-photo-remove-btn" type="button">Remove photo</button>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="restaurant-edit-actions">' +
+          '<button class="btn-primary" id="artist-edit-save-btn" type="button">Save</button>' +
+          '<button class="btn-ghost" id="artist-edit-cancel-btn" type="button">Cancel</button>' +
+        '</div>' +
+      '</div>';
+    const back = () => { artistEditMode = false; renderArtistDetailsContent(); };
+    artistDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeArtistDetailsPanel);
+    artistDetailsPanelInner.querySelector('#artist-edit-cancel-btn').addEventListener('click', back);
+    artistDetailsPanelInner.querySelector('#artist-edit-photo-btn').addEventListener('click', () => pickArtistCoverFile(row));
+    const removeBtn = artistDetailsPanelInner.querySelector('#artist-edit-photo-remove-btn');
+    if (removeBtn) removeBtn.addEventListener('click', () => {
+      row.coverPhoto = '';
+      saveArtistProgress();
+      renderArtistsPage();
+      renderArtistEditForm(row);
+      showToast('Back to the album grid');
+    });
+    artistDetailsPanelInner.querySelector('#artist-edit-save-btn').addEventListener('click', () => {
+      row.country = artistDetailsPanelInner.querySelector('#artist-edit-country').value.trim();
+      saveArtistProgress();
+      renderArtistsPage();
+      back();
+      showToast('Saved');
+    });
+  }
+
   function getOrderedRoads(){
     return roadRows
       .map((r, i) => ({ r, i }))
@@ -17516,7 +18022,7 @@
       items, history, isComplete, finalRanking, loadingDock, art, tierBoundaries, tierBoundariesTotal,
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
-      hikeRows, parkRows, roadRows, photoRows, tripRows,
+      hikeRows, parkRows, roadRows, photoRows, tripRows, artistRows,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
       hikeFullListText, dishFullListText,
@@ -17593,6 +18099,12 @@
         renderTripsPage();
         restoredParts.push(parsed.tripRows.length + ' trip' + (parsed.tripRows.length === 1 ? '' : 's'));
       }
+      if (Array.isArray(parsed.artistRows) && parsed.artistRows.length){
+        artistRows = parsed.artistRows.map(artistNormalize);
+        saveArtistProgress();
+        renderArtistsPage();
+        restoredParts.push(parsed.artistRows.length + ' artist' + (parsed.artistRows.length === 1 ? '' : 's'));
+      }
       const mediaImportFields = { book: 'bookRows', movie: 'movieRows', game: 'gameRows', show: 'showRows' };
       for (const type of ['book', 'movie', 'game', 'show']){
         const field = mediaImportFields[type];
@@ -17661,6 +18173,7 @@
     { el: hikeDetailsPanel, openClass: 'open' },
     { el: roadDetailsPanel, openClass: 'open' },
     { el: parkDetailsPanel, openClass: 'open' },
+    { el: artistDetailsPanel, openClass: 'open' },
   ];
   let openOverlayCount = 0;
   let ignoreNextPopstate = false;
@@ -17712,6 +18225,7 @@
     if (hikeDetailsPanel.classList.contains('open')){ closeHikeDetailsPanel(); return; }
     if (roadDetailsPanel.classList.contains('open')){ closeRoadDetailsPanel(); return; }
     if (parkDetailsPanel.classList.contains('open')){ closeParkDetailsPanel(); return; }
+    if (artistDetailsPanel.classList.contains('open')){ closeArtistDetailsPanel(); return; }
     if (otdOverlay.classList.contains('open')){ closeOnThisDay(); return; }
     if (ggOverlay.classList.contains('open')){ closeGuessGame(); return; }
     if (yirOverlay.classList.contains('open')){ closeYearInReview(); return; }
@@ -21522,6 +22036,7 @@
 
   loadDishFullListText();
   loadRoadProgress();
+  loadArtistProgress();
   loadPhotoProgress();
   loadTripProgress().then(() => renderTripsPage());
   loadMediaProgress('book');
