@@ -5595,7 +5595,7 @@
 
       <div class="settings-section">
         <h2 class="settings-section-title">Photo Cleanup</h2>
-        <p class="footer-note" style="margin-top:0;">Photos saved before a fix to how they're resized may still be stored at full size, which can make the app crash when they're shown. This checks every restaurant, hike, park, road, photo and trip and shrinks any that are still oversized — it can take a few minutes with a lot of photos, and it's safe to run more than once.</p>
+        <p class="footer-note" style="margin-top:0;">Some photos may still be stored directly in your data instead of on Cloudinary — from before a fix, before Cloudinary was connected, or an upload that failed silently. Those can make the app crash when shown, and bloat what gets synced (Firestore caps a document at 1MB). This checks every restaurant, hike, park, road, photo and trip: with Cloudinary connected, it moves any of those photos there; otherwise it shrinks any still oversized. It can take a few minutes with a lot of photos, and it's safe to run more than once.</p>
         <div class="import-row" style="margin-top:10px;">
           <span id="photo-cleanup-status-text">Not run yet</span>
           <button class="btn-ghost" id="photo-cleanup-btn" type="button">Check &amp; Shrink Photos</button>
@@ -6518,22 +6518,34 @@
     firestoreWriteTimer = setTimeout(writeFirestoreData, 600);
   }
 
-  // Below 70% of Firestore's 1MB-per-document cap, this stays hidden
-  // entirely — there's nothing to act on yet, and showing a size readout
-  // at all times would just be clutter. Once it's actually worth knowing
-  // about, amber first, then red as it gets genuinely close to the wall.
-  function updateFirestoreSizeDisplay(sizeMB){
+  // The payload is split across numbered chunk documents (below), each
+  // safely under Firestore's 1MB-per-document cap by construction — so
+  // this is no longer a wall to warn about, just an FYI once it's big
+  // enough to be worth mentioning at all.
+  function updateFirestoreSizeDisplay(sizeMB, chunkCount){
     if (sizeMB < 0.7){
       firestoreSizeNote.style.display = 'none';
       firestoreSizeNote.classList.remove('size-warning', 'size-critical');
       return;
     }
-    const pct = Math.round((sizeMB / 1) * 100);
-    const isCritical = sizeMB >= 0.9;
-    firestoreSizeNote.textContent = (isCritical ? '⚠️ ' : '') + 'Backup size: ' + sizeMB.toFixed(2) + ' MB of Firestore\'s 1 MB limit (' + pct + '%)' + (isCritical ? ' — approaching the limit, some data may stop syncing' : '');
-    firestoreSizeNote.classList.toggle('size-warning', !isCritical);
-    firestoreSizeNote.classList.toggle('size-critical', isCritical);
+    firestoreSizeNote.textContent = 'Backup size: ' + sizeMB.toFixed(2) + ' MB, synced in ' + chunkCount + ' part' + (chunkCount === 1 ? '' : 's');
+    firestoreSizeNote.classList.remove('size-warning', 'size-critical');
     firestoreSizeNote.style.display = 'block';
+  }
+
+  // Splits one big JSON string into pieces safely under Firestore's 1MB
+  // cap — same approach as MusicBee's own chunked storage below, now
+  // applied to the main payload too, since a restaurant's (or any other
+  // domain's) locally-stored photos can push the whole thing well past a
+  // single document's budget on their own. .length here is UTF-16 code
+  // units, not exact UTF-8 bytes, but the 800KB target leaves enough
+  // margin under the 1MB cap that the difference never matters in
+  // practice — the same approximation MusicBee's chunker already makes.
+  const FIRESTORE_CHUNK_TARGET_CHARS = 800 * 1024;
+  function chunkJsonString(str){
+    const chunks = [];
+    for (let i = 0; i < str.length; i += FIRESTORE_CHUNK_TARGET_CHARS) chunks.push(str.slice(i, i + FIRESTORE_CHUNK_TARGET_CHARS));
+    return chunks.length ? chunks : [''];
   }
 
   async function writeFirestoreData(){
@@ -6578,10 +6590,16 @@
         pointsAlgorithm, pointsAlgorithmSavedAt
       });
       const payloadSizeMB = payload.length / 1024 / 1024;
-      console.log('Firestore payload size:', payloadSizeMB.toFixed(2), 'MB (Firestore\'s cap is 1MB per document)');
-      updateFirestoreSizeDisplay(payloadSizeMB);
-      const docRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
-      await fb.setDoc(docRef, { json: payload });
+      const chunks = chunkJsonString(payload);
+      console.log('Firestore payload size:', payloadSizeMB.toFixed(2), 'MB, split across', chunks.length, 'document(s) (each kept under Firestore\'s 1MB-per-document cap)');
+      updateFirestoreSizeDisplay(payloadSizeMB, chunks.length);
+      const savedAtStamp = new Date().toISOString();
+      const manifestRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'appData', 'main');
+      await fb.setDoc(manifestRef, { chunkCount: chunks.length, savedAt: savedAtStamp });
+      await Promise.all(chunks.map((chunk, i) => {
+        const chunkRef = fb.doc(fb.db, 'users', firebaseUser.uid, 'mainChunks', String(i));
+        return fb.setDoc(chunkRef, { json: chunk });
+      }));
     }catch(e){
       console.error('Firestore write failed:', e);
       showToast("⚠️ Couldn't sync to Firebase (" + (e && e.code ? e.code : 'unknown error') + ") — see console, will retry on the next change");
@@ -6592,19 +6610,37 @@
     const fb = window.__firebase;
     if (!fb || !firebaseUser) return null;
     try{
-      // The locked guest account reads the OWNER's document, not its own —
+      // The locked guest account reads the OWNER's document(s), not its own —
       // its own uid-keyed path has never had anything written to it (see
       // the write guard above), so reading that would always come up
       // empty. This is what actually lets it see the owner's data at all;
       // it requires a matching Firestore security rule granting this
-      // specific read (see this session's chat for the exact rule).
+      // specific read — for both the manifest AND the mainChunks
+      // subcollection now that the payload lives across both (see this
+      // session's chat for the exact rule).
       const targetUid = isLockedGuestAccount ? OWNER_FIREBASE_UID : firebaseUser.uid;
-      const docRef = fb.doc(fb.db, 'users', targetUid, 'appData', 'main');
-      const snap = await fb.getDoc(docRef);
+      const manifestRef = fb.doc(fb.db, 'users', targetUid, 'appData', 'main');
+      const snap = await fb.getDoc(manifestRef);
       if (!snap.exists()) return null;
-      const data = snap.data();
-      if (!data || !data.json) return null;
-      return JSON.parse(data.json);
+      const manifest = snap.data();
+      if (!manifest) return null;
+      // Backward compatible with the old single-document shape (the
+      // payload lived directly on this doc as `.json`) — a device that
+      // hasn't written since the chunked split still leaves the manifest
+      // in that shape until its next save.
+      if (manifest.json) return JSON.parse(manifest.json);
+      if (!manifest.chunkCount) return null;
+      const chunkSnaps = await Promise.all(Array.from({ length: manifest.chunkCount }, (_, i) => {
+        const chunkRef = fb.doc(fb.db, 'users', targetUid, 'mainChunks', String(i));
+        return fb.getDoc(chunkRef);
+      }));
+      let json = '';
+      for (const chunkSnap of chunkSnaps){
+        if (!chunkSnap.exists()) return null; // a missing chunk means it can't be safely reassembled — treat as no remote data rather than parsing something corrupt
+        const chunkData = chunkSnap.data();
+        json += (chunkData && chunkData.json) || '';
+      }
+      return JSON.parse(json);
     }catch(e){
       console.error('Firestore read failed:', e);
       return null;
@@ -7477,6 +7513,19 @@
     if (!url || typeof url !== 'string' || url.indexOf('data:image') !== 0) return null;
     try{
       const blob = await (await fetch(url)).blob();
+      // If Cloudinary is connected now, ANY photo still sitting here as raw
+      // data was uploaded before that (or Cloudinary rejected it at the
+      // time) — move it there instead of just shrinking it in place. A
+      // Cloudinary link costs a few dozen bytes to store and sync; the
+      // same photo kept inline costs its full weight forever, dimension
+      // limit or not — that's the difference between a restaurant's
+      // photos taking a few KB and taking several MB.
+      if (cloudinaryConfig){
+        try{
+          const cloudUrl = await uploadToCloudinary(blob, 'RankHeaven/Cleanup');
+          if (cloudUrl) return cloudUrl;
+        }catch(e){ /* Cloudinary declined this one — fall through to shrinking it locally instead */ }
+      }
       const fixed = await compressImageForLocalStorage(blob);
       if (fixed === blob) return null; // already within the size/dimension target
       return await fileToDataUrl(fixed);
