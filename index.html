@@ -448,8 +448,24 @@
     background: var(--bg-2);
     cursor: pointer;
   }
-  .restaurant-course-thumb-tile[data-course-photo-index]{ cursor: pointer; }
-  .restaurant-course-thumb-tile:not([data-course-photo-index]){ cursor: default; }
+  .restaurant-course-thumb-tile[data-course-photo-index], .restaurant-course-thumb-tile[data-visit-photo-index]{ cursor: pointer; }
+  .restaurant-course-thumb-tile:not([data-course-photo-index]):not([data-visit-photo-index]){ cursor: default; }
+  .restaurant-course-thumb-tile.dragging{ opacity: 0.4; }
+  .restaurant-course-thumb-caption{
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 3px 5px 4px;
+    background: linear-gradient(to top, rgba(10, 22, 24, 0.88), rgba(10, 22, 24, 0));
+    color: var(--chalk);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+  }
+  body.guest-view-active .restaurant-course-thumb-caption{ display: none; }
   .restaurant-photo-thumb{
     position: relative;
     aspect-ratio: 1 / 1;
@@ -3897,6 +3913,10 @@
   }
   .lightbox-cover-toggle-btn.show{ display: block; }
   .lightbox-cover-toggle-btn.is-cover{ background: var(--amber); color: var(--ink); }
+  /* Shares the same look and position as the button above — but a restaurant's
+     own course-photo lightbox can show both at once (one restaurant cover,
+     one course cover), so this one sits a row lower instead of on top of it. */
+  #lightbox-dish-cover-btn{ top: 64px; }
 
   /* Same gating as the cover-toggle button — only appears in restaurant
      gallery mode, since that's the only current caller with anything
@@ -7784,7 +7804,13 @@
     const handler = resolveLightboxCoverHandler(lightboxCoverContext);
     if (!handler || !handler.row) return;
     const isCover = handler.row.coverPhoto === lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
-    lightboxCoverToggleBtn.textContent = isCover ? '★ Cover photo' : '☆ Set as cover';
+    // Once a restaurant's course photos can also have their OWN separate
+    // cover (below), the generic label needs to say which cover this is —
+    // every other type here still has just the one, so their wording stays as-is.
+    const isRestaurant = lightboxCoverContext.restaurantIndex !== undefined;
+    lightboxCoverToggleBtn.textContent = isCover
+      ? (isRestaurant ? '★ Restaurant cover' : '★ Cover photo')
+      : (isRestaurant ? '☆ Set as restaurant cover' : '☆ Set as cover');
     lightboxCoverToggleBtn.classList.toggle('is-cover', isCover);
   }
 
@@ -7819,22 +7845,53 @@
     lightboxHideDishBtn.classList.toggle('show', !!dishId);
   }
 
-  // Only for a dish with more than one photo — with just one, there's
-  // nothing to choose between. "How many photos does this dish have" is
-  // read directly from the current lightbox session's own photo set,
-  // since Dishes always opens with every visible dish's photos combined —
-  // counting entries sharing this dishId is exactly that dish's count,
-  // merged dishes included (their combined photos all carry the same id).
+  // A restaurant's own course-photo lightbox has no dishId on its entries
+  // (they're plain URL strings, unlike Dishes' own gallery) — this finds
+  // the course that owns the current photo by searching that restaurant's
+  // own courses by URL instead. Only relevant while lightboxCoverContext
+  // is a restaurant's.
+  function findRestaurantLightboxCourse(){
+    if (!lightboxCoverContext || lightboxCoverContext.restaurantIndex === undefined || !lightboxPhotos) return null;
+    const r = restaurantRows[lightboxCoverContext.restaurantIndex];
+    const url = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
+    if (!r || !url) return null;
+    for (const visit of ensureRestaurantVisits(r)){
+      for (const course of (visit.courses || [])){
+        if ((course.photos || []).indexOf(url) !== -1) return course;
+      }
+    }
+    return null;
+  }
+
+  // Only for a dish/course with more than one photo — with just one,
+  // there's nothing to choose between. Two ways this fires: Dishes' own
+  // cross-restaurant gallery, where every entry already carries a dishId
+  // ("how many photos does this dish have" is then how many of the
+  // CURRENT session's entries share it — Dishes always opens with every
+  // visible dish's photos combined, merged dishes included); or a
+  // restaurant's own course-photo lightbox, which carries no dishId at
+  // all, so the course is found by URL instead and gated on that course's
+  // OWN photo count (the lightbox there may hold every photo in the
+  // restaurant, not just this one course's).
   function updateLightboxDishCoverBtn(){
     if (!lightboxPhotos){ lightboxDishCoverBtn.classList.remove('show'); return; }
     const entry = lightboxPhotos[lightboxIndex];
     const dishId = (entry && typeof entry === 'object') ? entry.dishId : null;
-    if (!dishId){ lightboxDishCoverBtn.classList.remove('show'); return; }
-    const siblingCount = lightboxPhotos.filter(p => ((p && typeof p === 'object') ? p.dishId : null) === dishId).length;
-    if (siblingCount <= 1){ lightboxDishCoverBtn.classList.remove('show'); return; }
-    const course = findCourseByDishId(dishId);
-    const isCover = !!course && course.dishCoverPhoto === lightboxEntryUrl(entry);
-    lightboxDishCoverBtn.textContent = isCover ? '★ Dish cover photo' : '☆ Use as Dish cover photo';
+    if (dishId){
+      const siblingCount = lightboxPhotos.filter(p => ((p && typeof p === 'object') ? p.dishId : null) === dishId).length;
+      if (siblingCount <= 1){ lightboxDishCoverBtn.classList.remove('show'); return; }
+      const course = findCourseByDishId(dishId);
+      const isCover = !!course && course.dishCoverPhoto === lightboxEntryUrl(entry);
+      lightboxDishCoverBtn.textContent = isCover ? '★ Dish cover photo' : '☆ Use as Dish cover photo';
+      lightboxDishCoverBtn.classList.toggle('is-cover', isCover);
+      lightboxDishCoverBtn.classList.add('show');
+      return;
+    }
+    const course = findRestaurantLightboxCourse();
+    if (!course || (course.photos || []).length <= 1){ lightboxDishCoverBtn.classList.remove('show'); return; }
+    const currentUrl = lightboxEntryUrl(entry);
+    const isCover = course.dishCoverPhoto === currentUrl;
+    lightboxDishCoverBtn.textContent = isCover ? '★ Course cover photo' : '☆ Set as course cover';
     lightboxDishCoverBtn.classList.toggle('is-cover', isCover);
     lightboxDishCoverBtn.classList.add('show');
   }
@@ -7962,13 +8019,13 @@
     if (!lightboxPhotos) return;
     const entry = lightboxPhotos[lightboxIndex];
     const dishId = (entry && typeof entry === 'object') ? entry.dishId : null;
-    if (!dishId) return;
-    const course = findCourseByDishId(dishId);
+    const course = dishId ? findCourseByDishId(dishId) : findRestaurantLightboxCourse();
     if (!course) return;
     const currentUrl = lightboxEntryUrl(entry);
     course.dishCoverPhoto = course.dishCoverPhoto === currentUrl ? '' : currentUrl;
     saveRestaurantProgress();
     renderDishesPage();
+    if (!dishId && lightboxCoverContext && lightboxCoverContext.restaurantIndex === openRestaurantIndex) renderRestaurantDetailsContent();
     updateLightboxDishCoverBtn();
   });
 
@@ -16613,19 +16670,77 @@
   // pairings, no "+ Add Course", no "More Photos" section, no upload or
   // drag-drop — this view has exactly one job. Forced on for guests, who
   // have no other option here.
+  // Drag-and-drop reordering of a visit's courses, thumbnail view only —
+  // same mechanics as Restaurants/Albums (native drag events, live
+  // reordering during dragover via isBeforeInDom, committed on dragend),
+  // just on the tiles themselves rather than a dedicated rearrange mode,
+  // so no extra UI is needed. Guests are forced into thumbnail view but
+  // can't drag — this only wires up for the owner.
+  let courseDragEl = null;
+  function wireRestaurantCourseThumbDrag(visit){
+    if (guestViewEnabled || !restaurantVisitThumbnailMode || !visit) return;
+    const grid = restaurantDetailsPanelInner.querySelector('.restaurant-course-thumb-grid');
+    const tiles = grid ? Array.from(grid.querySelectorAll('.restaurant-course-thumb-tile[data-course-id]')) : [];
+    if (tiles.length < 2) return; // nothing to reorder
+    tiles.forEach(tile => {
+      tile.setAttribute('draggable', 'true');
+      tile.addEventListener('dragstart', (e) => {
+        courseDragEl = tile;
+        tile.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', tile.dataset.courseId || '');
+      });
+      tile.addEventListener('dragend', () => {
+        tile.classList.remove('dragging');
+        if (!courseDragEl || !grid) { courseDragEl = null; return; }
+        courseDragEl = null;
+        const newOrder = Array.from(grid.querySelectorAll('.restaurant-course-thumb-tile[data-course-id]')).map(el => el.dataset.courseId);
+        const courses = visit.courses || [];
+        if (newOrder.length !== courses.length) return; // shouldn't happen, but don't risk dropping a course over a mismatch
+        const byId = new Map(courses.map(c => [ensureCourseId(c), c]));
+        const reordered = newOrder.map(id => byId.get(id)).filter(Boolean);
+        if (reordered.length !== courses.length) return;
+        updateOpenRestaurant(r => { const v = ensureRestaurantVisits(r).find(x => x.id === visit.id); if (v) v.courses = reordered; });
+      });
+      tile.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (!courseDragEl || courseDragEl === tile || !tile.parentNode) return;
+        if (isBeforeInDom(courseDragEl, tile)) tile.parentNode.insertBefore(courseDragEl, tile.nextSibling);
+        else tile.parentNode.insertBefore(courseDragEl, tile);
+      });
+      tile.addEventListener('drop', (e) => { e.preventDefault(); });
+    });
+  }
+
   function renderRestaurantCoursesThumbnailGridHtml(visit){
     const courses = visit.courses || [];
-    if (!courses.length) return '<p class="restaurant-course-empty">No courses added yet.</p>';
-    const tilesHtml = courses.map((course, i) => {
+    const otherPhotos = visit.photos || [];
+    if (!courses.length && !otherPhotos.length) return '<p class="restaurant-course-empty">No courses added yet.</p>';
+    const courseTilesHtml = courses.map((course, i) => {
       const photos = ensureCoursePhotosArray(course);
-      const firstPhoto = photos[0];
+      const firstPhoto = getDishCoverPhoto(course);
+      // The caption names which dish this tile is — useful context once
+      // plain photos sit in the same grid with nothing of their own to go
+      // by, but it's the course's own written text, so it stays out of
+      // Guest View the same way that text does everywhere else.
+      const captionHtml = course.text ? '<span class="restaurant-course-thumb-caption">' + escapeHtml(course.text) + '</span>' : '';
       return (
-        '<div class="restaurant-course-thumb-tile"' + (firstPhoto ? ' data-course-photo-index="' + i + '" title="View in the gallery"' : '') + '>' +
+        '<div class="restaurant-course-thumb-tile" data-course-id="' + escapeAttr(ensureCourseId(course)) + '"' + (firstPhoto ? ' data-course-photo-index="' + i + '" title="View in the gallery"' : '') + '>' +
           (firstPhoto ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(firstPhoto, 350)) + '" alt="" loading="lazy">' : '<span class="art-drop-hint">📷</span>') +
+          captionHtml +
         '</div>'
       );
     }).join('');
-    return '<div class="restaurant-course-thumb-grid">' + tilesHtml + '</div>';
+    // The visit's other photos — not tied to any one course — shown as
+    // plain tiles alongside the course ones, same size, just with nothing
+    // to caption and no drag key, so course reordering never touches them.
+    const otherTilesHtml = otherPhotos.map((url, i) =>
+      '<div class="restaurant-course-thumb-tile restaurant-visit-photo-thumb-tile" data-visit-photo-index="' + i + '" title="View in the gallery">' +
+        '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 350)) + '" alt="" loading="lazy">' +
+      '</div>'
+    ).join('');
+    return '<div class="restaurant-course-thumb-grid">' + courseTilesHtml + otherTilesHtml + '</div>';
   }
 
   function renderRestaurantCoursesContentHtml(visit){
@@ -16637,7 +16752,7 @@
     const listHtml = courses.length
       ? courses.map((course, i) => {
           const photos = ensureCoursePhotosArray(course);
-          const firstPhoto = photos[0];
+          const firstPhoto = getDishCoverPhoto(course);
           const countBadgeHtml = photos.length > 1 ? '<span class="restaurant-course-photo-count">' + photos.length + ' photos</span>' : '';
           const pairingBtnHtml = course.drinkPairing
             ? ''
@@ -17035,9 +17150,10 @@
     }
 
     // Thumbnail-only view: tap opens the same shared gallery the full view
-    // uses, positioned at that dish's photo — nothing else is interactive
-    // here (no upload, no drag-drop, no editing), matching the empty-tile
-    // case simply having no data-course-photo-index at all to hook into.
+    // uses, positioned at that dish's photo. Uploading/editing still needs
+    // Full view, but the courses themselves can be dragged into a new
+    // order right here — same drag mechanics as Restaurants/Albums, on
+    // the tile itself, no separate rearrange mode needed.
     restaurantDetailsPanelInner.querySelectorAll('.restaurant-course-thumb-tile[data-course-photo-index]').forEach(el => {
       const i = Number(el.dataset.coursePhotoIndex);
       el.addEventListener('click', () => {
@@ -17047,6 +17163,19 @@
         openPhotoLightbox(allPhotos, allPhotos.indexOf(photos[0]), { restaurantIndex: openRestaurantIndex });
       });
     });
+    // The visit's other (non-course) photos, now shown in this same grid —
+    // same tap-to-view behavior, just keyed by their own position in
+    // visit.photos rather than a course's.
+    restaurantDetailsPanelInner.querySelectorAll('.restaurant-visit-photo-thumb-tile[data-visit-photo-index]').forEach(el => {
+      const i = Number(el.dataset.visitPhotoIndex);
+      el.addEventListener('click', () => {
+        const url = (activeVisit.photos || [])[i];
+        if (!url) return;
+        const allPhotos = gatherAllRestaurantPhotos(r);
+        openPhotoLightbox(allPhotos, allPhotos.indexOf(url), { restaurantIndex: openRestaurantIndex });
+      });
+    });
+    wireRestaurantCourseThumbDrag(activeVisit);
 
     // Course photo drop zones — each tap-to-browse/drag-drop uploads (via
     // Cloudinary when configured, else base64) and appends to that course's
