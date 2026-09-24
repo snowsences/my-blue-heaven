@@ -7054,7 +7054,7 @@
           : changed[name];
         const chunks = chunkJsonString(stored);
         chunks.forEach((chunk, i) => chunkWrites.push(fb.setDoc(syncPartRef(fb, uid, name, rev, i), { json: chunk })));
-        newParts[name] = { rev, count: chunks.length, chars: stored.length };
+        newParts[name] = { rev, count: chunks.length, chars: stored.length, at: Date.now() };
       }
       await Promise.all(chunkWrites);
       // Only now point the manifest at the new chunks — see the layout comment above.
@@ -7063,10 +7063,20 @@
       syncedParts = newParts;
       Object.assign(syncedPartJson, changed);
 
+      // The rev a part just moved off of isn't deleted immediately — only
+      // once it's a few minutes old. Right after this device sets the
+      // manifest to its new rev, another device that read the manifest a
+      // moment earlier can still be fetching chunks for the rev this write
+      // just superseded; deleting those chunks out from under that read is
+      // exactly what caused "Missing cloud chunk" (this app used to delete
+      // the instant a rev was superseded, with no such margin). A rev
+      // written before this app tracked `at` has none, and is always old
+      // enough — this only ever holds back genuinely fresh revisions.
+      const RECLAIM_AFTER_MS = 3 * 60 * 1000;
       const staleDeletes = [];
       for (const name of changedNames){
         const old = oldParts[name];
-        if (!old) continue;
+        if (!old || Date.now() - (old.at || 0) < RECLAIM_AFTER_MS) continue;
         for (let i = 0; i < old.count; i++) staleDeletes.push(fb.deleteDoc(syncPartRef(fb, uid, name, old.rev, i)));
       }
       await Promise.all(staleDeletes).catch(() => { /* leftovers are unreferenced and harmless */ });
@@ -7100,27 +7110,41 @@
 
     if (manifest.version === 2 && manifest.parts){
       const names = Object.keys(manifest.parts);
-      const jsons = await Promise.all(names.map(async (name) => {
+      // One broken part (a missing chunk from the delete-race below, or
+      // corrupted JSON) must never take down the whole read — that would
+      // block every domain's sync and, worse, this device's own writes
+      // (writeChangedSyncParts refuses to run until a read has succeeded).
+      // A broken part is just left out of `data`/`partJson`: the merge
+      // below only ever touches a domain when the cloud copy is present,
+      // so local data for that one domain is untouched, and leaving it out
+      // of `partJson` makes the very next write republish it fresh —
+      // self-healing the manifest without the person doing anything.
+      const results = await Promise.allSettled(names.map(async (name) => {
         const { rev, count } = manifest.parts[name];
         const chunkSnaps = await Promise.all(Array.from({ length: count }, (_, i) => fb.getDoc(syncPartRef(fb, targetUid, name, rev, i))));
-        return chunkSnaps.map((s, i) => {
+        const json = chunkSnaps.map((s, i) => {
           if (!s.exists()) throw new Error('Missing cloud chunk ' + name + ' #' + i);
           return (s.data() || {}).json || '';
         }).join('');
+        return { json, parsed: JSON.parse(json) }; // JSON.parse also catches corrupted/truncated JSON, same as a missing chunk
       }));
       const data = {};
       const partJson = {};
+      const broken = [];
       names.forEach((name, i) => {
-        const parsed = JSON.parse(jsons[i]);
+        const r = results[i];
+        if (r.status === 'rejected'){ broken.push(name); console.error('Cloud part "' + name + '" unreadable, skipped:', r.reason); return; }
+        const { json, parsed } = r.value;
         Object.assign(data, parsed);
         if (name === 'albums'){
           const content = Object.assign({}, parsed);
           delete content.savedAt;
           partJson[name] = JSON.stringify(content);
         } else {
-          partJson[name] = jsons[i];
+          partJson[name] = json; // the exact bytes read, same as before
         }
       });
+      if (broken.length) showToast('⚠️ Some cloud data (' + broken.join(', ') + ") couldn't be read — using this device's own copy for it; it'll resync automatically");
       return { data, parts: manifest.parts, partJson };
     }
 
