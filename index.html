@@ -138,7 +138,7 @@
     border-bottom: 2px solid transparent;
     border-radius: 0;
     cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease;
+    transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
   }
   .top-nav-btn:hover{ color: var(--chalk); }
   .top-nav-btn.active{
@@ -160,7 +160,7 @@
     color: var(--chalk-dim);
     font-size: 17px;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .top-nav-settings-btn:hover{ background: var(--bg); color: var(--chalk); }
   .top-nav-settings-btn.active{ color: var(--amber); }
@@ -214,7 +214,7 @@
     overflow-y: auto;   /* its own scroll, independent of the main page — only appears if its content actually exceeds one viewport */
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #details-panel.open{
     width: 400px;
@@ -243,7 +243,7 @@
     overflow-y: auto;
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #restaurant-details-panel.open{
     width: 600px;
@@ -260,7 +260,7 @@
     overflow-y: auto;
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #hike-details-panel.open{
     width: 600px;
@@ -277,7 +277,7 @@
     overflow-y: auto;
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #road-details-panel.open{
     width: 600px;
@@ -294,7 +294,7 @@
     overflow-y: auto;
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #artist-details-panel.open{
     width: 600px;
@@ -311,7 +311,7 @@
     overflow-y: auto;
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #park-details-panel.open{
     width: 600px;
@@ -331,7 +331,7 @@
   #road-details-panel, #artist-details-panel, #park-details-panel{
     background: linear-gradient(to bottom, var(--panel-tint) var(--tint-start, 0px), var(--panel) calc(var(--tint-start, 0px) + 520px)) var(--panel);
     background-attachment: local;
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1), --panel-tint 0.45s ease;
+    transition: width 0.38s var(--ease-out), --panel-tint 0.45s ease;
   }
   .park-linked-hikes-section{ margin-top: 24px; }
   .park-linked-hike-row{
@@ -357,7 +357,7 @@
     overflow-y: auto;
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #hike-full-list-panel.open{
     width: 600px;
@@ -374,7 +374,7 @@
     overflow-y: auto;
     background: var(--panel);
     border-left: 1px solid var(--panel-line);
-    transition: width 0.5s cubic-bezier(0.37, 0, 0.63, 1);
+    transition: width 0.38s var(--ease-out);
   }
   #dish-full-list-panel.open{
     width: 600px;
@@ -459,7 +459,7 @@
     padding: 8px 12px;
     border-radius: 999px;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .restaurant-details-tab-btn.active{ background: var(--amber); color: var(--ink); }
   .restaurant-details-tab-panel{ display: none; padding: 0 24px 24px; }
@@ -1203,7 +1203,7 @@
     line-height: 1.02;
     color: var(--chalk-dim);
     cursor: pointer;
-    transition: color 0.15s ease;
+    transition: color var(--dur-fast) var(--ease-out);
   }
   .group-sub-tab-btn .group-sub-tab-icon{ font-size: 0.7em; margin-right: 6px; }
   .group-sub-tab-btn:hover{ color: var(--chalk); }
@@ -1284,7 +1284,7 @@
     font-size: 15px;
     padding: 13px 26px;
     border-radius: 999px;
-    transition: transform 0.12s ease, background 0.12s ease;
+    transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
   }
   .btn-primary:hover:not(:disabled){ background: var(--amber-dark); transform: translateY(-1px); }
   .btn-primary:disabled{ opacity: 0.35; cursor: not-allowed; }
@@ -1296,7 +1296,7 @@
     padding: 10px 18px;
     border-radius: 999px;
     border: 1px solid var(--panel-line);
-    transition: border-color 0.12s ease, color 0.12s ease;
+    transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .btn-ghost:hover{ border-color: var(--amber); color: var(--chalk); }
 
@@ -1346,7 +1346,7 @@
     background: var(--bg-2);
     border: 1px solid var(--panel-line);
     border-radius: 999px;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    transition: background var(--dur-med) var(--ease-out), border-color var(--dur-med) var(--ease-out);
   }
   .toggle-switch-track::before{
     content: '';
@@ -1357,7 +1357,7 @@
     height: 18px;
     background: var(--chalk-dim);
     border-radius: 50%;
-    transition: transform 0.2s ease, background 0.2s ease;
+    transition: transform var(--dur-med) var(--ease-out), background var(--dur-med) var(--ease-out);
   }
   .toggle-switch input:checked + .toggle-switch-track{
     background: var(--amber-dark);
@@ -1469,7 +1469,7 @@
     text-align: center;
     cursor: pointer;
     border: 3px solid transparent;
-    transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+    transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
     word-break: break-word;
     animation: cardIn 0.28s ease both;
   }
@@ -1496,7 +1496,7 @@
     justify-content: center;
     cursor: pointer;
     z-index: 2;
-    transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
   }
   .card-relisten-btn:hover{ background: var(--amber); color: var(--ink); transform: scale(1.08); }
 
@@ -1634,7 +1634,7 @@
     inset: 0;
     background: rgba(6, 14, 16, 0.66);
     opacity: 0;
-    transition: opacity 0.28s ease;
+    transition: opacity var(--dur-med) var(--ease-out);
   }
   #otd-overlay.open .otd-backdrop{ opacity: 1; }
   .otd-sheet{
@@ -2199,7 +2199,7 @@
     inset: 0;
     background: rgba(6, 14, 16, 0.66);
     opacity: 0;
-    transition: opacity 0.28s ease;
+    transition: opacity var(--dur-med) var(--ease-out);
   }
   #share-overlay.open .share-backdrop, #tsheet-overlay.open .tsheet-backdrop{ opacity: 1; }
   .share-sheet, .tsheet{
@@ -2725,12 +2725,12 @@
   .trip-needs-pin{ font-size: 13px; color: var(--amber); border-color: rgba(232,163,61,0.5); }
   /* A stop on the map: the numbered circle sits exactly on the place, its name to the right. */
   .tmap-stop{ position: relative; width: 24px; height: 24px; padding: 0; border: none; background: none; font-family: 'Figtree', sans-serif; cursor: pointer; }
-  .tmap-stop-num{ position: absolute; inset: 0; border-radius: 50%; background: #FFFFFF; color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; transition: transform 0.15s ease; }
+  .tmap-stop-num{ position: absolute; inset: 0; border-radius: 50%; background: #FFFFFF; color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; transition: transform var(--dur-fast) var(--ease-out); }
   .tmap-stop-name{ position: absolute; left: 30px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: #202124;
     text-shadow: 0 0 2px #FFFFFF, 0 0 2px #FFFFFF, 0 0 4px #FFFFFF, 0 0 6px #FFFFFF; }
   .tmap-stop.sel .tmap-stop-num{ background: var(--amber); transform: scale(1.2); box-shadow: 0 0 0 6px rgba(232,163,61,0.3), 0 2px 5px rgba(0,0,0,0.3); }
   .tmap-stop:focus-visible .tmap-stop-num{ outline: 2px solid var(--amber); outline-offset: 2px; }
-  .tmap-overlay{ position: fixed; inset: 0; z-index: 195; /* above the trip screen (190), below details panels (200) and the little sheets */ visibility: hidden; pointer-events: none; opacity: 0; transition: opacity 0.2s ease, visibility 0s linear 0.2s; background: var(--bg); }
+  .tmap-overlay{ position: fixed; inset: 0; z-index: 195; /* above the trip screen (190), below details panels (200) and the little sheets */ visibility: hidden; pointer-events: none; opacity: 0; transition: opacity var(--dur-med) var(--ease-out), visibility 0s linear 0.2s; background: var(--bg); }
   .tmap-overlay.open{ visibility: visible; pointer-events: auto; opacity: 1; transition-delay: 0s; }
   .tmap-panel{ position: absolute; inset: 0; }
   .tmap-panel .tmap-map{ position: absolute; inset: 0; background: #F5F5F5; } /* beats MapLibre's own position: relative on map containers */
@@ -2829,7 +2829,7 @@
   .trip-year-rail::before{ content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--panel-line); border-radius: 1px; }
   .trip-year-btn{ position: relative; flex: none; display: grid; justify-items: center; gap: 4px; min-width: 56px; padding: 4px 6px 2px; background: none; border: none; color: var(--chalk-dim); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
   .trip-year-btn:first-child{ padding-left: 0; }
-  .trip-year-dot{ width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid rgba(241,236,222,0.35); transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease; }
+  .trip-year-dot{ width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid rgba(241,236,222,0.35); transition: transform var(--dur-med) var(--ease-out), background var(--dur-med) var(--ease-out), border-color var(--dur-med) var(--ease-out); }
   .trip-year-btn:hover{ color: var(--chalk); }
   .trip-year-btn.active{ color: var(--chalk); font-weight: 800; }
   .trip-year-btn.active .trip-year-dot{ background: var(--amber); border-color: var(--amber); transform: scale(1.3); box-shadow: 0 0 0 4px rgba(232,163,61,0.22); }
@@ -3412,7 +3412,7 @@
     justify-content: center;
     overflow: hidden;
     cursor: pointer;
-    transition: border-color 0.12s ease, background 0.12s ease;
+    transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
   }
   .art-drop:hover{ border-color: var(--amber); }
   .art-drop.drag-over{ border-color: var(--amber); background: rgba(232,163,61,0.14); border-style: solid; }
@@ -3440,7 +3440,7 @@
     font-weight: 600;
     padding: 7px 16px;
     border-radius: 999px;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .view-toggle-btn.active{ background: var(--amber); color: var(--ink); }
 
@@ -3633,7 +3633,7 @@
     overflow: hidden;
     animation: cardIn 0.3s ease both;
     cursor: pointer;
-    transition: box-shadow 0.15s ease;
+    transition: box-shadow var(--dur-fast) var(--ease-out);
   }
   .grid-card:hover{
     z-index: 5;
@@ -3712,7 +3712,7 @@
   .tiers-panel-toggle-icon{
     color: var(--chalk-dim);
     font-size: 13px;
-    transition: transform 0.15s ease;
+    transition: transform var(--dur-fast) var(--ease-out);
   }
   #restaurant-tiers-panel:not(.collapsed) .tiers-panel-toggle-icon{ transform: rotate(90deg); }
   #restaurant-tiers-panel .tiers-panel-body{ margin-top: 14px; }
@@ -3871,7 +3871,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.12s ease, color 0.12s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .row-remove-btn:hover{ background: var(--brick); color: #fff; }
   /* Dishes' edit-mode equivalent of .row-remove-btn — same size/shape, but
@@ -3891,7 +3891,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.12s ease, color 0.12s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .dish-unfavorite-btn:hover{ background: #FFD700; color: var(--ink); }
 
@@ -3909,7 +3909,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.12s ease, color 0.12s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .row-relisten-btn:hover{ background: var(--amber); color: var(--ink); }
 
@@ -3998,7 +3998,7 @@
     border-radius: 999px;
     border: none;
     cursor: pointer;
-    transition: background 0.12s ease, transform 0.12s ease;
+    transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
   }
   .btn-danger:hover{ background: #b0553d; transform: translateY(-1px); }
 
@@ -4218,7 +4218,7 @@
     border-radius: 8px;
     padding: 4px 6px;
     margin: 0 -6px;
-    transition: background 0.12s ease;
+    transition: background var(--dur-fast) var(--ease-out);
   }
   .artist-row:hover{ background: var(--bg-2); }
   .artist-rank{
@@ -4322,7 +4322,7 @@
     border-radius: 999px;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
   }
   .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -4360,7 +4360,7 @@
     font-weight: 600;
     padding: 9px 16px;
     border-radius: 999px;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .tab-btn.active{ background: var(--amber); color: var(--ink); }
 
@@ -4873,6 +4873,92 @@
     #park-details-panel, #artist-details-panel, #hike-full-list-panel, #dish-full-list-panel,
     #details-panel.open, #restaurant-details-panel.open, #hike-details-panel.open, #road-details-panel.open,
     #park-details-panel.open, #artist-details-panel.open, #hike-full-list-panel.open, #dish-full-list-panel.open{ transition: none; }
+  }
+  /* ================= MOTION (see MOTION in the script) =================
+     One set of timings and easings for the whole app:
+       --dur-fast 150ms  small changes (color, hover, press)
+       --dur-med  250ms  things moving into place
+       --dur-slow 400ms  bigger arrivals
+       --ease-out     settles quickly (most transitions)
+       --ease-spring  a touch of overshoot, for things arriving
+       --ease-inout   easeInOutSine, for things leaving */
+  :root{
+    --dur-fast: 150ms; --dur-med: 250ms; --dur-slow: 400ms;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.22, 1.25, 0.36, 1);
+    --ease-inout: cubic-bezier(0.37, 0, 0.63, 1);
+  }
+
+  /* Switching pages and tabs: a quick cross-fade with a slight upward drift.
+     backwards (not both) so nothing is left applied afterwards — a leftover
+     transform would break the fixed-position globe and sticky bars inside. */
+  @keyframes pageFade{ from{ opacity: 0; } }
+  @keyframes pageRise{ from{ transform: translateY(6px); } }
+  .top-page.active{ animation: pageFade 180ms var(--ease-out) backwards; }
+  .top-page.active > .page-content > :not(.trip-world):not(.trip-year-bar),
+  .top-page.active > #app > *, .top-page.active > .song-app > *{ animation: pageRise 220ms var(--ease-out) backwards; }
+
+  /* Cards fade up only when a page first appears (not on every re-render),
+     the first dozen a beat apart. */
+  .grid-card, .results-list li{ animation: none; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row){ animation: cardIn 320ms var(--ease-out) backwards; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(2){ animation-delay: 20ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(3){ animation-delay: 40ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(4){ animation-delay: 60ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(5){ animation-delay: 80ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(6){ animation-delay: 100ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(7){ animation-delay: 120ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(8){ animation-delay: 140ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(9){ animation-delay: 160ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(10){ animation-delay: 180ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(11){ animation-delay: 200ms; }
+  .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(n+12){ animation-delay: 220ms; }
+
+  /* Sub-tabs: one amber line that slides and stretches to the selected tab. */
+  .group-sub-tabs.has-ink .group-sub-tab-btn.active::after{ display: none; }
+  .sub-tab-ink{ position: absolute; left: 0; bottom: 0; height: 2px; width: var(--ink-w, 0px); transform: translateX(var(--ink-x, 0px)); background: var(--amber); z-index: 1; pointer-events: none;
+    transition: transform var(--dur-slow) var(--ease-spring), width var(--dur-slow) var(--ease-spring); }
+
+  /* Segmented toggles (List/Grid, Timeline/World, Album Rankings/Loading Dock…): the amber pill slides behind the choice. */
+  .has-pill{ position: relative; isolation: isolate; }
+  .has-pill > .view-toggle-btn, .has-pill > .tab-btn{ position: relative; z-index: 1; }
+  .has-pill > .view-toggle-btn.active, .has-pill > .tab-btn.active{ background: transparent; }
+  .toggle-pill{ position: absolute; left: 0; top: 0; width: var(--pill-w, 0px); height: var(--pill-h, 0px); transform: translate(var(--pill-x, 0px), var(--pill-y, 0px)); border-radius: 999px; background: var(--amber); z-index: 0; pointer-events: none;
+    transition: transform var(--dur-slow) var(--ease-spring), width var(--dur-slow) var(--ease-spring); }
+
+  /* Photos fade in once they've loaded (after the shimmer); big covers also settle from a hair larger. */
+  :is(.art-img, .restaurant-photo-thumb img){ opacity: 0; transition: opacity 220ms var(--ease-out); }
+  :is(.art-img, .restaurant-photo-thumb img).img-loaded{ opacity: 1; }
+  .details-art-wrap .art-img{ transform: scale(1.02); transition: opacity 260ms var(--ease-out), transform 600ms var(--ease-out); }
+  .details-art-wrap .art-img.img-loaded{ transform: none; }
+
+  /* Toasts spring up from above the tab bar and sink away. */
+  .toast{ z-index: 400; transform: translateX(-50%) translateY(14px) scale(0.96); transition: opacity 200ms var(--ease-inout), transform 220ms var(--ease-inout); display: inline-flex; align-items: center; gap: 8px; }
+  .toast.show{ transform: translateX(-50%) translateY(0) scale(1); transition: opacity 180ms var(--ease-out), transform 380ms var(--ease-spring); }
+  .toast-check{ display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--amber); font-size: 11px; font-weight: 800; animation: toastPop 420ms var(--ease-spring) 80ms backwards; }
+  @keyframes toastPop{ from{ transform: scale(0); } 60%{ transform: scale(1.25); } to{ transform: scale(1); } }
+  @media (max-width: 768px){ .toast{ bottom: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom, 0px) + 14px); } }
+
+  /* Fields that open (Seen Live, a place's other matches) ease in instead of popping. */
+  @keyframes revealIn{ from{ opacity: 0; transform: translateY(-6px); } }
+  .reveal-in{ animation: revealIn 240ms var(--ease-out) backwards; }
+
+  /* Trip route: stops pop in as the line reaches them (scale, not transform — MapLibre positions markers with transform). */
+  .tmap-stop .tmap-stop-num, .tmap-stop .tmap-stop-name{ transition: opacity 200ms var(--ease-out), scale 360ms var(--ease-spring); }
+  .tmap-stop.tmap-pre .tmap-stop-num, .tmap-stop.tmap-pre .tmap-stop-name{ opacity: 0; scale: 0.4; }
+
+  /* Year bar: one amber dot glides along the line to the year you're on. */
+  .trip-year-btn.active .trip-year-dot{ background: var(--bg); border-color: transparent; transform: none; box-shadow: none; }
+  .trip-year-glider{ position: absolute; top: 5px; left: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(232,163,61,0.22); pointer-events: none; z-index: 1;
+    transform: translateX(var(--glide-x, 0px)); transition: transform 420ms var(--ease-spring); }
+
+  /* A bottom sheet follows your finger when you drag it down by its top. */
+  .share-grabber, .share-head{ touch-action: none; }
+  .sheet-dragging{ transition: none !important; }
+
+  /* Reduced motion: every animation and transition in the app becomes instant. */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration: 0.01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; transition-delay: 0ms !important; scroll-behavior: auto !important; }
   }
 </style>
 <script type="module">
@@ -6723,10 +6809,16 @@
     }
   }
 
+  let toastTimer = null;
   function showToast(msg){
-    toast.textContent = msg;
+    // Things that worked ("Added to Seen Live", "Saved") get a little check that pops in.
+    const ok = /\b(added|saved|connected|copied)\b/i.test(msg) && !/couldn|could not|fail|⚠|not /i.test(msg);
+    toast.innerHTML = (ok ? '<span class="toast-check" aria-hidden="true">✓</span>' : '') + escapeHtml(msg);
+    toast.classList.remove('show');
+    void toast.offsetWidth; // restart the spring if one was already showing
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 1600);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
   }
 
   // ---------- IN-APP AUTOSAVE (window.storage) ----------
@@ -8350,6 +8442,7 @@
     lightboxCaption.classList.remove('show');
     lightboxGotoBtn.classList.remove('show');
     artLightboxOverlay.classList.add('show');
+    lightboxZoomIn();
   }
 
   // Multi-photo mode (restaurant galleries, Dishes' cross-gallery) — same
@@ -8367,6 +8460,7 @@
     artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(photos[lightboxIndex]), 1600);
     artLightboxOverlay.classList.add('multi');
     artLightboxOverlay.classList.add('show');
+    lightboxZoomIn();
     lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
     // A trip's gallery mixes photos from several different sources (visits,
     // hikes, roads, activities, trip-only uploads, the Photos tab) — there's
@@ -8519,6 +8613,7 @@
   }
 
   function closeArtLightbox(){
+    lightboxZoomOut(); // a snapshot flies back to the thumbnail while the real viewer closes at once
     artLightboxOverlay.classList.remove('show');
     artLightboxOverlay.classList.remove('multi');
     lightboxCoverToggleBtn.classList.remove('show');
@@ -9911,6 +10006,7 @@
     if (currentIndex === -1) return;
     const newIndex = (currentIndex + direction + visible.length) % visible.length;
     openDetailsPanel(visible[newIndex]);
+    if (!motionReduced()) detailsPanelInner.animate([{ transform: 'translateX(' + (direction * 28) + 'px)', opacity: 0.25 }, { transform: 'none', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
   }
 
   // Top-level navigation (Albums / Settings), independent of anything
@@ -10475,6 +10571,9 @@
     if (!detailsPanel.classList.contains('open')) return;
     if (detailsPanel.contains(e.target)) return;
     if (e.target.closest('.grid-card, .results-list li')) return;
+    // Layers that open on top of the tray (the photo viewer, a confirm
+    // box, a sheet) aren't "outside" it — closing them shouldn't close it.
+    if (artLightboxOverlay.contains(e.target) || modalOverlay.contains(e.target) || tsheetOverlay.contains(e.target)) return;
     closeDetailsPanel();
   }, true);
 
@@ -15102,7 +15201,7 @@
       ? '<button class="btn-ghost artist-concert-add-toggle" type="button" data-concert-open="1"><span class="artist-concert-plus" aria-hidden="true">+</span> Add</button>'
       : '<button class="artist-concert-add-icon" type="button" data-concert-open="1" aria-label="Add a time you saw them live">+</button>');
     const concertForm = formOpen
-      ? '<div class="artist-concert-form">' +
+      ? '<div class="artist-concert-form reveal-in">' +
           '<input type="date" class="restaurant-edit-input" id="artist-concert-date" aria-label="Date seen live">' +
           '<input type="text" class="restaurant-edit-input" id="artist-concert-location" placeholder="Where (venue, city)" aria-label="Location" autocomplete="off">' +
           '<span class="artist-concert-form-actions"><button class="btn-primary" type="button" id="artist-concert-add-btn">Save</button>' +
@@ -21254,6 +21353,7 @@
   const tripYearBar = document.getElementById('trip-year-bar');
   const tripYearRail = document.getElementById('trip-year-rail');
   let tripYearActive = null;
+  let tripYearGlideX = null; // where the gliding dot last was, so a redraw continues from there
   function renderTripYearBar(){
     const counts = new Map();
     tripSorted().forEach(t => { const y = String(t.startDate || '').slice(0, 4); if (y) counts.set(y, (counts.get(y) || 0) + 1); });
@@ -21263,7 +21363,11 @@
     if (years.indexOf(tripYearActive) === -1) tripYearActive = years[0];
     tripYearRail.innerHTML = years.map(y =>
       '<button type="button" class="trip-year-btn' + (y === tripYearActive ? ' active' : '') + '" data-year="' + escapeAttr(y) + '" aria-label="' + escapeAttr(y + ', ' + otdPlural(counts.get(y), 'trip', 'trips')) + '"' + (y === tripYearActive ? ' aria-current="true"' : '') + '>' +
-        '<span class="trip-year-dot" aria-hidden="true"></span><span class="trip-year-label">' + escapeHtml(y) + '</span></button>').join('');
+        '<span class="trip-year-dot" aria-hidden="true"></span><span class="trip-year-label">' + escapeHtml(y) + '</span></button>').join('') +
+      '<span class="trip-year-glider" aria-hidden="true"></span>';
+    const glider = tripYearRail.querySelector('.trip-year-glider');
+    if (tripYearGlideX !== null){ glider.style.transition = 'none'; glider.style.setProperty('--glide-x', tripYearGlideX + 'px'); void glider.offsetWidth; glider.style.transition = ''; }
+    tripYearSetActive(tripYearActive, false);
     tripYearSync();
   }
   // Where the bar's bottom edge sits once it's stuck — markers above this line have been scrolled past.
@@ -21278,6 +21382,12 @@
       b.classList.toggle('active', on);
       if (on){ b.setAttribute('aria-current', 'true'); activeBtn = b; } else b.removeAttribute('aria-current');
     });
+    const glider = tripYearRail.querySelector('.trip-year-glider');
+    if (activeBtn && glider){
+      const dot = activeBtn.querySelector('.trip-year-dot');
+      tripYearGlideX = activeBtn.offsetLeft + dot.offsetLeft + dot.offsetWidth / 2 - 6.5;
+      glider.style.setProperty('--glide-x', tripYearGlideX + 'px');
+    }
     if (activeBtn && (changed || !smooth)){
       const left = activeBtn.offsetLeft - (tripYearBar.clientWidth - activeBtn.offsetWidth) / 2;
       tripYearBar.scrollTo({ left: Math.max(0, left), behavior: smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
@@ -22699,6 +22809,38 @@
     map.addLayer({ id, type: 'line', source: id, layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': '#D98A1E', 'line-width': 2.6, 'line-dasharray': [2, 1.6] } });
   }
+  // The first time a trip's route is shown (each session), the dashed line
+  // traces from the first stop to the last and each stop pops in as the
+  // line reaches it.
+  const tripRoutesDrawn = new Set();
+  function tripAnimateRoute(map, id, pts, markers){
+    const coords = pts.map(p => [p.s.geo.lng, p.s.geo.lat]);
+    const seg = [0];
+    for (let i = 1; i < coords.length; i++) seg.push(seg[i - 1] + Math.hypot(coords[i][0] - coords[i - 1][0], coords[i][1] - coords[i - 1][1]));
+    const total = seg[seg.length - 1] || 1;
+    const dur = Math.max(900, Math.min(1800, 500 + 220 * coords.length));
+    const reveal = (i) => { const m = markers[i]; if (m) m.getElement().classList.remove('tmap-pre'); };
+    const lineOf = (c) => ({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: c.length > 1 ? c : [c[0], c[0]] } }] });
+    reveal(0);
+    const t0 = performance.now();
+    const step = (now) => {
+      const src = map.getSource(id);
+      if (!src) return;
+      const t = Math.min(1, (now - t0) / dur);
+      const d = (0.5 - Math.cos(Math.PI * t) / 2) * total; // easeInOutSine
+      const line = [coords[0]];
+      for (let i = 1; i < coords.length; i++){
+        if (seg[i] <= d){ line.push(coords[i]); reveal(i); continue; }
+        const f = (d - seg[i - 1]) / ((seg[i] - seg[i - 1]) || 1);
+        line.push([coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * f, coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * f]);
+        break;
+      }
+      src.setData(lineOf(line));
+      if (t < 1) requestAnimationFrame(step);
+      else { src.setData(lineOf(coords)); markers.forEach((m, i) => reveal(i)); }
+    };
+    requestAnimationFrame(step);
+  }
   function tripStopMarkerEl(num, name, showLabel, asButton){
     const el = document.createElement(asButton ? 'button' : 'div');
     if (asButton){ el.type = 'button'; el.setAttribute('aria-label', 'Stop ' + num + ': ' + name); }
@@ -22761,9 +22903,15 @@
     tovMarkers.forEach(m => m.remove());
     tovMarkers = pts.map(p => new lib.Marker({ element: tripStopMarkerEl(p.i + 1, p.s.name, pts.length <= 8, false), anchor: 'center' }).setLngLat([p.s.geo.lng, p.s.geo.lat]).addTo(tovMap));
     tripFitStops(tovMap, pts, 34, false);
+    const drawKey = 'ov:' + t.id;
+    const trace = pts.length > 1 && !tripRoutesDrawn.has(drawKey) && !motionReduced();
+    if (pts.length > 1) tripRoutesDrawn.add(drawKey);
+    if (trace) tovMarkers.forEach(m => m.getElement().classList.add('tmap-pre'));
+    const markersNow = tovMarkers;
     whenMapReady(tovMap, () => {
-      setGeoSource(tovMap, 'route', tripRouteData(pts).line);
+      setGeoSource(tovMap, 'route', trace ? { type: 'FeatureCollection', features: [] } : tripRouteData(pts).line);
       tripAddRouteLayer(tovMap, 'route');
+      if (trace) tripAnimateRoute(tovMap, 'route', pts, markersNow);
     });
   }
 
@@ -22842,9 +22990,15 @@
       return new lib.Marker({ element: el, anchor: 'center' }).setLngLat([p.s.geo.lng, p.s.geo.lat]).addTo(tmapMap);
     });
     if (refit) tripFitStops(tmapMap, st.pts, { top: 90, bottom: 210, left: 50, right: 120 }, false); // extra room on the right for stop names
+    const drawKey = 'fs:' + st.t.id;
+    const trace = refit && st.pts.length > 1 && !tripRoutesDrawn.has(drawKey) && !motionReduced();
+    if (refit && st.pts.length > 1) tripRoutesDrawn.add(drawKey);
+    if (trace) tmapMarkers.forEach(m => m.getElement().classList.add('tmap-pre'));
+    const markersNow = tmapMarkers;
     whenMapReady(tmapMap, () => {
-      setGeoSource(tmapMap, 'route', tripRouteData(st.pts).line);
+      setGeoSource(tmapMap, 'route', trace ? { type: 'FeatureCollection', features: [] } : tripRouteData(st.pts).line);
       tripAddRouteLayer(tmapMap, 'route');
+      if (trace) tripAnimateRoute(tmapMap, 'route', st.pts, markersNow);
     });
     tmapSelect(Math.min(tmapSel, Math.max(0, st.pts.length - 1)), false);
   }
@@ -22915,7 +23069,7 @@
         '<button type="button" class="tpin-head" data-tpin="' + i + '" aria-expanded="' + (openIdx === i) + '">' +
           '<span class="trip-stop-num">' + (i + 1) + '</span><span class="tpin-text"><b>' + escapeHtml(s.name) + '</b><span>' + escapeHtml(statusText(s)) + '</span></span>' +
           '<span class="tpin-mark" aria-hidden="true">' + (tripStopPinned(s) ? '✓' : '›') + '</span></button>' +
-        (openIdx === i ? '<div class="tpin-body" id="tpin-body"><p class="tf-hint">Searching…</p></div>' : '') +
+        (openIdx === i ? '<div class="tpin-body reveal-in" id="tpin-body"><p class="tf-hint">Searching…</p></div>' : '') +
       '</div>').join('');
     const showCandidates = async (body, s, query) => {
       const holder = body.querySelector('#tpin-body');
@@ -23503,6 +23657,282 @@
   loadMediaProgress('show');
   loadPointsAlgorithm().then(checkSavedProgress);
   otdStartupFlow().catch(err => console.error('On This Day could not start', err));
+
+  // ---------- MOTION ----------
+  // The moving parts that CSS alone can't do: the sliding tab line and
+  // toggle pill, press feedback, cards gliding to new spots when a list
+  // reorders, the photo viewer growing out of the tapped thumbnail, stats
+  // counting up, and bottom sheets you can drag down. Everything here is
+  // skipped with reduced motion.
+  const motionReduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const EASE_SPRING = 'cubic-bezier(0.22, 1.25, 0.36, 1)', EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)', EASE_INOUT = 'cubic-bezier(0.37, 0, 0.63, 1)';
+
+  // --- sliding indicators: the sub-tab line and the toggle pill ---
+  // Each copy of a tab row (Albums, Songs and Artists each have their own)
+  // shares a memory of where the line last was, so switching pages slides
+  // it from the old tab to the new one instead of starting in place.
+  const inkMemory = new Map();
+  function placeIndicator(host, kind){
+    if (!host.offsetWidth) return; // hidden — placed when it appears
+    const active = host.querySelector(kind === 'ink' ? ':scope > .group-sub-tab-btn.active' : ':scope > .view-toggle-btn.active, :scope > .tab-btn.active');
+    const el = host.__indicator;
+    if (!active){ el.style.opacity = '0'; return; }
+    el.style.opacity = '';
+    const target = kind === 'ink'
+      ? { x: active.offsetLeft, w: active.offsetWidth }
+      : { x: active.offsetLeft, y: active.offsetTop, w: active.offsetWidth, h: active.offsetHeight };
+    const key = host.__memoryKey;
+    const from = host.__placed ? null : inkMemory.get(key);
+    const apply = (p) => Object.keys(p).forEach(k => el.style.setProperty('--' + (kind === 'ink' ? 'ink' : 'pill') + '-' + k, p[k] + 'px'));
+    if (!host.__placed){
+      el.style.transition = 'none';
+      apply(from && !motionReduced() ? Object.assign({}, target, { x: from.x, w: from.w }) : target);
+      void el.offsetWidth; // commit the starting spot before sliding
+      el.style.transition = '';
+      host.__placed = true;
+    }
+    apply(target);
+    inkMemory.set(key, target);
+  }
+  function setupIndicator(host, kind){
+    if (host.__indicator) return;
+    const el = document.createElement('span');
+    el.className = kind === 'ink' ? 'sub-tab-ink' : 'toggle-pill';
+    el.setAttribute('aria-hidden', 'true');
+    host.appendChild(el);
+    host.__indicator = el;
+    host.classList.add(kind === 'ink' ? 'has-ink' : 'has-pill');
+    host.__memoryKey = kind === 'ink'
+      ? 'ink:' + (host.id || '').split('-sub-tabs')[0]
+      : 'pill:' + (host.id || Array.from(host.querySelectorAll(':scope > button')).map(b => b.textContent.trim()).join('|'));
+    new MutationObserver(() => placeIndicator(host, kind)).observe(host, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    if (window.ResizeObserver) new ResizeObserver(() => { if (!host.offsetWidth) host.__placed = false; else placeIndicator(host, kind); }).observe(host);
+    placeIndicator(host, kind);
+  }
+  function scanIndicators(root){
+    (root || document).querySelectorAll('.group-sub-tabs').forEach(h => setupIndicator(h, 'ink'));
+    (root || document).querySelectorAll('.view-toggle, .tab-switcher').forEach(h => { if (h.querySelector(':scope > .view-toggle-btn, :scope > .tab-btn')) setupIndicator(h, 'pill'); });
+  }
+
+  // --- cards fade up when a page first appears, not on every redraw ---
+  function markPageEnter(page, ms){
+    page.dataset.enter = '1';
+    clearTimeout(page.__enterTimer);
+    page.__enterTimer = setTimeout(() => { delete page.dataset.enter; }, ms || 900);
+  }
+  document.querySelectorAll('.top-page').forEach(page => {
+    let wasActive = page.classList.contains('active');
+    new MutationObserver(() => {
+      const on = page.classList.contains('active');
+      if (on && !wasActive) markPageEnter(page);
+      wasActive = on;
+    }).observe(page, { attributes: true, attributeFilter: ['class'] });
+  });
+  const firstPage = document.querySelector('.top-page.active');
+  if (firstPage) markPageEnter(firstPage, 2600); // the first screen's cards arrive with the data
+
+  // --- press feedback: everything tappable dips slightly and springs back ---
+  const PRESSABLE = 'button, .grid-card, .restaurant-gold-card, .trip-card, .artist-row, .results-list > li';
+  let pressedEl = null;
+  function pressRelease(){
+    const el = pressedEl;
+    pressedEl = null;
+    if (!el) return;
+    if (el.__pressAnim) el.__pressAnim.cancel();
+    el.__pressAnim = el.animate([{ scale: '0.97' }, { scale: '1' }], { duration: 360, easing: EASE_SPRING });
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (motionReduced() || e.button > 0) return;
+    const el = e.target.closest(PRESSABLE);
+    if (!el || el.disabled || el.closest('.maplibregl-map, .trip-world, .tmap-overlay')) return;
+    pressRelease();
+    pressedEl = el;
+    if (el.__pressAnim) el.__pressAnim.cancel();
+    el.__pressAnim = el.animate([{ scale: '1' }, { scale: '0.97' }], { duration: 110, easing: EASE_OUT, fill: 'forwards' });
+  }, { capture: true, passive: true });
+  ['pointerup', 'pointercancel', 'dragstart'].forEach(ev => document.addEventListener(ev, pressRelease, { capture: true, passive: true }));
+
+  // --- lists glide into their new order (drag to reorder, Save Order, re-ranking, search) ---
+  // Remembers where each card sat, and after the list changes, animates
+  // anything that moved from its old spot to its new one.
+  function flipKey(el){
+    const d = el.dataset;
+    const id = d.artistKey || d.mediaId || d.dishId || d.photoId || d.parkId || d.tripId || d.original;
+    if (id) return id;
+    const name = el.querySelector('.restaurant-gold-card-name, .rank-album, .rank-item');
+    if (name) return name.textContent.trim();
+    const img = el.querySelector('img');
+    if (img && img.getAttribute('src')) return img.getAttribute('src');
+    return el.textContent.replace(/#\d+/g, '').trim().slice(0, 120);
+  }
+  function flipMeasure(list){
+    const base = list.getBoundingClientRect();
+    const out = new Map(), dupes = new Set();
+    Array.from(list.children).forEach(el => {
+      if (el.classList.contains('dragging')) return;
+      const k = flipKey(el);
+      if (!k) return;
+      if (out.has(k)){ dupes.add(k); return; }
+      const r = el.getBoundingClientRect();
+      out.set(k, { el, x: r.left - base.left, y: r.top - base.top });
+    });
+    dupes.forEach(k => out.delete(k));
+    return out;
+  }
+  function setupFlip(list){
+    if (list.__flip) return;
+    list.__flip = { last: null };
+    const settle = () => { if (list.offsetParent && list.children.length <= 400) list.__flip.last = flipMeasure(list); };
+    new MutationObserver(() => {
+      const prev = list.__flip.last;
+      if (!list.offsetParent || list.children.length > 400){ list.__flip.last = null; return; }
+      const next = flipMeasure(list);
+      list.__flip.last = next;
+      const page = list.closest('.top-page');
+      if (!prev || motionReduced() || (page && page.dataset.enter)) return;
+      let shared = 0;
+      next.forEach((v, k) => { if (prev.has(k)) shared++; });
+      if (!next.size || shared / next.size < 0.5) return; // a whole new list, not a reorder
+      let moved = 0;
+      next.forEach((v, k) => {
+        const p = prev.get(k);
+        if (!p || moved >= 80) return;
+        const dx = p.x - v.x, dy = p.y - v.y;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        moved++;
+        v.el.animate([{ transform: 'translate(' + dx + 'px, ' + dy + 'px)' }, { transform: 'none' }], { duration: 320, easing: EASE_OUT });
+      });
+    }).observe(list, { childList: true });
+    if (window.ResizeObserver) new ResizeObserver(settle).observe(list);
+    settle();
+  }
+  document.querySelectorAll('.restaurant-gold-grid, .results-list').forEach(setupFlip);
+
+  // --- stats count up from zero when they appear ---
+  function countUp(el){
+    if (el.__counted) return;
+    el.__counted = true;
+    const text = el.textContent.trim();
+    if (!/^\d[\d,]*$/.test(text) || motionReduced()) return;
+    const end = Number(text.replace(/,/g, ''));
+    if (!end) return;
+    const t0 = performance.now(), dur = 650;
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(end * eased).toLocaleString('en-US');
+      if (t < 1) requestAnimationFrame(step); else el.textContent = text;
+    };
+    el.textContent = '0';
+    requestAnimationFrame(step);
+  }
+
+  // One watcher for things that appear anywhere: new tab rows and toggles,
+  // stat numbers, and cached photos that finished before anyone listened.
+  let motionScanQueued = false;
+  new MutationObserver(() => {
+    if (motionScanQueued) return;
+    motionScanQueued = true;
+    requestAnimationFrame(() => {
+      motionScanQueued = false;
+      scanIndicators();
+      document.querySelectorAll('.yir-stat-n, .cal-stat-n').forEach(el => { if (!el.__counted && el.offsetParent) countUp(el); });
+      document.querySelectorAll('.art-img:not(.img-loaded)').forEach(img => { if (img.complete && img.naturalWidth) img.classList.add('img-loaded'); });
+    });
+  }).observe(document.body, { childList: true, subtree: true });
+  scanIndicators();
+
+  // --- the photo viewer grows out of the tapped thumbnail, and shrinks back into it ---
+  let lastPressedImg = null, lightboxSource = null, lightboxSourceIndex = null;
+  document.addEventListener('pointerdown', (e) => {
+    const holder = e.target.closest('img, .art-drop, .yir-tile, .grid-card, .restaurant-gold-card, .restaurant-photo-thumb, .trip-gimg');
+    lastPressedImg = holder ? (holder.tagName === 'IMG' ? holder : holder.querySelector('img')) : null;
+  }, { capture: true, passive: true });
+  function lightboxZoomIn(){
+    const img = artLightboxImg;
+    lightboxSource = lastPressedImg && lastPressedImg.isConnected ? lastPressedImg : null;
+    lightboxSourceIndex = lightboxIndex;
+    if (motionReduced()) return;
+    artLightboxOverlay.animate([{ backgroundColor: 'rgba(10,20,22,0)' }, { backgroundColor: 'rgba(10,20,22,0.9)' }], { duration: 260, easing: EASE_OUT });
+    img.style.opacity = '0';
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      img.style.opacity = '';
+      const to = img.getBoundingClientRect();
+      const from = lightboxSource ? lightboxSource.getBoundingClientRect() : null;
+      if (from && from.width && to.width){
+        const s = Math.max(from.width / to.width, from.height / to.height);
+        const dx = (from.left + from.width / 2) - (to.left + to.width / 2), dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+        img.animate([{ transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + s + ')', opacity: 0.6 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: EASE_SPRING });
+      } else {
+        img.animate([{ transform: 'scale(0.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: EASE_OUT });
+      }
+    };
+    if (img.complete && img.naturalWidth) go();
+    else { img.addEventListener('load', go, { once: true }); img.addEventListener('error', go, { once: true }); setTimeout(go, 700); }
+  }
+  // The real viewer closes at once (the back button relies on that); a
+  // snapshot of the photo flies back to where it came from on top.
+  function lightboxZoomOut(){
+    const img = artLightboxImg;
+    if (motionReduced() || !img.getAttribute('src') || !artLightboxOverlay.classList.contains('show')) return;
+    const r = img.getBoundingClientRect();
+    if (!r.width) return;
+    const shade = document.createElement('div');
+    shade.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(10,20,22,0.9);pointer-events:none;';
+    const ghost = img.cloneNode();
+    ghost.removeAttribute('id');
+    ghost.style.cssText = 'position:fixed;margin:0;z-index:301;pointer-events:none;object-fit:contain;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;';
+    document.body.append(shade, ghost);
+    const src = lightboxSource && lightboxSource.isConnected && lightboxIndex === lightboxSourceIndex ? lightboxSource.getBoundingClientRect() : null;
+    const onScreen = src && src.width && src.bottom > 0 && src.top < window.innerHeight;
+    shade.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: EASE_INOUT, fill: 'forwards' });
+    const anim = onScreen
+      ? ghost.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate(' + ((src.left + src.width / 2) - (r.left + r.width / 2)) + 'px, ' + ((src.top + src.height / 2) - (r.top + r.height / 2)) + 'px) scale(' + Math.max(src.width / r.width, src.height / r.height) + ')', opacity: 0.85 }], { duration: 300, easing: EASE_INOUT, fill: 'forwards' })
+      : ghost.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(0.94)', opacity: 0 }], { duration: 220, easing: EASE_INOUT, fill: 'forwards' });
+    anim.onfinish = () => { shade.remove(); ghost.remove(); };
+  }
+
+  // --- a bottom sheet can be dragged down by its top to close it ---
+  function setupSheetDrag(sheet, close){
+    const handle = sheet.querySelectorAll('.share-grabber, .share-head');
+    let startY = 0, startT = 0, dy = 0, dragging = false, pid = null;
+    const backdrop = sheet.parentElement.querySelector('.share-backdrop, .tsheet-backdrop');
+    handle.forEach(h => {
+      h.addEventListener('pointerdown', (e) => {
+        if (e.button > 0 || e.target.closest('button, input, a')) return;
+        dragging = true; pid = e.pointerId; startY = e.clientY; startT = performance.now(); dy = 0;
+        h.setPointerCapture(pid);
+        sheet.classList.add('sheet-dragging');
+        if (backdrop) backdrop.classList.add('sheet-dragging');
+      });
+      h.addEventListener('pointermove', (e) => {
+        if (!dragging || e.pointerId !== pid) return;
+        dy = Math.max(0, e.clientY - startY);
+        sheet.style.transform = 'translateY(' + dy + 'px)';
+        if (backdrop) backdrop.style.opacity = String(Math.max(0, 1 - dy / (sheet.offsetHeight || 1)));
+      });
+      const end = (e) => {
+        if (!dragging || e.pointerId !== pid) return;
+        dragging = false;
+        const v = dy / Math.max(1, performance.now() - startT);
+        sheet.classList.remove('sheet-dragging');
+        if (backdrop) backdrop.classList.remove('sheet-dragging');
+        void sheet.offsetWidth; // transitions back on, starting from where the finger let go
+        if (dy > 110 || (dy > 30 && v > 0.6)) close(); // far enough, or flung: closes from here, not from the top
+        // Dropping the inline position a frame later lets the sheet's own transition run from the dragged spot —
+        // down and away if it closed, back up if not.
+        requestAnimationFrame(() => { sheet.style.transform = ''; if (backdrop) backdrop.style.opacity = ''; });
+      };
+      h.addEventListener('pointerup', end);
+      h.addEventListener('pointercancel', end);
+    });
+  }
+  setupSheetDrag(document.getElementById('tsheet'), () => tsheetClose());
+  const shareSheetEl = document.getElementById('share-sheet');
+  if (shareSheetEl) setupSheetDrag(shareSheetEl, () => closeShare());
 
   // Offline support and cached libraries for the installed app — see sw.js.
   // Only when served over HTTPS as the real site, not inside the artifact
