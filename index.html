@@ -329,7 +329,7 @@
   }
   #details-panel, #restaurant-details-panel, #hike-details-panel,
   #road-details-panel, #artist-details-panel, #park-details-panel{
-    background: linear-gradient(to bottom, var(--panel-tint) var(--tint-start, 0px), var(--panel) calc(var(--tint-start, 0px) + 520px)) var(--panel);
+    background: linear-gradient(to bottom, var(--panel-tint) var(--tint-start, 0px), var(--panel) calc(var(--tint-start, 0px) + 780px)) var(--panel);
     background-attachment: local;
     transition: width 0.38s var(--ease-out), --panel-tint 0.45s ease;
   }
@@ -470,15 +470,20 @@
     grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
     gap: 8px;
   }
+  /* Thumbnails: photos only, the usual grid look — 2px gaps, 4px corners,
+     running to the tray's edges (past .details-content's 24px padding). */
   .restaurant-course-thumb-grid{
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 2px;
+    margin-left: -24px;
+    margin-right: -24px;
   }
+  .restaurant-course-thumb-tile:not(:has(img)){ display: none; } /* a dish with no photo has nothing to show here */
   .restaurant-course-thumb-tile{
     position: relative;
     aspect-ratio: 1 / 1;
-    border-radius: 8px;
+    border-radius: 4px;
     overflow: hidden;
     background: var(--bg-2);
     cursor: pointer;
@@ -500,7 +505,7 @@
     text-overflow: ellipsis;
     pointer-events: none;
   }
-  body.guest-view-active .restaurant-course-thumb-caption{ display: none; }
+  .restaurant-course-thumb-caption{ display: none; } /* photos only */
   .restaurant-photo-thumb{
     position: relative;
     aspect-ratio: 1 / 1;
@@ -2655,7 +2660,7 @@
 
   #trip-overlay{ /* shares Year in Review's overlay shell, listed with #yir-overlay above */ }
   #trip-content{ max-width: 640px; margin: 0 auto; padding-top: 6px; }
-  .trip-hero-photo{ position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 18px; background: var(--panel); border: 1px solid var(--panel-line); }
+  .trip-hero-photo{ position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 18px; background: var(--panel); }
   .trip-hero-img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .trip-hero-ph{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 72px; opacity: 0.3; }
   .trip-hero-shade{ position: absolute; inset: 0; background: linear-gradient(to top, rgba(10, 22, 24, 0.9), rgba(10, 22, 24, 0) 60%); }
@@ -2713,8 +2718,6 @@
   .trip-map-cap{ display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; background: var(--panel); font-size: 12.5px; color: var(--chalk-dim); }
   .trip-map-cap b{ color: var(--chalk); font-size: 13px; }
   .trip-map-overview.empty .trip-map-expand{ display: none; }
-  .trip-map-credit{ margin-top: -4px; text-align: right; font-size: 10.5px; color: rgba(241,236,222,0.45); }
-  .trip-map-credit a{ color: inherit; }
   .trip-stop-chips{ display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .trip-stop-chips::-webkit-scrollbar{ display: none; }
   .trip-stop-chip{ flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 5px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--panel-line); color: var(--chalk); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
@@ -3254,6 +3257,9 @@
   .artist-concert-location{ flex: 1; min-width: 0; font-size: 13px; line-height: 1.35; color: var(--chalk-dim); overflow-wrap: anywhere; }
   .artist-concert-remove{ flex: none; width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); cursor: pointer; font-size: 12px; }
   .artist-live-head{ display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .artist-live-section .restaurant-other-photos-label{ margin-bottom: 4px; }
+  .artist-live-head + .artist-concert-row{ padding-top: 0; } /* about half the usual gap between the heading and the first date */
+  .artist-concert-row.editable{ cursor: pointer; }
   .artist-live-section.quiet .restaurant-other-photos-label{ opacity: 0.55; }
   .artist-concert-add-icon{ flex: none; width: 28px; height: 28px; padding: 0; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); opacity: 0.6; font-size: 17px; line-height: 1; cursor: pointer; }
   .artist-concert-add-icon:hover, .artist-concert-add-icon:focus-visible{ opacity: 1; }
@@ -7803,7 +7809,7 @@
           }
           if (total > 0){
             const [h, sat] = rgbToHsl(r / total, g / total, b / total);
-            color = 'hsl(' + Math.round(h) + ', ' + Math.round(Math.min(sat * 0.9, 0.55) * 100) + '%, 28%)';
+            color = 'hsl(' + Math.round(h) + ', ' + Math.round(Math.min(sat * 1.35, 0.82) * 100) + '%, 22%)'; // deep, and richly colored
           }
         }catch(e){ /* cross-origin without CORS — leave untinted */ }
         coverTintCache.set(url, color);
@@ -14933,7 +14939,8 @@
   // albums' own Grouping, the same field shown as a tag in the Albums list.
   const ARTIST_STORAGE_KEY = 'artist-list';
   const ARTIST_MIN_ALBUMS = 3;
-  let artistConcertFormKey = null; // the artist whose Seen Live fields are showing (after + Add), if any
+  let artistConcertFormKey = null; // the artist whose Seen Live fields are showing (after + Add, or tapping a date), if any
+  let artistConcertEditId = null;  // the date being edited in those fields; null when adding a new one
   let artistRows = []; // [{ key, name, country, coverPhoto, concerts:[{ id, date, location }] }], in the user's order
   let artistLastSavedAt = null;
   let openArtistKey = null;
@@ -15188,26 +15195,28 @@
       '</div>';
     }).join('');
     const concerts = row.concerts.slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
-    const concertsHtml = concerts.map(c => '<div class="artist-concert-row">' +
+    // Seen Live stays quiet: most artists will never have a date, so an
+    // empty section is just a dim heading with a small +, and the fields
+    // only appear once + is tapped. Tapping a date opens it for editing in place.
+    const formOpen = !guestViewEnabled && artistConcertFormKey === row.key;
+    const editingId = formOpen ? artistConcertEditId : null;
+    const concertFormHtml = (c) =>
+      '<div class="artist-concert-form reveal-in">' +
+        '<input type="date" class="restaurant-edit-input" id="artist-concert-date" aria-label="Date seen live" value="' + escapeAttr(c ? c.date : '') + '">' +
+        '<input type="text" class="restaurant-edit-input" id="artist-concert-location" placeholder="Where (venue, city)" aria-label="Location" autocomplete="off" value="' + escapeAttr(c ? c.location : '') + '">' +
+        '<span class="artist-concert-form-actions"><button class="btn-primary" type="button" id="artist-concert-add-btn">Save</button>' +
+        '<button class="btn-ghost" type="button" id="artist-concert-cancel-btn">Cancel</button></span>' +
+      '</div>';
+    const concertsHtml = concerts.map(c => c.id === editingId ? concertFormHtml(c) :
+      '<div class="artist-concert-row' + (guestViewEnabled ? '' : ' editable') + '"' + (guestViewEnabled ? '' : ' data-concert-edit="' + escapeAttr(c.id) + '" role="button" tabindex="0" aria-label="Edit ' + escapeAttr(artistConcertDateLabel(c.date) + ', ' + c.location) + '"') + '>' +
         '<span class="artist-concert-date">' + escapeHtml(artistConcertDateLabel(c.date)) + '</span>' +
         '<span class="artist-concert-location">' + escapeHtml(c.location) + '</span>' +
         (guestViewEnabled ? '' : '<button class="artist-concert-remove" type="button" data-concert-remove="' + escapeAttr(c.id) + '" aria-label="Remove this date">✕</button>') +
       '</div>').join('');
-    // Seen Live stays quiet: most artists will never have a date, so an
-    // empty section is just a dim heading with a small +, and the fields
-    // only appear once + is tapped.
-    const formOpen = !guestViewEnabled && artistConcertFormKey === row.key;
     const addBtn = (guestViewEnabled || formOpen) ? '' : (concerts.length
       ? '<button class="btn-ghost artist-concert-add-toggle" type="button" data-concert-open="1"><span class="artist-concert-plus" aria-hidden="true">+</span> Add</button>'
       : '<button class="artist-concert-add-icon" type="button" data-concert-open="1" aria-label="Add a time you saw them live">+</button>');
-    const concertForm = formOpen
-      ? '<div class="artist-concert-form reveal-in">' +
-          '<input type="date" class="restaurant-edit-input" id="artist-concert-date" aria-label="Date seen live">' +
-          '<input type="text" class="restaurant-edit-input" id="artist-concert-location" placeholder="Where (venue, city)" aria-label="Location" autocomplete="off">' +
-          '<span class="artist-concert-form-actions"><button class="btn-primary" type="button" id="artist-concert-add-btn">Save</button>' +
-          '<button class="btn-ghost" type="button" id="artist-concert-cancel-btn">Cancel</button></span>' +
-        '</div>'
-      : '';
+    const concertForm = formOpen && !editingId ? concertFormHtml(null) : '';
 
     artistDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
@@ -15243,6 +15252,18 @@
     if (guestViewEnabled) return;
     wireArtistFileDrop(cover, row);
     artistDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', () => { artistEditMode = true; renderArtistDetailsContent(); });
+    artistDetailsPanelInner.querySelectorAll('[data-concert-edit]').forEach(el => {
+      const open = (e) => {
+        if (e.target.closest('[data-concert-remove]')) return;
+        artistConcertFormKey = row.key;
+        artistConcertEditId = el.dataset.concertEdit;
+        renderArtistDetailsContent();
+        const d = artistDetailsPanelInner.querySelector('#artist-concert-date');
+        if (d){ try{ d.focus(); }catch(err){} }
+      };
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); open(e); } });
+    });
     artistDetailsPanelInner.querySelectorAll('[data-concert-remove]').forEach(btn => btn.addEventListener('click', () => {
       row.concerts = row.concerts.filter(c => c.id !== btn.dataset.concertRemove);
       saveArtistProgress();
@@ -15251,6 +15272,7 @@
     const openBtn = artistDetailsPanelInner.querySelector('[data-concert-open]');
     if (openBtn) openBtn.addEventListener('click', () => {
       artistConcertFormKey = row.key;
+      artistConcertEditId = null;
       renderArtistDetailsContent();
       const d = artistDetailsPanelInner.querySelector('#artist-concert-date');
       if (d){ try{ d.focus(); }catch(e){} }
@@ -15261,14 +15283,17 @@
       const location = artistDetailsPanelInner.querySelector('#artist-concert-location').value.trim();
       if (!date){ showToast('Pick the date you saw them'); return; }
       if (!location){ showToast('Add where you saw them'); return; }
-      row.concerts.push({ id: tripNewId('gig'), date, location });
+      const editing = artistConcertEditId && row.concerts.find(c => c.id === artistConcertEditId);
+      if (editing){ editing.date = date; editing.location = location; }
+      else row.concerts.push({ id: tripNewId('gig'), date, location });
       artistConcertFormKey = null;
+      artistConcertEditId = null;
       saveArtistProgress();
       renderArtistDetailsContent();
-      showToast('Added to Seen Live');
+      showToast(editing ? 'Saved' : 'Added to Seen Live');
     };
     artistDetailsPanelInner.querySelector('#artist-concert-add-btn').addEventListener('click', addConcert);
-    artistDetailsPanelInner.querySelector('#artist-concert-cancel-btn').addEventListener('click', () => { artistConcertFormKey = null; renderArtistDetailsContent(); });
+    artistDetailsPanelInner.querySelector('#artist-concert-cancel-btn').addEventListener('click', () => { artistConcertFormKey = null; artistConcertEditId = null; renderArtistDetailsContent(); });
     artistDetailsPanelInner.querySelector('#artist-concert-location').addEventListener('keydown', (e) => { if (e.key === 'Enter') addConcert(); });
   }
 
@@ -22870,7 +22895,6 @@
         '<span class="trip-map-slot"></span>' +
         '<span class="trip-map-cap"><b>' + escapeHtml(tripStopsSummary(stops)) + '</b><span class="trip-map-expand">Expand ⤢</span></span>' +
       '</button>' +
-      '<div class="trip-map-credit">Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · OpenFreeMap</div>' +
       '<div class="trip-stop-chips">' + chips + '</div>' +
       (owner ? '<button type="button" class="btn-ghost trip-owner trip-fix-pins' + (needs ? ' trip-needs-pin' : '') + '" data-trip-pins="1">📍 ' +
         (needs ? (needs === 1 ? '1 place needs a pin' : needs + ' places need a pin') : 'Fix a pin') + '</button>' : '') +
@@ -22975,10 +22999,9 @@
     try{ lib = await loadMapLibre(); }
     catch(e){ tmapOverlay.querySelector('#tmap-sheet').innerHTML = '<p class="tmap-note">The map needs an internet connection.</p>'; return; }
     if (!tmapMap){
-      // Controls go top-right, clear of the stop card along the bottom.
+      // Zoom buttons go top-right, clear of the stop card along the bottom. No attribution — this app is just for its owner.
       tmapMap = new lib.Map({ container: tmapOverlay.querySelector('#tmap-map'), style: tripMapStyle(false), attributionControl: false, fadeDuration: 0, maxZoom: 14 });
       tmapMap.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
-      tmapMap.addControl(new lib.AttributionControl({ compact: true }), 'top-right');
       trackMapReady(tmapMap);
     } else {
       tmapMap.resize();
@@ -23660,9 +23683,9 @@
 
   // ---------- MOTION ----------
   // The moving parts that CSS alone can't do: the sliding tab line and
-  // toggle pill, press feedback, cards gliding to new spots when a list
-  // reorders, the photo viewer growing out of the tapped thumbnail, stats
-  // counting up, and bottom sheets you can drag down. Everything here is
+  // toggle pill, press feedback, the photo viewer growing out of the tapped
+  // thumbnail, stats counting up, and bottom sheets you can drag down.
+  // (Reordering stays instant — cards swap in place while you drag.) Everything here is
   // skipped with reduced motion.
   const motionReduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const EASE_SPRING = 'cubic-bezier(0.22, 1.25, 0.36, 1)', EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)', EASE_INOUT = 'cubic-bezier(0.37, 0, 0.63, 1)';
@@ -23752,62 +23775,6 @@
   }, { capture: true, passive: true });
   ['pointerup', 'pointercancel', 'dragstart'].forEach(ev => document.addEventListener(ev, pressRelease, { capture: true, passive: true }));
 
-  // --- lists glide into their new order (drag to reorder, Save Order, re-ranking, search) ---
-  // Remembers where each card sat, and after the list changes, animates
-  // anything that moved from its old spot to its new one.
-  function flipKey(el){
-    const d = el.dataset;
-    const id = d.artistKey || d.mediaId || d.dishId || d.photoId || d.parkId || d.tripId || d.original;
-    if (id) return id;
-    const name = el.querySelector('.restaurant-gold-card-name, .rank-album, .rank-item');
-    if (name) return name.textContent.trim();
-    const img = el.querySelector('img');
-    if (img && img.getAttribute('src')) return img.getAttribute('src');
-    return el.textContent.replace(/#\d+/g, '').trim().slice(0, 120);
-  }
-  function flipMeasure(list){
-    const base = list.getBoundingClientRect();
-    const out = new Map(), dupes = new Set();
-    Array.from(list.children).forEach(el => {
-      if (el.classList.contains('dragging')) return;
-      const k = flipKey(el);
-      if (!k) return;
-      if (out.has(k)){ dupes.add(k); return; }
-      const r = el.getBoundingClientRect();
-      out.set(k, { el, x: r.left - base.left, y: r.top - base.top });
-    });
-    dupes.forEach(k => out.delete(k));
-    return out;
-  }
-  function setupFlip(list){
-    if (list.__flip) return;
-    list.__flip = { last: null };
-    const settle = () => { if (list.offsetParent && list.children.length <= 400) list.__flip.last = flipMeasure(list); };
-    new MutationObserver(() => {
-      const prev = list.__flip.last;
-      if (!list.offsetParent || list.children.length > 400){ list.__flip.last = null; return; }
-      const next = flipMeasure(list);
-      list.__flip.last = next;
-      const page = list.closest('.top-page');
-      if (!prev || motionReduced() || (page && page.dataset.enter)) return;
-      let shared = 0;
-      next.forEach((v, k) => { if (prev.has(k)) shared++; });
-      if (!next.size || shared / next.size < 0.5) return; // a whole new list, not a reorder
-      let moved = 0;
-      next.forEach((v, k) => {
-        const p = prev.get(k);
-        if (!p || moved >= 80) return;
-        const dx = p.x - v.x, dy = p.y - v.y;
-        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-        moved++;
-        v.el.animate([{ transform: 'translate(' + dx + 'px, ' + dy + 'px)' }, { transform: 'none' }], { duration: 320, easing: EASE_OUT });
-      });
-    }).observe(list, { childList: true });
-    if (window.ResizeObserver) new ResizeObserver(settle).observe(list);
-    settle();
-  }
-  document.querySelectorAll('.restaurant-gold-grid, .results-list').forEach(setupFlip);
-
   // --- stats count up from zero when they appear ---
   function countUp(el){
     if (el.__counted) return;
@@ -23830,6 +23797,24 @@
   // One watcher for things that appear anywhere: new tab rows and toggles,
   // stat numbers, and cached photos that finished before anyone listened.
   let motionScanQueued = false;
+  // Redraws (switching a restaurant's visit, paging, editing) re-create the
+  // same photos; ones already in the browser's memory are marked loaded in
+  // the same moment they're added, before anything is painted, so they
+  // don't fade in or flash the dark placeholder again.
+  new MutationObserver((records) => {
+    records.forEach(r => r.addedNodes.forEach(n => {
+      if (n.nodeType !== 1) return;
+      const imgs = n.tagName === 'IMG' ? [n] : n.querySelectorAll('img.art-img, .restaurant-photo-thumb img');
+      imgs.forEach(img => {
+        if (!img.complete || !img.naturalWidth) return;
+        // Already in memory: show it at full strength right away, skipping the fade entirely
+        // (the tray may have been measured before this ran, which would otherwise start a fade from 0).
+        img.style.transition = 'none';
+        img.classList.add('img-loaded');
+        requestAnimationFrame(() => requestAnimationFrame(() => { img.style.transition = ''; }));
+      });
+    }));
+  }).observe(document.body, { childList: true, subtree: true });
   new MutationObserver(() => {
     if (motionScanQueued) return;
     motionScanQueued = true;
@@ -23848,12 +23833,27 @@
     const holder = e.target.closest('img, .art-drop, .yir-tile, .grid-card, .restaurant-gold-card, .restaurant-photo-thumb, .trip-gimg');
     lastPressedImg = holder ? (holder.tagName === 'IMG' ? holder : holder.querySelector('img')) : null;
   }, { capture: true, passive: true });
+  // The thumbnail shows a square (or other) crop of the photo; the viewer
+  // shows all of it. To morph one into the other smoothly, the photo is
+  // scaled to cover the thumbnail and clipped to the thumbnail's shape, then
+  // the clip opens up to the full photo while it moves and grows — so the
+  // shape changes gradually instead of snapping at the end.
+  function lightboxMorph(from, to, fromRadius, toRadius){
+    const s = Math.max(from.width / to.width, from.height / to.height);
+    const ix = Math.max(0, (to.width - from.width / s) / 2), iy = Math.max(0, (to.height - from.height / s) / 2);
+    const dx = (from.left + from.width / 2) - (to.left + to.width / 2), dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+    return [
+      { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + s + ')', clipPath: 'inset(' + iy + 'px ' + ix + 'px round ' + (fromRadius / s) + 'px)' },
+      { transform: 'none', clipPath: 'inset(0px 0px round ' + toRadius + 'px)' }
+    ];
+  }
+  const radiusOf = (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) || parseFloat(getComputedStyle(el.parentElement || el).borderTopLeftRadius) || 0;
   function lightboxZoomIn(){
     const img = artLightboxImg;
     lightboxSource = lastPressedImg && lastPressedImg.isConnected ? lastPressedImg : null;
     lightboxSourceIndex = lightboxIndex;
     if (motionReduced()) return;
-    artLightboxOverlay.animate([{ backgroundColor: 'rgba(10,20,22,0)' }, { backgroundColor: 'rgba(10,20,22,0.9)' }], { duration: 260, easing: EASE_OUT });
+    artLightboxOverlay.animate([{ backgroundColor: 'rgba(10,20,22,0)' }, { backgroundColor: 'rgba(10,20,22,0.9)' }], { duration: 300, easing: EASE_OUT });
     img.style.opacity = '0';
     let done = false;
     const go = () => {
@@ -23863,9 +23863,7 @@
       const to = img.getBoundingClientRect();
       const from = lightboxSource ? lightboxSource.getBoundingClientRect() : null;
       if (from && from.width && to.width){
-        const s = Math.max(from.width / to.width, from.height / to.height);
-        const dx = (from.left + from.width / 2) - (to.left + to.width / 2), dy = (from.top + from.height / 2) - (to.top + to.height / 2);
-        img.animate([{ transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + s + ')', opacity: 0.6 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: EASE_SPRING });
+        img.animate(lightboxMorph(from, to, radiusOf(lightboxSource), 6), { duration: 420, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' });
       } else {
         img.animate([{ transform: 'scale(0.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: EASE_OUT });
       }
@@ -23874,7 +23872,7 @@
     else { img.addEventListener('load', go, { once: true }); img.addEventListener('error', go, { once: true }); setTimeout(go, 700); }
   }
   // The real viewer closes at once (the back button relies on that); a
-  // snapshot of the photo flies back to where it came from on top.
+  // snapshot of the photo morphs back into the thumbnail on top.
   function lightboxZoomOut(){
     const img = artLightboxImg;
     if (motionReduced() || !img.getAttribute('src') || !artLightboxOverlay.classList.contains('show')) return;
@@ -23884,13 +23882,14 @@
     shade.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(10,20,22,0.9);pointer-events:none;';
     const ghost = img.cloneNode();
     ghost.removeAttribute('id');
-    ghost.style.cssText = 'position:fixed;margin:0;z-index:301;pointer-events:none;object-fit:contain;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;';
+    ghost.style.cssText = 'position:fixed;margin:0;z-index:301;pointer-events:none;object-fit:contain;box-shadow:none;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;';
     document.body.append(shade, ghost);
-    const src = lightboxSource && lightboxSource.isConnected && lightboxIndex === lightboxSourceIndex ? lightboxSource.getBoundingClientRect() : null;
+    const srcEl = lightboxSource && lightboxSource.isConnected && lightboxIndex === lightboxSourceIndex ? lightboxSource : null;
+    const src = srcEl ? srcEl.getBoundingClientRect() : null;
     const onScreen = src && src.width && src.bottom > 0 && src.top < window.innerHeight;
-    shade.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: EASE_INOUT, fill: 'forwards' });
+    shade.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: EASE_INOUT, fill: 'forwards' });
     const anim = onScreen
-      ? ghost.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate(' + ((src.left + src.width / 2) - (r.left + r.width / 2)) + 'px, ' + ((src.top + src.height / 2) - (r.top + r.height / 2)) + 'px) scale(' + Math.max(src.width / r.width, src.height / r.height) + ')', opacity: 0.85 }], { duration: 300, easing: EASE_INOUT, fill: 'forwards' })
+      ? ghost.animate(lightboxMorph(src, r, radiusOf(srcEl), 6).reverse(), { duration: 340, easing: EASE_INOUT, fill: 'forwards' })
       : ghost.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(0.94)', opacity: 0 }], { duration: 220, easing: EASE_INOUT, fill: 'forwards' });
     anim.onfinish = () => { shade.remove(); ghost.remove(); };
   }
