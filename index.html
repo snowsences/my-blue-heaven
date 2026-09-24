@@ -4902,6 +4902,7 @@
   /* Cards fade up only when a page first appears (not on every re-render),
      the first dozen a beat apart. */
   .grid-card, .results-list li{ animation: none; }
+  .top-page[data-enter] .grid-card.no-enter{ animation: none; }
   .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row){ animation: cardIn 320ms var(--ease-out) backwards; }
   .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(2){ animation-delay: 20ms; }
   .top-page[data-enter] :is(.grid-card, .results-list > li, .restaurant-gold-card, .trip-tl-row):nth-child(3){ animation-delay: 40ms; }
@@ -11264,6 +11265,7 @@
     renderResultsTab();
   });
 
+  let gridArtWaitTimer = null, gridArtWaitExpired = false;
   function renderResultsTab(){
     displayedRanking = isComplete ? finalRanking : computeLiveEstimate();
     maybeInitTiers(displayedRanking.length);
@@ -11321,25 +11323,55 @@
     }
 
     const total = displayedRanking.length;
-    resultsList.innerHTML = '';
+
+    // Wait (briefly) for the albums' art before drawing the grid, so cards
+    // appear once with their photos instead of as placeholders that then
+    // swap. The art is read from this device's storage, normally within a
+    // few milliseconds; loadArtForItems redraws when it's in. If it takes
+    // longer than 400ms, draw anyway.
+    const artPending = showGrid && displayedRanking.some(raw => artCache[raw] === undefined);
+    if (artPending && !gridArtWaitExpired){
+      clearTimeout(gridArtWaitTimer);
+      gridArtWaitTimer = setTimeout(() => { gridArtWaitExpired = true; renderResultsTab(); gridArtWaitExpired = false; }, 400);
+      return;
+    }
+    clearTimeout(gridArtWaitTimer);
 
     if (showGrid){
+      // Redraws happen several times while the app starts up (local data, the
+      // cloud copy, settings, art) and whenever anything changes. Cards that
+      // haven't changed — same album, rank, art and selection — are kept as
+      // they are, in place, so they don't flash, restart their entrance or
+      // reload their photo. Only cards that actually changed are rebuilt.
+      const reusable = new Map();
+      Array.from(resultsList.children).forEach(el => { if (el.__gridSig) reusable.set(el.__gridItem, el); });
+      const wanted = [];
       displayedRanking.forEach((item, idx) => {
         const p = parseEntry(item);
         const itemGrouping = p.artist ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
         if ((activeYearFilter && p.year !== activeYearFilter) || (activeArtistFilter && p.artist !== activeArtistFilter) || (activeGroupingFilter && itemGrouping !== activeGroupingFilter)) return;
 
+        const art = artCache[item] || '';
+        const sig = idx + '|' + (item === selectedItem ? 1 : 0) + '|' + art.length + ':' + art.slice(0, 48) + art.slice(-48); // enough to tell art apart without copying it
+        const kept = reusable.get(item);
+        if (kept && kept.__gridSig === sig){ wanted.push(kept); return; }
         const card = document.createElement('div');
-        card.className = 'grid-card' + (item === selectedItem ? ' selected' : '');
+        card.className = 'grid-card' + (item === selectedItem ? ' selected' : '') + (kept ? ' no-enter' : ''); // a changed card updates quietly, without the entrance
         card.title = p.artist ? (p.artist + ' - ' + p.album + (p.year ? ' (' + p.year + ')' : '')) : item;
         card.innerHTML = '<span class="grid-card-rank">#' + (idx + 1) + '</span>' + artDropZoneHtml(item, null, true, 500);
-        resultsList.appendChild(card);
+        card.__gridItem = item;
+        card.__gridSig = sig;
+        wanted.push(card);
 
         wireArtDropZone(card.querySelector('.art-drop'), item, true); // true = drag-only, no click-to-browse
         makeRowDraggable(card, item);
         wireImmediateClick(card, () => openDetailsPanel(item));
       });
+      // Put the wanted cards in order, touching only what differs, then drop the rest.
+      wanted.forEach((card, i) => { if (resultsList.children[i] !== card) resultsList.insertBefore(card, resultsList.children[i] || null); });
+      while (resultsList.children.length > wanted.length) resultsList.lastElementChild.remove();
     } else {
+      resultsList.innerHTML = '';
       displayedRanking.forEach((item, idx) => {
         const p = parseEntry(item);
         const itemGrouping = p.artist ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
