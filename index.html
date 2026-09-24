@@ -3232,10 +3232,6 @@
      the top 20), capped at 2 columns instead of the usual auto-fill ~4 —
      fewer, wider columns is what actually makes the photos bigger, since
      the square aspect ratio itself is unchanged. */
-  .road-large-grid{
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
   /* ---------- ARTISTS ---------- */
   .artist-empty-msg{ color: var(--chalk-dim); font-size: 14px; text-align: center; padding: 40px 12px; }
   .restaurant-gold-card.dragging{ opacity: 0.4; }
@@ -5513,7 +5509,7 @@
         </div>
       </div>
 
-      <div class="restaurant-gold-grid road-large-grid" id="road-gold-grid"></div>
+      <div class="restaurant-gold-grid" id="road-gold-grid"></div>
       <ol class="results-list" id="road-list"></ol>
     </div>
   </div>
