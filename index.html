@@ -1181,15 +1181,16 @@
      rather than reusing them. */
   .group-sub-tabs{
     display: flex;
-    align-items: baseline;
+    align-items: flex-end; /* every tab's underline on one line */
     gap: 24px;
     margin: 0 0 8px;
     flex-wrap: wrap;
   }
   .group-sub-tab-btn{
+    position: relative;
     background: none;
     border: none;
-    padding: 0;
+    padding: 0 0 10px;
     font-family: 'Figtree', sans-serif;
     font-weight: 400;
     letter-spacing: 0.01em;
@@ -1202,6 +1203,8 @@
   .group-sub-tab-btn .group-sub-tab-icon{ font-size: 0.7em; margin-right: 6px; }
   .group-sub-tab-btn:hover{ color: var(--chalk); }
   .group-sub-tab-btn.active{ color: var(--chalk); font-weight: 700; }
+  .group-sub-tab-btn::after{ content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: rgba(241,236,222,0.1); }
+  .group-sub-tab-btn.active::after{ height: 2px; background: var(--amber); }
   .page-heading-row{
     display: flex;
     align-items: center;
@@ -3134,10 +3137,10 @@
     border: 1px solid var(--panel-line);
   }
   .restaurant-gold-card.drag-over{ border-color: var(--amber); }
-  #hike-gold-grid .restaurant-gold-card, #park-gold-grid .restaurant-gold-card, #road-gold-grid .restaurant-gold-card{
+  #hike-gold-grid .restaurant-gold-card, #park-gold-grid .restaurant-gold-card, #road-gold-grid .restaurant-gold-card, #artist-grid .restaurant-gold-card{
     border-color: transparent;
   }
-  #hike-gold-grid .restaurant-gold-card.drag-over, #park-gold-grid .restaurant-gold-card.drag-over, #road-gold-grid .restaurant-gold-card.drag-over{
+  #hike-gold-grid .restaurant-gold-card.drag-over, #park-gold-grid .restaurant-gold-card.drag-over, #road-gold-grid .restaurant-gold-card.drag-over, #artist-grid .restaurant-gold-card.drag-over{
     border-color: var(--amber);
   }
   /* Zoom-on-hover, matching .grid-card's own effect (used by Albums/Dishes/
@@ -3211,8 +3214,14 @@
   .artist-concert-date{ flex: none; font-size: 13px; font-weight: 700; color: var(--chalk); min-width: 96px; }
   .artist-concert-location{ flex: 1; min-width: 0; font-size: 13px; line-height: 1.35; color: var(--chalk-dim); overflow-wrap: anywhere; }
   .artist-concert-remove{ flex: none; width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); cursor: pointer; font-size: 12px; }
-  .artist-concert-empty{ font-size: 13px; color: var(--chalk-dim); padding: 4px 0 8px; }
+  .artist-live-head{ display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .artist-live-section.quiet .restaurant-other-photos-label{ opacity: 0.55; }
+  .artist-concert-add-icon{ flex: none; width: 28px; height: 28px; padding: 0; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); opacity: 0.6; font-size: 17px; line-height: 1; cursor: pointer; }
+  .artist-concert-add-icon:hover, .artist-concert-add-icon:focus-visible{ opacity: 1; }
+  .artist-concert-add-toggle{ margin-top: 10px; padding: 5px 14px; font-size: 13px; color: var(--chalk-dim); border-color: var(--panel-line); }
+  .artist-concert-plus{ color: var(--chalk-dim); opacity: 0.7; font-size: 15px; }
   .artist-concert-form{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .artist-concert-form-actions{ display: flex; gap: 8px; }
   .artist-concert-form input[type="date"]{ flex: none; width: 150px; }
   .artist-concert-form input[type="text"]{ flex: 1; min-width: 140px; }
   .artist-concert-form .restaurant-edit-input{ margin: 0; }
@@ -5202,7 +5211,7 @@
         </div>
       </div>
       <p class="artist-empty-msg" id="artist-empty-msg" style="display:none;">Any artist with 3 or more albums in your ranked Albums list shows up here automatically.</p>
-      <div class="restaurant-gold-grid road-large-grid" id="artist-grid"></div>
+      <div class="restaurant-gold-grid" id="artist-grid"></div>
     </div>
   </div>
 
@@ -14762,6 +14771,7 @@
   // albums' own Grouping, the same field shown as a tag in the Albums list.
   const ARTIST_STORAGE_KEY = 'artist-list';
   const ARTIST_MIN_ALBUMS = 3;
+  let artistConcertFormKey = null; // the artist whose Seen Live fields are showing (after + Add), if any
   let artistRows = []; // [{ key, name, country, coverPhoto, concerts:[{ id, date, location }] }], in the user's order
   let artistLastSavedAt = null;
   let openArtistKey = null;
@@ -14918,13 +14928,11 @@
     artistEmptyMsg.style.display = shown.length ? 'none' : 'block';
     artistGridEl.innerHTML = shown.map((r, i) => {
       const info = map.get(r.key);
-      const meta = artistMetaText(r, info);
       return '<div class="restaurant-gold-card artist-card" data-artist-key="' + escapeAttr(r.key) + '">' +
         '<span class="restaurant-gold-card-rank">#' + (i + 1) + '</span>' +
         artistCoverHtml(r, info, 600) +
         '<div class="restaurant-gold-card-overlay">' +
           '<div class="restaurant-gold-card-name">' + escapeHtml(r.name) + '</div>' +
-          (meta ? '<div class="restaurant-gold-card-meta">' + escapeHtml(meta) + '</div>' : '') +
         '</div>' +
       '</div>';
     }).join('');
@@ -15018,13 +15026,26 @@
       '</div>';
     }).join('');
     const concerts = row.concerts.slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
-    const concertsHtml = concerts.length
-      ? concerts.map(c => '<div class="artist-concert-row">' +
-          '<span class="artist-concert-date">' + escapeHtml(artistConcertDateLabel(c.date)) + '</span>' +
-          '<span class="artist-concert-location">' + escapeHtml(c.location) + '</span>' +
-          (guestViewEnabled ? '' : '<button class="artist-concert-remove" type="button" data-concert-remove="' + escapeAttr(c.id) + '" aria-label="Remove this date">✕</button>') +
-        '</div>').join('')
-      : '<p class="artist-concert-empty">Not seen live yet.</p>';
+    const concertsHtml = concerts.map(c => '<div class="artist-concert-row">' +
+        '<span class="artist-concert-date">' + escapeHtml(artistConcertDateLabel(c.date)) + '</span>' +
+        '<span class="artist-concert-location">' + escapeHtml(c.location) + '</span>' +
+        (guestViewEnabled ? '' : '<button class="artist-concert-remove" type="button" data-concert-remove="' + escapeAttr(c.id) + '" aria-label="Remove this date">✕</button>') +
+      '</div>').join('');
+    // Seen Live stays quiet: most artists will never have a date, so an
+    // empty section is just a dim heading with a small +, and the fields
+    // only appear once + is tapped.
+    const formOpen = !guestViewEnabled && artistConcertFormKey === row.key;
+    const addBtn = (guestViewEnabled || formOpen) ? '' : (concerts.length
+      ? '<button class="btn-ghost artist-concert-add-toggle" type="button" data-concert-open="1"><span class="artist-concert-plus" aria-hidden="true">+</span> Add</button>'
+      : '<button class="artist-concert-add-icon" type="button" data-concert-open="1" aria-label="Add a time you saw them live">+</button>');
+    const concertForm = formOpen
+      ? '<div class="artist-concert-form">' +
+          '<input type="date" class="restaurant-edit-input" id="artist-concert-date" aria-label="Date seen live">' +
+          '<input type="text" class="restaurant-edit-input" id="artist-concert-location" placeholder="Where (venue, city)" aria-label="Location" autocomplete="off">' +
+          '<span class="artist-concert-form-actions"><button class="btn-primary" type="button" id="artist-concert-add-btn">Save</button>' +
+          '<button class="btn-ghost" type="button" id="artist-concert-cancel-btn">Cancel</button></span>' +
+        '</div>'
+      : '';
 
     artistDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
@@ -15041,16 +15062,14 @@
           '<span class="restaurant-other-photos-label">Albums · ' + info.albums.length + '</span>' +
           albumsHtml +
         '</div>' +
-        '<div class="restaurant-other-photos-section">' +
-          '<span class="restaurant-other-photos-label">Seen Live' + (concerts.length ? ' · ' + concerts.length : '') + '</span>' +
+        ((concerts.length || !guestViewEnabled) ?
+        '<div class="restaurant-other-photos-section artist-live-section' + (concerts.length || formOpen ? '' : ' quiet') + '">' +
+          '<div class="artist-live-head"><span class="restaurant-other-photos-label">Seen Live' + (concerts.length ? ' · ' + concerts.length : '') + '</span>' +
+            (concerts.length ? '' : addBtn) + '</div>' +
           concertsHtml +
-          (guestViewEnabled ? '' :
-            '<div class="artist-concert-form">' +
-              '<input type="date" class="restaurant-edit-input" id="artist-concert-date" aria-label="Date seen live">' +
-              '<input type="text" class="restaurant-edit-input" id="artist-concert-location" placeholder="Where (venue, city)" aria-label="Location" autocomplete="off">' +
-              '<button class="btn-primary" type="button" id="artist-concert-add-btn">Add</button>' +
-            '</div>') +
-        '</div>' +
+          (concerts.length ? addBtn : '') +
+          concertForm +
+        '</div>' : '') +
       '</div>';
 
     artistDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeArtistDetailsPanel);
@@ -15067,17 +15086,27 @@
       saveArtistProgress();
       renderArtistDetailsContent();
     }));
+    const openBtn = artistDetailsPanelInner.querySelector('[data-concert-open]');
+    if (openBtn) openBtn.addEventListener('click', () => {
+      artistConcertFormKey = row.key;
+      renderArtistDetailsContent();
+      const d = artistDetailsPanelInner.querySelector('#artist-concert-date');
+      if (d){ try{ d.focus(); }catch(e){} }
+    });
+    if (!formOpen) return;
     const addConcert = () => {
       const date = artistDetailsPanelInner.querySelector('#artist-concert-date').value;
       const location = artistDetailsPanelInner.querySelector('#artist-concert-location').value.trim();
       if (!date){ showToast('Pick the date you saw them'); return; }
       if (!location){ showToast('Add where you saw them'); return; }
       row.concerts.push({ id: tripNewId('gig'), date, location });
+      artistConcertFormKey = null;
       saveArtistProgress();
       renderArtistDetailsContent();
       showToast('Added to Seen Live');
     };
     artistDetailsPanelInner.querySelector('#artist-concert-add-btn').addEventListener('click', addConcert);
+    artistDetailsPanelInner.querySelector('#artist-concert-cancel-btn').addEventListener('click', () => { artistConcertFormKey = null; renderArtistDetailsContent(); });
     artistDetailsPanelInner.querySelector('#artist-concert-location').addEventListener('keydown', (e) => { if (e.key === 'Enter') addConcert(); });
   }
 
