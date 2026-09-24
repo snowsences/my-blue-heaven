@@ -2770,26 +2770,27 @@
   .trip-actions-row .btn-ghost, .trip-actions-row .btn-primary{ white-space: nowrap; }
   .trips-view-toggle .view-toggle-btn{ padding-left: 12px; padding-right: 12px; }
   /* MapLibre's controls, in the app's colors */
-  .tmap-map .maplibregl-ctrl-group, .trip-world-map .maplibregl-ctrl-group{ background: rgba(15,33,36,0.9); border: 1px solid var(--panel-line); box-shadow: none; }
-  .tmap-map .maplibregl-ctrl-group button + button, .trip-world-map .maplibregl-ctrl-group button + button{ border-top-color: var(--panel-line); }
-  .tmap-map .maplibregl-ctrl-icon, .trip-world-map .maplibregl-ctrl-icon{ filter: invert(1) opacity(0.8); }
-  .tmap-map .maplibregl-ctrl-attrib, .trip-world-map .maplibregl-ctrl-attrib{ background: rgba(15,33,36,0.85); color: var(--chalk-dim); }
-  .tmap-map .maplibregl-ctrl-attrib a, .trip-world-map .maplibregl-ctrl-attrib a{ color: var(--chalk); }
-  .tmap-map .maplibregl-ctrl-attrib-button, .trip-world-map .maplibregl-ctrl-attrib-button{ filter: invert(1); }
+  .tmap-map .maplibregl-ctrl-group{ background: rgba(15,33,36,0.9); border: 1px solid var(--panel-line); box-shadow: none; }
+  .tmap-map .maplibregl-ctrl-group button + button{ border-top-color: var(--panel-line); }
+  .tmap-map .maplibregl-ctrl-icon{ filter: invert(1) opacity(0.8); }
+  .tmap-map .maplibregl-ctrl-attrib{ background: rgba(15,33,36,0.85); color: var(--chalk-dim); }
+  .tmap-map .maplibregl-ctrl-attrib a{ color: var(--chalk); }
+  .tmap-map .maplibregl-ctrl-attrib-button{ filter: invert(1); }
   .trip-actions-spacer{ flex: 1; }
-  .trip-world{ display: grid; gap: 12px; }
+  /* World view: the Trips page becomes exactly one screen — the toolbar, then
+     the globe filling everything down to the tab bar, edge to edge. */
+  #page-trips.trips-world .page-content{ height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+  #page-trips.trips-world .trip-actions-row{ flex: none; }
+  /* Pinned to the window, so it runs exactly edge to edge: from just under
+     the toolbar (--trip-world-top, measured in the script) to the bottom. */
+  .trip-world{ position: fixed; left: 0; right: 0; top: var(--trip-world-top, 180px); bottom: 0; z-index: 1; }
   .trip-world[hidden]{ display: none; }
-  .trip-world-years{ display: flex; flex-wrap: wrap; gap: 8px; }
-  .trip-world-year{ padding: 5px 12px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--panel-line); color: var(--chalk-dim); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
-  .trip-world-year.on{ background: var(--amber); border-color: transparent; color: var(--ink); }
-  .trip-world-stats{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .trip-world-stat{ padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--panel-line); }
-  .trip-world-stat b{ display: block; font-size: 22px; font-weight: 800; line-height: 1.1; color: var(--amber); font-variant-numeric: tabular-nums; }
-  .trip-world-stat span{ font-size: 12px; color: var(--chalk-dim); }
+  .trip-world-map[data-offline]::after{ content: 'The globe needs an internet connection'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(241,236,222,0.55); font-size: 14px; }
+  .trip-world-map .maplibregl-canvas:focus{ outline: none; }
   /* Deep space behind the globe: three layers of stars at different sizes and
      spacings (so the pattern never visibly repeats) over a dark blue glow. */
   .trip-world-map{
-    height: clamp(320px, 62vh, 620px); border-radius: 18px; overflow: hidden; border: 1px solid var(--panel-line);
+    position: relative; height: 100%; overflow: hidden;
     background-color: #03060D;
     background-image:
       radial-gradient(1.2px 1.2px at 12% 18%, rgba(255,255,255,0.95), transparent 70%),
@@ -2806,19 +2807,6 @@
       radial-gradient(ellipse at 50% 45%, rgba(40,70,130,0.35) 0%, rgba(10,20,45,0.2) 45%, transparent 75%);
     background-size: 173px 173px, 173px 173px, 173px 173px, 173px 173px, 251px 251px, 251px 251px, 251px 251px, 331px 331px, 331px 331px, 331px 331px, 331px 331px, 100% 100%;
   }
-  .trip-world-legend{ display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--chalk-dim); }
-  .trip-world-legend:empty{ display: none; }
-  .trip-world-legend i{ display: inline-block; width: 16px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; box-shadow: 0 0 0 1px rgba(241,236,222,0.25); }
-  .trip-world-note{ margin: 0; font-size: 13px; color: var(--chalk-dim); }
-  .trip-world-hint{ margin: 0; font-size: 13px; color: var(--chalk-dim); text-align: center; }
-  .trip-world-trip{ width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; color: var(--chalk); font-family: 'Figtree', sans-serif; text-align: left; cursor: pointer; }
-  .trip-world-thumb{ flex: none; width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--bg-2); }
-  .trip-world-thumb.ph{ display: flex; align-items: center; justify-content: center; font-size: 24px; }
-  .trip-world-text{ display: grid; gap: 2px; min-width: 0; }
-  .trip-world-text b{ font-size: 15px; }
-  .trip-world-date{ font-size: 12.5px; font-weight: 700; color: var(--amber); }
-  .trip-world-meta{ font-size: 12.5px; color: var(--chalk-dim); }
-  .trip-world-go{ margin-left: auto; font-size: 20px; color: var(--chalk-dim); }
   @media (prefers-reduced-motion: reduce){
     .tmap-overlay, .tmap-stop-num{ transition: none; }
   }
@@ -2849,6 +2837,7 @@
   @media (max-width: 768px){
     .trip-year-bar{ top: env(safe-area-inset-top, 0px); }
     body.export-reminder-active .trip-year-bar{ top: calc(40px + env(safe-area-inset-top, 0px)); }
+    .trip-world{ bottom: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom, 0px)); } /* down to the tab bar */
   }
   @media (prefers-reduced-motion: reduce){ .trip-year-dot{ transition: none; } }
   /* owner-only bits vanish in Guest View, which is read-only */
@@ -4872,7 +4861,7 @@
     #park-details-panel, #artist-details-panel, #hike-full-list-panel, #dish-full-list-panel{
       border-left: none;
       box-shadow: 60px 0 0 0 var(--panel);
-      transition: transform 0.28s cubic-bezier(0.55, 0, 0.9, 0.45), visibility 0s linear 0.28s, --panel-tint 0.45s ease;
+      transition: transform 0.3s cubic-bezier(0.37, 0, 0.63, 1), visibility 0s linear 0.3s, --panel-tint 0.45s ease; /* closing: easeInOutSine */
     }
     #details-panel.open, #restaurant-details-panel.open, #hike-details-panel.open, #road-details-panel.open,
     #park-details-panel.open, #artist-details-panel.open, #hike-full-list-panel.open, #dish-full-list-panel.open{
@@ -5747,12 +5736,7 @@
       <nav class="trip-year-bar" id="trip-year-bar" aria-label="Jump to a year" hidden><div class="trip-year-rail" id="trip-year-rail"></div></nav>
       <div class="trip-grid" id="trip-grid"></div>
       <div class="trip-world" id="trip-world" hidden>
-        <div class="trip-world-years" id="trip-world-years"></div>
-        <div class="trip-world-stats" id="trip-world-stats"></div>
-        <div class="trip-world-map" id="trip-world-map"></div>
-        <div class="trip-world-legend" id="trip-world-legend"></div>
-        <p class="trip-world-note" id="trip-world-note" hidden></p>
-        <div class="trip-world-card" id="trip-world-card"></div>
+        <div class="trip-world-map" id="trip-world-map" role="img" aria-label="A globe"></div>
       </div>
       <p class="restaurant-course-empty" id="trip-empty-message" style="display:none;">No trips yet — add one with + New.</p>
     </div>
@@ -22347,13 +22331,11 @@
   // library (MapLibre) and the map data (OpenFreeMap) need no account or
   // key, and the library only downloads the first time a map is shown.
   const MAPLIBRE_BASE = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/';
-  const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
+  const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json';
   const TOPOJSON_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js';
   // The classic Google Maps palette, from before its 2023 redesign: light grey
   // land, that familiar sky-blue water, soft green parks, yellow highways.
   const MAP_LAND = '#F5F5F5', MAP_WATER = '#AADAFF', MAP_PARK = '#C5E8C5', MAP_HIGHWAY = '#FDE293';
-  // Route colors by year, newest first — strong enough to read on both the light land and the blue water.
-  const TRIP_YEAR_COLORS = ['#E0891A', '#D2453B', '#2E9E5B', '#7B4FC9', '#1F7FB8', '#C2407E', '#8B5A2B', '#0F7C80'];
 
   function loadScriptOnce(src, globalName){
     if (window[globalName]) return Promise.resolve(window[globalName]);
@@ -22997,13 +22979,18 @@
   }
 
   // ----- the World view on the Trips tab -----
+  // Just the globe: every country you've visited in amber, nothing else — no
+  // labels, routes or controls. It fills the screen between the toolbar and
+  // the tab bar, turns slowly on its own, and pauses while you spin or zoom it.
   const TRIPS_VIEW_KEY = 'mbh-trips-view';
   let tripsViewMode = 'timeline';
   try{ if (localStorage.getItem(TRIPS_VIEW_KEY) === 'world') tripsViewMode = 'world'; }catch(e){ /* per-device preference only */ }
-  let worldYear = 'all';
-  let worldMap = null, worldSelId = null, worldCountries = null, worldRefreshTimer = null, worldFitted = false;
+  let worldMap = null, worldCountries = null, worldBorders = null, worldRefreshTimer = null, worldFitted = false;
   const tripWorldEl = document.getElementById('trip-world');
+  const tripWorldMapEl = document.getElementById('trip-world-map');
+  const tripsPageEl = document.getElementById('page-trips');
   const tripViewBtns = document.querySelectorAll('[data-trips-view]');
+  const WORLD_OCEAN = '#1D3A4F', WORLD_LAND = '#D6D1C7', WORLD_VISITED = '#EDA93F';
 
   function setTripsView(mode){
     tripsViewMode = mode;
@@ -23013,10 +23000,12 @@
   function applyTripsView(){
     const world = tripsViewMode === 'world';
     tripViewBtns.forEach(b => { const on = b.dataset.tripsView === tripsViewMode; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+    tripsPageEl.classList.toggle('trips-world', world); // the page becomes one screen: toolbar, then the globe
     tripGridEl.hidden = world;
     tripWorldEl.hidden = !world;
     if (world){
       tripEmptyMsg.style.display = 'none';
+      if (tripsPageEl.classList.contains('active')) window.scrollTo(0, 0);
       renderTripWorld();
       tripWorldPinAll();
     } else {
@@ -23037,176 +23026,177 @@
     try{ for (const t of tripSorted()){ if (tripsViewMode !== 'world') break; await ensureTripPins(t); } }
     finally{ tripWorldPinAll.running = false; }
   }
-
-  function tripWorldData(){
-    const all = tripSorted().map(t => {
-      const linked = tripLinked(t);
-      const stops = tripStops(t, linked);
-      return { t, linked, stops, pts: stops.filter(tripStopPinned), year: String(t.startDate || '').slice(0, 4) };
+  function tripWorldPins(){
+    const trips = [];
+    tripRows.forEach(t => {
+      const pts = tripStops(t, tripLinked(t)).filter(tripStopPinned).map(s => s.geo);
+      if (pts.length) trips.push(pts);
     });
-    const years = Array.from(new Set(all.map(x => x.year).filter(Boolean))).sort().reverse();
-    const colorOf = (y) => TRIP_YEAR_COLORS[Math.max(0, years.indexOf(y)) % TRIP_YEAR_COLORS.length];
-    const shown = all.filter(x => worldYear === 'all' || x.year === worldYear);
-    return { all, years, colorOf, shown };
+    return trips;
   }
+  function worldGlobeStyle(){
+    return {
+      version: 8,
+      projection: { type: 'globe' },
+      sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 4, 0.6, 6, 0] },
+      sources: {},
+      layers: [{ id: 'ocean', type: 'background', paint: { 'background-color': WORLD_OCEAN } }]
+    };
+  }
+  // The globe starts just under the toolbar row (which doesn't move — this page never scrolls in World view).
+  function tripWorldPlace(){
+    const row = tripsPageEl.querySelector('.trip-actions-row');
+    if (row && row.offsetParent) tripWorldEl.style.setProperty('--trip-world-top', Math.round(row.getBoundingClientRect().bottom + 14) + 'px');
+  }
+  window.addEventListener('resize', () => { if (tripsViewMode === 'world') tripWorldPlace(); });
+  const worldVisible = () => tripsViewMode === 'world' && tripsPageEl.classList.contains('active') && !!tripWorldMapEl.offsetWidth;
 
   async function renderTripWorld(){
-    const d = tripWorldData();
-    if (worldYear !== 'all' && d.years.indexOf(worldYear) === -1) worldYear = 'all';
-    const onMap = d.shown.filter(x => x.pts.length);
-    const ccs = new Set(), places = new Set();
-    onMap.forEach(x => x.pts.forEach(s => { if (s.geo.cc) ccs.add(s.geo.cc); places.add(s.geo.lat.toFixed(2) + ',' + s.geo.lng.toFixed(2)); }));
-    const chip = (val, label) => '<button type="button" class="chip-btn trip-world-year' + (worldYear === val ? ' on' : '') + '" data-world-year="' + escapeAttr(val) + '" aria-pressed="' + (worldYear === val) + '">' + escapeHtml(label) + '</button>';
-    document.getElementById('trip-world-years').innerHTML = chip('all', 'All years') + d.years.map(y => chip(y, y)).join('');
-    document.getElementById('trip-world-stats').innerHTML =
-      '<div class="trip-world-stat"><b>' + d.shown.length + '</b><span>' + (d.shown.length === 1 ? 'trip' : 'trips') + '</span></div>' +
-      '<div class="trip-world-stat"><b>' + ccs.size + '</b><span>' + (ccs.size === 1 ? 'country' : 'countries') + '</span></div>' +
-      '<div class="trip-world-stat"><b>' + places.size + '</b><span>' + (places.size === 1 ? 'place' : 'places') + '</span></div>';
-    const legendYears = (worldYear === 'all' ? d.years : [worldYear]).filter(y => onMap.some(x => x.year === y));
-    document.getElementById('trip-world-legend').innerHTML = legendYears.map(y => '<span><i style="background:' + d.colorOf(y) + '"></i>' + escapeHtml(y) + '</span>').join('');
-    const note = document.getElementById('trip-world-note');
-    const missing = d.shown.length - onMap.length;
-    note.textContent = !d.all.length ? 'No trips yet — add one with + New.'
-      : missing ? (tripWorldPinAll.running ? 'Putting your trips on the map…' : otdPlural(missing, 'trip isn’t', 'trips aren’t') + ' on the map yet — trips need places, or linked restaurants or hikes.')
-      : '';
-    note.hidden = !note.textContent;
-    if (worldSelId && !onMap.some(x => x.t.id === worldSelId)) worldSelId = null;
-    tripWorldCard(d);
-
-    let lib;
-    try{ lib = await loadMapLibre(); }
-    catch(e){ note.textContent = 'The map needs an internet connection.'; note.hidden = false; return; }
-    const mapEl = document.getElementById('trip-world-map');
-    if (tripsViewMode !== 'world' || !mapEl.offsetWidth) return; // not on screen — drawn when the Trips tab is shown
+    tripWorldPlace();
+    if (!worldVisible()) return; // drawn when the Trips tab is shown
+    let lib, countries;
+    try{ lib = await loadMapLibre(); countries = await tripWorldCountries(); }
+    catch(e){ tripWorldMapEl.dataset.offline = '1'; return; }
+    delete tripWorldMapEl.dataset.offline;
+    if (!worldVisible()) return;
+    const trips = tripWorldPins();
+    const visited = tripWorldVisited(trips, countries);
+    tripWorldMapEl.setAttribute('aria-label', visited.size ? 'A globe with the ' + otdPlural(visited.size, 'country', 'countries') + ' you’ve visited highlighted' : 'A globe');
+    const data = { type: 'FeatureCollection', features: countries.map((f, i) => ({ type: 'Feature', id: i, geometry: f.geometry, properties: { v: visited.has(f) ? 1 : 0 } })) };
     if (!worldMap){
-      worldMap = new lib.Map({ container: mapEl, style: tripMapStyle(true), attributionControl: { compact: true }, fadeDuration: 0, maxZoom: 12, center: [0, 25], zoom: 1 });
-      worldMap.addControl(new lib.NavigationControl({ showCompass: false }), 'bottom-right');
+      worldMap = new lib.Map({ container: tripWorldMapEl, style: worldGlobeStyle(), attributionControl: false, fadeDuration: 0, maxZoom: 4.5, center: [-40, 25], zoom: 1 }); // world copies on: shapes unwrapped past ±180° are drawn back in place
+      worldMap.dragRotate.disable();            // north stays up — spinning the globe is dragging it
+      worldMap.touchZoomRotate.disableRotation();
+      worldMap.keyboard.disableRotation();
       trackMapReady(worldMap);
-      worldMap.on('click', (e) => {
-        if (!worldMap.getLayer('world-points')) return;
-        const hits = worldMap.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ['world-points', 'world-lines'] });
-        worldSelId = hits.length ? hits[0].properties.tripId : null;
-        tripWorldHighlight();
-        tripWorldCard(tripWorldData());
-      });
+      // Anything you do to the globe (press, drag, pinch, scroll) pauses the slow turn for a few seconds.
+      const pauseSpin = () => { worldSpinPausedUntil = Date.now() + 5000; };
+      ['mousedown', 'touchstart', 'wheel'].forEach(ev => worldMap.on(ev, pauseSpin));
+      worldMap.on('movestart', (e) => { if (e.originalEvent) pauseSpin(); });
+      worldMap.on('move', (e) => { if (e.originalEvent) pauseSpin(); });
     } else {
       worldMap.resize();
     }
-    const lines = [], points = [];
-    onMap.forEach(x => {
-      const color = d.colorOf(x.year);
-      if (x.pts.length > 1) lines.push({ type: 'Feature', properties: { tripId: x.t.id, color }, geometry: { type: 'LineString', coordinates: x.pts.map(s => [s.geo.lng, s.geo.lat]) } });
-      x.pts.forEach(s => points.push({ type: 'Feature', properties: { tripId: x.t.id, color }, geometry: { type: 'Point', coordinates: [s.geo.lng, s.geo.lat] } }));
-    });
-    const visited = await tripWorldVisitedCountries(onMap);
     whenMapReady(worldMap, () => {
-      setGeoSource(worldMap, 'world-visited', visited);
-      setGeoSource(worldMap, 'world-lines', { type: 'FeatureCollection', features: lines });
-      setGeoSource(worldMap, 'world-points', { type: 'FeatureCollection', features: points });
-      if (!worldMap.getLayer('world-visited')){
-        worldMap.addLayer({ id: 'world-visited', type: 'fill', source: 'world-visited', paint: { 'fill-color': '#F2B654', 'fill-opacity': 0.32 } }, 'borders-state');
-        worldMap.addLayer({ id: 'world-lines-casing', type: 'line', source: 'world-lines', layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#0F2124', 'line-width': 4.5, 'line-opacity': 0.35 } });
-        worldMap.addLayer({ id: 'world-lines', type: 'line', source: 'world-lines', layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': ['get', 'color'], 'line-width': 2.2, 'line-opacity': 0.95 } });
-        worldMap.addLayer({ id: 'world-points', type: 'circle', source: 'world-points',
-          paint: { 'circle-color': ['get', 'color'], 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 5], 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 1.2 } });
-        ['world-points', 'world-lines'].forEach(id => {
-          worldMap.on('mouseenter', id, () => { worldMap.getCanvas().style.cursor = 'pointer'; });
-          worldMap.on('mouseleave', id, () => { worldMap.getCanvas().style.cursor = ''; });
-        });
+      setGeoSource(worldMap, 'countries', data);
+      setGeoSource(worldMap, 'borders', { type: 'Feature', properties: {}, geometry: worldBorders });
+      if (!worldMap.getLayer('land')){
+        worldMap.addLayer({ id: 'land', type: 'fill', source: 'countries',
+          paint: { 'fill-color': ['case', ['==', ['get', 'v'], 1], WORLD_VISITED, WORLD_LAND], 'fill-antialias': false } });
+        worldMap.addLayer({ id: 'borders', type: 'line', source: 'borders', layout: { 'line-join': 'round' },
+          paint: { 'line-color': 'rgba(255,255,255,0.55)', 'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.3, 4, 0.9] } });
       }
-      tripWorldHighlight();
-      tripWorldFit(onMap);
+      if (!worldFitted) tripWorldFit(trips);
+      worldSpinStart();
     });
   }
-  function tripWorldHighlight(){
-    if (!worldMap || !worldMap.getLayer('world-lines')) return;
-    const sel = worldSelId || '';
-    worldMap.setPaintProperty('world-lines', 'line-width', ['case', ['==', ['get', 'tripId'], sel], 4.5, 2.2]);
-    worldMap.setPaintProperty('world-points', 'circle-radius', ['case', ['==', ['get', 'tripId'], sel], 6.5, ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 5]]);
-  }
-  // Zooms to fit every trip shown. Trips spread around the world get the
-  // whole globe, turned to face the middle of them — one point per trip, so
-  // a trip with many stops doesn't pull the view, and kept to a natural
-  // latitude rather than looking down on a pole.
-  function tripWorldFit(onMap){
-    const all = [];
-    onMap.forEach(x => x.pts.forEach(s => all.push(s.geo)));
-    if (!all.length) return;
+  // Faces the middle of your trips (one point per trip, kept to a natural
+  // latitude), with the whole globe filling most of the screen.
+  function tripWorldFit(trips){
+    worldFitted = true;
     const rad = Math.PI / 180;
     const mean = (pts) => {
       let vx = 0, vy = 0, vz = 0;
       pts.forEach(p => { vx += Math.cos(p.lat * rad) * Math.cos(p.lng * rad); vy += Math.cos(p.lat * rad) * Math.sin(p.lng * rad); vz += Math.sin(p.lat * rad); });
       return { lng: Math.atan2(vy, vx) / rad, lat: Math.atan2(vz, Math.sqrt(vx * vx + vy * vy)) / rad };
     };
-    const center = mean(onMap.map(x => mean(x.pts.map(s => s.geo))));
-    const spread = Math.max.apply(null, all.map(p => geoDistanceKm(center, p)));
-    const anim = worldFitted && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    worldFitted = true;
-    if (all.length > 1 && spread <= 3500){
-      const b = new maplibregl.LngLatBounds();
-      all.forEach(p => b.extend([p.lng, p.lat]));
-      worldMap.fitBounds(b, { padding: 50, maxZoom: 6, duration: anim ? 700 : 0 });
-      return;
-    }
-    const lat = Math.max(-25, Math.min(40, center.lat));
-    // The globe's on-screen radius is 512·2^zoom / (2π·cos(lat)); pick the zoom that makes it fill ~85% of the box.
-    const el = worldMap.getContainer();
-    const box = Math.min(el.clientWidth, el.clientHeight);
-    const zoom = all.length === 1 ? 4 : Math.log2(0.85 * box * Math.PI * Math.cos(lat * rad) / 512);
-    worldMap.easeTo({ center: [center.lng, lat], zoom, duration: anim ? 700 : 0 });
+    const center = trips.length ? mean(trips.map(mean)) : { lng: -40, lat: 25 };
+    const lat = Math.max(-20, Math.min(35, center.lat));
+    worldMap.jumpTo({ center: [center.lng, lat], zoom: tripWorldFitZoom(lat) });
+    worldMap.setMinZoom(tripWorldFitZoom(lat) - 0.4);
   }
-  function tripWorldCard(d){
-    const el = document.getElementById('trip-world-card');
-    const x = worldSelId ? d.all.find(y => y.t.id === worldSelId) : null;
-    if (!x){ el.innerHTML = '<p class="trip-world-hint">Tap a route to see the trip.</p>'; return; }
-    const gallery = tripGallery(x.t, x.linked);
-    const cover = tripCoverUrl(x.t, gallery);
-    const parts = [otdPlural(x.stops.length, 'stop', 'stops')];
-    if (x.linked.visits.length) parts.push(otdPlural(x.linked.visits.length, 'meal', 'meals'));
-    if (x.linked.hikes.length) parts.push(otdPlural(x.linked.hikes.length, 'hike', 'hikes'));
-    el.innerHTML = '<button type="button" class="trip-world-trip" data-trip-id="' + escapeAttr(x.t.id) + '">' +
-      (cover ? '<img class="trip-world-thumb" src="' + escapeAttr(cloudinaryThumbUrl(cover, 160)) + '" alt="">' : '<span class="trip-world-thumb ph" aria-hidden="true">🧳</span>') +
-      '<span class="trip-world-text"><b>' + escapeHtml(x.t.name || 'Untitled trip') + '</b><span class="trip-world-date">' + escapeHtml(tripDateLabel(x.t)) + '</span>' +
-      '<span class="trip-world-meta">' + escapeHtml(parts.join(' · ')) + '</span></span><span class="trip-world-go" aria-hidden="true">›</span></button>';
+  // The globe's on-screen radius is 512·2^zoom / (2π·cos(lat)); this is the zoom that makes it 82% of the smaller side.
+  function tripWorldFitZoom(lat){
+    const box = Math.min(tripWorldMapEl.clientWidth, tripWorldMapEl.clientHeight);
+    return Math.log2(0.82 * box * Math.PI * Math.cos(lat * Math.PI / 180) / 512);
   }
-  document.getElementById('trip-world-card').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-trip-id]');
-    if (b) openTrip(b.dataset.tripId);
-  });
-  document.getElementById('trip-world-years').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-world-year]');
-    if (!b) return;
-    worldYear = b.dataset.worldYear;
-    worldSelId = null;
-    renderTripWorld();
-  });
 
-  // Visited countries, lightly shaded on the globe. Matched by country name
-  // first, then by which country outline contains the pin. The outlines are
-  // a small public world map, loaded only for this view.
+  // A slow, steady turn while you're just looking at it.
+  let worldSpinRAF = null, worldSpinLast = 0, worldSpinPausedUntil = 0;
+  function worldSpinStart(){
+    if (worldSpinRAF || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    worldSpinLast = performance.now();
+    const step = (now) => {
+      const dt = Math.min(64, now - worldSpinLast);
+      worldSpinLast = now;
+      if (!worldMap || !worldVisible()){ worldSpinRAF = null; return; } // stops when the globe is out of sight; the next render restarts it
+      if (Date.now() > worldSpinPausedUntil && !worldMap.isMoving()){
+        const c = worldMap.getCenter();
+        worldMap.setCenter([c.lng + dt * 0.003, c.lat]); // about 3° a second
+      }
+      worldSpinRAF = requestAnimationFrame(step);
+    };
+    worldSpinRAF = requestAnimationFrame(step);
+  }
+
+  async function tripWorldCountries(){
+    if (!worldCountries){
+      const topo = await loadScriptOnce(TOPOJSON_URL, 'topojson').then(() => fetch(WORLD_ATLAS_URL)).then(r => { if (!r.ok) throw new Error('world map'); return r.json(); });
+      worldCountries = topojson.feature(topo, topo.objects.countries).features.map(f => Object.assign({}, f, { geometry: geoUnwrap(f.geometry, true) }));
+      // Only the borders two countries share — no coastline strokes.
+      worldBorders = geoUnwrap(topojson.mesh(topo, topo.objects.countries, (a, b) => a !== b), false);
+    }
+    return worldCountries;
+  }
+  // The world outlines are stitched across the date line for globe renderers
+  // that work on a sphere (Russia runs 170°E → -170°), but MapLibre draws
+  // shapes on a flat longitude grid, where that jump wraps the wrong way
+  // round the world. Unwrapping keeps each outline's longitudes continuous
+  // (past ±180° when needed, which MapLibre handles), and a ring that goes
+  // all the way round a pole (Antarctica) is closed through that pole.
+  function geoUnwrapLine(line){
+    const out = [];
+    let off = 0;
+    line.forEach((pt, i) => {
+      if (i){ const d = pt[0] - line[i - 1][0]; if (d > 180) off -= 360; else if (d < -180) off += 360; }
+      out.push([pt[0] + off, pt[1]]);
+    });
+    return out;
+  }
+  function geoUnwrapRing(ring){
+    let out = geoUnwrapLine(ring);
+    if (Math.abs(out[out.length - 1][0] - out[0][0]) > 180){
+      // Circles a pole: the data already detours through the pole at the date line, which unwrapping folds
+      // back on itself — drop those pole points and close the ring through the pole below instead.
+      const trimmed = ring.filter(p => Math.abs(p[1]) < 89.9);
+      if (trimmed.length >= 3) out = geoUnwrapLine(trimmed);
+    }
+    // Slide the whole outline by full turns so it starts inside -180°..180° (unwrapping can leave it a world away).
+    const minX = Math.min.apply(null, out.map(p => p[0]));
+    const turns = minX < -180 ? Math.ceil((-180 - minX) / 360) : minX >= 180 ? -Math.floor((minX + 180) / 360) : 0;
+    if (turns) out = out.map(p => [p[0] + turns * 360, p[1]]);
+    const span = out[out.length - 1][0] - out[0][0];
+    if (Math.abs(span) > 180){ // circles a pole
+      const pole = out.reduce((sum, p) => sum + p[1], 0) < 0 ? -90 : 90;
+      out.push([out[out.length - 1][0], pole], [out[0][0], pole], out[0].slice());
+    }
+    return out;
+  }
+  function geoUnwrap(g, isArea){
+    if (!g) return g;
+    if (g.type === 'Polygon') return { type: 'Polygon', coordinates: g.coordinates.map(geoUnwrapRing) };
+    if (g.type === 'MultiPolygon') return { type: 'MultiPolygon', coordinates: g.coordinates.map(poly => poly.map(geoUnwrapRing)) };
+    if (g.type === 'LineString') return { type: 'LineString', coordinates: geoUnwrapLine(g.coordinates) };
+    if (g.type === 'MultiLineString') return { type: 'MultiLineString', coordinates: g.coordinates.map(geoUnwrapLine) };
+    return g;
+  }
+
+  // Visited countries: matched by country name first, then by which country
+  // outline contains the pin. The outlines are Natural Earth's public-domain
+  // world map, loaded only for this view.
   const WORLD_NAME_ALIASES = { 'united states': 'united states of america', 'czech republic': 'czechia', 'south korea': 's korea', 'republic of korea': 's korea', 'north korea': 'n korea',
     'bosnia and herzegovina': 'bosnia and herz', 'dominican republic': 'dominican rep', 'democratic republic of the congo': 'dem rep congo', 'central african republic': 'central african rep',
     'south sudan': 's sudan', 'equatorial guinea': 'eq guinea', 'solomon islands': 'solomon is', 'falkland islands': 'falkland is', 'ivory coast': "côte d'ivoire", 'eswatini': 'eswatini', 'north macedonia': 'macedonia' };
-  async function tripWorldVisitedCountries(onMap){
-    const empty = { type: 'FeatureCollection', features: [] };
-    if (!onMap.length) return empty;
-    try{
-      if (!worldCountries){
-        const topo = await loadScriptOnce(TOPOJSON_URL, 'topojson').then(() => fetch(WORLD_ATLAS_URL)).then(r => { if (!r.ok) throw new Error('world map'); return r.json(); });
-        worldCountries = topojson.feature(topo, topo.objects.countries).features;
-      }
-    }catch(e){ return empty; }
+  function tripWorldVisited(trips, countries){
     const norm = (s) => String(s || '').toLowerCase().replace(/\./g, '').trim();
-    const byName = new Map(worldCountries.map(f => [norm(f.properties.name), f]));
+    const byName = new Map(countries.map(f => [norm(f.properties.name), f]));
     const hit = new Set();
-    onMap.forEach(x => x.pts.forEach(s => {
-      const n = norm(s.geo.country);
-      const f = byName.get(WORLD_NAME_ALIASES[n] || n) || worldCountries.find(c => geoInFeature(s.geo, c));
+    trips.forEach(pts => pts.forEach(g => {
+      const n = norm(g.country);
+      const f = byName.get(WORLD_NAME_ALIASES[n] || n) || countries.find(c => geoInFeature(g, c));
       if (f) hit.add(f);
     }));
-    return { type: 'FeatureCollection', features: Array.from(hit) };
+    return hit;
   }
   function geoInRing(p, ring){
     let inside = false;
