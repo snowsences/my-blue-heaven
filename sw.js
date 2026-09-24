@@ -2,11 +2,11 @@
 // and skips re-downloading the libraries on repeat visits.
 //  - The app's own files (same origin): network first, so an online load
 //    always gets the latest version — the cached copy is only used offline.
-//  - Versioned libraries (Firebase SDK, SheetJS): cache first. A given URL
+//  - Versioned libraries (Firebase SDK, SheetJS, the map library): cache first. A given URL
 //    never changes, so a cached copy is never stale.
 //  - Google Fonts: served from cache, refreshed in the background.
 // Everything else — Firestore, sign-in, Last.fm, Cloudinary — isn't touched.
-const CACHE = 'mbh-v1';
+const CACHE = 'mbh-v2';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192-v2.png', './favicon-32-v2.png'];
 
 self.addEventListener('install', (event) => {
@@ -23,7 +23,8 @@ self.addEventListener('activate', (event) => {
 
 function isVersionedLibrary(url){
   return (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/'))
-    || url.hostname === 'cdn.sheetjs.com';
+    || url.hostname === 'cdn.sheetjs.com'
+    || (url.hostname === 'cdn.jsdelivr.net' && /^\/npm\/[^/]+@\d/.test(url.pathname)); // the map library and world outlines, pinned versions
 }
 
 function isFont(url){

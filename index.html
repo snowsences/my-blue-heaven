@@ -2692,6 +2692,108 @@
   .trip-gtile{ position: relative; }
   .trip-gimg{ width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; }
   .trip-gx{ position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; padding: 0; border: none; border-radius: 999px; background: rgba(10, 22, 24, 0.75); color: var(--chalk); font-size: 12px; cursor: pointer; }
+  /* ---------- TRIP MAPS (see TRIP MAPS in the script) ---------- */
+  .trip-map-block{ display: grid; gap: 10px; margin-top: 16px; }
+  .trip-map-overview{ display: block; width: 100%; padding: 0; border: 1px solid var(--panel-line); border-radius: 16px; overflow: hidden; background: #1E3A3E; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .trip-map-overview:focus-visible{ outline: 2px solid var(--amber); outline-offset: 2px; }
+  .trip-map-overview.empty{ cursor: default; }
+  .trip-map-slot{ position: relative; display: block; height: clamp(170px, 42vw, 260px); }
+  .trip-map-overview.empty .trip-map-slot{ height: 88px; display: flex; align-items: center; justify-content: center; }
+  .trip-map-slot .trip-map-canvas{ position: absolute; inset: 0; } /* beats MapLibre's own position: relative on map containers */
+  .trip-map-overview .tmap-stop{ pointer-events: none; }
+  .trip-map-msg{ font-size: 13px; color: var(--chalk-dim); }
+  .trip-map-cap{ display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; background: var(--panel); font-size: 12.5px; color: var(--chalk-dim); }
+  .trip-map-cap b{ color: var(--chalk); font-size: 13px; }
+  .trip-map-overview.empty .trip-map-expand{ display: none; }
+  .trip-map-credit{ margin-top: -4px; text-align: right; font-size: 10.5px; color: rgba(241,236,222,0.45); }
+  .trip-map-credit a{ color: inherit; }
+  .trip-stop-chips{ display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .trip-stop-chips::-webkit-scrollbar{ display: none; }
+  .trip-stop-chip{ flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 5px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--panel-line); color: var(--chalk); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
+  .trip-stop-chip:hover{ border-color: rgba(232,163,61,0.5); }
+  .trip-stop-num{ flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--chalk); color: var(--ink); font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+  .trip-stop-dates{ color: var(--chalk-dim); font-weight: 500; }
+  .trip-needs-pin{ justify-self: start; font-size: 13px; color: var(--amber); border-color: rgba(232,163,61,0.5); }
+  /* A stop on the map: the numbered circle sits exactly on the place, its name to the right. */
+  .tmap-stop{ position: relative; width: 24px; height: 24px; padding: 0; border: none; background: none; font-family: 'Figtree', sans-serif; cursor: pointer; }
+  .tmap-stop-num{ position: absolute; inset: 0; border-radius: 50%; background: var(--chalk); color: var(--ink); border: 2px solid var(--bg-2); box-shadow: 0 2px 6px rgba(0,0,0,0.45); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; transition: transform 0.15s ease; }
+  .tmap-stop-name{ position: absolute; left: 30px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: var(--chalk);
+    text-shadow: 0 0 3px #1E3A3E, 0 0 3px #1E3A3E, 0 0 6px #1E3A3E; }
+  .tmap-stop.sel .tmap-stop-num{ background: var(--amber); transform: scale(1.2); box-shadow: 0 0 0 6px rgba(232,163,61,0.25), 0 2px 6px rgba(0,0,0,0.45); }
+  .tmap-stop:focus-visible .tmap-stop-num{ outline: 2px solid var(--amber); outline-offset: 2px; }
+  .tmap-overlay{ position: fixed; inset: 0; z-index: 195; /* above the trip screen (190), below details panels (200) and the little sheets */ visibility: hidden; pointer-events: none; opacity: 0; transition: opacity 0.2s ease, visibility 0s linear 0.2s; background: var(--bg); }
+  .tmap-overlay.open{ visibility: visible; pointer-events: auto; opacity: 1; transition-delay: 0s; }
+  .tmap-panel{ position: absolute; inset: 0; }
+  .tmap-panel .tmap-map{ position: absolute; inset: 0; background: #1E3A3E; } /* beats MapLibre's own position: relative on map containers */
+  .tmap-map .maplibregl-ctrl-top-right{ top: calc(60px + env(safe-area-inset-top, 0px)); }
+  .tmap-top{ position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; pointer-events: none; }
+  .tmap-top > *{ pointer-events: auto; }
+  .tmap-title{ margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px 'Figtree', sans-serif; color: var(--chalk); background: rgba(15,33,36,0.85); border: 1px solid var(--panel-line); border-radius: 999px; padding: 7px 14px; }
+  .tmap-top-actions{ display: flex; gap: 8px; flex: none; }
+  .tmap-top .yir-icon-btn{ background: rgba(15,33,36,0.85); border: 1px solid var(--panel-line); }
+  .tmap-sheet{ position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: min(520px, calc(100% - 24px)); display: grid; gap: 8px; padding: 14px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 18px; box-shadow: 0 -8px 28px rgba(0,0,0,0.35); }
+  .tmap-sheet-head{ display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .tmap-sheet-num{ flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--amber); color: var(--ink); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+  .tmap-sheet-name{ font-size: 17px; color: var(--chalk); }
+  .tmap-sheet-dates, .tmap-sheet-where{ font-size: 12.5px; color: var(--chalk-dim); }
+  .tmap-sheet-counts{ display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--chalk-dim); }
+  .tmap-sheet-nav{ display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; padding-top: 10px; border-top: 1px solid var(--panel-line); }
+  .tmap-nav-btn{ min-width: 0; padding: 4px 0; background: none; border: none; color: var(--chalk-dim); font: 600 12.5px 'Figtree', sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; cursor: pointer; }
+  .tmap-nav-btn:last-child{ text-align: right; }
+  .tmap-nav-btn:disabled{ opacity: 0.4; cursor: default; }
+  .tmap-days-btn{ color: var(--amber); }
+  .tmap-note{ margin: 0; font-size: 13px; color: var(--chalk-dim); }
+  .tpin-list{ display: grid; gap: 8px; margin-top: 10px; }
+  .tpin-row{ border: 1px solid var(--panel-line); border-radius: 12px; background: var(--bg-2); }
+  .tpin-row.ask{ border-color: rgba(232,163,61,0.55); }
+  .tpin-head{ width: 100%; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; background: none; border: none; color: var(--chalk); font-family: 'Figtree', sans-serif; text-align: left; cursor: pointer; }
+  .tpin-row.ask .trip-stop-num{ background: var(--amber); }
+  .tpin-text b{ display: block; font-size: 14px; }
+  .tpin-text span{ display: block; font-size: 12px; color: var(--chalk-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tpin-mark{ color: var(--green); font-size: 14px; }
+  .tpin-body{ display: grid; gap: 8px; padding: 0 10px 12px 44px; }
+  .tpin-cands{ display: grid; gap: 6px; }
+  .tpin-cand{ padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--panel-line); color: var(--chalk); font: 13px 'Figtree', sans-serif; text-align: left; cursor: pointer; }
+  .tpin-cand.best{ border-color: var(--amber); }
+  .tpin-cand em{ font-style: normal; color: var(--chalk-dim); }
+  .tpin-search{ margin: 0; }
+  .trip-actions-row .trips-view-toggle{ margin: 0; flex: none; }
+  .trip-actions-row .btn-ghost, .trip-actions-row .btn-primary{ white-space: nowrap; }
+  .trips-view-toggle .view-toggle-btn{ padding-left: 12px; padding-right: 12px; }
+  /* MapLibre's controls, in the app's colors */
+  .tmap-map .maplibregl-ctrl-group, .trip-world-map .maplibregl-ctrl-group{ background: rgba(15,33,36,0.9); border: 1px solid var(--panel-line); box-shadow: none; }
+  .tmap-map .maplibregl-ctrl-group button + button, .trip-world-map .maplibregl-ctrl-group button + button{ border-top-color: var(--panel-line); }
+  .tmap-map .maplibregl-ctrl-icon, .trip-world-map .maplibregl-ctrl-icon{ filter: invert(1) opacity(0.8); }
+  .tmap-map .maplibregl-ctrl-attrib, .trip-world-map .maplibregl-ctrl-attrib{ background: rgba(15,33,36,0.85); color: var(--chalk-dim); }
+  .tmap-map .maplibregl-ctrl-attrib a, .trip-world-map .maplibregl-ctrl-attrib a{ color: var(--chalk); }
+  .tmap-map .maplibregl-ctrl-attrib-button, .trip-world-map .maplibregl-ctrl-attrib-button{ filter: invert(1); }
+  .trip-actions-spacer{ flex: 1; }
+  .trip-world{ display: grid; gap: 12px; }
+  .trip-world[hidden]{ display: none; }
+  .trip-world-years{ display: flex; flex-wrap: wrap; gap: 8px; }
+  .trip-world-year{ padding: 5px 12px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--panel-line); color: var(--chalk-dim); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
+  .trip-world-year.on{ background: var(--amber); border-color: transparent; color: var(--ink); }
+  .trip-world-stats{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .trip-world-stat{ padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--panel-line); }
+  .trip-world-stat b{ display: block; font-size: 22px; font-weight: 800; line-height: 1.1; color: var(--amber); font-variant-numeric: tabular-nums; }
+  .trip-world-stat span{ font-size: 12px; color: var(--chalk-dim); }
+  .trip-world-map{ height: clamp(320px, 62vh, 620px); border-radius: 18px; overflow: hidden; border: 1px solid var(--panel-line); background: radial-gradient(circle at 50% 45%, #16303A 0%, var(--bg-2) 70%); }
+  .trip-world-legend{ display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--chalk-dim); }
+  .trip-world-legend:empty{ display: none; }
+  .trip-world-legend i{ display: inline-block; width: 16px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .trip-world-note{ margin: 0; font-size: 13px; color: var(--chalk-dim); }
+  .trip-world-hint{ margin: 0; font-size: 13px; color: var(--chalk-dim); text-align: center; }
+  .trip-world-trip{ width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; color: var(--chalk); font-family: 'Figtree', sans-serif; text-align: left; cursor: pointer; }
+  .trip-world-thumb{ flex: none; width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--bg-2); }
+  .trip-world-thumb.ph{ display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .trip-world-text{ display: grid; gap: 2px; min-width: 0; }
+  .trip-world-text b{ font-size: 15px; }
+  .trip-world-date{ font-size: 12.5px; font-weight: 700; color: var(--amber); }
+  .trip-world-meta{ font-size: 12.5px; color: var(--chalk-dim); }
+  .trip-world-go{ margin-left: auto; font-size: 20px; color: var(--chalk-dim); }
+  @media (prefers-reduced-motion: reduce){
+    .tmap-overlay, .tmap-stop-num{ transition: none; }
+  }
   /* owner-only bits vanish in Guest View, which is read-only */
   body.guest-view-active .trip-owner, body.guest-view-active #trip-new-btn, body.guest-view-active #trip-edit-btn,
   body.guest-view-active .trip-link-btn, body.guest-view-active .row-trip-btn{ display: none !important; }
@@ -2729,7 +2831,8 @@
   .li-radio input, .li-place input{ flex: none; width: 20px; height: 20px; margin-top: 1px; accent-color: var(--amber); }
   .li-radio-main{ display: block; font-size: 15px; font-weight: 600; }
   .li-radio-sub{ display: block; font-size: 12px; font-weight: 500; color: var(--chalk-dim); }
-  body.guest-view-active .trip-actions-row, body.guest-view-active #trip-import-btn{ display: none !important; }
+  /* Guests keep the row for the Timeline / World toggle; only the owner's buttons go. */
+  body.guest-view-active #trip-import-btn, body.guest-view-active .trip-actions-spacer{ display: none !important; }
 
   /* the small bottom sheet (form, pickers, memories) */
   #tsheet-overlay{ z-index: 265; }
@@ -5546,10 +5649,23 @@
   <div id="page-trips" class="top-page">
     <div class="page-content">
       <div class="trip-actions-row">
+        <div class="view-toggle trips-view-toggle" role="group" aria-label="Show trips as">
+          <button type="button" class="view-toggle-btn active" data-trips-view="timeline" aria-pressed="true">Timeline</button>
+          <button type="button" class="view-toggle-btn" data-trips-view="world" aria-pressed="false">World</button>
+        </div>
+        <span class="trip-actions-spacer"></span>
         <button class="btn-ghost" id="trip-import-btn" type="button" aria-label="Import a trip from Lambus">Import</button>
         <button class="btn-primary" id="trip-new-btn" type="button" aria-label="New trip">+ New</button>
       </div>
       <div class="trip-grid" id="trip-grid"></div>
+      <div class="trip-world" id="trip-world" hidden>
+        <div class="trip-world-years" id="trip-world-years"></div>
+        <div class="trip-world-stats" id="trip-world-stats"></div>
+        <div class="trip-world-map" id="trip-world-map"></div>
+        <div class="trip-world-legend" id="trip-world-legend"></div>
+        <p class="trip-world-note" id="trip-world-note" hidden></p>
+        <div class="trip-world-card" id="trip-world-card"></div>
+      </div>
       <p class="restaurant-course-empty" id="trip-empty-message" style="display:none;">No trips yet — add one with + New.</p>
     </div>
   </div>
@@ -15577,7 +15693,9 @@
     // Places are the cities/parks of the route, in order; `days` are the dates
     // (from a Lambus import) when the trip was there. `assign` holds the places
     // chosen by hand for a visit/hike/photo (keys 'v:…', 'h:…', 'p:…').
-    t.places = (Array.isArray(t.places) ? t.places : []).map(p => ({ id: p.id || tripNewId('pl'), name: p.name || '', days: Array.isArray(p.days) ? p.days : [] }));
+    t.places = (Array.isArray(t.places) ? t.places : []).map(p => ({ id: p.id || tripNewId('pl'), name: p.name || '', days: Array.isArray(p.days) ? p.days : [], geo: (p.geo && typeof p.geo === 'object') ? p.geo : undefined }));
+    // Map pins for a trip without places, keyed by the city of its linked restaurants and hikes (see TRIP MAPS).
+    t.stopGeo = (t.stopGeo && typeof t.stopGeo === 'object') ? t.stopGeo : {};
     t.assign = (t.assign && typeof t.assign === 'object') ? t.assign : {};
     t.notes = Array.isArray(t.notes) ? t.notes : [];
     t.photos = Array.isArray(t.photos) ? t.photos : [];
@@ -18507,6 +18625,7 @@
     if (ggOverlay.classList.contains('open')){ closeGuessGame(); return; }
     if (yirOverlay.classList.contains('open')){ closeYearInReview(); return; }
     if (calOverlay.classList.contains('open')){ closeActivityCalendar(); return; }
+    if (tmapOverlay && tmapOverlay.classList.contains('open')){ closeTripMap(); return; }
     if (tripOverlay.classList.contains('open')){ closeTrip(); return; }
   }
 
@@ -18815,7 +18934,7 @@
   function otdHeroHtml(url, icon, chipText){
     return '<span class="otd-hero">' +
       '<span class="otd-hero-icon">' + otdIcon(icon, 44) + '</span>' +
-      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 640)) + '" alt="" loading="lazy" decoding="async" decoding="async">' : '') +
+      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 640)) + '" alt="" loading="lazy" decoding="async">' : '') +
       (chipText ? '<span class="otd-hero-chip">' + escapeHtml(chipText) + '</span>' : '') +
     '</span>';
   }
@@ -18823,7 +18942,7 @@
   function otdThumbHtml(url, icon){
     return '<span class="otd-thumb">' +
       '<span class="otd-hero-icon">' + otdIcon(icon, 28) + '</span>' +
-      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 240)) + '" alt="" loading="lazy" decoding="async" decoding="async">' : '') +
+      (url ? '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(url, 240)) + '" alt="" loading="lazy" decoding="async">' : '') +
     '</span>';
   }
 
@@ -18907,7 +19026,7 @@
       const isMore = urls.length > 4 && i === 3;
       return '<button type="button" class="otd-tile" data-otd-photos="' + token + '" data-otd-index="' + i + '" aria-label="' +
         (isMore ? 'See all ' + urls.length + ' photos' : 'Open photo ' + (i + 1) + ' of ' + urls.length) + '">' +
-        '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy" decoding="async" decoding="async">' +
+        '<img class="otd-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(u, 240)) + '" alt="" loading="lazy" decoding="async">' +
         (isMore ? '<span class="otd-tile-more">+' + (urls.length - 3) + '</span>' : '') +
       '</button>';
     }).join('');
@@ -20420,7 +20539,7 @@
   function yirReg(item){ yirItems.push(item); return yirItems.length - 1; }
 
   function yirImg(url, w, alt){
-    return '<img class="yir-img" src="' + escapeAttr(cloudinaryThumbUrl(url, w)) + '" alt="' + escapeAttr(alt || '') + '" loading="lazy" decoding="async" decoding="async">';
+    return '<img class="yir-img" src="' + escapeAttr(cloudinaryThumbUrl(url, w)) + '" alt="' + escapeAttr(alt || '') + '" loading="lazy" decoding="async">';
   }
 
   function yirPhotoSetHtml(urls, cls, max){
@@ -21021,7 +21140,7 @@
       html += '<div class="trip-tl-row">' +
         '<span class="trip-tl-spine-col">' + (lineClass ? '<span class="trip-tl-line ' + lineClass + '"></span>' : '') + '<span class="trip-tl-dot"></span></span>' +
         '<button type="button" class="trip-card" data-trip-id="' + escapeAttr(t.id) + '">' +
-          (cover ? '<img class="trip-card-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 800)) + '" alt="" loading="lazy" decoding="async" decoding="async">' : '<span class="trip-card-ph" aria-hidden="true">🧳</span>') +
+          (cover ? '<img class="trip-card-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 800)) + '" alt="" loading="lazy" decoding="async">' : '<span class="trip-card-ph" aria-hidden="true">🧳</span>') +
           '<span class="trip-card-shade"></span>' +
           '<span class="trip-card-text"><span class="trip-card-name">' + escapeHtml(t.name || 'Untitled trip') + '</span>' +
             '<span class="trip-card-date">' + escapeHtml(tripDateLabel(t)) + '</span></span>' +
@@ -21029,6 +21148,7 @@
     });
     tripGridEl.innerHTML = html;
     tripGridEl.querySelectorAll('.trip-card-img').forEach(img => img.addEventListener('error', () => img.remove()));
+    if (tripsViewMode === 'world'){ tripEmptyMsg.style.display = 'none'; tripWorldRefreshSoon(); }
   }
   tripGridEl.addEventListener('click', (e) => {
     const card = e.target.closest('[data-trip-id]');
@@ -21202,7 +21322,7 @@
         } else {
           badge = '<span class="yir-day-num">—</span><span class="yir-day-dow">no date</span>';
         }
-        return monthHead + '<div class="yir-day"><div class="yir-day-badge">' + badge + '</div><div class="yir-day-cards" data-group-key="' + escapeAttr(pid + '|' + key) + '">' + cards + photosCard + dayNoteHtml + '</div></div>';
+        return monthHead + '<div class="yir-day" data-day="' + escapeAttr(key) + '"><div class="yir-day-badge">' + badge + '</div><div class="yir-day-cards" data-group-key="' + escapeAttr(pid + '|' + key) + '">' + cards + photosCard + dayNoteHtml + '</div></div>';
       }).join('');
     };
 
@@ -21213,7 +21333,7 @@
         const span = tripSpanLabel(p.days.length ? p.days : (g ? Array.from(g.keys()).filter(Boolean) : []));
         const placeNotes = noteBlock(forAnchor('place', p.id));
         const inner = daysHtml(p.id);
-        body += '<section class="trip-place"><div class="trip-place-head"><span class="trip-place-name"><span aria-hidden="true">📍</span> ' + escapeHtml(p.name) + '</span>' +
+        body += '<section class="trip-place" data-place-id="' + escapeAttr(p.id) + '"><div class="trip-place-head"><span class="trip-place-name"><span aria-hidden="true">📍</span> ' + escapeHtml(p.name) + '</span>' +
           (span ? '<span class="trip-place-dates">' + escapeHtml(span) + '</span>' : '') +
           (owner ? '<button type="button" class="trip-mini trip-owner" data-trip-act="note" data-anchor-type="place" data-anchor-id="' + escapeAttr(p.id) + '" aria-label="Add a memory for ' + escapeAttr(p.name) + '">💬</button>' : '') + '</div>' +
           placeNotes + inner + '</section>';
@@ -21273,6 +21393,7 @@
     const gallery = tripGallery(t, linked);
     tripCurrentGallery = gallery;
     const cover = tripCoverUrl(t, gallery);
+    const stops = tripStops(t, linked);
     const toggle = '<div class="view-toggle trip-view-toggle"><button type="button" class="view-toggle-btn' + (tripView === 'timeline' ? ' active' : '') + '" data-trip-view="timeline">Timeline</button>' +
       '<button type="button" class="view-toggle-btn' + (tripView === 'gallery' ? ' active' : '') + '" data-trip-view="gallery">Gallery</button></div>';
     const memoryBtn = owner ? '<button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="" aria-label="Add a memory">💬</button>' : '';
@@ -21283,11 +21404,14 @@
         (cover ? '<img class="trip-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 1200)) + '" alt="">' : '<span class="trip-hero-ph" aria-hidden="true">🧳</span>') +
         '<div class="trip-hero-shade"></div><div class="trip-hero-text"><h2 class="trip-title" id="trip-title">' + escapeHtml(t.name || 'Untitled trip') + '</h2>' +
         '<p class="trip-dates">' + escapeHtml(tripDateLabel(t)) + '</p></div></div></section>' +
+      tripMapBlockHtml(t, stops, owner) +
       toolbarRow +
       (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripTimelineHtml(t, linked, owner));
     tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
     tripWireItemDrag(t);
     tripScroll.scrollTop = prevTop;
+    tripMountOverview(t, stops);
+    setTimeout(() => ensureTripPins(t), 0); // after this render, never inside it
   }
 
   // Drag-and-drop reordering of restaurant/hike/activity cards within a day's
@@ -21438,6 +21562,9 @@
     if (!t) return;
     let el;
     if ((el = e.target.closest('[data-trip-view]'))){ tripView = el.dataset.tripView; tripRender(); return; }
+    if ((el = e.target.closest('[data-trip-map-open]'))){ if (!el.classList.contains('empty')) openTripMap(t); return; }
+    if ((el = e.target.closest('[data-trip-stop]'))){ const s = tripStops(t, tripLinked(t))[Number(el.dataset.tripStop)]; if (s) tripScrollToStop(s); return; }
+    if ((el = e.target.closest('[data-trip-pins]'))){ tripOpenPinsSheet(t); return; }
     if ((el = e.target.closest('[data-trip-photo]'))){
       openPhotoLightbox(tripCurrentGallery.map(g => g.url), Number(el.dataset.tripPhoto) || 0, guestViewEnabled ? null : { tripId: t.id });
       return;
@@ -21526,6 +21653,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (tsheetOverlay.classList.contains('open') && !modalOverlay.classList.contains('show') && !artLightboxOverlay.classList.contains('show')){ tsheetClose(); return; }
+    if (tmapOverlay && tmapOverlay.classList.contains('open')){ closeTripMap(); return; }
     const otherPanelOpen = ['restaurant-details-panel', 'hike-details-panel', 'park-details-panel', 'road-details-panel'].some(id => { const el = document.getElementById(id); return el && el.classList.contains('open'); });
     if (tripOverlay.classList.contains('open') && !otherPanelOpen && !tsheetOverlay.classList.contains('open') && !modalOverlay.classList.contains('show') && !artLightboxOverlay.classList.contains('show')) closeTrip();
   });
@@ -21794,7 +21922,7 @@
       month: t && tripIsMonth(t) ? t.startDate : '',
       start: t && !tripIsMonth(t) ? t.startDate : '',
       end: t && !tripIsMonth(t) ? (t.endDate || '') : '',
-      places: t ? t.places.map(p => ({ id: p.id, name: p.name, days: p.days.slice() })) : [],
+      places: t ? t.places.map(p => ({ id: p.id, name: p.name, days: p.days.slice(), geo: p.geo })) : [],
       cover: t ? t.coverPhoto : ''
     };
     const gallery = t ? tripGallery(t, tripLinked(t)).slice(0, 30) : [];
@@ -21845,7 +21973,8 @@
             let trip = t;
             if (isNew){ trip = tripNormalize({ id: tripNewId('t') }); tripRows.push(trip); }
             trip.name = name; trip.startDate = startDate; trip.endDate = endDate;
-            trip.places = draft.places.map(p => ({ id: p.id, name: p.name.trim(), days: p.days || [] })).filter(p => p.name);
+            // A place keeps its map pin unless it was renamed — then it's looked up again.
+            trip.places = draft.places.map(p => ({ id: p.id, name: p.name.trim(), days: p.days || [], geo: (p.geo && p.geo.query === p.name.trim()) ? p.geo : undefined })).filter(p => p.name);
             trip.coverPhoto = draft.cover || '';
             // Anything that pointed at a place that's gone stops pointing at it: hand-picked places are cleared, memories go back to the trip.
             const placeIds = new Set(trip.places.map(p => p.id));
@@ -22033,6 +22162,842 @@
       showToast('Trip deleted');
     });
   }
+
+  // ---------- TRIP MAPS ----------
+  // Each trip's stops (its places, or failing that the cities of its linked
+  // restaurants and hikes) get a pin once, from a free OpenStreetMap place
+  // search, saved on the place so it syncs and is never looked up again.
+  // The trip page shows the route as an overview under the cover; the Trips
+  // tab's World view puts every trip on a globe, colored by year. The map
+  // library (MapLibre) and the map data (OpenFreeMap) need no account or
+  // key, and the library only downloads the first time a map is shown.
+  const MAPLIBRE_BASE = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/';
+  const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
+  const TOPOJSON_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js';
+  const MAP_LAND = '#1E3A3E', MAP_WATER = '#10262A', MAP_PARK = '#21423A';
+  const TRIP_YEAR_COLORS = ['#E8A33D', '#6FB7D6', '#5FBF77', '#C8593F', '#B9A2E0', '#F1ECDE', '#E58FB6', '#8FD3C1'];
+
+  function loadScriptOnce(src, globalName){
+    if (window[globalName]) return Promise.resolve(window[globalName]);
+    loadScriptOnce.pending = loadScriptOnce.pending || {};
+    if (!loadScriptOnce.pending[src]){
+      loadScriptOnce.pending[src] = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => window[globalName] ? resolve(window[globalName]) : reject(new Error(globalName + ' missing'));
+        s.onerror = () => { delete loadScriptOnce.pending[src]; s.remove(); reject(new Error('Could not load ' + src)); };
+        document.head.appendChild(s);
+      });
+    }
+    return loadScriptOnce.pending[src];
+  }
+  function loadMapLibre(){
+    if (!document.getElementById('maplibre-css')){
+      const css = document.createElement('link');
+      css.id = 'maplibre-css';
+      css.rel = 'stylesheet';
+      css.href = MAPLIBRE_BASE + 'maplibre-gl.css';
+      document.head.appendChild(css);
+    }
+    return loadScriptOnce(MAPLIBRE_BASE + 'maplibre-gl.js', 'maplibregl');
+  }
+
+  // A quiet map in the app's own colors — land, water, parks, borders and
+  // place names only, so the route is what stands out.
+  function tripMapStyle(globe){
+    const name = ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name']];
+    const label = (id, classes, minzoom, maxzoom, size, font, color, upper) => ({
+      id, type: 'symbol', source: 'ofm', 'source-layer': 'place', minzoom, maxzoom,
+      filter: ['in', ['get', 'class'], ['literal', classes]],
+      layout: {
+        'text-field': name, 'text-font': [font], 'text-size': size,
+        'text-transform': upper ? 'uppercase' : 'none', 'text-letter-spacing': upper ? 0.12 : 0,
+        'text-max-width': 8, 'symbol-sort-key': ['coalesce', ['get', 'rank'], 99]
+      },
+      paint: { 'text-color': color, 'text-halo-color': MAP_LAND, 'text-halo-width': 1.2 }
+    });
+    return {
+      version: 8,
+      projection: { type: globe ? 'globe' : 'mercator' },
+      glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+      sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' } },
+      layers: [
+        { id: 'land', type: 'background', paint: { 'background-color': MAP_LAND } },
+        { id: 'park', type: 'fill', source: 'ofm', 'source-layer': 'park', minzoom: 5, paint: { 'fill-color': MAP_PARK, 'fill-opacity': 0.7 } },
+        { id: 'water', type: 'fill', source: 'ofm', 'source-layer': 'water', paint: { 'fill-color': MAP_WATER } },
+        { id: 'rivers', type: 'line', source: 'ofm', 'source-layer': 'waterway', minzoom: 6,
+          filter: ['==', ['get', 'class'], 'river'],
+          paint: { 'line-color': MAP_WATER, 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.6, 12, 2.5] } },
+        { id: 'roads', type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 6,
+          filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary']]],
+          paint: { 'line-color': 'rgba(241,236,222,0.07)', 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 2] } },
+        { id: 'borders-state', type: 'line', source: 'ofm', 'source-layer': 'boundary', minzoom: 3,
+          filter: ['all', ['==', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]],
+          paint: { 'line-color': 'rgba(241,236,222,0.12)', 'line-width': 0.7, 'line-dasharray': [3, 2] } },
+        { id: 'borders-country', type: 'line', source: 'ofm', 'source-layer': 'boundary',
+          filter: ['all', ['==', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]],
+          paint: { 'line-color': 'rgba(241,236,222,0.26)', 'line-width': 0.8 } },
+        label('labels-country', ['country'], 1, 6, 10, 'Noto Sans Bold', 'rgba(241,236,222,0.42)', true),
+        label('labels-state', ['state'], 4.5, 8, 10, 'Noto Sans Regular', 'rgba(241,236,222,0.32)', true),
+        label('labels-city', ['city', 'town'], 4, 24, ['interpolate', ['linear'], ['zoom'], 4, 10, 10, 13], 'Noto Sans Regular', 'rgba(241,236,222,0.6)', false)
+      ]
+    };
+  }
+
+  // Runs fn once the map's style has loaded (straight away if it already has).
+  function whenMapReady(map, fn){
+    if (map.__mbhReady) fn();
+    else (map.__mbhQueue = map.__mbhQueue || []).push(fn);
+  }
+  function trackMapReady(map){
+    map.on('load', () => {
+      map.__mbhReady = true;
+      (map.__mbhQueue || []).splice(0).forEach(f => f());
+    });
+  }
+  function setGeoSource(map, id, data){
+    const src = map.getSource(id);
+    if (src) src.setData(data);
+    else map.addSource(id, { type: 'geojson', data });
+  }
+
+  // ----- place search -----
+  const GEO_MIN_GAP_MS = 1100; // the free services ask for at most one request a second
+  let geoQueue = Promise.resolve();
+  let geoLastAt = 0;
+  function geoThrottle(fn){
+    const run = geoQueue.then(async () => {
+      const wait = geoLastAt + GEO_MIN_GAP_MS - Date.now();
+      if (wait > 0) await new Promise(r => setTimeout(r, wait));
+      geoLastAt = Date.now();
+      return fn();
+    });
+    geoQueue = run.catch(() => {});
+    return run;
+  }
+  const GEO_KINDS = new Set(['city', 'town', 'village', 'hamlet', 'municipality', 'suburb', 'island', 'state', 'county', 'region', 'province', 'national_park', 'park', 'nature_reserve', 'protected_area', 'peak', 'volcano', 'administrative', 'country', 'locality']);
+  function geoLabel(parts){
+    const out = [];
+    parts.forEach(p => { p = String(p || '').trim(); if (p && out.indexOf(p) === -1) out.push(p); });
+    return out.join(', ');
+  }
+  async function photonSearch(query, bias){
+    let url = 'https://photon.komoot.io/api/?limit=6&lang=en&q=' + encodeURIComponent(query);
+    if (bias) url += '&lat=' + bias.lat.toFixed(4) + '&lon=' + bias.lng.toFixed(4);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Place search failed (' + res.status + ')');
+    const data = await res.json();
+    return (data.features || []).filter(f => f.geometry && f.geometry.type === 'Point').map(f => {
+      const p = f.properties || {};
+      return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: p.name || query, state: p.state || '', country: p.country || '',
+        cc: String(p.countrycode || '').toUpperCase(), kind: p.osm_value || p.type || '', label: geoLabel([p.name || query, p.state, p.country]) };
+    });
+  }
+  async function nominatimSearch(query){
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&accept-language=en&q=' + encodeURIComponent(query));
+    if (!res.ok) throw new Error('Place search failed (' + res.status + ')');
+    const data = await res.json();
+    return (Array.isArray(data) ? data : []).map(d => {
+      const a = d.address || {};
+      const nm = d.name || String(d.display_name || query).split(',')[0];
+      return { lat: Number(d.lat), lng: Number(d.lon), name: nm, state: a.state || a.region || '', country: a.country || '',
+        cc: String(a.country_code || '').toUpperCase(), kind: d.type || '', label: geoLabel([nm, a.state || a.region, a.country]) };
+    }).filter(c => isFinite(c.lat) && isFinite(c.lng));
+  }
+  // Candidates for a name, best first. Throws only when both services are
+  // unreachable, so a failure is never mistaken for "no such place".
+  async function geoSearch(query, bias){
+    let photonFailed = false;
+    try{
+      const found = await geoThrottle(() => photonSearch(query, bias));
+      const places = found.filter(c => GEO_KINDS.has(c.kind));
+      if (places.length) return places;
+      if (found.length) return found;
+    }catch(e){ photonFailed = true; }
+    try{
+      return await geoThrottle(() => nominatimSearch(query));
+    }catch(e){
+      if (photonFailed) throw e;
+      return [];
+    }
+  }
+
+  function geoDistanceKm(a, b){
+    const R = 6371, rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  const US_STATE_NAMES = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'District of Columbia', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming' };
+  function geoNormState(s){
+    s = String(s || '').trim();
+    return (US_STATE_NAMES[s.toUpperCase()] || s).toLowerCase();
+  }
+  function geoNormCountry(s){
+    s = String(s || '').trim().toLowerCase().replace(/\./g, '');
+    if (['us', 'usa', 'united states', 'united states of america', 'america'].indexOf(s) !== -1) return 'united states';
+    if (['uk', 'gb', 'great britain', 'united kingdom', 'england', 'scotland', 'wales'].indexOf(s) !== -1) return 'united kingdom';
+    return s;
+  }
+
+  // What the trip already says about where it was: the states and countries
+  // of its linked restaurants, hikes and roads, plus any stops already pinned.
+  function tripGeoContext(t, linked, stops){
+    const states = new Set(), countries = new Set();
+    const add = (st, co) => { if (st) states.add(geoNormState(st)); if (co) countries.add(geoNormCountry(co)); };
+    linked.visits.forEach(x => { const loc = String(x.r.location || '').split(','); add(x.r.state || (loc[1] || ''), x.r.country); });
+    linked.hikes.forEach(x => add(x.h.state, x.h.country));
+    linked.roads.forEach(x => add(x.rd.state, x.rd.country));
+    const points = stops.filter(s => tripStopPinned(s)).map(s => s.geo);
+    return { states, countries, points };
+  }
+
+  // Picks the right match for a name, using the trip's context to tell apart
+  // places like Portland, Oregon and Portland, Maine. When nothing about the
+  // trip separates the results, the search service's own first answer wins.
+  function geoPick(cands, ctx){
+    if (!cands.length) return { status: 'notfound' };
+    const scored = cands.map((c, i) => {
+      let context = 0;
+      if (c.state && ctx.states.has(geoNormState(c.state))) context += 3;
+      if (c.country && ctx.countries.has(geoNormCountry(c.country))) context += 1.5;
+      if (ctx.points.length){
+        const d = Math.min.apply(null, ctx.points.map(p => geoDistanceKm(p, c)));
+        context += d < 300 ? 3 : d < 1000 ? 2 : d < 3000 ? 1 : 0;
+      }
+      return { c, context, score: context + (GEO_KINDS.has(c.kind) ? 0.5 : 0) + (i === 0 ? 0.8 : i === 1 ? 0.4 : 0) };
+    }).sort((a, b) => b.score - a.score);
+    const top = scored[0];
+    if (scored.length === 1 || scored.every(s => geoDistanceKm(s.c, top.c) < 80)) return { status: 'ok', pick: top.c };
+    if (scored.every(s => s.context === top.context)) return { status: 'ok', pick: cands[0] };
+    if (top.score - scored[1].score >= 1.5) return { status: 'ok', pick: top.c };
+    return { status: 'ambiguous', candidates: scored.map(s => s.c) };
+  }
+  function geoFromCandidate(c, query, source){
+    return { lat: Math.round(c.lat * 1e5) / 1e5, lng: Math.round(c.lng * 1e5) / 1e5, label: c.label, state: c.state || '', country: c.country || '', cc: c.cc || '', source, query };
+  }
+  function geoBias(points){
+    if (!points.length) return null;
+    return { lat: points.reduce((s, p) => s + p.lat, 0) / points.length, lng: points.reduce((s, p) => s + p.lng, 0) / points.length };
+  }
+
+  // ----- a trip's stops -----
+  // With places: those, in route order. Without: the cities of the linked
+  // restaurants and hikes, in the order first visited — their pins live in
+  // t.stopGeo, keyed by the city text.
+  function tripStops(t, linked){
+    if (t.places.length){
+      return t.places.map(p => ({ id: p.id, placeId: p.id, name: p.name, query: String(p.name || '').trim(), days: p.days.slice().sort(),
+        geo: p.geo || null, set: (g) => { p.geo = g; } }));
+    }
+    const byKey = new Map();
+    const add = (city, state, country, date) => {
+      city = String(city || '').trim();
+      if (!city) return;
+      const parts = [city, state, country].map(x => String(x || '').trim());
+      const key = parts.join('|').toLowerCase();
+      let s = byKey.get(key);
+      if (!s){ s = { id: 'auto:' + key, key, name: city, query: parts.filter(Boolean).join(', '), days: [] }; byKey.set(key, s); }
+      if (date && s.days.indexOf(date) === -1) s.days.push(date);
+    };
+    linked.visits.forEach(x => add(restaurantCityOf(x.r), x.r.state, x.r.country, x.date));
+    linked.hikes.forEach(x => add(x.h.city, x.h.state, x.h.country, x.date));
+    const list = Array.from(byKey.values());
+    list.forEach(s => {
+      s.days.sort();
+      s.geo = (t.stopGeo && t.stopGeo[s.key]) || null;
+      s.set = (g) => { t.stopGeo[s.key] = g; };
+    });
+    list.sort((a, b) => (a.days[0] || '9999') < (b.days[0] || '9999') ? -1 : (a.days[0] || '9999') > (b.days[0] || '9999') ? 1 : 0);
+    return list;
+  }
+  const tripStopCurrent = (s) => !!(s.geo && s.geo.query === s.query);
+  const tripStopPinned = (s) => tripStopCurrent(s) && typeof s.geo.lat === 'number' && typeof s.geo.lng === 'number';
+  const tripStopNeedsPin = (s) => tripStopCurrent(s) && (s.geo.status === 'ambiguous' || s.geo.status === 'notfound');
+
+  // What happened at each stop — the same place assignment the timeline uses.
+  function tripStopCounts(t, linked, stops){
+    const counts = new Map(stops.map(s => [s.id, { meals: 0, hikes: 0, activities: 0, photos: 0 }]));
+    const bump = (id, k, n) => { const c = counts.get(id); if (c) c[k] += (n === undefined ? 1 : n); };
+    const dateOf = (s) => { const p = otdParse(s); return p ? p.str : ''; };
+    if (t.places.length){
+      linked.visits.forEach(x => { const id = tripPlaceOf(t, 'v:' + x.v.id, x.date, restaurantCityOf(x.r)); bump(id, 'meals'); bump(id, 'photos', tripVisitPhotos(x.v).length); });
+      linked.hikes.forEach(x => { const id = tripPlaceOf(t, 'h:' + x.d.id, x.date, x.h.city); bump(id, 'hikes'); bump(id, 'photos', tripHikePhotos(x.d).length); });
+      t.activities.forEach(a => { const id = tripPlaceOf(t, 'a:' + a.id, dateOf(a.date), ''); bump(id, 'activities'); bump(id, 'photos', a.photos.length); });
+      linked.photos.forEach(x => bump(tripPlaceOf(t, 'p:' + x.p.id, x.date, ''), 'photos'));
+      t.photos.forEach(p => bump(tripPlaceOf(t, 'p:' + p.id, dateOf(p.date), ''), 'photos'));
+    } else {
+      const idFor = (city, state, country) => 'auto:' + [city, state, country].map(x => String(x || '').trim()).join('|').toLowerCase();
+      linked.visits.forEach(x => { const id = idFor(restaurantCityOf(x.r), x.r.state, x.r.country); bump(id, 'meals'); bump(id, 'photos', tripVisitPhotos(x.v).length); });
+      linked.hikes.forEach(x => { const id = idFor(x.h.city, x.h.state, x.h.country); bump(id, 'hikes'); bump(id, 'photos', tripHikePhotos(x.d).length); });
+    }
+    return counts;
+  }
+
+  // "4 stops · 1 state", "3 stops · 2 countries", "2 stops · Japan"
+  function tripStopsSummary(stops){
+    const pinned = stops.filter(tripStopPinned);
+    let where = '';
+    const ccs = new Set(pinned.map(s => s.geo.cc).filter(Boolean));
+    if (ccs.size > 1) where = ccs.size + ' countries';
+    else if (ccs.size === 1 && Array.from(ccs)[0] === 'US'){
+      const states = new Set(pinned.map(s => s.geo.state).filter(Boolean));
+      if (states.size) where = otdPlural(states.size, 'state', 'states');
+    } else if (pinned.length && pinned[0].geo.country) where = pinned[0].geo.country;
+    return otdPlural(stops.length, 'stop', 'stops') + (where ? ' · ' + where : '');
+  }
+
+  // ----- looking up pins (owner only — guests never write) -----
+  const tripPinsRunning = new Set();
+  const tripPinsFailedAt = new Map(); // trip id → when the place search was last unreachable
+  async function ensureTripPins(t){
+    if (guestViewEnabled || !t || tripPinsRunning.has(t.id)) return;
+    if (Date.now() - (tripPinsFailedAt.get(t.id) || 0) < 60000) return; // offline a moment ago — wait a minute before trying again
+    const linked = tripLinked(t);
+    const todo = () => tripStops(t, linked).filter(s => s.query && !tripStopCurrent(s));
+    if (!todo().length) return;
+    tripPinsRunning.add(t.id);
+    tripPinsChanged(t);
+    try{
+      let s;
+      while ((s = todo()[0])){
+        const stops = tripStops(t, linked);
+        const ctx = tripGeoContext(t, linked, stops);
+        let cands;
+        try{ cands = await geoSearch(s.query, geoBias(ctx.points)); }
+        catch(e){ tripPinsFailedAt.set(t.id, Date.now()); break; } // offline or the services are down — try again later
+        const live = tripStops(t, linked).find(x => x.id === s.id);
+        if (!live || live.query !== s.query) continue; // renamed or removed meanwhile
+        const res = geoPick(cands, ctx);
+        live.set(res.status === 'ok' ? geoFromCandidate(res.pick, s.query, 'search') : { status: res.status, query: s.query });
+        saveTripProgress();
+        tripPinsChanged(t);
+      }
+    } finally {
+      tripPinsRunning.delete(t.id);
+      tripPinsChanged(t);
+    }
+  }
+  function tripPinsChanged(t){
+    if (tripOpenId === t.id) tripRender();
+    if (tmapTripId === t.id && tmapOverlay && tmapOverlay.classList.contains('open')) tmapDraw();
+    if (tripsViewMode === 'world') tripWorldRefreshSoon();
+  }
+
+  // ----- drawing a route -----
+  function tripRouteData(pts){
+    return {
+      line: { type: 'FeatureCollection', features: pts.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts.map(p => [p.s.geo.lng, p.s.geo.lat]) } }] : [] }
+    };
+  }
+  function tripAddRouteLayer(map, id){
+    if (map.getLayer(id)) return;
+    map.addLayer({ id, type: 'line', source: id, layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#E8A33D', 'line-width': 2.5, 'line-dasharray': [2, 1.6] } });
+  }
+  function tripStopMarkerEl(num, name, showLabel, asButton){
+    const el = document.createElement(asButton ? 'button' : 'div');
+    if (asButton){ el.type = 'button'; el.setAttribute('aria-label', 'Stop ' + num + ': ' + name); }
+    el.className = 'tmap-stop';
+    el.innerHTML = '<span class="tmap-stop-num">' + num + '</span>' + (showLabel ? '<span class="tmap-stop-name">' + escapeHtml(name) + '</span>' : '');
+    return el;
+  }
+  function tripFitStops(map, pts, padding, animate){
+    if (!pts.length) return;
+    if (pts.length === 1){ map.jumpTo({ center: [pts[0].s.geo.lng, pts[0].s.geo.lat], zoom: 7 }); return; }
+    const b = new maplibregl.LngLatBounds();
+    pts.forEach(p => b.extend([p.s.geo.lng, p.s.geo.lat]));
+    map.fitBounds(b, { padding, maxZoom: 9, duration: animate ? 600 : 0 });
+  }
+
+  // ----- the overview under the trip's cover -----
+  function tripMapBlockHtml(t, stops, owner){
+    if (!stops.length) return '';
+    const needs = stops.filter(tripStopNeedsPin).length;
+    const chips = stops.map((s, i) => {
+      const span = tripSpanLabel(s.days);
+      return '<button type="button" class="trip-stop-chip" data-trip-stop="' + i + '"><span class="trip-stop-num">' + (i + 1) + '</span>' +
+        '<span class="trip-stop-name">' + escapeHtml(s.name) + '</span>' + (span ? '<span class="trip-stop-dates">' + escapeHtml(span) + '</span>' : '') + '</button>';
+    }).join('');
+    return '<section class="trip-map-block">' +
+      '<button type="button" class="trip-map-overview" data-trip-map-open="1" aria-label="Open the map of this trip\'s route">' +
+        '<span class="trip-map-slot"></span>' +
+        '<span class="trip-map-cap"><b>' + escapeHtml(tripStopsSummary(stops)) + '</b><span class="trip-map-expand">Expand ⤢</span></span>' +
+      '</button>' +
+      '<div class="trip-map-credit">Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · OpenFreeMap</div>' +
+      '<div class="trip-stop-chips">' + chips + '</div>' +
+      (owner && needs ? '<button type="button" class="btn-ghost trip-owner trip-needs-pin" data-trip-pins="1">📍 ' + (needs === 1 ? '1 place needs a pin' : needs + ' places need a pin') + '</button>' : '') +
+    '</section>';
+  }
+
+  let tovMap = null, tovEl = null, tovMarkers = [];
+  async function tripMountOverview(t, stops){
+    const slot = tripContent.querySelector('.trip-map-slot');
+    if (!slot) return;
+    const block = slot.closest('.trip-map-overview');
+    const pts = stops.map((s, i) => ({ s, i })).filter(x => tripStopPinned(x.s));
+    const message = (text) => { block.classList.add('empty'); slot.innerHTML = '<span class="trip-map-msg">' + escapeHtml(text) + '</span>'; };
+    if (!pts.length){
+      message(tripPinsRunning.has(t.id) ? 'Finding places on the map…' : (guestViewEnabled ? 'These places aren’t on the map yet.' : 'Couldn’t put these places on the map yet.'));
+      return;
+    }
+    if (!tovEl){ tovEl = document.createElement('div'); tovEl.className = 'trip-map-canvas'; }
+    slot.appendChild(tovEl);
+    let lib;
+    try{ lib = await loadMapLibre(); }
+    catch(e){ if (slot.isConnected) message('The map needs an internet connection.'); return; }
+    if (!tovEl.isConnected || tovEl.parentNode !== slot) return; // redrawn meanwhile — that render mounts it again
+    if (!tovMap){
+      tovMap = new lib.Map({ container: tovEl, style: tripMapStyle(false), interactive: false, attributionControl: false, fadeDuration: 0 });
+      trackMapReady(tovMap);
+    } else {
+      tovMap.resize();
+    }
+    tovMarkers.forEach(m => m.remove());
+    tovMarkers = pts.map(p => new lib.Marker({ element: tripStopMarkerEl(p.i + 1, p.s.name, pts.length <= 8, false), anchor: 'center' }).setLngLat([p.s.geo.lng, p.s.geo.lat]).addTo(tovMap));
+    tripFitStops(tovMap, pts, 34, false);
+    whenMapReady(tovMap, () => {
+      setGeoSource(tovMap, 'route', tripRouteData(pts).line);
+      tripAddRouteLayer(tovMap, 'route');
+    });
+  }
+
+  // ----- the full-screen trip map -----
+  let tmapOverlay = null, tmapMap = null, tmapMarkers = [], tmapTripId = null, tmapSel = 0;
+  function tmapBuild(){
+    if (tmapOverlay) return;
+    tmapOverlay = document.createElement('div');
+    tmapOverlay.className = 'tmap-overlay';
+    tmapOverlay.id = 'tmap-overlay';
+    tmapOverlay.setAttribute('aria-hidden', 'true');
+    tmapOverlay.innerHTML =
+      '<div class="tmap-panel" role="dialog" aria-modal="true" aria-labelledby="tmap-title">' +
+        '<div class="tmap-map" id="tmap-map"></div>' +
+        '<div class="tmap-top"><h2 class="tmap-title" id="tmap-title"></h2><span class="tmap-top-actions">' +
+          '<button type="button" class="yir-icon-btn trip-owner" id="tmap-pins-btn" aria-label="Fix places on the map">📍</button>' +
+          '<button type="button" class="yir-icon-btn" id="tmap-close-btn" aria-label="Close map">✕</button></span></div>' +
+        '<div class="tmap-sheet" id="tmap-sheet" aria-live="polite"></div>' +
+      '</div>';
+    document.body.appendChild(tmapOverlay);
+    tmapOverlay.querySelector('#tmap-close-btn').addEventListener('click', closeTripMap);
+    tmapOverlay.querySelector('#tmap-pins-btn').addEventListener('click', () => { const t = tripFind(tmapTripId); if (t) tripOpenPinsSheet(t); });
+    tmapOverlay.querySelector('#tmap-sheet').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tmap-go]');
+      if (!b) return;
+      if (b.dataset.tmapGo === 'days'){ tmapSeeDays(); return; }
+      tmapSelect(tmapSel + (b.dataset.tmapGo === 'next' ? 1 : -1), true);
+    });
+    ['touchstart', 'touchend'].forEach(ev => tmapOverlay.addEventListener(ev, (e) => e.stopPropagation(), { passive: true }));
+    BACK_BUTTON_OVERLAYS.push({ el: tmapOverlay, openClass: 'open' });
+    new MutationObserver(handleOverlayClassChange).observe(tmapOverlay, { attributes: true, attributeFilter: ['class'] });
+  }
+  function openTripMap(t){
+    tmapBuild();
+    tmapTripId = t.id;
+    tmapSel = 0;
+    tmapOverlay.classList.add('open');
+    tmapOverlay.setAttribute('aria-hidden', 'false');
+    tmapDraw(true);
+    setTimeout(() => { try{ tmapOverlay.querySelector('#tmap-close-btn').focus({ preventScroll: true }); }catch(e){} }, 60);
+  }
+  function closeTripMap(){
+    if (!tmapOverlay || !tmapOverlay.classList.contains('open')) return;
+    tmapOverlay.classList.remove('open');
+    tmapOverlay.setAttribute('aria-hidden', 'true');
+    const b = tripContent.querySelector('.trip-map-overview');
+    if (b){ try{ b.focus({ preventScroll: true }); }catch(e){} }
+  }
+  function tmapState(){
+    const t = tripFind(tmapTripId);
+    if (!t) return null;
+    const linked = tripLinked(t);
+    const stops = tripStops(t, linked);
+    return { t, linked, stops, pts: stops.map((s, i) => ({ s, i })).filter(x => tripStopPinned(x.s)) };
+  }
+  async function tmapDraw(refit){
+    const st = tmapState();
+    if (!st){ closeTripMap(); return; }
+    tmapOverlay.querySelector('#tmap-title').textContent = st.t.name || 'Untitled trip';
+    let lib;
+    try{ lib = await loadMapLibre(); }
+    catch(e){ tmapOverlay.querySelector('#tmap-sheet').innerHTML = '<p class="tmap-note">The map needs an internet connection.</p>'; return; }
+    if (!tmapMap){
+      // Controls go top-right, clear of the stop card along the bottom.
+      tmapMap = new lib.Map({ container: tmapOverlay.querySelector('#tmap-map'), style: tripMapStyle(false), attributionControl: false, fadeDuration: 0, maxZoom: 14 });
+      tmapMap.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
+      tmapMap.addControl(new lib.AttributionControl({ compact: true }), 'top-right');
+      trackMapReady(tmapMap);
+    } else {
+      tmapMap.resize();
+    }
+    tmapMarkers.forEach(m => m.remove());
+    tmapMarkers = st.pts.map(p => {
+      const el = tripStopMarkerEl(p.i + 1, p.s.name, true, true);
+      el.addEventListener('click', (e) => { e.stopPropagation(); tmapSelect(st.pts.indexOf(p), false); });
+      return new lib.Marker({ element: el, anchor: 'center' }).setLngLat([p.s.geo.lng, p.s.geo.lat]).addTo(tmapMap);
+    });
+    if (refit) tripFitStops(tmapMap, st.pts, { top: 90, bottom: 210, left: 50, right: 120 }, false); // extra room on the right for stop names
+    whenMapReady(tmapMap, () => {
+      setGeoSource(tmapMap, 'route', tripRouteData(st.pts).line);
+      tripAddRouteLayer(tmapMap, 'route');
+    });
+    tmapSelect(Math.min(tmapSel, Math.max(0, st.pts.length - 1)), false);
+  }
+  function tmapSelect(idx, pan){
+    const st = tmapState();
+    if (!st) return;
+    const sheet = tmapOverlay.querySelector('#tmap-sheet');
+    if (!st.pts.length){
+      sheet.innerHTML = '<p class="tmap-note">' + (tripPinsRunning.has(st.t.id) ? 'Finding places on the map…' : 'None of this trip’s places are on the map yet.') + '</p>';
+      return;
+    }
+    tmapSel = Math.max(0, Math.min(idx, st.pts.length - 1));
+    const p = st.pts[tmapSel];
+    tmapMarkers.forEach((m, i) => m.getElement().classList.toggle('sel', i === tmapSel));
+    const c = tripStopCounts(st.t, st.linked, st.stops).get(p.s.id) || {};
+    const bits = [];
+    if (c.meals) bits.push('🍴 ' + otdPlural(c.meals, 'meal', 'meals'));
+    if (c.hikes) bits.push('🥾 ' + otdPlural(c.hikes, 'hike', 'hikes'));
+    if (c.activities) bits.push('🎟️ ' + otdPlural(c.activities, 'activity', 'activities'));
+    if (c.photos) bits.push('📷 ' + otdPlural(c.photos, 'photo', 'photos'));
+    const span = tripSpanLabel(p.s.days);
+    const prev = st.pts[tmapSel - 1], next = st.pts[tmapSel + 1];
+    sheet.innerHTML =
+      '<div class="tmap-sheet-head"><span class="tmap-sheet-num">' + (p.i + 1) + '</span><b class="tmap-sheet-name">' + escapeHtml(p.s.name) + '</b>' +
+        (span ? '<span class="tmap-sheet-dates">' + escapeHtml(span) + (p.s.days.length > 1 ? ' · ' + p.s.days.length + ' days' : '') + '</span>' : '') + '</div>' +
+      (p.s.geo.label && p.s.geo.label !== p.s.name ? '<div class="tmap-sheet-where">' + escapeHtml(p.s.geo.label) + '</div>' : '') +
+      '<div class="tmap-sheet-counts">' + (bits.length ? bits.map(b => '<span>' + escapeHtml(b) + '</span>').join('') : '<span>Nothing linked here yet</span>') + '</div>' +
+      '<div class="tmap-sheet-nav">' +
+        '<button type="button" class="tmap-nav-btn" data-tmap-go="prev"' + (prev ? '' : ' disabled') + '>‹ ' + escapeHtml(prev ? prev.s.name : 'Start') + '</button>' +
+        '<button type="button" class="tmap-nav-btn tmap-days-btn" data-tmap-go="days">See these days</button>' +
+        '<button type="button" class="tmap-nav-btn" data-tmap-go="next"' + (next ? '' : ' disabled') + '>' + escapeHtml(next ? next.s.name : 'End') + ' ›</button>' +
+      '</div>';
+    if (pan && tmapMap){
+      const ll = [p.s.geo.lng, p.s.geo.lat];
+      if (!tmapMap.getBounds().contains(ll)) tmapMap.easeTo({ center: ll, duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500 });
+    }
+  }
+  // Closes the map and scrolls the trip's timeline to that stop.
+  function tmapSeeDays(){
+    const st = tmapState();
+    if (!st || !st.pts.length) return;
+    const s = st.pts[tmapSel].s;
+    closeTripMap();
+    tripScrollToStop(s);
+  }
+  function tripScrollToStop(s){
+    if (tripView !== 'timeline'){ tripView = 'timeline'; tripRender(); }
+    let target = null;
+    if (s.placeId) target = tripContent.querySelector('.trip-place[data-place-id="' + CSS.escape(s.placeId) + '"]');
+    if (!target && s.days[0]) target = tripContent.querySelector('.yir-day[data-day="' + CSS.escape(s.days[0]) + '"]');
+    if (!target) return;
+    const top = target.getBoundingClientRect().top - tripScroll.getBoundingClientRect().top + tripScroll.scrollTop - 12;
+    tripScroll.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+
+  // ----- fixing a place's pin (owner only) -----
+  function tripOpenPinsSheet(t){
+    if (guestViewEnabled) return;
+    const linked = tripLinked(t);
+    let openIdx = -1;
+    const statusText = (s) => {
+      if (tripStopPinned(s)) return s.geo.label || 'On the map';
+      if (tripStopNeedsPin(s)) return s.geo.status === 'ambiguous' ? 'Which one? Tap to choose' : 'Not found. Tap to search';
+      return tripPinsRunning.has(t.id) ? 'Looking it up…' : 'Not placed yet';
+    };
+    const rowsHtml = () => tripStops(t, linked).map((s, i) =>
+      '<div class="tpin-row' + (tripStopNeedsPin(s) ? ' ask' : '') + (openIdx === i ? ' open' : '') + '">' +
+        '<button type="button" class="tpin-head" data-tpin="' + i + '" aria-expanded="' + (openIdx === i) + '">' +
+          '<span class="trip-stop-num">' + (i + 1) + '</span><span class="tpin-text"><b>' + escapeHtml(s.name) + '</b><span>' + escapeHtml(statusText(s)) + '</span></span>' +
+          '<span class="tpin-mark" aria-hidden="true">' + (tripStopPinned(s) ? '✓' : '›') + '</span></button>' +
+        (openIdx === i ? '<div class="tpin-body" id="tpin-body"><p class="tf-hint">Searching…</p></div>' : '') +
+      '</div>').join('');
+    const showCandidates = async (body, s, query) => {
+      const holder = body.querySelector('#tpin-body');
+      if (!holder) return;
+      holder.innerHTML = '<p class="tf-hint">Searching…</p>';
+      const stops = tripStops(t, linked);
+      const ctx = tripGeoContext(t, linked, stops.filter(x => x.id !== s.id));
+      let cands;
+      try{ cands = await geoSearch(query, geoBias(ctx.points)); }
+      catch(e){ if (holder.isConnected) holder.innerHTML = '<p class="tf-hint">Couldn’t reach the place search. Check your connection and try again.</p>'; return; }
+      if (!holder.isConnected) return;
+      const res = geoPick(cands, ctx);
+      const best = res.status === 'ok' ? res.pick : (res.candidates ? res.candidates[0] : null);
+      const ordered = best ? [best].concat(cands.filter(c => c !== best)) : cands;
+      tpinCands = ordered;
+      holder.innerHTML =
+        (ordered.length ? '<div class="tpin-cands">' + ordered.map((c, ci) =>
+          '<button type="button" class="tpin-cand' + (ci === 0 && ctx.points.length ? ' best' : '') + '" data-tpin-pick="' + ci + '">' + escapeHtml(c.label) +
+            (ci === 0 && ctx.points.length ? ' <em>· nearest to your other stops</em>' : '') + '</button>').join('') + '</div>'
+          : '<p class="tf-hint">Nothing found for “' + escapeHtml(query) + '”.</p>') +
+        '<div class="tf-place-row tpin-search"><input type="text" class="tf-input" id="tpin-query" placeholder="Search for a different place" autocomplete="off" value="' + escapeAttr(query === s.query ? '' : query) + '"><button type="button" class="btn-ghost" id="tpin-go">Search</button></div>';
+    };
+    let tpinCands = [];
+    tsheetOpen({
+      title: 'Places on the map',
+      bodyHtml: '<p class="tf-hint">Most places are found automatically. Tap one to choose a different match or search for it.</p><div class="tpin-list" id="tpin-list">' + rowsHtml() + '</div>',
+      actions: [{ label: 'Done', primary: true, onClick: tsheetClose }],
+      onOpen: (body) => {
+        const list = body.querySelector('#tpin-list');
+        const redraw = () => {
+          list.innerHTML = rowsHtml();
+          const s = tripStops(t, linked)[openIdx];
+          if (s) showCandidates(body, s, s.query);
+        };
+        list.addEventListener('click', (e) => {
+          const head = e.target.closest('[data-tpin]');
+          if (head){ const i = Number(head.dataset.tpin); openIdx = openIdx === i ? -1 : i; redraw(); return; }
+          const pick = e.target.closest('[data-tpin-pick]');
+          if (pick){
+            const s = tripStops(t, linked)[openIdx];
+            const c = tpinCands[Number(pick.dataset.tpinPick)];
+            if (!s || !c) return;
+            s.set(geoFromCandidate(c, s.query, 'picked'));
+            saveTripProgress();
+            openIdx = -1;
+            redraw();
+            tripPinsChanged(t);
+            return;
+          }
+          if (e.target.closest('#tpin-go')){
+            const s = tripStops(t, linked)[openIdx];
+            const q = (body.querySelector('#tpin-query').value || '').trim();
+            if (s && q) showCandidates(body, s, q);
+          }
+        });
+        list.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && e.target.id === 'tpin-query'){ e.preventDefault(); const go = body.querySelector('#tpin-go'); if (go) go.click(); }
+        });
+      }
+    });
+  }
+
+  // ----- the World view on the Trips tab -----
+  const TRIPS_VIEW_KEY = 'mbh-trips-view';
+  let tripsViewMode = 'timeline';
+  try{ if (localStorage.getItem(TRIPS_VIEW_KEY) === 'world') tripsViewMode = 'world'; }catch(e){ /* per-device preference only */ }
+  let worldYear = 'all';
+  let worldMap = null, worldSelId = null, worldCountries = null, worldRefreshTimer = null, worldFitted = false;
+  const tripWorldEl = document.getElementById('trip-world');
+  const tripViewBtns = document.querySelectorAll('[data-trips-view]');
+
+  function setTripsView(mode){
+    tripsViewMode = mode;
+    try{ localStorage.setItem(TRIPS_VIEW_KEY, mode); }catch(e){ /* per-device preference only */ }
+    applyTripsView();
+  }
+  function applyTripsView(){
+    const world = tripsViewMode === 'world';
+    tripViewBtns.forEach(b => { const on = b.dataset.tripsView === tripsViewMode; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+    tripGridEl.hidden = world;
+    tripWorldEl.hidden = !world;
+    if (world){
+      tripEmptyMsg.style.display = 'none';
+      renderTripWorld();
+      tripWorldPinAll();
+    } else {
+      tripEmptyMsg.style.display = tripRows.length ? 'none' : 'block';
+    }
+  }
+  tripViewBtns.forEach(b => b.addEventListener('click', () => setTripsView(b.dataset.tripsView)));
+
+  function tripWorldRefreshSoon(){
+    clearTimeout(worldRefreshTimer);
+    worldRefreshTimer = setTimeout(() => { if (tripsViewMode === 'world') renderTripWorld(); }, 400);
+  }
+  // Looks up pins for every trip, one trip at a time, in the background.
+  async function tripWorldPinAll(){
+    if (guestViewEnabled || tripWorldPinAll.running) return;
+    tripWorldPinAll.running = true;
+    try{ for (const t of tripSorted()){ if (tripsViewMode !== 'world') break; await ensureTripPins(t); } }
+    finally{ tripWorldPinAll.running = false; }
+  }
+
+  function tripWorldData(){
+    const all = tripSorted().map(t => {
+      const linked = tripLinked(t);
+      const stops = tripStops(t, linked);
+      return { t, linked, stops, pts: stops.filter(tripStopPinned), year: String(t.startDate || '').slice(0, 4) };
+    });
+    const years = Array.from(new Set(all.map(x => x.year).filter(Boolean))).sort().reverse();
+    const colorOf = (y) => TRIP_YEAR_COLORS[Math.max(0, years.indexOf(y)) % TRIP_YEAR_COLORS.length];
+    const shown = all.filter(x => worldYear === 'all' || x.year === worldYear);
+    return { all, years, colorOf, shown };
+  }
+
+  async function renderTripWorld(){
+    const d = tripWorldData();
+    if (worldYear !== 'all' && d.years.indexOf(worldYear) === -1) worldYear = 'all';
+    const onMap = d.shown.filter(x => x.pts.length);
+    const ccs = new Set(), places = new Set();
+    onMap.forEach(x => x.pts.forEach(s => { if (s.geo.cc) ccs.add(s.geo.cc); places.add(s.geo.lat.toFixed(2) + ',' + s.geo.lng.toFixed(2)); }));
+    const chip = (val, label) => '<button type="button" class="chip-btn trip-world-year' + (worldYear === val ? ' on' : '') + '" data-world-year="' + escapeAttr(val) + '" aria-pressed="' + (worldYear === val) + '">' + escapeHtml(label) + '</button>';
+    document.getElementById('trip-world-years').innerHTML = chip('all', 'All years') + d.years.map(y => chip(y, y)).join('');
+    document.getElementById('trip-world-stats').innerHTML =
+      '<div class="trip-world-stat"><b>' + d.shown.length + '</b><span>' + (d.shown.length === 1 ? 'trip' : 'trips') + '</span></div>' +
+      '<div class="trip-world-stat"><b>' + ccs.size + '</b><span>' + (ccs.size === 1 ? 'country' : 'countries') + '</span></div>' +
+      '<div class="trip-world-stat"><b>' + places.size + '</b><span>' + (places.size === 1 ? 'place' : 'places') + '</span></div>';
+    const legendYears = (worldYear === 'all' ? d.years : [worldYear]).filter(y => onMap.some(x => x.year === y));
+    document.getElementById('trip-world-legend').innerHTML = legendYears.map(y => '<span><i style="background:' + d.colorOf(y) + '"></i>' + escapeHtml(y) + '</span>').join('');
+    const note = document.getElementById('trip-world-note');
+    const missing = d.shown.length - onMap.length;
+    note.textContent = !d.all.length ? 'No trips yet — add one with + New.'
+      : missing ? (tripWorldPinAll.running ? 'Putting your trips on the map…' : otdPlural(missing, 'trip isn’t', 'trips aren’t') + ' on the map yet — trips need places, or linked restaurants or hikes.')
+      : '';
+    note.hidden = !note.textContent;
+    if (worldSelId && !onMap.some(x => x.t.id === worldSelId)) worldSelId = null;
+    tripWorldCard(d);
+
+    let lib;
+    try{ lib = await loadMapLibre(); }
+    catch(e){ note.textContent = 'The map needs an internet connection.'; note.hidden = false; return; }
+    const mapEl = document.getElementById('trip-world-map');
+    if (tripsViewMode !== 'world' || !mapEl.offsetWidth) return; // not on screen — drawn when the Trips tab is shown
+    if (!worldMap){
+      worldMap = new lib.Map({ container: mapEl, style: tripMapStyle(true), attributionControl: { compact: true }, fadeDuration: 0, maxZoom: 12, center: [0, 25], zoom: 1 });
+      worldMap.addControl(new lib.NavigationControl({ showCompass: false }), 'bottom-right');
+      trackMapReady(worldMap);
+      worldMap.on('click', (e) => {
+        if (!worldMap.getLayer('world-points')) return;
+        const hits = worldMap.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ['world-points', 'world-lines'] });
+        worldSelId = hits.length ? hits[0].properties.tripId : null;
+        tripWorldHighlight();
+        tripWorldCard(tripWorldData());
+      });
+    } else {
+      worldMap.resize();
+    }
+    const lines = [], points = [];
+    onMap.forEach(x => {
+      const color = d.colorOf(x.year);
+      if (x.pts.length > 1) lines.push({ type: 'Feature', properties: { tripId: x.t.id, color }, geometry: { type: 'LineString', coordinates: x.pts.map(s => [s.geo.lng, s.geo.lat]) } });
+      x.pts.forEach(s => points.push({ type: 'Feature', properties: { tripId: x.t.id, color }, geometry: { type: 'Point', coordinates: [s.geo.lng, s.geo.lat] } }));
+    });
+    const visited = await tripWorldVisitedCountries(onMap);
+    whenMapReady(worldMap, () => {
+      setGeoSource(worldMap, 'world-visited', visited);
+      setGeoSource(worldMap, 'world-lines', { type: 'FeatureCollection', features: lines });
+      setGeoSource(worldMap, 'world-points', { type: 'FeatureCollection', features: points });
+      if (!worldMap.getLayer('world-visited')){
+        worldMap.addLayer({ id: 'world-visited', type: 'fill', source: 'world-visited', paint: { 'fill-color': '#E8A33D', 'fill-opacity': 0.13 } }, 'borders-state');
+        worldMap.addLayer({ id: 'world-lines', type: 'line', source: 'world-lines', layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': ['get', 'color'], 'line-width': 2.2, 'line-opacity': 0.95 } });
+        worldMap.addLayer({ id: 'world-points', type: 'circle', source: 'world-points',
+          paint: { 'circle-color': ['get', 'color'], 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 5], 'circle-stroke-color': '#0F2124', 'circle-stroke-width': 1 } });
+        ['world-points', 'world-lines'].forEach(id => {
+          worldMap.on('mouseenter', id, () => { worldMap.getCanvas().style.cursor = 'pointer'; });
+          worldMap.on('mouseleave', id, () => { worldMap.getCanvas().style.cursor = ''; });
+        });
+      }
+      tripWorldHighlight();
+      tripWorldFit(onMap);
+    });
+  }
+  function tripWorldHighlight(){
+    if (!worldMap || !worldMap.getLayer('world-lines')) return;
+    const sel = worldSelId || '';
+    worldMap.setPaintProperty('world-lines', 'line-width', ['case', ['==', ['get', 'tripId'], sel], 4.5, 2.2]);
+    worldMap.setPaintProperty('world-points', 'circle-radius', ['case', ['==', ['get', 'tripId'], sel], 6.5, ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 5]]);
+  }
+  // Zooms to fit every trip shown. Trips spread around the world get the
+  // whole globe, turned to face the middle of them — one point per trip, so
+  // a trip with many stops doesn't pull the view, and kept to a natural
+  // latitude rather than looking down on a pole.
+  function tripWorldFit(onMap){
+    const all = [];
+    onMap.forEach(x => x.pts.forEach(s => all.push(s.geo)));
+    if (!all.length) return;
+    const rad = Math.PI / 180;
+    const mean = (pts) => {
+      let vx = 0, vy = 0, vz = 0;
+      pts.forEach(p => { vx += Math.cos(p.lat * rad) * Math.cos(p.lng * rad); vy += Math.cos(p.lat * rad) * Math.sin(p.lng * rad); vz += Math.sin(p.lat * rad); });
+      return { lng: Math.atan2(vy, vx) / rad, lat: Math.atan2(vz, Math.sqrt(vx * vx + vy * vy)) / rad };
+    };
+    const center = mean(onMap.map(x => mean(x.pts.map(s => s.geo))));
+    const spread = Math.max.apply(null, all.map(p => geoDistanceKm(center, p)));
+    const anim = worldFitted && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    worldFitted = true;
+    if (all.length > 1 && spread <= 3500){
+      const b = new maplibregl.LngLatBounds();
+      all.forEach(p => b.extend([p.lng, p.lat]));
+      worldMap.fitBounds(b, { padding: 50, maxZoom: 6, duration: anim ? 700 : 0 });
+      return;
+    }
+    const lat = Math.max(-25, Math.min(40, center.lat));
+    // The globe's on-screen radius is 512·2^zoom / (2π·cos(lat)); pick the zoom that makes it fill ~85% of the box.
+    const el = worldMap.getContainer();
+    const box = Math.min(el.clientWidth, el.clientHeight);
+    const zoom = all.length === 1 ? 4 : Math.log2(0.85 * box * Math.PI * Math.cos(lat * rad) / 512);
+    worldMap.easeTo({ center: [center.lng, lat], zoom, duration: anim ? 700 : 0 });
+  }
+  function tripWorldCard(d){
+    const el = document.getElementById('trip-world-card');
+    const x = worldSelId ? d.all.find(y => y.t.id === worldSelId) : null;
+    if (!x){ el.innerHTML = '<p class="trip-world-hint">Tap a route to see the trip.</p>'; return; }
+    const gallery = tripGallery(x.t, x.linked);
+    const cover = tripCoverUrl(x.t, gallery);
+    const parts = [otdPlural(x.stops.length, 'stop', 'stops')];
+    if (x.linked.visits.length) parts.push(otdPlural(x.linked.visits.length, 'meal', 'meals'));
+    if (x.linked.hikes.length) parts.push(otdPlural(x.linked.hikes.length, 'hike', 'hikes'));
+    el.innerHTML = '<button type="button" class="trip-world-trip" data-trip-id="' + escapeAttr(x.t.id) + '">' +
+      (cover ? '<img class="trip-world-thumb" src="' + escapeAttr(cloudinaryThumbUrl(cover, 160)) + '" alt="">' : '<span class="trip-world-thumb ph" aria-hidden="true">🧳</span>') +
+      '<span class="trip-world-text"><b>' + escapeHtml(x.t.name || 'Untitled trip') + '</b><span class="trip-world-date">' + escapeHtml(tripDateLabel(x.t)) + '</span>' +
+      '<span class="trip-world-meta">' + escapeHtml(parts.join(' · ')) + '</span></span><span class="trip-world-go" aria-hidden="true">›</span></button>';
+  }
+  document.getElementById('trip-world-card').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-trip-id]');
+    if (b) openTrip(b.dataset.tripId);
+  });
+  document.getElementById('trip-world-years').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-world-year]');
+    if (!b) return;
+    worldYear = b.dataset.worldYear;
+    worldSelId = null;
+    renderTripWorld();
+  });
+
+  // Visited countries, lightly shaded on the globe. Matched by country name
+  // first, then by which country outline contains the pin. The outlines are
+  // a small public world map, loaded only for this view.
+  const WORLD_NAME_ALIASES = { 'united states': 'united states of america', 'czech republic': 'czechia', 'south korea': 's korea', 'republic of korea': 's korea', 'north korea': 'n korea',
+    'bosnia and herzegovina': 'bosnia and herz', 'dominican republic': 'dominican rep', 'democratic republic of the congo': 'dem rep congo', 'central african republic': 'central african rep',
+    'south sudan': 's sudan', 'equatorial guinea': 'eq guinea', 'solomon islands': 'solomon is', 'falkland islands': 'falkland is', 'ivory coast': "côte d'ivoire", 'eswatini': 'eswatini', 'north macedonia': 'macedonia' };
+  async function tripWorldVisitedCountries(onMap){
+    const empty = { type: 'FeatureCollection', features: [] };
+    if (!onMap.length) return empty;
+    try{
+      if (!worldCountries){
+        const topo = await loadScriptOnce(TOPOJSON_URL, 'topojson').then(() => fetch(WORLD_ATLAS_URL)).then(r => { if (!r.ok) throw new Error('world map'); return r.json(); });
+        worldCountries = topojson.feature(topo, topo.objects.countries).features;
+      }
+    }catch(e){ return empty; }
+    const norm = (s) => String(s || '').toLowerCase().replace(/\./g, '').trim();
+    const byName = new Map(worldCountries.map(f => [norm(f.properties.name), f]));
+    const hit = new Set();
+    onMap.forEach(x => x.pts.forEach(s => {
+      const n = norm(s.geo.country);
+      const f = byName.get(WORLD_NAME_ALIASES[n] || n) || worldCountries.find(c => geoInFeature(s.geo, c));
+      if (f) hit.add(f);
+    }));
+    return { type: 'FeatureCollection', features: Array.from(hit) };
+  }
+  function geoInRing(p, ring){
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+      const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if (((yi > p.lat) !== (yj > p.lat)) && (p.lng < (xj - xi) * (p.lat - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function geoInFeature(p, f){
+    const g = f.geometry;
+    if (!g) return false;
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+    return polys.some(poly => geoInRing(p, poly[0]) && !poly.slice(1).some(hole => geoInRing(p, hole)));
+  }
+
+  applyTripsView();
 
   // ---------- TRIPS: import from Lambus ----------
   // Lambus can export a trip as a PDF (plan + map + daily pages). Only the
