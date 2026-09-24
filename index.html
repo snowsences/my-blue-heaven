@@ -329,7 +329,8 @@
   }
   #details-panel, #restaurant-details-panel, #hike-details-panel,
   #road-details-panel, #artist-details-panel, #park-details-panel{
-    background: linear-gradient(to bottom, var(--panel-tint) var(--tint-start, 0px), var(--panel) calc(var(--tint-start, 0px) + 780px)) var(--panel);
+    /* fades into the panel color taken halfway to black (#1D3B3F → #0F1E20), which is also the rest of the tray */
+    background: linear-gradient(to bottom, var(--panel-tint) var(--tint-start, 0px), #0F1E20 calc(var(--tint-start, 0px) + 780px)) #0F1E20;
     background-attachment: local;
     transition: width 0.38s var(--ease-out), --panel-tint 0.45s ease;
   }
@@ -1103,7 +1104,6 @@
     justify-content: space-between;
     gap: 12px;
     padding: 6px 0;
-    border-bottom: 1px solid var(--panel-line);
     font-size: 13px;
   }
   .details-track-name{ flex: 1; }
@@ -4861,7 +4861,7 @@
     #details-panel, #restaurant-details-panel, #hike-details-panel, #road-details-panel,
     #park-details-panel, #artist-details-panel, #hike-full-list-panel, #dish-full-list-panel{
       border-left: none;
-      box-shadow: 60px 0 0 0 var(--panel);
+      box-shadow: 60px 0 0 0 #0F1E20; /* matches the tray's dark base */
       transition: transform 0.3s cubic-bezier(0.37, 0, 0.63, 1), visibility 0s linear 0.3s, --panel-tint 0.45s ease; /* closing: easeInOutSine */
     }
     #details-panel.open, #restaurant-details-panel.open, #hike-details-panel.open, #road-details-panel.open,
