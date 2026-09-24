@@ -4455,7 +4455,7 @@
     }
     [id^="nature-sub-tabs-"] .group-sub-tab-btn, [id^="art-sub-tabs-"] .group-sub-tab-btn{
       text-overflow: clip;
-      text-align: left; /* buttons center by default — keep the first label flush with the page's left edge */
+      text-align: center; /* each label and emoji centered in its quarter of the row, like Music and Food */
     }
 
     /* Music and Food: same idea, but with only two tabs each gets half the
@@ -4469,7 +4469,6 @@
     }
     /* Equal-width tabs on a phone: a little room each side of every label, the first flush left. */
     .group-sub-tabs .group-sub-tab-btn{ padding-left: 4px; padding-right: 4px; }
-    [id^="nature-sub-tabs-"] .group-sub-tab-btn:first-child, [id^="art-sub-tabs-"] .group-sub-tab-btn:first-child{ padding-left: 0; }
     [id^="music-sub-tabs"] .group-sub-tab-btn, [id^="food-sub-tabs"] .group-sub-tab-btn, [id^="tools-sub-tabs"] .group-sub-tab-btn{
       flex: 1 1 0;
       min-width: 0;
