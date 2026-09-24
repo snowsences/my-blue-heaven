@@ -2718,12 +2718,7 @@
   .trip-map-cap{ display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; background: var(--panel); font-size: 12.5px; color: var(--chalk-dim); }
   .trip-map-cap b{ color: var(--chalk); font-size: 13px; }
   .trip-map-overview.empty .trip-map-expand{ display: none; }
-  .trip-stop-chips{ display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .trip-stop-chips::-webkit-scrollbar{ display: none; }
-  .trip-stop-chip{ flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 5px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--panel-line); color: var(--chalk); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
-  .trip-stop-chip:hover{ border-color: rgba(232,163,61,0.5); }
   .trip-stop-num{ flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--chalk); color: var(--ink); font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
-  .trip-stop-dates{ color: var(--chalk-dim); font-weight: 500; }
   .trip-fix-pins{ justify-self: start; padding: 5px 12px; font-size: 12.5px; color: var(--chalk-dim); }
   .trip-needs-pin{ font-size: 13px; color: var(--amber); border-color: rgba(232,163,61,0.5); }
   /* A stop on the map: the numbered circle sits exactly on the place, its name to the right. */
@@ -7809,7 +7804,7 @@
           }
           if (total > 0){
             const [h, sat] = rgbToHsl(r / total, g / total, b / total);
-            color = 'hsl(' + Math.round(h) + ', ' + Math.round(Math.min(sat * 1.35, 0.82) * 100) + '%, 22%)'; // deep, and richly colored
+            color = 'hsl(' + Math.round(h) + ', ' + Math.round(Math.min(sat * 1.35, 0.82) * 100) + '%, 17.6%)'; // deep, and richly colored
           }
         }catch(e){ /* cross-origin without CORS — leave untinted */ }
         coverTintCache.set(url, color);
@@ -21857,7 +21852,6 @@
     let el;
     if ((el = e.target.closest('[data-trip-view]'))){ tripView = el.dataset.tripView; tripRender(); return; }
     if ((el = e.target.closest('[data-trip-map-open]'))){ if (!el.classList.contains('empty')) openTripMap(t); return; }
-    if ((el = e.target.closest('[data-trip-stop]'))){ const s = tripStops(t, tripLinked(t))[Number(el.dataset.tripStop)]; if (s) tripScrollToStop(s); return; }
     if ((el = e.target.closest('[data-trip-pins]'))){ tripOpenPinsSheet(t); return; }
     if ((el = e.target.closest('[data-trip-photo]'))){
       openPhotoLightbox(tripCurrentGallery.map(g => g.url), Number(el.dataset.tripPhoto) || 0, guestViewEnabled ? null : { tripId: t.id });
@@ -22885,17 +22879,11 @@
   function tripMapBlockHtml(t, stops, owner){
     if (!stops.length) return '';
     const needs = stops.filter(tripStopNeedsPin).length;
-    const chips = stops.map((s, i) => {
-      const span = tripSpanLabel(s.days);
-      return '<button type="button" class="trip-stop-chip" data-trip-stop="' + i + '"><span class="trip-stop-num">' + (i + 1) + '</span>' +
-        '<span class="trip-stop-name">' + escapeHtml(s.name) + '</span>' + (span ? '<span class="trip-stop-dates">' + escapeHtml(span) + '</span>' : '') + '</button>';
-    }).join('');
     return '<section class="trip-map-block">' +
       '<button type="button" class="trip-map-overview" data-trip-map-open="1" aria-label="Open the map of this trip\'s route">' +
         '<span class="trip-map-slot"></span>' +
         '<span class="trip-map-cap"><b>' + escapeHtml(tripStopsSummary(stops)) + '</b><span class="trip-map-expand">Expand ⤢</span></span>' +
       '</button>' +
-      '<div class="trip-stop-chips">' + chips + '</div>' +
       (owner ? '<button type="button" class="btn-ghost trip-owner trip-fix-pins' + (needs ? ' trip-needs-pin' : '') + '" data-trip-pins="1">📍 ' +
         (needs ? (needs === 1 ? '1 place needs a pin' : needs + ' places need a pin') : 'Fix a pin') + '</button>' : '') +
     '</section>';
