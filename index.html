@@ -1180,17 +1180,21 @@
      levels of hierarchy, so styled distinctly from .tab-switcher/.tab-btn
      rather than reusing them. */
   .group-sub-tabs{
+    position: relative;
     display: flex;
     align-items: flex-end; /* every tab's underline on one line */
-    gap: 24px;
-    margin: 0 0 8px;
+    gap: 0; /* tabs touch, so the underline runs unbroken */
+    width: 100%; flex: 1 0 100%; /* and the row spans the page, so the line does too */
+    margin: -10px 0 8px;
     flex-wrap: wrap;
   }
+  /* One barely-visible line across the whole row; the selected tab draws its amber line over it. */
+  .group-sub-tabs::after{ content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: rgba(241,236,222,0.1); pointer-events: none; }
   .group-sub-tab-btn{
     position: relative;
     background: none;
     border: none;
-    padding: 0 0 10px;
+    padding: 0 12px 16px;
     font-family: 'Figtree', sans-serif;
     font-weight: 400;
     letter-spacing: 0.01em;
@@ -1203,8 +1207,8 @@
   .group-sub-tab-btn .group-sub-tab-icon{ font-size: 0.7em; margin-right: 6px; }
   .group-sub-tab-btn:hover{ color: var(--chalk); }
   .group-sub-tab-btn.active{ color: var(--chalk); font-weight: 700; }
-  .group-sub-tab-btn::after{ content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: rgba(241,236,222,0.1); }
-  .group-sub-tab-btn.active::after{ height: 2px; background: var(--amber); }
+  .group-sub-tab-btn:first-child{ padding-left: 0; }
+  .group-sub-tab-btn.active::after{ content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--amber); z-index: 1; }
   .page-heading-row{
     display: flex;
     align-items: center;
@@ -2697,12 +2701,12 @@
   .trip-gx{ position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; padding: 0; border: none; border-radius: 999px; background: rgba(10, 22, 24, 0.75); color: var(--chalk); font-size: 12px; cursor: pointer; }
   /* ---------- TRIP MAPS (see TRIP MAPS in the script) ---------- */
   .trip-map-block{ display: grid; gap: 10px; margin-top: 16px; }
-  .trip-map-overview{ display: block; width: 100%; padding: 0; border: 1px solid var(--panel-line); border-radius: 16px; overflow: hidden; background: #1E3A3E; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .trip-map-overview{ display: block; width: 100%; padding: 0; border: 1px solid var(--panel-line); border-radius: 16px; overflow: hidden; background: var(--panel); color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .trip-map-overview:focus-visible{ outline: 2px solid var(--amber); outline-offset: 2px; }
   .trip-map-overview.empty{ cursor: default; }
   .trip-map-slot{ position: relative; display: block; height: clamp(170px, 42vw, 260px); }
   .trip-map-overview.empty .trip-map-slot{ height: 88px; display: flex; align-items: center; justify-content: center; }
-  .trip-map-slot .trip-map-canvas{ position: absolute; inset: 0; } /* beats MapLibre's own position: relative on map containers */
+  .trip-map-slot .trip-map-canvas{ position: absolute; inset: 0; background: #F5F5F5; } /* beats MapLibre's own position: relative on map containers */
   .trip-map-overview .tmap-stop{ pointer-events: none; }
   .trip-map-msg{ font-size: 13px; color: var(--chalk-dim); }
   .trip-map-cap{ display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; background: var(--panel); font-size: 12.5px; color: var(--chalk-dim); }
@@ -2716,18 +2720,19 @@
   .trip-stop-chip:hover{ border-color: rgba(232,163,61,0.5); }
   .trip-stop-num{ flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--chalk); color: var(--ink); font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
   .trip-stop-dates{ color: var(--chalk-dim); font-weight: 500; }
-  .trip-needs-pin{ justify-self: start; font-size: 13px; color: var(--amber); border-color: rgba(232,163,61,0.5); }
+  .trip-fix-pins{ justify-self: start; padding: 5px 12px; font-size: 12.5px; color: var(--chalk-dim); }
+  .trip-needs-pin{ font-size: 13px; color: var(--amber); border-color: rgba(232,163,61,0.5); }
   /* A stop on the map: the numbered circle sits exactly on the place, its name to the right. */
   .tmap-stop{ position: relative; width: 24px; height: 24px; padding: 0; border: none; background: none; font-family: 'Figtree', sans-serif; cursor: pointer; }
-  .tmap-stop-num{ position: absolute; inset: 0; border-radius: 50%; background: var(--chalk); color: var(--ink); border: 2px solid var(--bg-2); box-shadow: 0 2px 6px rgba(0,0,0,0.45); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; transition: transform 0.15s ease; }
-  .tmap-stop-name{ position: absolute; left: 30px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: var(--chalk);
-    text-shadow: 0 0 3px #1E3A3E, 0 0 3px #1E3A3E, 0 0 6px #1E3A3E; }
-  .tmap-stop.sel .tmap-stop-num{ background: var(--amber); transform: scale(1.2); box-shadow: 0 0 0 6px rgba(232,163,61,0.25), 0 2px 6px rgba(0,0,0,0.45); }
+  .tmap-stop-num{ position: absolute; inset: 0; border-radius: 50%; background: #FFFFFF; color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; transition: transform 0.15s ease; }
+  .tmap-stop-name{ position: absolute; left: 30px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: #202124;
+    text-shadow: 0 0 2px #FFFFFF, 0 0 2px #FFFFFF, 0 0 4px #FFFFFF, 0 0 6px #FFFFFF; }
+  .tmap-stop.sel .tmap-stop-num{ background: var(--amber); transform: scale(1.2); box-shadow: 0 0 0 6px rgba(232,163,61,0.3), 0 2px 5px rgba(0,0,0,0.3); }
   .tmap-stop:focus-visible .tmap-stop-num{ outline: 2px solid var(--amber); outline-offset: 2px; }
   .tmap-overlay{ position: fixed; inset: 0; z-index: 195; /* above the trip screen (190), below details panels (200) and the little sheets */ visibility: hidden; pointer-events: none; opacity: 0; transition: opacity 0.2s ease, visibility 0s linear 0.2s; background: var(--bg); }
   .tmap-overlay.open{ visibility: visible; pointer-events: auto; opacity: 1; transition-delay: 0s; }
   .tmap-panel{ position: absolute; inset: 0; }
-  .tmap-panel .tmap-map{ position: absolute; inset: 0; background: #1E3A3E; } /* beats MapLibre's own position: relative on map containers */
+  .tmap-panel .tmap-map{ position: absolute; inset: 0; background: #F5F5F5; } /* beats MapLibre's own position: relative on map containers */
   .tmap-map .maplibregl-ctrl-top-right{ top: calc(60px + env(safe-area-inset-top, 0px)); }
   .tmap-top{ position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; pointer-events: none; }
   .tmap-top > *{ pointer-events: auto; }
@@ -2780,10 +2785,29 @@
   .trip-world-stat{ padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--panel-line); }
   .trip-world-stat b{ display: block; font-size: 22px; font-weight: 800; line-height: 1.1; color: var(--amber); font-variant-numeric: tabular-nums; }
   .trip-world-stat span{ font-size: 12px; color: var(--chalk-dim); }
-  .trip-world-map{ height: clamp(320px, 62vh, 620px); border-radius: 18px; overflow: hidden; border: 1px solid var(--panel-line); background: radial-gradient(circle at 50% 45%, #16303A 0%, var(--bg-2) 70%); }
+  /* Deep space behind the globe: three layers of stars at different sizes and
+     spacings (so the pattern never visibly repeats) over a dark blue glow. */
+  .trip-world-map{
+    height: clamp(320px, 62vh, 620px); border-radius: 18px; overflow: hidden; border: 1px solid var(--panel-line);
+    background-color: #03060D;
+    background-image:
+      radial-gradient(1.2px 1.2px at 12% 18%, rgba(255,255,255,0.95), transparent 70%),
+      radial-gradient(1px 1px at 68% 9%, rgba(255,255,255,0.8), transparent 70%),
+      radial-gradient(1.4px 1.4px at 83% 64%, rgba(210,225,255,0.9), transparent 70%),
+      radial-gradient(1px 1px at 37% 77%, rgba(255,255,255,0.75), transparent 70%),
+      radial-gradient(1px 1px at 55% 40%, rgba(255,240,220,0.7), transparent 70%),
+      radial-gradient(0.8px 0.8px at 25% 55%, rgba(255,255,255,0.6), transparent 70%),
+      radial-gradient(0.8px 0.8px at 91% 28%, rgba(255,255,255,0.65), transparent 70%),
+      radial-gradient(1.6px 1.6px at 6% 88%, rgba(200,215,255,0.85), transparent 70%),
+      radial-gradient(0.7px 0.7px at 47% 13%, rgba(255,255,255,0.5), transparent 70%),
+      radial-gradient(0.7px 0.7px at 74% 92%, rgba(255,255,255,0.5), transparent 70%),
+      radial-gradient(0.9px 0.9px at 33% 33%, rgba(255,255,255,0.55), transparent 70%),
+      radial-gradient(ellipse at 50% 45%, rgba(40,70,130,0.35) 0%, rgba(10,20,45,0.2) 45%, transparent 75%);
+    background-size: 173px 173px, 173px 173px, 173px 173px, 173px 173px, 251px 251px, 251px 251px, 251px 251px, 331px 331px, 331px 331px, 331px 331px, 331px 331px, 100% 100%;
+  }
   .trip-world-legend{ display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--chalk-dim); }
   .trip-world-legend:empty{ display: none; }
-  .trip-world-legend i{ display: inline-block; width: 16px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .trip-world-legend i{ display: inline-block; width: 16px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; box-shadow: 0 0 0 1px rgba(241,236,222,0.25); }
   .trip-world-note{ margin: 0; font-size: 13px; color: var(--chalk-dim); }
   .trip-world-hint{ margin: 0; font-size: 13px; color: var(--chalk-dim); text-align: center; }
   .trip-world-trip{ width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; color: var(--chalk); font-family: 'Figtree', sans-serif; text-align: left; cursor: pointer; }
@@ -2797,6 +2821,35 @@
   @media (prefers-reduced-motion: reduce){
     .tmap-overlay, .tmap-stop-num{ transition: none; }
   }
+  /* ---------- TRIPS: the year bar (see renderTripYearBar) ---------- */
+  .trip-year-bar{
+    position: sticky;
+    top: var(--desktop-nav-height); /* just under the fixed top nav (and the backup banner when it shows) */
+    z-index: 20;
+    margin: 0 -20px 18px;
+    padding: 10px 20px 8px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--panel-line);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .trip-year-bar::-webkit-scrollbar{ display: none; }
+  .trip-year-bar[hidden]{ display: none; }
+  .trip-year-rail{ position: relative; display: inline-flex; min-width: 100%; gap: 6px; }
+  /* the horizontal timeline's line, running through every dot */
+  .trip-year-rail::before{ content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--panel-line); border-radius: 1px; }
+  .trip-year-btn{ position: relative; flex: none; display: grid; justify-items: center; gap: 4px; min-width: 56px; padding: 4px 6px 2px; background: none; border: none; color: var(--chalk-dim); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
+  .trip-year-btn:first-child{ padding-left: 0; }
+  .trip-year-dot{ width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid rgba(241,236,222,0.35); transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease; }
+  .trip-year-btn:hover{ color: var(--chalk); }
+  .trip-year-btn.active{ color: var(--chalk); font-weight: 800; }
+  .trip-year-btn.active .trip-year-dot{ background: var(--amber); border-color: var(--amber); transform: scale(1.3); box-shadow: 0 0 0 4px rgba(232,163,61,0.22); }
+  .trip-year-btn:focus-visible{ outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 8px; }
+  @media (max-width: 768px){
+    .trip-year-bar{ top: env(safe-area-inset-top, 0px); }
+    body.export-reminder-active .trip-year-bar{ top: calc(40px + env(safe-area-inset-top, 0px)); }
+  }
+  @media (prefers-reduced-motion: reduce){ .trip-year-dot{ transition: none; } }
   /* owner-only bits vanish in Guest View, which is read-only */
   body.guest-view-active .trip-owner, body.guest-view-active #trip-new-btn, body.guest-view-active #trip-edit-btn,
   body.guest-view-active .trip-link-btn, body.guest-view-active .row-trip-btn{ display: none !important; }
@@ -3490,7 +3543,7 @@
      stretch across a wide screen. In rearrange mode Save Order / Cancel take
      the buttons' places. */
   #page-restaurants .restaurant-heading-actions{ flex: 1 1 100%; margin-bottom: 12px; }
-  #page-restaurants .restaurant-heading-actions .filter-wrap{ flex: 1 1 96px; min-width: 0; max-width: 320px; }
+  #page-restaurants .restaurant-heading-actions .filter-wrap{ flex: 1 1 96px; min-width: 0; max-width: 320px; order: -1; } /* search sits left of Edit / + New */
   #page-restaurants .restaurant-heading-actions .restaurant-search-filter-input{ width: 100%; max-width: none; }
   /* Songs: same treatment as Album Rankings' row — the two filters share the
      line with the Edit button, shrinking together to make room, instead of
@@ -3505,6 +3558,8 @@
   /* Hikes: line 1 is toggle · Edit · + New, left to right; the search field takes line 2 at full width. */
   #page-hikes .restaurant-heading-actions{ flex: 1 1 100%; margin-bottom: 12px; }
   #page-hikes .restaurant-heading-actions .filter-wrap{ flex: 1 1 100%; min-width: 0; }
+  /* List / Grid stays left; Edit (or Save Order in edit mode) and + New go right. */
+  #hike-rearrange-btn, #hike-rearrange-save-btn{ margin-left: auto; }
   #page-hikes .restaurant-heading-actions .filter-input{ width: 100%; max-width: none; }
   /* Parks and Roads: a filter on the left taking the space, the buttons pinned to the right. */
   #page-parks .restaurant-heading-actions, #page-roads .restaurant-heading-actions{ flex: 1 1 100%; flex-wrap: nowrap; margin-bottom: 12px; }
@@ -4379,7 +4434,7 @@
        case "Photos"/"Movies" (the longest labels) need a bit more room. */
     [id^="nature-sub-tabs-"], [id^="art-sub-tabs-"]{
       flex-wrap: nowrap;
-      gap: 10px;
+      gap: 0;
     }
     [id^="nature-sub-tabs-"] .group-sub-tab-btn, [id^="art-sub-tabs-"] .group-sub-tab-btn{
       flex: 1 1 0;
@@ -4396,7 +4451,7 @@
        cleanly at the tab's edge — no ellipsis. */
     [id^="nature-sub-tabs-"], [id^="art-sub-tabs-"]{
       flex: 1 0 100%;
-      gap: 6px;
+      gap: 0;
     }
     [id^="nature-sub-tabs-"] .group-sub-tab-btn, [id^="art-sub-tabs-"] .group-sub-tab-btn{
       text-overflow: clip;
@@ -4410,8 +4465,11 @@
     [id^="music-sub-tabs"], [id^="food-sub-tabs"], [id^="tools-sub-tabs"]{
       width: 100%;
       flex-wrap: nowrap;
-      gap: 6px;
+      gap: 0;
     }
+    /* Equal-width tabs on a phone: a little room each side of every label, the first flush left. */
+    .group-sub-tabs .group-sub-tab-btn{ padding-left: 4px; padding-right: 4px; }
+    [id^="nature-sub-tabs-"] .group-sub-tab-btn:first-child, [id^="art-sub-tabs-"] .group-sub-tab-btn:first-child{ padding-left: 0; }
     [id^="music-sub-tabs"] .group-sub-tab-btn, [id^="food-sub-tabs"] .group-sub-tab-btn, [id^="tools-sub-tabs"] .group-sub-tab-btn{
       flex: 1 1 0;
       min-width: 0;
@@ -4435,7 +4493,7 @@
        sits in, a fixed-position child usually doesn't affect layout, but
        this guards against any stray horizontal scroll on the shell itself.
     */
-    #page-shell{ overflow-x: hidden; }
+    #page-shell{ overflow-x: clip; } /* clip, not hidden: hidden would make this a scroll box and stop sticky bars (the Trips year bar, reorder bars) from sticking */
     /* The nav moves to the bottom on mobile (further down this block) — the
        top of the viewport is clear here, unlike on desktop, so this reverts
        both reorder bars back to a plain 12px rather than clearing a fixed
@@ -5666,6 +5724,7 @@
         <button class="btn-ghost" id="trip-import-btn" type="button" aria-label="Import a trip from Lambus">Import</button>
         <button class="btn-primary" id="trip-new-btn" type="button" aria-label="New trip">+ New</button>
       </div>
+      <nav class="trip-year-bar" id="trip-year-bar" aria-label="Jump to a year" hidden><div class="trip-year-rail" id="trip-year-rail"></div></nav>
       <div class="trip-grid" id="trip-grid"></div>
       <div class="trip-world" id="trip-world" hidden>
         <div class="trip-world-years" id="trip-world-years"></div>
@@ -21153,7 +21212,7 @@
         // A marker before any trip has appeared sits above the first dot — no line there.
         // Every later marker is sandwiched between two trips, so its line always runs full.
         const markerLine = spineStarted ? '<span class="trip-tl-line trip-tl-line-full"></span>' : '';
-        html += '<div class="trip-tl-year"><span class="trip-tl-spine-col">' + markerLine + '</span><span class="trip-tl-year-label">' + escapeHtml(year) + '</span></div>';
+        html += '<div class="trip-tl-year" data-year="' + escapeAttr(year) + '"><span class="trip-tl-spine-col">' + markerLine + '</span><span class="trip-tl-year-label">' + escapeHtml(year) + '</span></div>';
         lastYear = year;
       }
       const isLast = i === trips.length - 1;
@@ -21178,7 +21237,72 @@
     tripGridEl.innerHTML = html;
     tripGridEl.querySelectorAll('.trip-card-img').forEach(img => img.addEventListener('error', () => img.remove()));
     if (tripsViewMode === 'world'){ tripEmptyMsg.style.display = 'none'; tripWorldRefreshSoon(); }
+    renderTripYearBar();
   }
+
+  // ---------- the year bar above the trips timeline ----------
+  // A horizontal timeline of years that stays pinned at the top while the
+  // vertical timeline scrolls under it. The year you're scrolled to lights
+  // up (and slides into view along the bar); tapping a year scrolls the
+  // list to it.
+  const tripYearBar = document.getElementById('trip-year-bar');
+  const tripYearRail = document.getElementById('trip-year-rail');
+  let tripYearActive = null;
+  function renderTripYearBar(){
+    const counts = new Map();
+    tripSorted().forEach(t => { const y = String(t.startDate || '').slice(0, 4); if (y) counts.set(y, (counts.get(y) || 0) + 1); });
+    const years = Array.from(counts.keys()); // newest first, same order as the list
+    tripYearBar.hidden = tripsViewMode === 'world' || years.length < 2;
+    if (tripYearBar.hidden) return;
+    if (years.indexOf(tripYearActive) === -1) tripYearActive = years[0];
+    tripYearRail.innerHTML = years.map(y =>
+      '<button type="button" class="trip-year-btn' + (y === tripYearActive ? ' active' : '') + '" data-year="' + escapeAttr(y) + '" aria-label="' + escapeAttr(y + ', ' + otdPlural(counts.get(y), 'trip', 'trips')) + '"' + (y === tripYearActive ? ' aria-current="true"' : '') + '>' +
+        '<span class="trip-year-dot" aria-hidden="true"></span><span class="trip-year-label">' + escapeHtml(y) + '</span></button>').join('');
+    tripYearSync();
+  }
+  // Where the bar's bottom edge sits once it's stuck — markers above this line have been scrolled past.
+  function tripYearLine(){ return tripYearBar.getBoundingClientRect().bottom + 12; }
+  function tripYearSetActive(y, smooth){
+    if (!y) return;
+    const changed = y !== tripYearActive;
+    tripYearActive = y;
+    let activeBtn = null;
+    tripYearRail.querySelectorAll('.trip-year-btn').forEach(b => {
+      const on = b.dataset.year === y;
+      b.classList.toggle('active', on);
+      if (on){ b.setAttribute('aria-current', 'true'); activeBtn = b; } else b.removeAttribute('aria-current');
+    });
+    if (activeBtn && (changed || !smooth)){
+      const left = activeBtn.offsetLeft - (tripYearBar.clientWidth - activeBtn.offsetWidth) / 2;
+      tripYearBar.scrollTo({ left: Math.max(0, left), behavior: smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
+    }
+  }
+  function tripYearSync(){
+    if (tripYearBar.hidden || !document.getElementById('page-trips').classList.contains('active')) return;
+    const markers = Array.from(tripGridEl.querySelectorAll('.trip-tl-year[data-year]'));
+    if (!markers.length) return;
+    const line = tripYearLine();
+    let y = markers[0].dataset.year;
+    markers.forEach(m => { if (m.getBoundingClientRect().top <= line) y = m.dataset.year; });
+    // At the very bottom the last year may be too short to reach the top — it's still the one you're looking at.
+    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) y = markers[markers.length - 1].dataset.year;
+    tripYearSetActive(y, true);
+  }
+  let tripYearTicking = false;
+  window.addEventListener('scroll', () => {
+    if (tripYearTicking) return;
+    tripYearTicking = true;
+    requestAnimationFrame(() => { tripYearTicking = false; tripYearSync(); });
+  }, { passive: true });
+  tripYearRail.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-year]');
+    if (!b) return;
+    const marker = tripGridEl.querySelector('.trip-tl-year[data-year="' + CSS.escape(b.dataset.year) + '"]');
+    if (!marker) return;
+    tripYearSetActive(b.dataset.year, true);
+    const top = marker.getBoundingClientRect().top + window.scrollY - (tripYearLine() - 12) - 4;
+    window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
   tripGridEl.addEventListener('click', (e) => {
     const card = e.target.closest('[data-trip-id]');
     if (card) openTrip(card.dataset.tripId);
@@ -22203,8 +22327,11 @@
   const MAPLIBRE_BASE = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/';
   const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
   const TOPOJSON_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js';
-  const MAP_LAND = '#1E3A3E', MAP_WATER = '#10262A', MAP_PARK = '#21423A';
-  const TRIP_YEAR_COLORS = ['#E8A33D', '#6FB7D6', '#5FBF77', '#C8593F', '#B9A2E0', '#F1ECDE', '#E58FB6', '#8FD3C1'];
+  // The classic Google Maps palette, from before its 2023 redesign: light grey
+  // land, that familiar sky-blue water, soft green parks, yellow highways.
+  const MAP_LAND = '#F5F5F5', MAP_WATER = '#AADAFF', MAP_PARK = '#C5E8C5', MAP_HIGHWAY = '#FDE293';
+  // Route colors by year, newest first — strong enough to read on both the light land and the blue water.
+  const TRIP_YEAR_COLORS = ['#E0891A', '#D2453B', '#2E9E5B', '#7B4FC9', '#1F7FB8', '#C2407E', '#8B5A2B', '#0F7C80'];
 
   function loadScriptOnce(src, globalName){
     if (window[globalName]) return Promise.resolve(window[globalName]);
@@ -22231,8 +22358,8 @@
     return loadScriptOnce(MAPLIBRE_BASE + 'maplibre-gl.js', 'maplibregl');
   }
 
-  // A quiet map in the app's own colors — land, water, parks, borders and
-  // place names only, so the route is what stands out.
+  // A quiet map — land, water, parks, borders, big roads and place names
+  // only, so the route is what stands out.
   function tripMapStyle(globe){
     const name = ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name']];
     const label = (id, classes, minzoom, maxzoom, size, font, color, upper) => ({
@@ -22243,11 +22370,13 @@
         'text-transform': upper ? 'uppercase' : 'none', 'text-letter-spacing': upper ? 0.12 : 0,
         'text-max-width': 8, 'symbol-sort-key': ['coalesce', ['get', 'rank'], 99]
       },
-      paint: { 'text-color': color, 'text-halo-color': MAP_LAND, 'text-halo-width': 1.2 }
+      paint: { 'text-color': color, 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.4 }
     });
     return {
       version: 8,
       projection: { type: globe ? 'globe' : 'mercator' },
+      // A soft atmosphere glow around the globe, fading out as you zoom in.
+      sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
       glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
       sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' } },
       layers: [
@@ -22258,17 +22387,20 @@
           filter: ['==', ['get', 'class'], 'river'],
           paint: { 'line-color': MAP_WATER, 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.6, 12, 2.5] } },
         { id: 'roads', type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 6,
-          filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary']]],
-          paint: { 'line-color': 'rgba(241,236,222,0.07)', 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 2] } },
+          filter: ['in', ['get', 'class'], ['literal', ['trunk', 'primary']]],
+          paint: { 'line-color': '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.6, 12, 3] } },
+        { id: 'highways', type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 5,
+          filter: ['==', ['get', 'class'], 'motorway'],
+          paint: { 'line-color': MAP_HIGHWAY, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.7, 12, 3.5] } },
         { id: 'borders-state', type: 'line', source: 'ofm', 'source-layer': 'boundary', minzoom: 3,
           filter: ['all', ['==', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]],
-          paint: { 'line-color': 'rgba(241,236,222,0.12)', 'line-width': 0.7, 'line-dasharray': [3, 2] } },
+          paint: { 'line-color': '#B0B0B0', 'line-width': 0.8, 'line-dasharray': [3, 2] } },
         { id: 'borders-country', type: 'line', source: 'ofm', 'source-layer': 'boundary',
           filter: ['all', ['==', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]],
-          paint: { 'line-color': 'rgba(241,236,222,0.26)', 'line-width': 0.8 } },
-        label('labels-country', ['country'], 1, 6, 10, 'Noto Sans Bold', 'rgba(241,236,222,0.42)', true),
-        label('labels-state', ['state'], 4.5, 8, 10, 'Noto Sans Regular', 'rgba(241,236,222,0.32)', true),
-        label('labels-city', ['city', 'town'], 4, 24, ['interpolate', ['linear'], ['zoom'], 4, 10, 10, 13], 'Noto Sans Regular', 'rgba(241,236,222,0.6)', false)
+          paint: { 'line-color': '#8F8F8F', 'line-width': 1 } },
+        label('labels-country', ['country'], 1, 6, 10, 'Noto Sans Bold', '#6B6B6B', true),
+        label('labels-state', ['state'], 4.5, 8, 10, 'Noto Sans Regular', '#8A8A8A', true),
+        label('labels-city', ['city', 'town'], 4, 24, ['interpolate', ['linear'], ['zoom'], 4, 10, 10, 13], 'Noto Sans Regular', '#4F4F4F', false)
       ]
     };
   }
@@ -22304,7 +22436,11 @@
     geoQueue = run.catch(() => {});
     return run;
   }
-  const GEO_KINDS = new Set(['city', 'town', 'village', 'hamlet', 'municipality', 'suburb', 'island', 'state', 'county', 'region', 'province', 'national_park', 'park', 'nature_reserve', 'protected_area', 'peak', 'volcano', 'administrative', 'country', 'locality']);
+  // The kinds of result a trip stop usually is — ranked a little higher, never required.
+  const GEO_KINDS = new Set(['city', 'town', 'village', 'hamlet', 'municipality', 'suburb', 'island', 'state', 'county', 'region', 'province', 'national_park', 'park', 'nature_reserve', 'protected_area', 'peak', 'volcano', 'administrative', 'country', 'locality',
+    'archaeological_site', 'ruins', 'historic', 'attraction', 'monument', 'castle', 'museum', 'viewpoint', 'beach', 'bay', 'peninsula', 'valley', 'glacier', 'waterfall', 'lake', 'mountain_range', 'forest', 'desert', 'cape', 'fjord', 'archipelago']);
+  // Results that are never a trip stop: a street, a bus stop, a single shop or building.
+  const GEO_SKIP_KEYS = new Set(['highway', 'building', 'shop', 'office', 'craft', 'railway', 'public_transport', 'power', 'barrier', 'emergency']);
   function geoLabel(parts){
     const out = [];
     parts.forEach(p => { p = String(p || '').trim(); if (p && out.indexOf(p) === -1) out.push(p); });
@@ -22319,7 +22455,7 @@
     return (data.features || []).filter(f => f.geometry && f.geometry.type === 'Point').map(f => {
       const p = f.properties || {};
       return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: p.name || query, state: p.state || '', country: p.country || '',
-        cc: String(p.countrycode || '').toUpperCase(), kind: p.osm_value || p.type || '', label: geoLabel([p.name || query, p.state, p.country]) };
+        cc: String(p.countrycode || '').toUpperCase(), kind: p.osm_value || p.type || '', key: p.osm_key || '', label: geoLabel([p.name || query, p.state, p.country]) };
     });
   }
   async function nominatimSearch(query){
@@ -22330,7 +22466,7 @@
       const a = d.address || {};
       const nm = d.name || String(d.display_name || query).split(',')[0];
       return { lat: Number(d.lat), lng: Number(d.lon), name: nm, state: a.state || a.region || '', country: a.country || '',
-        cc: String(a.country_code || '').toUpperCase(), kind: d.type || '', label: geoLabel([nm, a.state || a.region, a.country]) };
+        cc: String(a.country_code || '').toUpperCase(), kind: d.type || '', key: d.category || '', label: geoLabel([nm, a.state || a.region, a.country]) };
     }).filter(c => isFinite(c.lat) && isFinite(c.lng));
   }
   // Candidates for a name, best first. Throws only when both services are
@@ -22338,13 +22474,11 @@
   async function geoSearch(query, bias){
     let photonFailed = false;
     try{
-      const found = await geoThrottle(() => photonSearch(query, bias));
-      const places = found.filter(c => GEO_KINDS.has(c.kind));
-      if (places.length) return places;
+      const found = (await geoThrottle(() => photonSearch(query, bias))).filter(c => !GEO_SKIP_KEYS.has(c.key));
       if (found.length) return found;
     }catch(e){ photonFailed = true; }
     try{
-      return await geoThrottle(() => nominatimSearch(query));
+      return (await geoThrottle(() => nominatimSearch(query))).filter(c => !GEO_SKIP_KEYS.has(c.key));
     }catch(e){
       if (photonFailed) throw e;
       return [];
@@ -22397,9 +22531,11 @@
       return { c, context, score: context + (GEO_KINDS.has(c.kind) ? 0.5 : 0) + (i === 0 ? 0.8 : i === 1 ? 0.4 : 0) };
     }).sort((a, b) => b.score - a.score);
     const top = scored[0];
-    if (scored.length === 1 || scored.every(s => geoDistanceKm(s.c, top.c) < 80)) return { status: 'ok', pick: top.c };
-    if (scored.every(s => s.context === top.context)) return { status: 'ok', pick: cands[0] };
-    if (top.score - scored[1].score >= 1.5) return { status: 'ok', pick: top.c };
+    // Results within 80 km of the best one are the same place (a town and its old site, a street named after it).
+    const rivals = scored.filter(x => geoDistanceKm(x.c, top.c) >= 80);
+    if (!rivals.length) return { status: 'ok', pick: top.c };
+    if (scored.every(x => x.context === top.context)) return { status: 'ok', pick: cands[0] };
+    if (top.score - rivals[0].score >= 1.5) return { status: 'ok', pick: top.c };
     return { status: 'ambiguous', candidates: scored.map(s => s.c) };
   }
   function geoFromCandidate(c, query, source){
@@ -22484,7 +22620,8 @@
     if (Date.now() - (tripPinsFailedAt.get(t.id) || 0) < 60000) return; // offline a moment ago — wait a minute before trying again
     const linked = tripLinked(t);
     const todo = () => tripStops(t, linked).filter(s => s.query && !tripStopCurrent(s));
-    if (!todo().length) return;
+    const unchecked = () => tripStops(t, linked).filter(s => tripStopPinned(s) && s.geo.source === 'search' && !s.geo.checked);
+    if (!todo().length && !unchecked().length) return;
     tripPinsRunning.add(t.id);
     tripPinsChanged(t);
     try{
@@ -22502,11 +22639,43 @@
         saveTripProgress();
         tripPinsChanged(t);
       }
+      if (!todo().length) await tripRecheckFarStops(t, linked);
     } finally {
       tripPinsRunning.delete(t.id);
       tripPinsChanged(t);
     }
   }
+  // A second look, once per pin, at any automatically placed stop that ended
+  // up far from all the others (Herculaneum, Missouri on a trip around
+  // Naples) — searched again with the rest of the trip, now pinned, pointing
+  // it the right way. Pins you picked yourself are never touched.
+  async function tripRecheckFarStops(t, linked){
+    let changed = false;
+    for (const s of tripStops(t, linked)){
+      if (!tripStopPinned(s) || s.geo.source !== 'search' || s.geo.checked) continue;
+      const others = tripStops(t, linked).filter(o => o.id !== s.id && tripStopPinned(o)).map(o => o.geo);
+      if (!others.length) continue; // nothing to compare against yet — look again once more stops are pinned
+      const nearest = (g) => Math.min.apply(null, others.map(o => geoDistanceKm(o, g)));
+      const far = nearest(s.geo);
+      let geo = Object.assign({}, s.geo, { checked: true });
+      if (far > 2500){
+        let cands;
+        try{ cands = await geoSearch(s.query, geoBias(others)); }
+        catch(e){ tripPinsFailedAt.set(t.id, Date.now()); break; }
+        const live = tripStops(t, linked).find(x => x.id === s.id);
+        if (!live || !tripStopCurrent(live) || live.geo.source !== 'search') continue; // changed meanwhile
+        const ctx = tripGeoContext(t, linked, tripStops(t, linked).filter(x => x.id !== s.id));
+        const res = geoPick(cands, ctx);
+        const options = res.status === 'ok' ? [res.pick] : (res.candidates || []);
+        const better = options.filter(c => nearest(c) < Math.min(far, 1500)).sort((a, b) => nearest(a) - nearest(b))[0];
+        if (better) geo = Object.assign(geoFromCandidate(better, s.query, 'search'), { checked: true });
+      }
+      s.set(geo);
+      changed = true;
+    }
+    if (changed){ saveTripProgress(); tripPinsChanged(t); }
+  }
+
   function tripPinsChanged(t){
     if (tripOpenId === t.id) tripRender();
     if (tmapTripId === t.id && tmapOverlay && tmapOverlay.classList.contains('open')) tmapDraw();
@@ -22521,8 +22690,10 @@
   }
   function tripAddRouteLayer(map, id){
     if (map.getLayer(id)) return;
+    map.addLayer({ id: id + '-casing', type: 'line', source: id, layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#FFFFFF', 'line-width': 5, 'line-opacity': 0.9 } });
     map.addLayer({ id, type: 'line', source: id, layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#E8A33D', 'line-width': 2.5, 'line-dasharray': [2, 1.6] } });
+      paint: { 'line-color': '#D98A1E', 'line-width': 2.6, 'line-dasharray': [2, 1.6] } });
   }
   function tripStopMarkerEl(num, name, showLabel, asButton){
     const el = document.createElement(asButton ? 'button' : 'div');
@@ -22555,7 +22726,8 @@
       '</button>' +
       '<div class="trip-map-credit">Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · OpenFreeMap</div>' +
       '<div class="trip-stop-chips">' + chips + '</div>' +
-      (owner && needs ? '<button type="button" class="btn-ghost trip-owner trip-needs-pin" data-trip-pins="1">📍 ' + (needs === 1 ? '1 place needs a pin' : needs + ' places need a pin') + '</button>' : '') +
+      (owner ? '<button type="button" class="btn-ghost trip-owner trip-fix-pins' + (needs ? ' trip-needs-pin' : '') + '" data-trip-pins="1">📍 ' +
+        (needs ? (needs === 1 ? '1 place needs a pin' : needs + ' places need a pin') : 'Fix a pin') + '</button>' : '') +
     '</section>';
   }
 
@@ -22828,6 +23000,7 @@
     } else {
       tripEmptyMsg.style.display = tripRows.length ? 'none' : 'block';
     }
+    renderTripYearBar();
   }
   tripViewBtns.forEach(b => b.addEventListener('click', () => setTripsView(b.dataset.tripsView)));
 
@@ -22909,11 +23082,13 @@
       setGeoSource(worldMap, 'world-lines', { type: 'FeatureCollection', features: lines });
       setGeoSource(worldMap, 'world-points', { type: 'FeatureCollection', features: points });
       if (!worldMap.getLayer('world-visited')){
-        worldMap.addLayer({ id: 'world-visited', type: 'fill', source: 'world-visited', paint: { 'fill-color': '#E8A33D', 'fill-opacity': 0.13 } }, 'borders-state');
+        worldMap.addLayer({ id: 'world-visited', type: 'fill', source: 'world-visited', paint: { 'fill-color': '#F2B654', 'fill-opacity': 0.32 } }, 'borders-state');
+        worldMap.addLayer({ id: 'world-lines-casing', type: 'line', source: 'world-lines', layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#0F2124', 'line-width': 4.5, 'line-opacity': 0.35 } });
         worldMap.addLayer({ id: 'world-lines', type: 'line', source: 'world-lines', layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': ['get', 'color'], 'line-width': 2.2, 'line-opacity': 0.95 } });
         worldMap.addLayer({ id: 'world-points', type: 'circle', source: 'world-points',
-          paint: { 'circle-color': ['get', 'color'], 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 5], 'circle-stroke-color': '#0F2124', 'circle-stroke-width': 1 } });
+          paint: { 'circle-color': ['get', 'color'], 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 5], 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 1.2 } });
         ['world-points', 'world-lines'].forEach(id => {
           worldMap.on('mouseenter', id, () => { worldMap.getCanvas().style.cursor = 'pointer'; });
           worldMap.on('mouseleave', id, () => { worldMap.getCanvas().style.cursor = ''; });
