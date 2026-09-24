@@ -437,6 +437,7 @@
     border: none;
   }
   .details-art-wrap .art-drop-hint{ font-size: 64px; }
+  .details-art-wrap .art-drop.has-art{ border: 0; } /* the cover runs edge to edge — no grey frame */
 
   /* ---------- RESTAURANT DETAILS: tabs, photo gallery, course cards ---------- */
   .restaurant-details-tabs{
@@ -2641,7 +2642,7 @@
   .trip-tl-dot{ position: relative; top: 36px; width: 12px; height: 12px; flex: none; border-radius: 999px; background: var(--amber); box-shadow: 0 0 0 5px var(--bg); z-index: 2; }
   .trip-card{
     position: relative; display: block; width: 100%; padding: 0; overflow: hidden;
-    aspect-ratio: 16 / 10; border: 1px solid var(--panel-line); border-radius: 18px;
+    aspect-ratio: 16 / 10; border: none; border-radius: 18px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
     background: var(--panel); color: inherit; font: inherit; text-align: left; cursor: pointer;
   }
   .trip-card-img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -4860,6 +4861,30 @@
      controls (Cloud Sync, Cloudinary, Full Backup, Album Ranker Settings)
      this account should never be able to reach. */
   body.locked-guest-account #top-nav-tools-btn{ display: none; }
+  /* ---------- Trays on phones: open and close ----------
+     Opening springs in fast with a slight overshoot; closing slides back out
+     (visibility waits for the slide to finish instead of hiding it at once).
+     The solid strip past the tray's right edge covers the page behind it
+     during the overshoot. Later in the file than each tray's own rules (the
+     phone section above), so these win. */
+  @media (max-width: 768px){
+    #details-panel, #restaurant-details-panel, #hike-details-panel, #road-details-panel,
+    #park-details-panel, #artist-details-panel, #hike-full-list-panel, #dish-full-list-panel{
+      border-left: none;
+      box-shadow: 60px 0 0 0 var(--panel);
+      transition: transform 0.28s cubic-bezier(0.55, 0, 0.9, 0.45), visibility 0s linear 0.28s, --panel-tint 0.45s ease;
+    }
+    #details-panel.open, #restaurant-details-panel.open, #hike-details-panel.open, #road-details-panel.open,
+    #park-details-panel.open, #artist-details-panel.open, #hike-full-list-panel.open, #dish-full-list-panel.open{
+      transition: transform 0.46s cubic-bezier(0.22, 1.25, 0.36, 1), visibility 0s linear 0s, --panel-tint 0.45s ease;
+    }
+  }
+  @media (max-width: 768px) and (prefers-reduced-motion: reduce){
+    #details-panel, #restaurant-details-panel, #hike-details-panel, #road-details-panel,
+    #park-details-panel, #artist-details-panel, #hike-full-list-panel, #dish-full-list-panel,
+    #details-panel.open, #restaurant-details-panel.open, #hike-details-panel.open, #road-details-panel.open,
+    #park-details-panel.open, #artist-details-panel.open, #hike-full-list-panel.open, #dish-full-list-panel.open{ transition: none; }
+  }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
@@ -18652,6 +18677,7 @@
     { el: roadDetailsPanel, openClass: 'open' },
     { el: parkDetailsPanel, openClass: 'open' },
     { el: artistDetailsPanel, openClass: 'open' },
+    { el: detailsPanel, openClass: 'open' }, // the album tray
   ];
   let openOverlayCount = 0;
   let ignoreNextPopstate = false;
@@ -18704,6 +18730,7 @@
     if (roadDetailsPanel.classList.contains('open')){ closeRoadDetailsPanel(); return; }
     if (parkDetailsPanel.classList.contains('open')){ closeParkDetailsPanel(); return; }
     if (artistDetailsPanel.classList.contains('open')){ closeArtistDetailsPanel(); return; }
+    if (detailsPanel.classList.contains('open')){ closeDetailsPanel(); return; }
     if (otdOverlay.classList.contains('open')){ closeOnThisDay(); return; }
     if (ggOverlay.classList.contains('open')){ closeGuessGame(); return; }
     if (yirOverlay.classList.contains('open')){ closeYearInReview(); return; }
