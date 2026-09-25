@@ -17402,17 +17402,19 @@
     return null;
   }
 
-  // A "dish" is any course scored the maximum 12/10 — no separate favorite
-  // flag; scoring is already how a course's quality gets recorded, so
-  // reusing that as the Dishes criterion means there's nothing new to keep
-  // in sync. Select values are always strings, hence '12' not 12.
+  // A "dish" is any course scored 12/10 or the rare 13/10 — no separate
+  // favorite flag; scoring is already how a course's quality gets recorded,
+  // so reusing the top of that scale as the Dishes criterion means there's
+  // nothing new to keep in sync. Select values are always strings, hence
+  // '12'/'13' not 12/13.
+  function isDishScore(score){ return score === '12' || score === '13'; }
   function getAllFavoritedDishes(){
     const dishes = [];
     restaurantRows.forEach((r, restaurantIndex) => {
       const visits = ensureRestaurantVisits(r);
       visits.forEach(visit => {
         (visit.courses || []).forEach((course, courseIndex) => {
-          if (course.score === '12' && !course.hiddenFromDishes){
+          if (isDishScore(course.score) && !course.hiddenFromDishes){
             dishes.push({ id: ensureCourseId(course), course, restaurant: r, restaurantIndex, visit, courseIndex });
           }
         });
@@ -17421,8 +17423,8 @@
     return dishes;
   }
 
-  // Layers the manual order on top of whatever's currently scored 12/10 —
-  // newly-qualifying dishes not yet in dishOrder are appended at the end;
+  // Layers the manual order on top of whatever's currently scored 12/10 or
+  // 13/10 — newly-qualifying dishes not yet in dishOrder are appended at the end;
   // dishOrder entries for courses that no longer qualify are just skipped,
   // not actively pruned from storage (harmless leftovers, cheaper than
   // rewriting dishOrder on every render to drop a few stale ids).
@@ -19350,12 +19352,12 @@
             const t = (c.text || '').trim();
             if (t && !OTD_TIME_LABEL.test(t) && names.indexOf(t) === -1) names.push(t);
           });
-          const stars = courses.filter(c => c.score === '12' && !c.hiddenFromDishes);
+          const stars = courses.filter(c => isDishScore(c.score) && !c.hiddenFromDishes);
           let star = '';
-          if (stars.length > 1) star = stars.length + ' dishes scored 12/10';
+          if (stars.length > 1) star = stars.length + ' dishes scored 12+/10';
           else if (stars.length === 1){
             const t = (stars[0].text || '').trim();
-            star = (t && !OTD_TIME_LABEL.test(t)) ? 'Dish of the night: ' + t + ', 12/10' : 'A 12/10 dish';
+            star = (t && !OTD_TIME_LABEL.test(t)) ? 'Dish of the night: ' + t + ', ' + stars[0].score + '/10' : 'A ' + stars[0].score + '/10 dish';
           }
 
           const rank = ri + 1;
@@ -21464,12 +21466,12 @@
         e.visits.forEach(v => (v.photos || []).forEach(u => { if (u && photos.indexOf(u) === -1) photos.push(u); }));
         const names = [];
         courses.forEach(c => { const t = (c.text || '').trim(); if (t && !OTD_TIME_LABEL.test(t) && names.indexOf(t) === -1) names.push(t); });
-        const stars = courses.filter(c => c.score === '12' && !c.hiddenFromDishes);
+        const stars = courses.filter(c => isDishScore(c.score) && !c.hiddenFromDishes);
         const top = scored.slice().sort((a, b) => scoreOf(b) - scoreOf(a))[0];
         const topName = top && (top.text || '').trim() && !OTD_TIME_LABEL.test((top.text || '').trim()) ? top.text.trim() : '';
         const item = { type: 'restaurant', restaurant: r, visitId: e.visits[0].id, dateStr: e.p.str, photos, avg,
           where: [r.cuisine, r.location].filter(Boolean).join(' · '), dishes: names.slice(0, 3), moreDishes: Math.max(0, names.length - 3),
-          star: stars.length > 1 ? stars.length + ' dishes at 12/10' : stars.length === 1 ? ((stars[0].text || '').trim() && !OTD_TIME_LABEL.test((stars[0].text || '').trim()) ? 'Dish of the night: ' + stars[0].text.trim() + ', 12/10' : 'A 12/10 dish') : '',
+          star: stars.length > 1 ? stars.length + ' dishes at 12+/10' : stars.length === 1 ? ((stars[0].text || '').trim() && !OTD_TIME_LABEL.test((stars[0].text || '').trim()) ? 'Dish of the night: ' + stars[0].text.trim() + ', ' + stars[0].score + '/10' : 'A ' + stars[0].score + '/10 dish') : '',
           topDish: top ? { name: topName, score: scoreOf(top) } : null };
         day(e.p).restaurants.push(item);
         stats.restaurants++; stats.uniqueRestaurants.add(r);
