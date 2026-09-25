@@ -4325,7 +4325,39 @@
     pointer-events: none;
     transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
   }
-  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  /* Errors stay up (no auto-dismiss, see showToast) and get the app's
+     existing "needs attention" color — the same one the backup-reminder
+     banner uses — plus a close button, since they'd otherwise vanish
+     before there's time to read them. */
+  /* An error's message is usually much longer than a success one's, so
+     the pill shape (sized for one short line) is swapped for a rounded
+     card that wraps, stays readable at phone width, and keeps the close
+     button pinned to the top corner instead of centered against several
+     lines of text. */
+  .toast.error{
+    background: var(--brick);
+    color: #fff;
+    border-radius: 14px;
+    align-items: flex-start;
+    max-width: min(360px, calc(100vw - 40px));
+    text-align: left;
+  }
+  .toast-msg{ flex: 1; min-width: 0; }
+  .toast-close{
+    display: none;
+    flex: none;
+    width: 20px; height: 20px;
+    margin-top: 1px;
+    border: none; border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    color: inherit;
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .toast-close:hover{ background: rgba(255,255,255,0.32); }
+  .toast.error .toast-close{ display: inline-flex; align-items: center; justify-content: center; }
 
   .footer-note{
     margin-top: auto;
@@ -6049,7 +6081,10 @@
 
 </div>
 
-<div class="toast" id="toast">Copied to clipboard</div>
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span class="toast-msg" id="toast-msg">Copied to clipboard</span>
+  <button type="button" class="toast-close" id="toast-close" aria-label="Dismiss">✕</button>
+</div>
 
 <div class="otd-overlay" id="otd-overlay" aria-hidden="true">
   <div class="otd-backdrop" id="otd-backdrop"></div>
@@ -6358,6 +6393,8 @@
   const excelBtn = document.getElementById('excel-btn');
   const restartBtn = document.getElementById('restart-btn');
   const toast = document.getElementById('toast');
+  const toastMsg = document.getElementById('toast-msg');
+  const toastCloseBtn = document.getElementById('toast-close');
   const viewToggle = document.getElementById('view-toggle');
   const viewListBtn = document.getElementById('view-list-btn');
   const viewGridBtn = document.getElementById('view-grid-btn');
@@ -6812,15 +6849,28 @@
   }
 
   let toastTimer = null;
+  function hideToast(){
+    toast.classList.remove('show', 'error');
+    clearTimeout(toastTimer);
+  }
+  toastCloseBtn.addEventListener('click', hideToast);
+  // An error is sticky — it stays up with a close button instead of timing
+  // out — so a message that comes and goes in under 2 seconds is never
+  // the one you actually needed to read. A success toast landing while an
+  // unread error is still showing doesn't clear it out from under you;
+  // it's dropped (the error itself said whether that action worked).
   function showToast(msg){
+    const isError = /couldn|could not|fail|⚠|error|\bnot \b/i.test(msg);
+    if (!isError && toast.classList.contains('error')) return;
     // Things that worked ("Added to Seen Live", "Saved") get a little check that pops in.
-    const ok = /\b(added|saved|connected|copied)\b/i.test(msg) && !/couldn|could not|fail|⚠|not /i.test(msg);
-    toast.innerHTML = (ok ? '<span class="toast-check" aria-hidden="true">✓</span>' : '') + escapeHtml(msg);
+    const ok = !isError && /\b(added|saved|connected|copied)\b/i.test(msg);
+    toastMsg.innerHTML = (ok ? '<span class="toast-check" aria-hidden="true">✓</span>' : '') + escapeHtml(msg);
+    toast.classList.toggle('error', isError);
     toast.classList.remove('show');
     void toast.offsetWidth; // restart the spring if one was already showing
     toast.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+    if (!isError) toastTimer = setTimeout(hideToast, 1800);
   }
 
   // ---------- IN-APP AUTOSAVE (window.storage) ----------
