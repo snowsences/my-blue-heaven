@@ -4941,6 +4941,18 @@
   .activity-details-empty{ margin: 0; font-size: 14px; color: var(--chalk-dim); }
   .yir-card-desc{ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.4; color: var(--chalk-dim); }
   .yir-stats .yir-stat:last-child:nth-child(odd){ grid-column: 1 / -1; }
+  .oa-cats{ display: flex; flex-wrap: wrap; gap: 8px; }
+  .oa-cat{ min-height: 36px; padding: 0 13px; font-size: 13.5px; }
+  .activity-artist-link{ display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--panel-line); background: rgba(255,255,255,0.04); color: var(--chalk); font: 600 14px 'Figtree', sans-serif; cursor: pointer; }
+  .activity-artist-link:hover{ border-color: var(--amber); }
+  .activity-star-btn{ display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; color: var(--chalk-dim); font: 600 14px 'Figtree', sans-serif; cursor: pointer; }
+  .activity-star-btn.is-on{ border-color: var(--amber); background: rgba(232, 163, 61, 0.16); color: var(--amber); }
+  .activity-star-static{ cursor: default; }
+  .activity-review-row{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 15px; color: var(--chalk); cursor: pointer; }
+  .activity-review-row input{ width: 20px; height: 20px; accent-color: var(--amber); }
+  .yir-row .yir-star{ margin-top: 0; padding: 3px 9px; }
+  .yir-highlight-label svg{ vertical-align: -1px; }
+  .artist-concert-activity{ flex: none; width: 28px; text-align: center; font-size: 14px; }
   .af-photo.is-cover{ box-shadow: 0 0 0 2px var(--amber); }
   .af-photo-star{ position: absolute; left: 4px; bottom: 4px; padding: 1px 5px; border-radius: 999px; background: rgba(15,33,36,0.8); color: var(--amber); font-size: 10px; font-weight: 800; line-height: 1.5; }
   .af-photo-hint{ margin: 8px 0 0; font-size: 12.5px; color: var(--chalk-dim); }
@@ -5936,6 +5948,7 @@
               <div class="otd-settings-caption">INCLUDE</div>
               <label class="otd-setting-row"><span>Hikes</span><input type="checkbox" id="otd-hikes-check" checked></label>
               <label class="otd-setting-row"><span>Restaurants</span><input type="checkbox" id="otd-restaurants-check" checked></label>
+              <label class="otd-setting-row"><span>Activities</span><input type="checkbox" id="otd-activities-check" checked></label>
               <label class="otd-setting-row" style="min-height:56px;"><span style="display:flex; flex-direction:column; gap:2px;"><span>Photos</span><span style="font-size:13px; line-height:1.35; color:var(--chalk-dim);">Matched by the date at the start of each file name, like 20250517_021456</span></span><input type="checkbox" id="otd-photos-check" checked></label>
             </div>
 
@@ -7088,7 +7101,7 @@
       parks: { parkRows, parkSavedAt: parkLastSavedAt },
       photos: { photoRows, photoSavedAt: photoLastSavedAt },
       trips: { tripRows, tripSavedAt: tripLastSavedAt },
-      activities: { activityRows, activitySavedAt: activityLastSavedAt },
+      activities: { activityRows, activityMemorable, activitySavedAt: activityLastSavedAt },
       artists: { artistRows, artistSavedAt: artistLastSavedAt },
       media: {
         bookRows: mediaState.book.rows, bookSavedAt: mediaState.book.lastSavedAt,
@@ -7431,8 +7444,9 @@
       const localTime = new Date(activityLastSavedAt || 0).getTime();
       if (remoteTime > localTime){
         activityRows = existing.activityRows.map(activityNormalize);
+        activityMemorable = activityNormalizeMemorable(existing.activityMemorable);
         activityLastSavedAt = existing.activitySavedAt || null;
-        try{ await window.storage.set(ACTIVITY_STORAGE_KEY, JSON.stringify({ activityRows, savedAt: activityLastSavedAt }), false); }catch(e){ /* best effort */ }
+        try{ await window.storage.set(ACTIVITY_STORAGE_KEY, activityStoragePayload(), false); }catch(e){ /* best effort */ }
         if (activityDetailsPanel.classList.contains('open')) renderActivityDetailsContent();
       }
     }
@@ -7769,6 +7783,7 @@
     }catch(e){ /* no local activity save */ }
     if (localActivityParsed && Array.isArray(localActivityParsed.activityRows)){
       activityRows = localActivityParsed.activityRows.map(activityNormalize);
+      activityMemorable = activityNormalizeMemorable(localActivityParsed.activityMemorable);
       activityLastSavedAt = localActivityParsed.savedAt || null;
     }
 
@@ -8434,7 +8449,7 @@
       for (const act of (t.activities || [])){
         for (const p of (act.photos || [])){
           if (!p) continue;
-          await process(() => p.url, (u) => { p.url = u; }, 'trip');
+          await process(() => p.url, (u) => { if (act.coverPhoto === p.url) act.coverPhoto = u; p.url = u; }, 'trip');
         }
       }
     }
@@ -15412,7 +15427,13 @@
         '<span class="artist-album-rank">#' + a.rank + '</span>' +
       '</div>';
     }).join('');
-    const concerts = row.concerts.slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+    // Concert activities naming this artist (see ONE-OFF ACTIVITIES) join the
+    // list as their own rows — tapping one opens the activity. One on a date
+    // already logged here isn't shown twice.
+    const ownDates = new Set(row.concerts.map(c => c.date));
+    const linkedConcerts = activityConcertsForArtist(row.key).filter(a => !ownDates.has(a.date))
+      .map(a => ({ id: 'act:' + a.id, date: a.date, location: a.location || a.name, activityId: a.id }));
+    const concerts = row.concerts.concat(linkedConcerts).sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
     // Seen Live stays quiet: most artists will never have a date, so an
     // empty section is just a dim heading with a small +, and the fields
     // only appear once + is tapped. Tapping a date opens it for editing in place.
@@ -15425,7 +15446,12 @@
         '<span class="artist-concert-form-actions"><button class="btn-primary" type="button" id="artist-concert-add-btn">Save</button>' +
         '<button class="btn-ghost" type="button" id="artist-concert-cancel-btn">Cancel</button></span>' +
       '</div>';
-    const concertsHtml = concerts.map(c => c.id === editingId ? concertFormHtml(c) :
+    const concertsHtml = concerts.map(c => c.activityId ?
+      '<div class="artist-concert-row editable" data-concert-activity="' + escapeAttr(c.activityId) + '" role="button" tabindex="0" aria-label="Open the activity for ' + escapeAttr(artistConcertDateLabel(c.date)) + '">' +
+        '<span class="artist-concert-date">' + escapeHtml(artistConcertDateLabel(c.date)) + '</span>' +
+        '<span class="artist-concert-location">' + escapeHtml(c.location) + '</span>' +
+        '<span class="artist-concert-activity" aria-hidden="true">🎟️</span>' +
+      '</div>' : c.id === editingId ? concertFormHtml(c) :
       '<div class="artist-concert-row' + (guestViewEnabled ? '' : ' editable') + '"' + (guestViewEnabled ? '' : ' data-concert-edit="' + escapeAttr(c.id) + '" role="button" tabindex="0" aria-label="Edit ' + escapeAttr(artistConcertDateLabel(c.date) + ', ' + c.location) + '"') + '>' +
         '<span class="artist-concert-date">' + escapeHtml(artistConcertDateLabel(c.date)) + '</span>' +
         '<span class="artist-concert-location">' + escapeHtml(c.location) + '</span>' +
@@ -15466,6 +15492,11 @@
     cover.addEventListener('click', () => {
       if (row.coverPhoto) openArtLightbox(row.coverPhoto);
       else if (!guestViewEnabled) pickArtistCoverFile(row);
+    });
+    artistDetailsPanelInner.querySelectorAll('[data-concert-activity]').forEach(el => {
+      const open = () => openActivityDetailsPanel(el.dataset.concertActivity);
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); open(); } });
     });
     if (guestViewEnabled) return;
     wireArtistFileDrop(cover, row);
@@ -16144,7 +16175,9 @@
     t.activities = (Array.isArray(t.activities) ? t.activities : []).map(a => ({
       id: a.id || tripNewId('act'), name: a.name || '', date: a.date || '',
       description: (a.description || '').slice(0, 140),
-      photos: (Array.isArray(a.photos) ? a.photos : []).map(p => (p && p.url) ? p : { url: p }).filter(p => p.url)
+      photos: (Array.isArray(a.photos) ? a.photos : []).map(p => (p && p.url) ? p : { url: p }).filter(p => p.url),
+      coverPhoto: a.coverPhoto || '',          // picked in the photo viewer from its tray (see ONE-OFF ACTIVITIES)
+      ...(a.hideFromYear ? { hideFromYear: true } : {}) // switched off from Year in Review
     }));
     t.coverPhoto = t.coverPhoto || '';
     t.endDate = t.endDate || '';
@@ -18851,7 +18884,7 @@
       items, history, isComplete, finalRanking, loadingDock, art, tierBoundaries, tierBoundariesTotal,
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
-      hikeRows, parkRows, roadRows, photoRows, tripRows, artistRows, activityRows,
+      hikeRows, parkRows, roadRows, photoRows, tripRows, artistRows, activityRows, activityMemorable,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
       hikeFullListText, dishFullListText,
@@ -18930,6 +18963,7 @@
       }
       if (Array.isArray(parsed.activityRows) && parsed.activityRows.length){
         activityRows = parsed.activityRows.map(activityNormalize);
+        activityMemorable = activityNormalizeMemorable(parsed.activityMemorable);
         saveActivityProgress();
         activityRefreshViews();
         restoredParts.push(otdPlural(activityRows.length, 'activity', 'activities'));
@@ -19099,6 +19133,8 @@
   //   • Restaurants   — each visit's date (restaurant.visits[].date)
   //   • Photos        — the date read from the file name when the photo was
   //                     uploaded (photoRows[].date; see the Photos upload handler)
+  //   • Activities    — one-offs and the trip activities shown in Year in
+  //                     Review (see activitiesForReview)
   // Anything without a valid date can't appear. Notes are deliberately never
   // shown here. Everything below is read-only: showing this never saves,
   // syncs or changes any ranking data. Its own settings and the "already
@@ -19118,7 +19154,7 @@
   const otdCompactDate = document.getElementById('otd-compact-date');
   const otdCloseBtn = document.getElementById('otd-close-btn');
 
-  let otdSettings = { enabled: true, hikes: true, restaurants: true, photos: true, lastShown: '' };
+  let otdSettings = { enabled: true, hikes: true, restaurants: true, photos: true, activities: true, lastShown: '' };
   let otdItems = [];        // what each tappable card/tile in the open pop-up points at
   let otdReturnFocus = null;
   let otdReady = false;     // startup waits (local data, cloud merge) are done
@@ -19135,6 +19171,7 @@
           hikes: p.hikes !== false,
           restaurants: p.restaurants !== false,
           photos: p.photos !== false,
+          activities: p.activities !== false,
           lastShown: typeof p.lastShown === 'string' ? p.lastShown : ''
         };
       }
@@ -19219,7 +19256,7 @@
     const byYear = new Map();
     const slot = (p) => {
       let g = byYear.get(p.y);
-      if (!g){ g = { year: p.y, dateStr: p.str, hikes: [], restaurants: [], photos: [] }; byYear.set(p.y, g); }
+      if (!g){ g = { year: p.y, dateStr: p.str, hikes: [], restaurants: [], activities: [], photos: [] }; byYear.set(p.y, g); }
       return g;
     };
 
@@ -19332,6 +19369,13 @@
       });
     }
 
+    if (otdSettings.activities){
+      activitiesForReview().forEach(({ a, trip }) => {
+        const p = otdParse(a.date);
+        if (otdMatches(p, today)) slot(p).activities.push({ type: 'activity', activity: a, trip, dateStr: p.str, photos: activityCoverFirstPhotos(a), memorable: activityIsMemorable(a) });
+      });
+    }
+
     if (otdSettings.photos){
       photoRows.forEach(ph => {
         const p = ph && ph.url ? otdParse(ph.date) : null;
@@ -19341,16 +19385,17 @@
     }
 
     const groups = Array.from(byYear.values())
-      .filter(g => g.hikes.length || g.restaurants.length || g.photos.length)
+      .filter(g => g.hikes.length || g.restaurants.length || g.activities.length || g.photos.length)
       .sort((a, b) => b.year - a.year);
-    const counts = { hikes: 0, restaurants: 0, photos: 0, photoDays: 0, memories: 0, years: groups.length };
+    const counts = { hikes: 0, restaurants: 0, activities: 0, photos: 0, photoDays: 0, memories: 0, years: groups.length };
     groups.forEach(g => {
       counts.hikes += g.hikes.length;
       counts.restaurants += g.restaurants.length;
+      counts.activities += g.activities.length;
       counts.photos += g.photos.length;
       if (g.photos.length) counts.photoDays++;
     });
-    counts.memories = counts.hikes + counts.restaurants + counts.photoDays;
+    counts.memories = counts.hikes + counts.restaurants + counts.activities + counts.photoDays;
     return { now, groups, counts };
   }
 
@@ -19365,7 +19410,8 @@
       food: '<path d="M6 3v6a2.5 2.5 0 0 0 5 0V3"></path><path d="M8.5 3v18"></path><path d="M17 3c-2 1.5-3 4-3 7h3v11"></path>',
       camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.5" r="3.3"></circle>',
       chevron: '<path d="M9 6l6 6-6 6"></path>',
-      close: '<path d="M6 6l12 12M18 6L6 18"></path>'
+      close: '<path d="M6 6l12 12M18 6L6 18"></path>',
+      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>'
     };
     return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[name] + '</svg>';
   }
@@ -19463,6 +19509,37 @@
     '</button>';
   }
 
+  function otdActivityCardHtml(m, compact){
+    const a = m.activity;
+    const cat = activityCategory(a.category);
+    const kicker = activityChipLabel(a);
+    const place = [a.category === 'concert' ? a.artistName : '', a.location, m.trip ? m.trip.name || 'Trip' : ''].filter(Boolean).join(' · ');
+    const idx = otdRegister(m);
+    const icon = cat ? '<span aria-hidden="true">' + cat.icon + '</span>' : otdIcon('activity', 12);
+    if (compact){
+      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
+        otdThumbHtml(m.photos[0], 'activity') +
+        '<span class="otd-row-text">' +
+          '<span class="otd-kicker">' + escapeHtml(kicker + (m.memorable ? ' · MOST MEMORABLE' : '')) + '</span>' +
+          '<span class="otd-row-name">' + escapeHtml(a.name) + '</span>' +
+          (place ? '<span class="otd-row-place">' + escapeHtml(place) + '</span>' : '') +
+          (a.description ? '<span class="otd-row-line">' + escapeHtml(a.description) + '</span>' : '') +
+        '</span>' +
+        '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
+      '</button>';
+    }
+    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
+      otdHeroHtml(m.photos[0], 'activity', m.photos.length > 1 ? m.photos.length + ' photos' : '') +
+      '<span class="otd-body">' +
+        '<span class="otd-row-between"><span class="otd-chip">' + icon + escapeHtml(kicker) + '</span></span>' +
+        '<span><span class="otd-name">' + escapeHtml(a.name) + '</span>' +
+          (place ? '<span class="otd-place">' + escapeHtml(place) + '</span>' : '') + '</span>' +
+        (a.description ? '<span class="otd-dishes">' + escapeHtml(a.description) + '</span>' : '') +
+        (m.memorable ? '<span class="otd-star">' + otdIcon('star', 14) + 'Most memorable of ' + m.dateStr.slice(0, 4) + '</span>' : '') +
+      '</span>' +
+    '</button>';
+  }
+
   function otdPhotosCardHtml(g){
     const urls = g.photos.map(p => p.url);
     const token = otdRegister({ type: 'photos', urls });
@@ -19496,6 +19573,7 @@
       const parts = [];
       if (c.hikes) parts.push(otdPlural(c.hikes, 'hike', 'hikes'));
       if (c.restaurants) parts.push(otdPlural(c.restaurants, 'restaurant visit', 'restaurant visits'));
+      if (c.activities) parts.push(otdPlural(c.activities, 'activity', 'activities'));
       if (c.photos) parts.push(otdPlural(c.photos, 'photo', 'photos'));
       lede = otdJoin(parts) + ' have landed on this date, ' +
         (c.years > 1 ? 'spread over ' + c.years + ' different years.' : 'all from ' + data.groups[0].year + '.');
@@ -19507,6 +19585,7 @@
       const body =
         g.hikes.map(m => otdHikeCardHtml(m, compact)).join('') +
         g.restaurants.map(m => otdRestaurantCardHtml(m, compact)).join('') +
+        g.activities.map(m => otdActivityCardHtml(m, compact)).join('') +
         (g.photos.length ? otdPhotosCardHtml(g) : '');
       return '<section class="otd-year">' +
         '<div class="otd-year-head"><span class="otd-year-ago">' + escapeHtml(otdPlural(ago, 'year', 'years') + ' ago') + '</span>' +
@@ -19574,6 +19653,9 @@
       switchFoodSubPage('restaurants');
       restaurantActiveVisitId = item.visitId;
       openRestaurantDetailsPanel(idx);
+    } else if (item.type === 'activity'){
+      closeOnThisDay();
+      openActivityDetailsPanel(item.activity.id);
     }
   }
 
@@ -19690,6 +19772,7 @@
   const otdHikesCheck = document.getElementById('otd-hikes-check');
   const otdRestaurantsCheck = document.getElementById('otd-restaurants-check');
   const otdPhotosCheck = document.getElementById('otd-photos-check');
+  const otdActivitiesCheck = document.getElementById('otd-activities-check');
   const otdShowAgainBtn = document.getElementById('otd-show-again-btn');
   const otdUndatedBox = document.getElementById('otd-undated-box');
   const otdUndatedTitle = document.getElementById('otd-undated-title');
@@ -19719,6 +19802,7 @@
     otdHikesCheck.checked = otdSettings.hikes;
     otdRestaurantsCheck.checked = otdSettings.restaurants;
     otdPhotosCheck.checked = otdSettings.photos;
+    otdActivitiesCheck.checked = otdSettings.activities;
     // The switch only controls the automatic daily pop-up. "Show today's" and
     // the include filters keep working either way — turning the pop-up off
     // shouldn't stop you looking whenever you like.
@@ -19753,6 +19837,7 @@
   otdHikesCheck.addEventListener('change', () => otdSetSetting('hikes', otdHikesCheck.checked));
   otdRestaurantsCheck.addEventListener('change', () => otdSetSetting('restaurants', otdRestaurantsCheck.checked));
   otdPhotosCheck.addEventListener('change', () => otdSetSetting('photos', otdPhotosCheck.checked));
+  otdActivitiesCheck.addEventListener('change', () => otdSetSetting('activities', otdActivitiesCheck.checked));
   otdShowAgainBtn.addEventListener('click', () => {
     const r = otdTryShow({ force: true });
     if (r === 'busy') showToast('Close what is open first');
@@ -20802,16 +20887,35 @@
   // ---------- ONE-OFF ACTIVITIES ----------
   // Things worth keeping on the yearly record that aren't a restaurant, a
   // hike or part of a trip — whitewater rafting, a museum, a concert or a
-  // show. Added from Year in Review's + button, they show on its timeline
-  // (and the Activity Calendar) and open in their own tray, where they're
-  // edited, deleted and given photos. Activities inside a trip are separate
-  // — they live on the trip itself (t.activities).
-  //   { id, name, description, date: 'YYYY-MM-DD', photos: [{ url }], coverPhoto }
+  // show. Added from Year in Review's + button, they show on its timeline,
+  // the Activity Calendar and On This Day, and open in their own tray, where
+  // they're edited, deleted, given photos and starred.
+  //   { id, name, description, date: 'YYYY-MM-DD', location, category,
+  //     artistName, artistKey, photos: [{ url }], coverPhoto }
+  // A concert can name an artist: it then also appears under that artist's
+  // Seen Live (worked out when the artist's tray draws — nothing is copied).
   // The cover is one of its photos, picked in the photo viewer; with none
   // picked the first photo stands in.
+  //
+  // A trip's own activities (t.activities) use the same tray and appear in
+  // Year in Review too, unless switched off one by one (hideFromYear) — so
+  // most of what's below takes an id and works for either kind, through
+  // activityResolve.
+  //
+  // One activity per year can be starred as the year's most memorable
+  // (activityMemorable: { 'YYYY': id }), shown as Year in Review's first highlight.
   const ACTIVITY_STORAGE_KEY = 'activity-list';
   const ACTIVITY_DESC_MAX = 1000;
+  const ACTIVITY_CATEGORIES = [
+    { key: 'adventure', label: 'Adventure', icon: '🛶', one: 'adventure', many: 'adventures' },
+    { key: 'museum', label: 'Museum', icon: '🏛️', one: 'museum', many: 'museums' },
+    { key: 'concert', label: 'Concert', icon: '🎤', one: 'concert', many: 'concerts' },
+    { key: 'show', label: 'Show', icon: '🎭', one: 'show', many: 'shows' },
+    { key: 'sports', label: 'Sports', icon: '🏟️', one: 'game', many: 'games' },
+    { key: 'other', label: 'Other', icon: '✨', one: 'other', many: 'others' }
+  ];
   let activityRows = [];
+  let activityMemorable = {};   // 'YYYY' -> the starred activity's id (one-off or trip)
   let activityLastSavedAt = null;
   let openActivityId = null;
 
@@ -20819,36 +20923,57 @@
   const activityDetailsPanelInner = document.getElementById('activity-details-panel-inner');
 
   function activityNewId(){ return 'oa' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function activityCategory(key){ return ACTIVITY_CATEGORIES.find(c => c.key === key) || null; }
 
   function activityNormalize(a){
     a = a || {};
+    const artistName = (a.artistName || '').trim();
     return {
       id: a.id || activityNewId(),
       name: a.name || '',
       description: a.description || '',
       date: a.date || '',
+      location: a.location || '',
+      category: activityCategory(a.category) ? a.category : '',
+      artistName,
+      artistKey: artistName ? artistKeyOf(artistName) : '',
       photos: (Array.isArray(a.photos) ? a.photos : []).filter(p => p && p.url).map(p => ({ url: p.url })),
       coverPhoto: a.coverPhoto || ''
     };
   }
+  function activityNormalizeMemorable(m){
+    const out = {};
+    if (m && typeof m === 'object') Object.keys(m).forEach(y => { if (/^\d{4}$/.test(y) && typeof m[y] === 'string' && m[y]) out[y] = m[y]; });
+    return out;
+  }
 
+  function activityStoragePayload(){ return JSON.stringify({ activityRows, activityMemorable, savedAt: activityLastSavedAt }); }
   function saveActivityProgress(){
     activityLastSavedAt = new Date().toISOString();
-    try{ window.storage.set(ACTIVITY_STORAGE_KEY, JSON.stringify({ activityRows, savedAt: activityLastSavedAt }), false); }catch(e){ /* best effort */ }
+    try{ window.storage.set(ACTIVITY_STORAGE_KEY, activityStoragePayload(), false); }catch(e){ /* best effort */ }
     scheduleSyncWrite();
   }
 
-  function activityFind(id){ return id ? (activityRows.find(a => a.id === id) || null) : null; }
-
-  // In the order they were added, so the viewer walks them the same way the
-  // tray's grid shows them.
-  function gatherAllActivityPhotos(a){
-    const all = (a.photos || []).map(p => p.url).filter(Boolean);
-    if (a.coverPhoto && all.indexOf(a.coverPhoto) === -1) all.unshift(a.coverPhoto);
-    return all;
+  // → { a, trip } — trip is null for a one-off — or null if it's gone.
+  function activityResolve(id){
+    if (!id) return null;
+    const a = activityRows.find(x => x.id === id);
+    if (a) return { a, trip: null };
+    for (const t of tripRows){
+      const ta = (t.activities || []).find(x => x.id === id);
+      if (ta) return { a: ta, trip: t };
+    }
+    return null;
   }
-  function getEffectiveActivityCover(a){ return a.coverPhoto || ((a.photos || [])[0] || {}).url || ''; }
-  // Cover first — for the photo strip on a Year in Review card.
+  function activityFind(id){ const ref = activityResolve(id); return ref ? ref.a : null; }
+
+  // In the order they were added, so the viewer walks them the same way the tray's grid shows them.
+  function gatherAllActivityPhotos(a){ return (a.photos || []).map(p => p && p.url).filter(Boolean); }
+  function getEffectiveActivityCover(a){
+    const all = gatherAllActivityPhotos(a);
+    return (a.coverPhoto && all.indexOf(a.coverPhoto) !== -1) ? a.coverPhoto : (all[0] || '');
+  }
+  // Cover first — for the photo strip on a card.
   function activityCoverFirstPhotos(a){
     const all = gatherAllActivityPhotos(a);
     const cover = getEffectiveActivityCover(a);
@@ -20858,38 +20983,98 @@
   function activityLongDate(str){
     return otdParse(str) ? new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '';
   }
+  // "🎤 Concert · Red Rocks" — the category and where, for cards and the tray.
+  function activityMetaText(a, trip){
+    const cat = activityCategory(a.category);
+    return [cat ? cat.icon + ' ' + cat.label : '', a.location || '', trip ? 'Trip: ' + (trip.name || 'Untitled trip') : ''].filter(Boolean).join(' · ');
+  }
+  function activityChipLabel(a){ const cat = activityCategory(a.category); return cat ? cat.label.toUpperCase() : 'ACTIVITY'; }
+
+  function activityIsMemorable(a){
+    const p = otdParse(a.date);
+    return !!p && activityMemorable[p.y] === a.id;
+  }
+
+  // Everything that can land in a given year's review: one-offs, plus each
+  // trip's activities that haven't been switched off.
+  function activitiesForReview(){
+    const out = [];
+    activityRows.forEach(a => { if ((a.name || '').trim() && otdParse(a.date)) out.push({ a, trip: null }); });
+    tripRows.forEach(t => (t.activities || []).forEach(a => { if (!a.hideFromYear && (a.name || '').trim() && otdParse(a.date)) out.push({ a, trip: t }); }));
+    return out;
+  }
 
   // Anything that shows activities redraws in place after a change.
   function activityRefreshViews(){
     if (activityDetailsPanel.classList.contains('open')) renderActivityDetailsContent();
     if (yirOverlay.classList.contains('open')) yirRender(true);
     if (calOverlay.classList.contains('open')) calRender(true);
+    if (artistDetailsPanel.classList.contains('open')) renderArtistDetailsContent();
   }
-  function activityChanged(){
-    saveActivityProgress();
+  function activitySave(trip){
+    if (trip){ saveTripProgress(); tripRefresh(); }
+    else saveActivityProgress();
+  }
+  function activityChanged(trip){
+    activitySave(trip);
     activityRefreshViews();
   }
 
   // The photo viewer's cover toggle and delete button (see resolveLightboxCoverHandler).
   function setActivityCoverPhoto(id, url){
     if (guestViewEnabled) return;
-    const a = activityFind(id);
-    if (!a) return;
-    a.coverPhoto = url;
-    activityChanged();
+    const ref = activityResolve(id);
+    if (!ref) return;
+    ref.a.coverPhoto = url;
+    activityChanged(ref.trip);
   }
   function deleteActivityPhoto(id, url){
     if (guestViewEnabled) return;
-    const a = activityFind(id);
-    if (!a || !url) return;
-    a.photos = (a.photos || []).filter(p => p.url !== url);
-    if (a.coverPhoto === url) a.coverPhoto = '';
-    activityChanged();
+    const ref = activityResolve(id);
+    if (!ref || !url) return;
+    ref.a.photos = (ref.a.photos || []).filter(p => p.url !== url);
+    if (ref.a.coverPhoto === url) ref.a.coverPhoto = '';
+    activityChanged(ref.trip);
+  }
+
+  function toggleActivityMemorable(id){
+    if (guestViewEnabled) return;
+    const ref = activityResolve(id);
+    const p = ref && otdParse(ref.a.date);
+    if (!p) return;
+    const was = activityMemorable[p.y] === id;
+    if (was) delete activityMemorable[p.y]; else activityMemorable[p.y] = id;
+    saveActivityProgress(); // the stars live with the one-off activities, whichever kind was starred
+    activityRefreshViews();
+    showToast(was ? 'No longer the most memorable of ' + p.y : 'Most memorable of ' + p.y);
+  }
+
+  // Concerts linked to an artist, as extra Seen Live rows (see renderArtistDetailsContent).
+  function activityConcertsForArtist(key){
+    return activityRows.filter(a => a.category === 'concert' && a.artistKey && a.artistKey === key && otdParse(a.date));
+  }
+  // Artists with a tray (3+ ranked albums), for the concert's artist suggestions.
+  function activityArtistNames(){
+    const names = [];
+    try{ artistAlbumMap().forEach(info => { if (info.albums.length >= ARTIST_MIN_ALBUMS) names.push(info.name); }); }catch(e){ /* albums not loaded yet */ }
+    return names.sort((x, y) => x.localeCompare(y));
+  }
+  function activityOpenArtist(key){
+    const map = artistAlbumMap();
+    const info = map.get(key);
+    if (!info || info.albums.length < ARTIST_MIN_ALBUMS) return;
+    syncArtistRows(map);
+    closeActivityDetailsPanel();
+    // On wide screens the artist tray is a column beside the page, underneath these full-screen views.
+    if (!window.matchMedia('(max-width: 768px)').matches){ closeYearInReview(); closeActivityCalendar(); }
+    switchTopGroup('music');
+    switchMusicSubPage('artists');
+    openArtistDetailsPanel(key);
   }
 
   // ---------- the tray ----------
   function openActivityDetailsPanel(id){
-    if (!activityFind(id)) return;
+    if (!activityResolve(id)) return;
     openActivityId = id;
     renderActivityDetailsContent();
     activityDetailsPanel.scrollTop = 0;
@@ -20911,11 +21096,17 @@
   }
 
   function renderActivityDetailsContent(){
-    const a = activityFind(openActivityId);
-    if (!a){ closeActivityDetailsPanel(); return; }
+    const ref = activityResolve(openActivityId);
+    if (!ref){ closeActivityDetailsPanel(); return; }
+    const a = ref.a, trip = ref.trip;
     const cover = getEffectiveActivityCover(a);
     const dateText = activityLongDate(a.date);
+    const meta = activityMetaText(a, trip);
     const photos = a.photos || [];
+    const year = (otdParse(a.date) || {}).y;
+    const starred = activityIsMemorable(a);
+    const inReview = !trip || !a.hideFromYear;
+    const artistHasTray = a.category === 'concert' && a.artistKey && activityArtistNames().some(n => artistKeyOf(n) === a.artistKey);
     const gridHtml = photos.map((p, i) =>
       '<div class="restaurant-photo-thumb" data-photo-index="' + i + '">' +
         '<img src="' + escapeAttr(cloudinaryThumbUrl(p.url, 350)) + '" alt="" loading="lazy" decoding="async">' +
@@ -20925,15 +21116,30 @@
     activityDetailsPanelInner.innerHTML =
       '<div class="details-art-wrap">' +
         '<div class="art-drop restaurant-cover-drop"' + (cover ? ' title="Open the photos"' : ' title="Add photos below"') + '>' +
-          (cover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 700)) + '" alt="">' : '<span class="art-drop-hint">🎟️</span>') +
+          (cover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 700)) + '" alt="">' : '<span class="art-drop-hint">' + ((activityCategory(a.category) || {}).icon || '🎟️') + '</span>') +
         '</div>' +
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
       '</div>' +
       '<div class="details-content" style="padding-top:20px;">' +
         '<h2 class="details-album">' + escapeHtml(a.name) + '</h2>' +
+        (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
         (dateText ? '<p class="details-artist">' + escapeHtml(dateText) + '</p>' : '') +
+        (a.category === 'concert' && a.artistName
+          ? (artistHasTray
+              ? '<button type="button" class="activity-artist-link" id="activity-artist-link">🎤 ' + escapeHtml(a.artistName) + ' · Seen Live</button>'
+              : '<p class="details-artist">🎤 ' + escapeHtml(a.artistName) + '</p>')
+          : '') +
         (a.description ? '<p class="activity-details-desc">' + escapeHtml(a.description) + '</p>' : '') +
+        (year && inReview
+          ? (guestViewEnabled
+              ? (starred ? '<p class="activity-star-btn is-on activity-star-static">★ Most memorable of ' + year + '</p>' : '')
+              : '<button type="button" class="activity-star-btn' + (starred ? ' is-on' : '') + '" id="activity-star-btn" aria-pressed="' + starred + '">' +
+                  (starred ? '★ Most memorable of ' + year : '☆ Make it the most memorable of ' + year) + '</button>')
+          : '') +
+        (trip && !guestViewEnabled
+          ? '<label class="activity-review-row"><span>Show in Year in Review</span><input type="checkbox" id="activity-review-check"' + (inReview ? ' checked' : '') + '></label>'
+          : '') +
       '</div>' +
       '<div class="restaurant-other-photos-section">' +
         '<span class="restaurant-other-photos-label">Photos</span>' +
@@ -20945,8 +21151,21 @@
       '</div>';
 
     activityDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeActivityDetailsPanel);
-    activityDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', () => openActivityForm(a));
+    activityDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', () => {
+      if (guestViewEnabled) return;
+      if (trip) tripOpenActivityForm(trip, a); else openActivityForm(a);
+    });
     activityDetailsPanelInner.querySelector('.restaurant-cover-drop').addEventListener('click', () => activityOpenViewer(a, cover));
+    const artistLink = activityDetailsPanelInner.querySelector('#activity-artist-link');
+    if (artistLink) artistLink.addEventListener('click', () => activityOpenArtist(a.artistKey));
+    const starBtn = activityDetailsPanelInner.querySelector('#activity-star-btn');
+    if (starBtn) starBtn.addEventListener('click', () => toggleActivityMemorable(a.id));
+    const reviewCheck = activityDetailsPanelInner.querySelector('#activity-review-check');
+    if (reviewCheck) reviewCheck.addEventListener('change', () => {
+      if (reviewCheck.checked) delete a.hideFromYear; else a.hideFromYear = true;
+      activityChanged(trip);
+      showToast(reviewCheck.checked ? 'Shown in Year in Review' : 'Hidden from Year in Review');
+    });
 
     activityDetailsPanelInner.querySelectorAll('.restaurant-photo-thumb').forEach(thumb => {
       thumb.addEventListener('click', (e) => {
@@ -20973,13 +21192,13 @@
         for (let i = 0; i < fileArray.length; i++){
           const tile = activityDetailsPanelInner.querySelector('#activity-photo-add-tile');
           if (tile && openActivityId === id) tile.textContent = fileArray.length > 1 ? (i + 1) + '/' + fileArray.length : '…';
-          const url = await uploadRestaurantPhoto(fileArray[i], 'RankHeaven/ActivityPhotos');
+          const url = await uploadRestaurantPhoto(fileArray[i], trip ? 'RankHeaven/TripPhotos' : 'RankHeaven/ActivityPhotos');
           if (url) uploaded.push({ url });
         }
-        const live = activityFind(id); // looked up again — the tray may have been closed or the activity changed meanwhile
+        const live = activityResolve(id); // looked up again — the tray may have been closed or the activity changed meanwhile
         if (live && uploaded.length){
-          live.photos = (live.photos || []).concat(uploaded);
-          activityChanged();
+          live.a.photos = (live.a.photos || []).concat(uploaded);
+          activityChanged(live.trip);
         } else if (openActivityId === id){
           renderActivityDetailsContent();
         }
@@ -21007,14 +21226,15 @@
     }
   }
 
-  // ---------- adding, editing and deleting (the same sheet a trip's activities use) ----------
+  // ---------- adding, editing and deleting a one-off (the same kind of sheet a trip's activities use) ----------
   // `defaults.date` pre-fills a new one's date.
   function openActivityForm(activity, defaults){
     if (guestViewEnabled) return;
     const isNew = !activity;
     const draft = {
       photos: activity ? activity.photos.map(p => ({ url: p.url })) : [],
-      coverPhoto: activity ? activity.coverPhoto : ''
+      coverPhoto: activity ? activity.coverPhoto : '',
+      category: activity ? activity.category : ''
     };
     let uploading = 0;
     const draftCover = () => draft.coverPhoto && draft.photos.some(p => p.url === draft.coverPhoto) ? draft.coverPhoto : ((draft.photos[0] || {}).url || '');
@@ -21028,12 +21248,20 @@
         (draft.photos.length > 1 ? '<p class="af-photo-hint">To pick a different cover, open a photo in the activity\'s tray and tap “Set as cover”.</p>' : '');
     };
     const date = activity ? activity.date : ((defaults && defaults.date) || '');
+    const catsHtml = () => ACTIVITY_CATEGORIES.map(c =>
+      '<button type="button" class="cal-type oa-cat' + (draft.category === c.key ? ' selected' : '') + '" data-oa-cat="' + c.key + '" aria-pressed="' + (draft.category === c.key) + '">' + c.icon + ' ' + escapeHtml(c.label) + '</button>').join('');
     tsheetOpen({
       title: isNew ? 'New activity' : 'Edit activity',
       bodyHtml:
         '<label class="tf-label" for="oa-name">Name</label><input type="text" class="tf-input" id="oa-name" maxlength="80" placeholder="e.g. Whitewater rafting on the Gauley" value="' + escapeAttr(activity ? activity.name : '') + '" autocomplete="off">' +
-        '<label class="tf-label" for="oa-description">Description</label><textarea class="tf-input tf-area" id="oa-description" rows="3" maxlength="' + ACTIVITY_DESC_MAX + '" placeholder="What it was, who was there, what made it memorable">' + escapeHtml(activity ? activity.description : '') + '</textarea>' +
+        '<label class="tf-label">Category</label><div class="oa-cats" id="oa-cats">' + catsHtml() + '</div>' +
+        '<div id="oa-artist-wrap"' + (draft.category === 'concert' ? '' : ' style="display:none;"') + '>' +
+          '<label class="tf-label" for="oa-artist">Artist</label><input type="text" class="tf-input" id="oa-artist" list="oa-artist-list" maxlength="80" placeholder="Shows under their Seen Live" value="' + escapeAttr(activity ? activity.artistName : '') + '" autocomplete="off">' +
+          '<datalist id="oa-artist-list">' + activityArtistNames().map(n => '<option value="' + escapeAttr(n) + '">').join('') + '</datalist>' +
+        '</div>' +
+        '<label class="tf-label" for="oa-location">Location</label><input type="text" class="tf-input" id="oa-location" maxlength="120" placeholder="e.g. Fayetteville, WV" value="' + escapeAttr(activity ? activity.location : '') + '" autocomplete="off">' +
         '<label class="tf-label" for="oa-date">Date</label><input type="date" class="tf-input" id="oa-date" value="' + escapeAttr(date) + '">' +
+        '<label class="tf-label" for="oa-description">Description</label><textarea class="tf-input tf-area" id="oa-description" rows="3" maxlength="' + ACTIVITY_DESC_MAX + '" placeholder="What it was, what made it memorable">' + escapeHtml(activity ? activity.description : '') + '</textarea>' +
         '<label class="tf-label">Photos</label><div id="oa-photos-wrap">' + photosHtml() + '</div>',
       actions: [
         !isNew ? { label: 'Delete activity', danger: true, onClick: () => confirmDeleteActivity(activity) } : null,
@@ -21041,17 +21269,22 @@
         { label: 'Save', primary: true, onClick: () => {
             const name = document.getElementById('oa-name').value.trim();
             const description = document.getElementById('oa-description').value.trim().slice(0, ACTIVITY_DESC_MAX);
+            const location = document.getElementById('oa-location').value.trim();
+            const typedArtist = draft.category === 'concert' ? document.getElementById('oa-artist').value.trim() : '';
+            const artistName = activityArtistNames().find(n => artistKeyOf(n) === artistKeyOf(typedArtist)) || typedArtist; // written the way the Albums list writes it
             const dateVal = document.getElementById('oa-date').value;
             if (!name){ showToast('Give the activity a name'); return; }
             if (!otdParse(dateVal)){ showToast('Pick a date'); return; }
             if (uploading){ showToast('Hang on — photos are still uploading'); return; }
-            let a = isNew ? null : activityFind(activity.id);
+            let a = isNew ? null : activityRows.find(x => x.id === activity.id);
             if (!a){ a = activityNormalize({}); activityRows.push(a); }
-            a.name = name;
-            a.description = description;
-            a.date = dateVal;
-            a.photos = draft.photos;
-            a.coverPhoto = draft.photos.some(p => p.url === draft.coverPhoto) ? draft.coverPhoto : '';
+            // A starred one moved to another year leaves that year's star behind.
+            const oldYear = (otdParse(a.date) || {}).y;
+            if (oldYear && activityMemorable[oldYear] === a.id && oldYear !== otdParse(dateVal).y) delete activityMemorable[oldYear];
+            Object.assign(a, activityNormalize(Object.assign({}, a, {
+              name, description, location, date: dateVal, category: draft.category, artistName,
+              photos: draft.photos, coverPhoto: draft.photos.some(p => p.url === draft.coverPhoto) ? draft.coverPhoto : ''
+            })));
             tsheetClose();
             // A new one dated in another year jumps Year in Review to that year, so it's there to see.
             const y = otdParse(dateVal).y;
@@ -21060,13 +21293,21 @@
               yirSignature = '';
               yirRender(false);
             }
-            activityChanged();
+            activityChanged(null);
             showToast(isNew ? 'Activity added' : 'Activity saved');
           } }
       ].filter(Boolean),
       onOpen: (body) => {
         const wrap = body.querySelector('#oa-photos-wrap');
         const redraw = () => { if (document.body.contains(wrap)) wrap.innerHTML = photosHtml(); };
+        const cats = body.querySelector('#oa-cats');
+        cats.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-oa-cat]');
+          if (!b) return;
+          draft.category = draft.category === b.dataset.oaCat ? '' : b.dataset.oaCat; // tap again to clear
+          cats.innerHTML = catsHtml();
+          body.querySelector('#oa-artist-wrap').style.display = draft.category === 'concert' ? '' : 'none';
+        });
         wrap.addEventListener('click', (e) => {
           const x = e.target.closest('[data-af-photo-x]');
           if (x){ draft.photos.splice(Number(x.dataset.afPhotoX), 1); redraw(); return; }
@@ -21099,9 +21340,10 @@
     const n = (activity.photos || []).length;
     showConfirmModal('Delete “' + (activity.name || 'this activity') + '”?', (n ? otdPlural(n, 'photo', 'photos') + ' added to it will be gone for good. ' : '') + 'This can\'t be undone.', () => {
       activityRows = activityRows.filter(a => a.id !== activity.id);
+      Object.keys(activityMemorable).forEach(y => { if (activityMemorable[y] === activity.id) delete activityMemorable[y]; });
       tsheetClose();
       if (openActivityId === activity.id) closeActivityDetailsPanel();
-      activityChanged();
+      activityChanged(null);
       showToast('Activity deleted');
     });
   }
@@ -21150,7 +21392,7 @@
     hikeRows.forEach(h => (h.dates || []).forEach(d => { const p = otdParse(d.date); if (p) bump(p.y, 'hikes'); }));
     restaurantRows.forEach(r => (Array.isArray(r.visits) ? r.visits : []).forEach(v => { const p = otdParse(v.date); if (p) bump(p.y, 'restaurants'); }));
     photoRows.forEach(ph => { const p = ph && ph.url ? otdParse(ph.date) : null; if (p) bump(p.y, 'photos'); });
-    activityRows.forEach(a => { const p = (a.name || '').trim() ? otdParse(a.date) : null; if (p) bump(p.y, 'activities'); });
+    activitiesForReview().forEach(x => bump(otdParse(x.a.date).y, 'activities'));
     return counts;
   }
 
@@ -21179,7 +21421,7 @@
     };
     const orderedHikes = getOrderedHikes();
     const stats = { hikes: 0, uniqueHikes: new Set(), miles: 0, feet: 0, newTrails: 0, restaurants: 0, uniqueRestaurants: new Set(), newRestaurants: 0,
-      scored: [], photos: 0, photoDays: 0, activities: 0 };
+      scored: [], photos: 0, photoDays: 0, activities: 0, activityCats: {}, memorable: null };
 
     hikeRows.forEach(h => {
       const dated = (h.dates || []).map(d => ({ d, p: otdParse(d.date) })).filter(x => x.p);
@@ -21235,11 +21477,14 @@
       if (firstYear === year) stats.newRestaurants++;
     });
 
-    activityRows.forEach(a => {
+    activitiesForReview().forEach(({ a, trip }) => {
       const p = otdParse(a.date);
-      if (!p || p.y !== year || !(a.name || '').trim()) return;
-      day(p).activities.push({ type: 'activity', activity: a, dateStr: p.str, photos: activityCoverFirstPhotos(a) });
+      if (p.y !== year) return;
+      const item = { type: 'activity', activity: a, trip, dateStr: p.str, photos: activityCoverFirstPhotos(a), memorable: activityIsMemorable(a) };
+      day(p).activities.push(item);
       stats.activities++;
+      stats.activityCats[a.category || ''] = (stats.activityCats[a.category || ''] || 0) + 1;
+      if (item.memorable) stats.memorable = item;
     });
 
     photoRows.forEach(ph => {
@@ -21264,6 +21509,8 @@
 
     // Highlights — each only shown when the data actually supports it.
     const hl = [];
+    const mem = stats.memorable;
+    if (mem) hl.push({ label: 'Most memorable', big: mem.activity.name, sub: [yirShortDate(mem.dateStr), mem.activity.location].filter(Boolean).join(' · '), item: mem, star: true });
     const bestMeal = stats.scored.slice().sort((a, b) => b.avg - a.avg || (a.dateStr < b.dateStr ? 1 : -1))[0];
     if (bestMeal && stats.scored.length >= 2 && !guestViewEnabled) hl.push({ label: 'Best meal', big: bestMeal.restaurant.name, sub: bestMeal.avg.toFixed(1) + ' · ' + yirShortDate(bestMeal.dateStr), item: bestMeal });
     let longest = null, withMiles = 0;
@@ -21344,7 +21591,8 @@
     const tiles = [
       { n: s.hikes, label: s.hikes === 1 ? 'Hike' : 'Hikes', sub: miles > 0 ? miles + ' mi' + (feet > 0 ? ' · ' + feet.toLocaleString('en-US') + ' ft' : '') : (s.newTrails ? s.newTrails + ' new ' + (s.newTrails === 1 ? 'trail' : 'trails') : (s.uniqueHikes.size ? otdPlural(s.uniqueHikes.size, 'trail', 'trails') : '')) },
       { n: s.restaurants, label: s.restaurants === 1 ? 'Restaurant visit' : 'Restaurant visits', sub: s.uniqueRestaurants.size ? otdPlural(s.uniqueRestaurants.size, 'place', 'places') + (s.newRestaurants ? ' · ' + s.newRestaurants + ' new' : '') : '' },
-      s.activities ? { n: s.activities, label: s.activities === 1 ? 'Activity' : 'Activities', sub: '' } : null,
+      s.activities ? { n: s.activities, label: s.activities === 1 ? 'Activity' : 'Activities', sub: ACTIVITY_CATEGORIES.filter(c => c.key !== 'other' && s.activityCats[c.key])
+        .sort((x, y) => s.activityCats[y.key] - s.activityCats[x.key]).slice(0, 3).map(c => otdPlural(s.activityCats[c.key], c.one, c.many)).join(' · ') } : null,
       { n: s.photos, label: s.photos === 1 ? 'Photo' : 'Photos', sub: s.photoDays ? otdPlural(s.photoDays, 'day', 'days') : '' },
       { n: data.list.length, label: data.list.length === 1 ? 'Active day' : 'Active days', sub: busyMonths ? 'across ' + otdPlural(busyMonths, 'month', 'months') : '' }
     ].filter(Boolean);
@@ -21359,7 +21607,7 @@
       const attr = h.item ? ' data-yir-item="' + yirReg(h.item) + '"' : '';
       const tag = h.item ? 'button' : 'div';
       return '<' + tag + (h.item ? ' type="button"' : '') + ' class="yir-highlight"' + attr + '>' +
-        '<span class="yir-highlight-label">' + escapeHtml(h.label.toUpperCase()) + '</span>' +
+        '<span class="yir-highlight-label">' + (h.star ? yirIcon('star', 11) + ' ' : '') + escapeHtml(h.label.toUpperCase()) + '</span>' +
         '<span class="yir-highlight-big">' + escapeHtml(h.big) + '</span>' +
         '<span class="yir-highlight-sub">' + escapeHtml(h.sub) + '</span></' + tag + '>';
     }).join('') + '</section>';
@@ -21395,11 +21643,16 @@
 
   function yirActivityCardHtml(m){
     const idx = yirReg(m);
+    const a = m.activity;
+    const cat = activityCategory(a.category);
+    const where = [a.category === 'concert' ? a.artistName : '', a.location, m.trip ? m.trip.name || 'Trip' : ''].filter(Boolean).join(' · ');
     const strip = m.photos.length ? '<span class="yir-strip s' + Math.min(3, m.photos.length) + '">' + m.photos.slice(0, 3).map(u => yirImg(u, 400)).join('') + '</span>' : '';
     return '<button type="button" class="yir-card" data-yir-item="' + idx + '">' + strip +
       '<span class="yir-card-body">' +
-        '<span class="yir-row"><span class="yir-chip">' + yirIcon('activity', 12) + 'ACTIVITY</span>' + (m.photos.length > 3 ? '<span class="yir-dim">' + m.photos.length + ' photos</span>' : '') + '</span>' +
-        '<span class="yir-card-name">' + escapeHtml(m.activity.name) + '</span>' +
+        '<span class="yir-row"><span class="yir-chip">' + (cat ? '<span aria-hidden="true">' + cat.icon + '</span>' : yirIcon('activity', 12)) + escapeHtml(activityChipLabel(a)) + '</span>' +
+          (m.memorable ? '<span class="yir-star">' + yirIcon('star', 13) + 'Most memorable</span>' : (m.photos.length > 3 ? '<span class="yir-dim">' + m.photos.length + ' photos</span>' : '')) + '</span>' +
+        '<span class="yir-card-name">' + escapeHtml(a.name) + '</span>' +
+        (where ? '<span class="yir-card-where">' + escapeHtml(where) + '</span>' : '') +
         (m.activity.description ? '<span class="yir-card-desc">' + escapeHtml(m.activity.description) + '</span>' : '') +
       '</span></button>';
   }
@@ -21442,7 +21695,7 @@
   }
 
   function yirSignatureOf(data){
-    return [data.year, data.stats.hikes, data.stats.restaurants, data.stats.photos, data.list.length, data.stats.activities].join('|');
+    return [data.year, data.stats.hikes, data.stats.restaurants, data.stats.photos, data.list.length, data.stats.activities, data.stats.memorable ? data.stats.memorable.activity.id : ''].join('|');
   }
 
   function yirRender(keepScroll){
@@ -22934,7 +23187,8 @@
         '<label class="tf-label" for="af-description">Description</label><textarea class="tf-input tf-area af-desc" id="af-description" rows="2" maxlength="140" placeholder="A short line about it, e.g. its cuisine or what it\'s known for">' + escapeHtml(draft.description) + '</textarea>' +
         '<label class="tf-label" for="af-date">Date</label><input type="date" class="tf-input" id="af-date" value="' + escapeAttr(draft.date) + '">' +
         (t.places.length ? '<label class="tf-label" for="af-place">Place</label><select class="tf-input" id="af-place"><option value="">Automatic</option>' + placeOpts + '</select>' : '') +
-        '<label class="tf-label">Photos</label><div id="af-photos-wrap">' + photosHtml() + '</div>',
+        '<label class="tf-label">Photos</label><div id="af-photos-wrap">' + photosHtml() + '</div>' +
+        '<label class="activity-review-row"><span>Show in Year in Review</span><input type="checkbox" id="af-in-review"' + (activity && activity.hideFromYear ? '' : ' checked') + '></label>',
       actions: [
         !isNew ? { label: 'Delete activity', danger: true, onClick: () => tripConfirmDeleteActivity(t, activity) } : null,
         { label: 'Cancel', onClick: tsheetClose },
@@ -22948,11 +23202,13 @@
             let a = activity;
             if (isNew){ a = { id: tripNewId('act'), name: '', description: '', date: '', photos: [] }; t.activities.push(a); }
             a.name = name; a.description = description; a.date = date; a.photos = draft.photos;
+            if (document.getElementById('af-in-review').checked) delete a.hideFromYear; else a.hideFromYear = true;
             const key = 'a:' + a.id;
             if (placeSel && placeSel.value) t.assign[key] = placeSel.value; else delete t.assign[key];
             saveTripProgress();
             tsheetClose();
             tripRefresh();
+            activityRefreshViews(); // its tray / Year in Review, if open
             showToast(isNew ? 'Activity added' : 'Activity saved');
           } }
       ].filter(Boolean),
@@ -22991,9 +23247,12 @@
       t.activities = t.activities.filter(a => a.id !== activity.id);
       delete t.assign['a:' + activity.id];
       t.notes.forEach(n => { if (n.anchor && n.anchor.type === 'activity' && n.anchor.id === activity.id) n.anchor = { type: 'trip', id: '' }; });
+      Object.keys(activityMemorable).forEach(y => { if (activityMemorable[y] === activity.id){ delete activityMemorable[y]; saveActivityProgress(); } });
       saveTripProgress();
       tsheetClose();
+      if (openActivityId === activity.id) closeActivityDetailsPanel();
       tripRefresh();
+      activityRefreshViews();
       showToast('Activity deleted');
     });
   }
