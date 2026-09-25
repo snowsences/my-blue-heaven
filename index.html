@@ -2436,6 +2436,7 @@
   button.yir-highlight{ cursor: pointer; }
   .yir-highlight-label{ font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--amber); }
   .yir-highlight-big{ font-size: 18px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+  .yir-clamp2{ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; } /* long dish descriptions end in … after two lines */
   .yir-highlight-sub{ font-size: 13px; color: var(--chalk-dim); }
 
   .yir-tile{ position: relative; display: block; padding: 0; border: none; background: #2F4C4A; overflow: hidden; cursor: pointer; }
@@ -21519,7 +21520,7 @@
     const dishes = [];
     list.forEach(dy => dy.restaurants.forEach(rs => { if (rs.topDish && rs.topDish.name) dishes.push({ rs, name: rs.topDish.name, score: rs.topDish.score }); }));
     dishes.sort((a, b) => b.score - a.score);
-    if (dishes.length && !guestViewEnabled) hl.push({ label: 'Standout dish', big: dishes[0].name, sub: dishes[0].rs.restaurant.name + (dishes[0].score >= 0 ? ' · ' + dishes[0].score + '/10' : ''), item: dishes[0].rs });
+    if (dishes.length && !guestViewEnabled) hl.push({ label: 'Standout dish', clamp: true, big: dishes[0].name, sub: dishes[0].rs.restaurant.name + (dishes[0].score >= 0 ? ' · ' + dishes[0].score + '/10' : ''), item: dishes[0].rs });
     const busiest = months.slice().sort((a, b) => b.entries - a.entries)[0];
     if (busiest && busiest.entries >= 2) hl.push({ label: 'Busiest month', big: yirMonthName(busiest.m), sub: otdPlural(busiest.entries, 'thing', 'things') + ' logged' });
     const visitCounts = new Map();
@@ -21608,7 +21609,7 @@
       const tag = h.item ? 'button' : 'div';
       return '<' + tag + (h.item ? ' type="button"' : '') + ' class="yir-highlight"' + attr + '>' +
         '<span class="yir-highlight-label">' + (h.star ? yirIcon('star', 11) + ' ' : '') + escapeHtml(h.label.toUpperCase()) + '</span>' +
-        '<span class="yir-highlight-big">' + escapeHtml(h.big) + '</span>' +
+        '<span class="yir-highlight-big' + (h.clamp ? ' yir-clamp2' : '') + '">' + escapeHtml(h.big) + '</span>' +
         '<span class="yir-highlight-sub">' + escapeHtml(h.sub) + '</span></' + tag + '>';
     }).join('') + '</section>';
   }
