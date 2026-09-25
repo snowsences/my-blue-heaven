@@ -5038,7 +5038,7 @@
     getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc, deleteDoc
+    getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction
   } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -5062,7 +5062,7 @@
     auth: firebaseAuth,
     db: firestoreDb,
     GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
-    doc, getDoc, setDoc, deleteDoc
+    doc, getDoc, setDoc, deleteDoc, runTransaction
   };
   // Module scripts always run deferred (after the whole document is parsed),
   // but the main app below is a classic script that runs immediately when
@@ -7142,7 +7142,7 @@
       if (!changedNames.length) return;
 
       const rev = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      const newParts = Object.assign({}, syncedParts);
+      const ownParts = {};
       const chunkWrites = [];
       for (const name of changedNames){
         const stored = name === 'albums'
@@ -7150,30 +7150,58 @@
           : changed[name];
         const chunks = chunkJsonString(stored);
         chunks.forEach((chunk, i) => chunkWrites.push(fb.setDoc(syncPartRef(fb, uid, name, rev, i), { json: chunk })));
-        newParts[name] = { rev, count: chunks.length, chars: stored.length, at: Date.now() };
+        ownParts[name] = { rev, count: chunks.length, chars: stored.length, at: Date.now() };
       }
       await Promise.all(chunkWrites);
       // Only now point the manifest at the new chunks — see the layout comment above.
-      await fb.setDoc(fb.doc(fb.db, 'users', uid, 'appData', 'main'), { version: 2, parts: newParts, savedAt: new Date().toISOString() });
-      const oldParts = syncedParts;
+      // The manifest is read fresh and only the parts this device changed
+      // are replaced: another device may have moved other parts on since
+      // this one last read it. (Writing back this device's remembered copy
+      // of the whole manifest used to point those parts at versions that
+      // device had already cleaned up — "Some cloud data (photos, settings)
+      // couldn't be read".)
+      //
+      // A version that gets replaced goes on the manifest's `retired` list
+      // with the time it was replaced, and is deleted by whichever device
+      // writes next once it's been retired for a few minutes — long enough
+      // for any device that read the manifest just before to finish
+      // reading it.
+      const RECLAIM_AFTER_MS = 3 * 60 * 1000;
+      const manifestRef = fb.doc(fb.db, 'users', uid, 'appData', 'main');
+      const mergeManifest = (current) => {
+        const now = Date.now();
+        const remoteParts = (current && current.version === 2 && current.parts) || {};
+        const parts = Object.assign({}, remoteParts, ownParts);
+        const retired = (current && Array.isArray(current.retired) ? current.retired : []).slice();
+        for (const name of changedNames){
+          const old = remoteParts[name];
+          if (old && old.rev !== ownParts[name].rev) retired.push({ name, rev: old.rev, count: old.count, at: now });
+        }
+        const inUse = new Set(Object.keys(parts).map(n => n + '~' + parts[n].rev));
+        const reclaim = retired.filter(r => now - (r.at || 0) >= RECLAIM_AFTER_MS && !inUse.has(r.name + '~' + r.rev));
+        const keep = retired.filter(r => reclaim.indexOf(r) === -1 && !inUse.has(r.name + '~' + r.rev));
+        return { manifest: { version: 2, parts, retired: keep, savedAt: new Date().toISOString() }, reclaim };
+      };
+      let merged;
+      if (fb.runTransaction){
+        merged = await fb.runTransaction(fb.db, async (tx) => {
+          const snap = await tx.get(manifestRef);
+          const m = mergeManifest(snap.exists() ? snap.data() : null);
+          tx.set(manifestRef, m.manifest);
+          return m;
+        });
+      } else {
+        const snap = await fb.getDoc(manifestRef);
+        merged = mergeManifest(snap.exists() ? snap.data() : null);
+        await fb.setDoc(manifestRef, merged.manifest);
+      }
+      const newParts = merged.manifest.parts;
       syncedParts = newParts;
       Object.assign(syncedPartJson, changed);
 
-      // The rev a part just moved off of isn't deleted immediately — only
-      // once it's a few minutes old. Right after this device sets the
-      // manifest to its new rev, another device that read the manifest a
-      // moment earlier can still be fetching chunks for the rev this write
-      // just superseded; deleting those chunks out from under that read is
-      // exactly what caused "Missing cloud chunk" (this app used to delete
-      // the instant a rev was superseded, with no such margin). A rev
-      // written before this app tracked `at` has none, and is always old
-      // enough — this only ever holds back genuinely fresh revisions.
-      const RECLAIM_AFTER_MS = 3 * 60 * 1000;
       const staleDeletes = [];
-      for (const name of changedNames){
-        const old = oldParts[name];
-        if (!old || Date.now() - (old.at || 0) < RECLAIM_AFTER_MS) continue;
-        for (let i = 0; i < old.count; i++) staleDeletes.push(fb.deleteDoc(syncPartRef(fb, uid, name, old.rev, i)));
+      for (const r of merged.reclaim){
+        for (let i = 0; i < r.count; i++) staleDeletes.push(fb.deleteDoc(syncPartRef(fb, uid, r.name, r.rev, i)));
       }
       await Promise.all(staleDeletes).catch(() => { /* leftovers are unreferenced and harmless */ });
 
@@ -7266,6 +7294,15 @@
     }
     return cloudLoadInFlight;
   }
+
+  // Coming back to the app after a while re-reads the cloud, so changes made
+  // on another device in the meantime land here (newest wins, same as on
+  // load) instead of this device carrying on from what it read hours ago.
+  let cloudHiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden'){ cloudHiddenAt = Date.now(); return; }
+    if (firebaseUser && cloudReadOk && cloudHiddenAt && Date.now() - cloudHiddenAt > 60 * 1000) runCloudLoad();
+  });
 
   // Runs on every page load (Firebase's signed-in session persists across
   // reloads, unlike the old folder-sync connection which only ever asked
