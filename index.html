@@ -16244,11 +16244,16 @@
     }catch(e){ /* nothing saved yet */ }
   }
 
-  function savePhotoProgress(){
+  // `opts.skipDuelReconcile` is for a big upload batch saving after every
+  // single photo (see the upload handler below) — reconciling Duels after
+  // each one would restart its merge sort that many times over, turning a
+  // big batch dramatically slower for no benefit; the batch reconciles
+  // once, after it's done, instead.
+  function savePhotoProgress(opts){
     photoLastSavedAt = new Date().toISOString();
     try{ window.storage.set(PHOTOS_STORAGE_KEY, JSON.stringify({ photoRows, savedAt: photoLastSavedAt }), false); }catch(e){ /* best effort */ }
     scheduleSyncWrite();
-    photoDuelReconcile(); // keeps Duels' working set in step with whatever just changed in photoRows — a no-op unless Duels has ever been turned on
+    if (!(opts && opts.skipDuelReconcile)) photoDuelReconcile(); // keeps Duels' working set in step with whatever just changed in photoRows — a no-op unless Duels has ever been turned on
   }
 
   // ---------- PHOTO DUELS ----------
@@ -17000,33 +17005,43 @@
       const files = Array.from(input.files || []);
       if (!files.length) return;
       const originalText = photoAddBtn.textContent;
-      const uploaded = [];
-      let undatedCount = 0;
+      let addedCount = 0, undatedCount = 0;
       for (let i = 0; i < files.length; i++){
         if (files.length > 1) photoAddBtn.textContent = 'Uploading ' + (i + 1) + '/' + files.length + '...';
         const url = await uploadRestaurantPhoto(files[i], 'RankHeaven/Photos');
-        if (url){
-          const row = { id: 'ph' + Date.now().toString(36) + Math.random().toString(36).slice(2), url };
-          // A file named like 20250517_021456.jpg carries the date it was taken
-          // (anything after that — "-2", an extension — is ignored). It's kept
-          // on the photo so "On This Day" can find it; the file name itself
-          // isn't stored anywhere else once the photo is uploaded.
-          const info = parsePhotoFilenameDateTime(files[i].name);
-          if (info){
-            row.date = info.dateKey;
-            row.time = info.timestamp.toTimeString().slice(0, 8);
-          } else {
-            undatedCount++;
-          }
-          uploaded.push(row);
+        if (!url) continue;
+        const row = { id: 'ph' + Date.now().toString(36) + Math.random().toString(36).slice(2), url };
+        // A file named like 20250517_021456.jpg carries the date it was taken
+        // (anything after that — "-2", an extension — is ignored). It's kept
+        // on the photo so "On This Day" can find it; the file name itself
+        // isn't stored anywhere else once the photo is uploaded.
+        const info = parsePhotoFilenameDateTime(files[i].name);
+        if (info){
+          row.date = info.dateKey;
+          row.time = info.timestamp.toTimeString().slice(0, 8);
+        } else {
+          undatedCount++;
         }
+        // Saved right away, one photo at a time — for a big batch, a closed
+        // tab, lost connection, or a phone suspending the browser partway
+        // through only loses the one photo still uploading when it
+        // happened, never the ones that already finished (which used to
+        // all be held back and lost together, since nothing was saved
+        // until the entire batch was done).
+        photoRows.push(row);
+        addedCount++;
+        savePhotoProgress({ skipDuelReconcile: true });
+        // Redrawing the whole grid after every single photo would itself
+        // slow a big batch down — only every 10th photo, plus the last one.
+        if (addedCount % 10 === 0 || i === files.length - 1) renderPhotosPage();
       }
       photoAddBtn.textContent = originalText;
-      if (uploaded.length){
-        photoRows.push(...uploaded); // added to the bottom of the list
-        savePhotoProgress();
+      if (addedCount){
+        photoDuelReconcile(); // once, now that the whole batch has landed — see savePhotoProgress's own comment
         renderPhotosPage();
         if (undatedCount) showToast(undatedCount + (undatedCount === 1 ? ' photo has' : ' photos have') + ' no date in the file name');
+      } else {
+        showToast('Nothing uploaded');
       }
     });
     input.click();
