@@ -21276,16 +21276,33 @@
     return canvas;
   }
 
+  // Mirrors shareRestaurantVisit's own photo-gathering logic (courses,
+  // best-scored first, then any loose visit photos) but returns the full
+  // URL list instead of opening the picker — used to give restaurant rows
+  // in the whole-day share card every photo the pop-up's own detail tray
+  // would show, not just the one "best" cover shot otdCollect keeps.
+  function shareOtdRestaurantPhotos(r, visitId){
+    const v = (Array.isArray(r.visits) ? r.visits : []).find(x => x.id === visitId);
+    if (!v) return [];
+    const scoreOf = (c) => (c.score === '' || c.score == null || isNaN(Number(c.score))) ? -1 : Number(c.score);
+    const urls = [];
+    (v.courses || []).slice().sort((a, b) => scoreOf(b) - scoreOf(a)).forEach(c => {
+      otdCoursePhotos(c).forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); });
+    });
+    (v.photos || []).forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); });
+    return urls;
+  }
+
   // ---------- SHARE: ON THIS DAY AS A WHOLE ----------
   // Builds one big canvas that reads like the pop-up itself: the header,
   // then each year's "N years ago" section with a row per hike, restaurant
   // visit and activity (plus a row for that year's Photos-tab photos, if
-  // any) underneath it. Every entry shown in the pop-up gets a row here,
-  // whether or not it has a photo — a plain-colored tile stands in for one
-  // that doesn't, same as the pop-up's own thumbnails do. Score/dish/
-  // insight detail is simplified to a single line per row, so a day
-  // spanning several years stays readable instead of turning into a wall
-  // of text.
+  // any) underneath it. Every entry shown in the pop-up gets a row here.
+  // Score/dish/insight detail is simplified to a single line per row, so a
+  // day spanning several years stays readable instead of turning into a
+  // wall of text, but every one of that item's own photos gets its own
+  // tile in a small grid under the text, up to a generous cap.
+  const SHARE_OTD_PHOTO_CAP = 8;
   function shareOtdRowsFor(data){
     return data.groups.map(g => {
       const ago = data.now.getFullYear() - g.year;
@@ -21295,14 +21312,14 @@
         name: m.hike.name || 'Untitled hike',
         meta: otdHikePlace(m.hike),
         stat: (m.history && m.history[0]) || '',
-        photoUrl: m.photos[0] || m.cover || ''
+        photoUrls: (m.photos && m.photos.length) ? m.photos : (m.cover ? [m.cover] : [])
       }));
       g.restaurants.forEach(m => items.push({
         kicker: 'RESTAURANT',
         name: m.restaurant.name || 'Untitled restaurant',
         meta: otdRestaurantPlace(m.restaurant),
         stat: m.avg !== null ? ('Visit score ' + m.avg.toFixed(1)) : ((m.history && m.history[0]) || ''),
-        photoUrl: m.cover || ''
+        photoUrls: shareOtdRestaurantPhotos(m.restaurant, m.visitId)
       }));
       g.activities.forEach(m => {
         const a = m.activity;
@@ -21312,7 +21329,7 @@
           name: a.name || 'Activity',
           meta: [a.category === 'concert' ? a.artistName : '', a.location, m.trip ? (m.trip.name || 'Trip') : ''].filter(Boolean).join(' · '),
           stat: a.description || '',
-          photoUrl: (m.photos && m.photos[0]) || ''
+          photoUrls: m.photos || []
         });
       });
       if (g.photos.length){
@@ -21320,9 +21337,13 @@
           kicker: 'PHOTOS',
           name: otdPlural(g.photos.length, 'photo', 'photos'),
           meta: '', stat: '',
-          photoUrl: g.photos[0].url
+          photoUrls: g.photos.map(p => p.url)
         });
       }
+      items.forEach(it => {
+        it.shownPhotos = it.photoUrls.slice(0, SHARE_OTD_PHOTO_CAP);
+        it.overflowCount = Math.max(0, it.photoUrls.length - it.shownPhotos.length);
+      });
       return { label: otdPlural(ago, 'year', 'years') + ' ago', dateLabel: otdLongDate(g.dateStr), items };
     });
   }
@@ -21331,7 +21352,7 @@
     try{ await Promise.all([document.fonts.load('700 72px Figtree'), document.fonts.load('700 30px Figtree'), document.fonts.load('500 24px Figtree')]); }catch(e){ /* falls back to the system font */ }
     const groups = shareOtdRowsFor(data);
     const urls = [];
-    groups.forEach(g => g.items.forEach(it => { if (it.photoUrl && urls.indexOf(it.photoUrl) === -1) urls.push(it.photoUrl); }));
+    groups.forEach(g => g.items.forEach(it => it.shownPhotos.forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); })));
     const loaded = await Promise.all(urls.map(u => shareLoadImage(u)));
     const byUrl = new Map(urls.map((u, i) => [u, loaded[i]]));
 
@@ -21351,9 +21372,13 @@
 
     // Every row is measured up front (text wraps to a known width) so the
     // canvas height — and every row's own y position — is known before
-    // anything is actually drawn.
-    const ROW_PAD = 20, THUMB = 108, TEXT_GAP = 24, MIN_ROW_H = THUMB + ROW_PAD * 2, LINE_H = 34;
-    const textW = cw - ROW_PAD * 2 - THUMB - TEXT_GAP;
+    // anything is actually drawn. The text block now spans the full row
+    // width, with a grid of photo tiles (one per photo, up to the cap)
+    // underneath it instead of a single thumbnail beside it.
+    const ROW_PAD = 20, TEXT_GAP = 24, LINE_H = 34;
+    const TILE = 150, TILE_GAP = 10;
+    const textW = cw - ROW_PAD * 2;
+    const tileCols = Math.max(1, Math.floor((textW + TILE_GAP) / (TILE + TILE_GAP)));
     groups.forEach(g => {
       g.items.forEach(it => {
         measure.font = '700 30px ' + SHARE_FONT;
@@ -21362,7 +21387,9 @@
         it.metaLines = it.meta ? shareWrapText(measure, it.meta, textW, 1) : [];
         it.statLines = it.stat ? shareWrapText(measure, it.stat, textW, 1) : [];
         const textH = LINE_H + it.nameLines.length * LINE_H + (it.metaLines.length ? LINE_H : 0) + (it.statLines.length ? LINE_H : 0);
-        it.rowH = Math.max(MIN_ROW_H, textH + ROW_PAD * 2);
+        const tileRows = it.shownPhotos.length ? Math.ceil(it.shownPhotos.length / tileCols) : 0;
+        const gridH = tileRows ? tileRows * TILE + (tileRows - 1) * TILE_GAP : 0;
+        it.rowH = ROW_PAD + textH + (gridH ? TEXT_GAP + gridH : 0) + ROW_PAD;
       });
     });
 
@@ -21411,17 +21438,8 @@
         ctx.fillStyle = '#1B3236';
         shareRoundRect(ctx, PAD, y, cw, rowH, 18);
         ctx.fill();
-        const img = it.photoUrl ? byUrl.get(it.photoUrl) : null;
-        const thumbY = y + (rowH - THUMB) / 2;
-        if (img){
-          shareDrawCover(ctx, img, PAD + ROW_PAD, thumbY, THUMB, THUMB, 14);
-        } else {
-          ctx.fillStyle = '#2F4C4A';
-          shareRoundRect(ctx, PAD + ROW_PAD, thumbY, THUMB, THUMB, 14);
-          ctx.fill();
-        }
         let ty = y + ROW_PAD;
-        const tx = PAD + ROW_PAD + THUMB + TEXT_GAP;
+        const tx = PAD + ROW_PAD;
         ctx.fillStyle = '#E8A33D';
         ctx.font = '700 18px ' + SHARE_FONT;
         ctx.fillText(it.kicker, tx, ty + 16);
@@ -21440,6 +21458,32 @@
           ctx.fillStyle = 'rgba(241, 236, 222, 0.56)';
           ctx.font = '500 24px ' + SHARE_FONT;
           ctx.fillText(it.statLines[0], tx, ty + 20);
+          ty += LINE_H;
+        }
+        if (it.shownPhotos.length){
+          ty += TEXT_GAP;
+          it.shownPhotos.forEach((u, pi) => {
+            const col = pi % tileCols, row = Math.floor(pi / tileCols);
+            const px = tx + col * (TILE + TILE_GAP), py = ty + row * (TILE + TILE_GAP);
+            const img = byUrl.get(u);
+            if (img){
+              shareDrawCover(ctx, img, px, py, TILE, TILE, 14);
+            } else {
+              ctx.fillStyle = '#2F4C4A';
+              shareRoundRect(ctx, px, py, TILE, TILE, 14);
+              ctx.fill();
+            }
+            const isLast = pi === it.shownPhotos.length - 1;
+            if (isLast && it.overflowCount > 0){
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+              shareRoundRect(ctx, px, py, TILE, TILE, 14);
+              ctx.fill();
+              ctx.fillStyle = '#F1ECDE';
+              ctx.font = '700 32px ' + SHARE_FONT;
+              const label = '+' + it.overflowCount;
+              ctx.fillText(label, px + (TILE - ctx.measureText(label).width) / 2, py + TILE / 2 + 11);
+            }
+          });
         }
         y += rowH + (ii < g.items.length - 1 ? ROW_GAP : 0);
       });
