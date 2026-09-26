@@ -1696,12 +1696,27 @@
     justify-content: center;
     cursor: pointer;
   }
+  .otd-share-day-btn{
+    position: absolute;
+    top: 12px; right: 68px;
+    z-index: 5;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--chalk);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
   .otd-compact{
     position: absolute;
     top: 0; left: 0; right: 0;
     z-index: 3;
     height: 66px;
-    padding: 24px 76px 0 20px;
+    padding: 24px 128px 0 20px;
     background: var(--bg);
     border-bottom: 1px solid var(--panel-line);
     display: flex;
@@ -1819,20 +1834,6 @@
     letter-spacing: 0.08em;
   }
   .otd-rank{ font-size: 13px; font-weight: 600; color: var(--amber); }
-  .otd-row-right{ display: flex; align-items: center; gap: 10px; flex: none; }
-  .otd-share-btn{
-    flex: none;
-    width: 28px; height: 28px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 50%;
-    border: 1px solid var(--panel-line);
-    background: transparent;
-    color: var(--chalk-dim);
-    cursor: pointer;
-  }
-  .otd-share-btn:hover{ border-color: var(--amber); color: var(--amber); }
-  .otd-row .otd-share-btn{ background: var(--bg); }
-  .otd-card[role="button"]:focus-visible, .otd-row[role="button"]:focus-visible{ outline: 2px solid var(--amber); outline-offset: 2px; }
   .otd-name{ display: block; font-size: 21px; font-weight: 700; line-height: 1.15; }
   .otd-place{ display: block; margin-top: 2px; font-size: 14px; color: var(--chalk-dim); }
   .otd-score{ display: flex; align-items: center; gap: 12px; }
@@ -6238,6 +6239,9 @@
       <span class="otd-eyebrow">ON THIS DAY</span>
       <span class="otd-compact-date" id="otd-compact-date"></span>
     </div>
+    <button type="button" class="otd-share-day-btn" id="otd-share-day-btn" aria-label="Share today" title="Share today">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+    </button>
     <button type="button" class="otd-close" id="otd-close-btn" aria-label="Close">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
     </button>
@@ -19686,11 +19690,13 @@
   const otdCompact = document.getElementById('otd-compact');
   const otdCompactDate = document.getElementById('otd-compact-date');
   const otdCloseBtn = document.getElementById('otd-close-btn');
+  const otdShareDayBtn = document.getElementById('otd-share-day-btn');
 
   let otdSettings = { enabled: true, hikes: true, restaurants: true, photos: true, activities: true, lastShown: '' };
   let otdItems = [];        // what each tappable card/tile in the open pop-up points at
   let otdReturnFocus = null;
   let otdReady = false;     // startup waits (local data, cloud merge) are done
+  let otdLastData = null;   // whatever otdCollect() built for the date currently on screen — read by the day's own Share button
 
   function otdSleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -19944,22 +19950,12 @@
       camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.5" r="3.3"></circle>',
       chevron: '<path d="M9 6l6 6-6 6"></path>',
       close: '<path d="M6 6l12 12M18 6L6 18"></path>',
-      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>',
-      share: '<path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>'
+      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>'
     };
     return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[name] + '</svg>';
   }
 
   function otdRegister(item){ otdItems.push(item); return otdItems.length - 1; }
-
-  // A share button lives inside these otherwise-clickable cards, so the
-  // card itself is a plain div (role="button") rather than a real <button>
-  // — same fix Trips already needed for its own kebab menu — and this is
-  // checked for in the click/keydown delegation below before the "open the
-  // item" fallback runs.
-  function otdShareBtnHtml(idx){
-    return '<button type="button" class="otd-share-btn" data-otd-share="' + idx + '" aria-label="Share" title="Share">' + otdIcon('share', 14) + '</button>';
-  }
 
   function otdInsightsHtml(lines){
     return lines.map(l => '<span class="otd-insight"><span class="otd-dot"></span><span>' + escapeHtml(l) + '</span></span>').join('');
@@ -19995,7 +19991,7 @@
     const name = h.name || 'Untitled hike';
     const idx = otdRegister(m);
     if (compact){
-      return '<div class="otd-row" role="button" tabindex="0" data-otd-item="' + idx + '">' +
+      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
         otdThumbHtml(url, 'hike') +
         '<span class="otd-row-text">' +
           '<span class="otd-kicker">HIKE · #' + m.rank + ' OF ' + m.total + '</span>' +
@@ -20003,19 +19999,18 @@
           (otdHikePlace(h) ? '<span class="otd-row-place">' + escapeHtml(otdHikePlace(h)) + '</span>' : '') +
           '<span class="otd-row-line">' + escapeHtml(m.history[0]) + '</span>' +
         '</span>' +
-        (url ? otdShareBtnHtml(idx) : '') +
         '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
-      '</div>';
+      '</button>';
     }
-    return '<div class="otd-card" role="button" tabindex="0" data-otd-item="' + idx + '">' +
+    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
       otdHeroHtml(url, 'hike', m.photos.length > 1 ? m.photos.length + ' photos' : '') +
       '<span class="otd-body">' +
-        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('hike', 12) + 'HIKE</span><span class="otd-row-right">' + (url ? otdShareBtnHtml(idx) : '') + '<span class="otd-rank">#' + m.rank + ' of ' + m.total + '</span></span></span>' +
+        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('hike', 12) + 'HIKE</span><span class="otd-rank">#' + m.rank + ' of ' + m.total + '</span></span>' +
         '<span><span class="otd-name">' + escapeHtml(name) + '</span>' +
           (otdHikePlace(h) ? '<span class="otd-place">' + escapeHtml(otdHikePlace(h)) + '</span>' : '') + '</span>' +
         '<span class="otd-insights">' + otdInsightsHtml(m.history) + '</span>' +
       '</span>' +
-    '</div>';
+    '</button>';
   }
 
   function otdRestaurantCardHtml(m, compact){
@@ -20025,7 +20020,7 @@
     if (compact){
       const line = m.avg !== null ? ('Visit score ' + m.avg.toFixed(1) + (m.scoreSub === 'Your best visit here' ? ' · your best here' : '')) : m.history[0];
       const kicker = 'RESTAURANT' + (m.tier ? ' · ' + m.tier.name.toUpperCase() + ' #' + m.rank : ' · #' + m.rank + ' OF ' + m.total);
-      return '<div class="otd-row" role="button" tabindex="0" data-otd-item="' + idx + '">' +
+      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
         otdThumbHtml(m.cover, 'food') +
         '<span class="otd-row-text">' +
           '<span class="otd-kicker">' + escapeHtml(kicker) + '</span>' +
@@ -20033,15 +20028,14 @@
           (otdRestaurantPlace(r) ? '<span class="otd-row-place">' + escapeHtml(otdRestaurantPlace(r)) + '</span>' : '') +
           '<span class="otd-row-line">' + escapeHtml(line) + '</span>' +
         '</span>' +
-        (m.cover ? otdShareBtnHtml(idx) : '') +
         '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
-      '</div>';
+      '</button>';
     }
     const dishText = m.dishes.length ? m.dishes.join(' · ') + (m.moreDishes ? ' · +' + m.moreDishes + ' more' : '') : '';
-    return '<div class="otd-card" role="button" tabindex="0" data-otd-item="' + idx + '">' +
+    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
       otdHeroHtml(m.cover, 'food', m.coverIsTopDish ? 'Photo of the top dish' : '') +
       '<span class="otd-body">' +
-        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('food', 12) + 'RESTAURANT</span><span class="otd-row-right">' + (m.cover ? otdShareBtnHtml(idx) : '') + otdRestaurantRankHtml(m) + '</span></span>' +
+        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('food', 12) + 'RESTAURANT</span>' + otdRestaurantRankHtml(m) + '</span>' +
         '<span><span class="otd-name">' + escapeHtml(name) + '</span>' +
           (otdRestaurantPlace(r) ? '<span class="otd-place">' + escapeHtml(otdRestaurantPlace(r)) + '</span>' : '') + '</span>' +
         (m.avg !== null
@@ -20051,7 +20045,7 @@
         (m.star ? '<span class="otd-star">' + otdIcon('star', 14) + escapeHtml(m.star) + '</span>' : '') +
         '<span class="otd-insights otd-insights-ruled">' + otdInsightsHtml(m.history) + '</span>' +
       '</span>' +
-    '</div>';
+    '</button>';
   }
 
   function otdActivityCardHtml(m, compact){
@@ -20062,7 +20056,7 @@
     const idx = otdRegister(m);
     const icon = cat ? '<span aria-hidden="true">' + cat.icon + '</span>' : otdIcon('activity', 12);
     if (compact){
-      return '<div class="otd-row" role="button" tabindex="0" data-otd-item="' + idx + '">' +
+      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
         otdThumbHtml(m.photos[0], 'activity') +
         '<span class="otd-row-text">' +
           '<span class="otd-kicker">' + escapeHtml(kicker + (m.memorable ? ' · MOST MEMORABLE' : '')) + '</span>' +
@@ -20070,20 +20064,19 @@
           (place ? '<span class="otd-row-place">' + escapeHtml(place) + '</span>' : '') +
           (a.description ? '<span class="otd-row-line">' + escapeHtml(a.description) + '</span>' : '') +
         '</span>' +
-        (m.photos.length ? otdShareBtnHtml(idx) : '') +
         '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
-      '</div>';
+      '</button>';
     }
-    return '<div class="otd-card" role="button" tabindex="0" data-otd-item="' + idx + '">' +
+    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
       otdHeroHtml(m.photos[0], 'activity', m.photos.length > 1 ? m.photos.length + ' photos' : '') +
       '<span class="otd-body">' +
-        '<span class="otd-row-between"><span class="otd-chip">' + icon + escapeHtml(kicker) + '</span>' + (m.photos.length ? otdShareBtnHtml(idx) : '') + '</span>' +
+        '<span class="otd-row-between"><span class="otd-chip">' + icon + escapeHtml(kicker) + '</span></span>' +
         '<span><span class="otd-name">' + escapeHtml(a.name) + '</span>' +
           (place ? '<span class="otd-place">' + escapeHtml(place) + '</span>' : '') + '</span>' +
         (a.description ? '<span class="otd-dishes">' + escapeHtml(a.description) + '</span>' : '') +
         (m.memorable ? '<span class="otd-star">' + otdIcon('star', 14) + 'Most memorable of ' + m.dateStr.slice(0, 4) + '</span>' : '') +
       '</span>' +
-    '</div>';
+    '</button>';
   }
 
   function otdPhotosCardHtml(g){
@@ -20107,6 +20100,7 @@
 
   function otdRender(data){
     otdItems = [];
+    otdLastData = data; // so the day's own Share button (outside otdContent) can reach whatever's currently on screen
     const now = data.now;
     const c = data.counts;
     const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
@@ -20234,21 +20228,6 @@
     }
   }
 
-  // Turns a course's photos (hike/restaurant) — see SHARE CARD, further
-  // down — into a downloadable/shareable image; On This Day's own share
-  // button reuses those exact card builders, one activities of its own
-  // since no other screen needed to share those yet.
-  function shareActivity(a){
-    const urls = (a.photos || []).map(p => p && p.url).filter(Boolean);
-    openShare({ title: (a.name || 'Activity').trim(), location: (a.location || '').trim(), urls });
-  }
-  function otdShareItem(item){
-    if (!item) return;
-    if (item.type === 'hike') shareHikeOuting(item.hike, item.dateId);
-    else if (item.type === 'restaurant') shareRestaurantVisit(item.restaurant, item.visitId);
-    else if (item.type === 'activity') shareActivity(item.activity);
-  }
-
   otdContent.addEventListener('click', (e) => {
     if (e.target.closest('#otd-done-btn')){ closeOnThisDay(); return; }
     const tile = e.target.closest('[data-otd-photos]');
@@ -20257,21 +20236,35 @@
       if (set) openPhotoLightbox(set.urls, Number(tile.dataset.otdIndex) || 0, null);
       return;
     }
-    const shareBtn = e.target.closest('[data-otd-share]');
-    if (shareBtn){ otdShareItem(otdItems[Number(shareBtn.dataset.otdShare)]); return; }
     const card = e.target.closest('[data-otd-item]');
     if (card) otdOpenItem(otdItems[Number(card.dataset.otdItem)]);
   });
-  // The cards are divs now (role="button"), not real <button>s, so Enter/
-  // Space needs wiring by hand — same fix as the trip timeline's own cards.
-  otdContent.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    if (e.target.closest('[data-otd-share], [data-otd-photos], #otd-done-btn')) return; // those are real buttons; the browser already handles them
-    const card = e.target.closest('[data-otd-item]');
-    if (!card) return;
-    e.preventDefault();
-    card.click();
-  });
+  // One image for the whole day — every hike, restaurant visit, activity
+  // and Photos-tab photo shown above, across every year, combined into a
+  // single card (see SHARE CARD, further down, for the actual drawing).
+  // Reuses whatever otdRender just displayed, so what's shared always
+  // matches what's on screen; most recent year's photos come first, since
+  // that's also how the timeline above reads.
+  function shareOnThisDayWhole(){
+    if (!otdLastData) return;
+    const data = otdLastData;
+    const now = data.now;
+    const monthDay = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const c = data.counts;
+    const sub = weekday + ' · ' + otdPlural(c.memories, 'memory', 'memories') + (c.years > 1 ? ' across ' + c.years + ' years' : '');
+    const urls = [];
+    const add = (u) => { if (u && urls.indexOf(u) === -1) urls.push(u); };
+    data.groups.forEach(g => {
+      g.hikes.forEach(m => (m.photos || []).forEach(add));
+      g.restaurants.forEach(m => { if (m.cover) add(m.cover); });
+      g.activities.forEach(m => (m.photos || []).forEach(add));
+      g.photos.forEach(p => add(p.url));
+    });
+    if (!urls.length){ showToast("Nothing with a photo to share yet"); return; }
+    openShare({ title: monthDay, location: sub, urls });
+  }
+  otdShareDayBtn.addEventListener('click', shareOnThisDayWhole);
   otdCloseBtn.addEventListener('click', otdTryClose);
   otdBackdrop.addEventListener('click', otdTryClose);
   document.addEventListener('keydown', (e) => {
