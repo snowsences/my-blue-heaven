@@ -1819,6 +1819,20 @@
     letter-spacing: 0.08em;
   }
   .otd-rank{ font-size: 13px; font-weight: 600; color: var(--amber); }
+  .otd-row-right{ display: flex; align-items: center; gap: 10px; flex: none; }
+  .otd-share-btn{
+    flex: none;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--panel-line);
+    background: transparent;
+    color: var(--chalk-dim);
+    cursor: pointer;
+  }
+  .otd-share-btn:hover{ border-color: var(--amber); color: var(--amber); }
+  .otd-row .otd-share-btn{ background: var(--bg); }
+  .otd-card[role="button"]:focus-visible, .otd-row[role="button"]:focus-visible{ outline: 2px solid var(--amber); outline-offset: 2px; }
   .otd-name{ display: block; font-size: 21px; font-weight: 700; line-height: 1.15; }
   .otd-place{ display: block; margin-top: 2px; font-size: 14px; color: var(--chalk-dim); }
   .otd-score{ display: flex; align-items: center; gap: 12px; }
@@ -8743,6 +8757,7 @@
   let lightboxPhotos = null; // array of URLs (restaurant galleries) OR {url, caption, goToContext, dishId} entries (Dishes' cross-gallery) when in gallery mode, else null
   let lightboxIndex = 0;
   let lightboxCoverContext = null; // { restaurantIndex } when opened from a restaurant gallery, else null
+  let lightboxJustSwiped = false; // set by the swipe gesture below, so the tap-to-close click that follows a swipe on mobile is ignored
 
   // lightboxPhotos entries can be a plain URL string (every existing
   // caller — restaurant galleries, album art) or a richer object (Dishes'
@@ -8950,7 +8965,71 @@
     lightboxPhotos = null;
     lightboxCoverContext = null;
   }
-  artLightboxOverlay.addEventListener('click', closeArtLightbox);
+  artLightboxOverlay.addEventListener('click', (e) => {
+    if (lightboxJustSwiped){ lightboxJustSwiped = false; return; } // a swipe just fired, not a tap to close
+    closeArtLightbox();
+  });
+
+  // ---------- swipe left/right to flip between photos (mobile) ----------
+  // Vertical movement is left alone — there's no swipe-down gesture here,
+  // tapping anywhere already closes the viewer. A drag that doesn't clear
+  // the threshold just snaps back and still counts as a normal tap-to-close;
+  // one that does is an instant snap to the new photo, not a sliding
+  // animation — matching how reordering elsewhere in the app also swaps
+  // instantly rather than sliding.
+  (function wireLightboxSwipe(){
+    const SWIPE_THRESHOLD = 50;
+    let startX = 0, startY = 0, dx = 0, dragging = false;
+
+    artLightboxOverlay.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1 || !lightboxPhotos || lightboxPhotos.length < 2 || e.target.closest('button')){
+        dragging = false;
+        return;
+      }
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dx = 0;
+      dragging = true;
+    }, { passive: true });
+
+    artLightboxOverlay.addEventListener('touchmove', (e) => {
+      if (!dragging) return;
+      const touch = e.touches[0];
+      dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6){
+        e.preventDefault(); // a horizontal swipe, not a vertical scroll
+        artLightboxImg.style.transition = 'none';
+        artLightboxImg.style.transform = 'translateX(' + dx + 'px)';
+        artLightboxImg.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 500));
+      }
+    }, { passive: false });
+
+    const finish = () => {
+      if (!dragging) return;
+      dragging = false;
+      const moved = Math.abs(dx) > 6; // matches the touchmove threshold above that calls preventDefault, which is what suppresses the browser's own tap-to-close click
+      artLightboxImg.style.transition = '';
+      artLightboxImg.style.transform = '';
+      artLightboxImg.style.opacity = '';
+      if (Math.abs(dx) > SWIPE_THRESHOLD){
+        lightboxJustSwiped = true;
+        navigateLightbox(dx > 0 ? -1 : 1); // dragged right -> previous photo, dragged left -> next
+      } else if (moved){
+        // Dragged enough to suppress that native click, but not far enough
+        // to count as a swipe — close it ourselves instead of leaving the
+        // viewer stuck open with nothing having visibly happened.
+        closeArtLightbox();
+      }
+    };
+    artLightboxOverlay.addEventListener('touchend', finish, { passive: true });
+    artLightboxOverlay.addEventListener('touchcancel', () => {
+      dragging = false;
+      artLightboxImg.style.transition = '';
+      artLightboxImg.style.transform = '';
+      artLightboxImg.style.opacity = '';
+    }, { passive: true });
+  })();
   // Arrows (and the cover toggle / delete button) need to stop the click
   // from reaching the overlay's own close handler — otherwise using them
   // would also close the lightbox.
@@ -10566,6 +10645,11 @@
     // A details panel (or similar full-screen overlay) sitting on top
     // shouldn't let a swipe change the page underneath it.
     if (document.body.classList.contains('details-open-lock')) return;
+    // The photo viewer has its own left/right swipe (flip between photos),
+    // and can be opened straight from a plain grid with no lock of its own
+    // (e.g. the Photos tab itself) — without this, swiping through photos
+    // there would also swipe the whole app to a different Nature sub-tab underneath it.
+    if (artLightboxOverlay.classList.contains('show')) return;
     // Guest View's nav is flat (Restaurants / Hikes / Fun) — there are no
     // sub-tabs to swipe between, and stepping through the hidden Music group
     // would land a guest on pages they aren't meant to reach.
@@ -19860,12 +19944,22 @@
       camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.5" r="3.3"></circle>',
       chevron: '<path d="M9 6l6 6-6 6"></path>',
       close: '<path d="M6 6l12 12M18 6L6 18"></path>',
-      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>'
+      activity: '<path d="M4 9a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"></path><path d="M12 6v1.5M12 11v2M12 16.5V18"></path>',
+      share: '<path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>'
     };
     return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[name] + '</svg>';
   }
 
   function otdRegister(item){ otdItems.push(item); return otdItems.length - 1; }
+
+  // A share button lives inside these otherwise-clickable cards, so the
+  // card itself is a plain div (role="button") rather than a real <button>
+  // — same fix Trips already needed for its own kebab menu — and this is
+  // checked for in the click/keydown delegation below before the "open the
+  // item" fallback runs.
+  function otdShareBtnHtml(idx){
+    return '<button type="button" class="otd-share-btn" data-otd-share="' + idx + '" aria-label="Share" title="Share">' + otdIcon('share', 14) + '</button>';
+  }
 
   function otdInsightsHtml(lines){
     return lines.map(l => '<span class="otd-insight"><span class="otd-dot"></span><span>' + escapeHtml(l) + '</span></span>').join('');
@@ -19901,7 +19995,7 @@
     const name = h.name || 'Untitled hike';
     const idx = otdRegister(m);
     if (compact){
-      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
+      return '<div class="otd-row" role="button" tabindex="0" data-otd-item="' + idx + '">' +
         otdThumbHtml(url, 'hike') +
         '<span class="otd-row-text">' +
           '<span class="otd-kicker">HIKE · #' + m.rank + ' OF ' + m.total + '</span>' +
@@ -19909,18 +20003,19 @@
           (otdHikePlace(h) ? '<span class="otd-row-place">' + escapeHtml(otdHikePlace(h)) + '</span>' : '') +
           '<span class="otd-row-line">' + escapeHtml(m.history[0]) + '</span>' +
         '</span>' +
+        (url ? otdShareBtnHtml(idx) : '') +
         '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
-      '</button>';
+      '</div>';
     }
-    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
+    return '<div class="otd-card" role="button" tabindex="0" data-otd-item="' + idx + '">' +
       otdHeroHtml(url, 'hike', m.photos.length > 1 ? m.photos.length + ' photos' : '') +
       '<span class="otd-body">' +
-        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('hike', 12) + 'HIKE</span><span class="otd-rank">#' + m.rank + ' of ' + m.total + '</span></span>' +
+        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('hike', 12) + 'HIKE</span><span class="otd-row-right">' + (url ? otdShareBtnHtml(idx) : '') + '<span class="otd-rank">#' + m.rank + ' of ' + m.total + '</span></span></span>' +
         '<span><span class="otd-name">' + escapeHtml(name) + '</span>' +
           (otdHikePlace(h) ? '<span class="otd-place">' + escapeHtml(otdHikePlace(h)) + '</span>' : '') + '</span>' +
         '<span class="otd-insights">' + otdInsightsHtml(m.history) + '</span>' +
       '</span>' +
-    '</button>';
+    '</div>';
   }
 
   function otdRestaurantCardHtml(m, compact){
@@ -19930,7 +20025,7 @@
     if (compact){
       const line = m.avg !== null ? ('Visit score ' + m.avg.toFixed(1) + (m.scoreSub === 'Your best visit here' ? ' · your best here' : '')) : m.history[0];
       const kicker = 'RESTAURANT' + (m.tier ? ' · ' + m.tier.name.toUpperCase() + ' #' + m.rank : ' · #' + m.rank + ' OF ' + m.total);
-      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
+      return '<div class="otd-row" role="button" tabindex="0" data-otd-item="' + idx + '">' +
         otdThumbHtml(m.cover, 'food') +
         '<span class="otd-row-text">' +
           '<span class="otd-kicker">' + escapeHtml(kicker) + '</span>' +
@@ -19938,14 +20033,15 @@
           (otdRestaurantPlace(r) ? '<span class="otd-row-place">' + escapeHtml(otdRestaurantPlace(r)) + '</span>' : '') +
           '<span class="otd-row-line">' + escapeHtml(line) + '</span>' +
         '</span>' +
+        (m.cover ? otdShareBtnHtml(idx) : '') +
         '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
-      '</button>';
+      '</div>';
     }
     const dishText = m.dishes.length ? m.dishes.join(' · ') + (m.moreDishes ? ' · +' + m.moreDishes + ' more' : '') : '';
-    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
+    return '<div class="otd-card" role="button" tabindex="0" data-otd-item="' + idx + '">' +
       otdHeroHtml(m.cover, 'food', m.coverIsTopDish ? 'Photo of the top dish' : '') +
       '<span class="otd-body">' +
-        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('food', 12) + 'RESTAURANT</span>' + otdRestaurantRankHtml(m) + '</span>' +
+        '<span class="otd-row-between"><span class="otd-chip">' + otdIcon('food', 12) + 'RESTAURANT</span><span class="otd-row-right">' + (m.cover ? otdShareBtnHtml(idx) : '') + otdRestaurantRankHtml(m) + '</span></span>' +
         '<span><span class="otd-name">' + escapeHtml(name) + '</span>' +
           (otdRestaurantPlace(r) ? '<span class="otd-place">' + escapeHtml(otdRestaurantPlace(r)) + '</span>' : '') + '</span>' +
         (m.avg !== null
@@ -19955,7 +20051,7 @@
         (m.star ? '<span class="otd-star">' + otdIcon('star', 14) + escapeHtml(m.star) + '</span>' : '') +
         '<span class="otd-insights otd-insights-ruled">' + otdInsightsHtml(m.history) + '</span>' +
       '</span>' +
-    '</button>';
+    '</div>';
   }
 
   function otdActivityCardHtml(m, compact){
@@ -19966,7 +20062,7 @@
     const idx = otdRegister(m);
     const icon = cat ? '<span aria-hidden="true">' + cat.icon + '</span>' : otdIcon('activity', 12);
     if (compact){
-      return '<button type="button" class="otd-row" data-otd-item="' + idx + '">' +
+      return '<div class="otd-row" role="button" tabindex="0" data-otd-item="' + idx + '">' +
         otdThumbHtml(m.photos[0], 'activity') +
         '<span class="otd-row-text">' +
           '<span class="otd-kicker">' + escapeHtml(kicker + (m.memorable ? ' · MOST MEMORABLE' : '')) + '</span>' +
@@ -19974,19 +20070,20 @@
           (place ? '<span class="otd-row-place">' + escapeHtml(place) + '</span>' : '') +
           (a.description ? '<span class="otd-row-line">' + escapeHtml(a.description) + '</span>' : '') +
         '</span>' +
+        (m.photos.length ? otdShareBtnHtml(idx) : '') +
         '<span class="otd-chevron">' + otdIcon('chevron', 20) + '</span>' +
-      '</button>';
+      '</div>';
     }
-    return '<button type="button" class="otd-card" data-otd-item="' + idx + '">' +
+    return '<div class="otd-card" role="button" tabindex="0" data-otd-item="' + idx + '">' +
       otdHeroHtml(m.photos[0], 'activity', m.photos.length > 1 ? m.photos.length + ' photos' : '') +
       '<span class="otd-body">' +
-        '<span class="otd-row-between"><span class="otd-chip">' + icon + escapeHtml(kicker) + '</span></span>' +
+        '<span class="otd-row-between"><span class="otd-chip">' + icon + escapeHtml(kicker) + '</span>' + (m.photos.length ? otdShareBtnHtml(idx) : '') + '</span>' +
         '<span><span class="otd-name">' + escapeHtml(a.name) + '</span>' +
           (place ? '<span class="otd-place">' + escapeHtml(place) + '</span>' : '') + '</span>' +
         (a.description ? '<span class="otd-dishes">' + escapeHtml(a.description) + '</span>' : '') +
         (m.memorable ? '<span class="otd-star">' + otdIcon('star', 14) + 'Most memorable of ' + m.dateStr.slice(0, 4) + '</span>' : '') +
       '</span>' +
-    '</button>';
+    '</div>';
   }
 
   function otdPhotosCardHtml(g){
@@ -20137,6 +20234,21 @@
     }
   }
 
+  // Turns a course's photos (hike/restaurant) — see SHARE CARD, further
+  // down — into a downloadable/shareable image; On This Day's own share
+  // button reuses those exact card builders, one activities of its own
+  // since no other screen needed to share those yet.
+  function shareActivity(a){
+    const urls = (a.photos || []).map(p => p && p.url).filter(Boolean);
+    openShare({ title: (a.name || 'Activity').trim(), location: (a.location || '').trim(), urls });
+  }
+  function otdShareItem(item){
+    if (!item) return;
+    if (item.type === 'hike') shareHikeOuting(item.hike, item.dateId);
+    else if (item.type === 'restaurant') shareRestaurantVisit(item.restaurant, item.visitId);
+    else if (item.type === 'activity') shareActivity(item.activity);
+  }
+
   otdContent.addEventListener('click', (e) => {
     if (e.target.closest('#otd-done-btn')){ closeOnThisDay(); return; }
     const tile = e.target.closest('[data-otd-photos]');
@@ -20145,8 +20257,20 @@
       if (set) openPhotoLightbox(set.urls, Number(tile.dataset.otdIndex) || 0, null);
       return;
     }
+    const shareBtn = e.target.closest('[data-otd-share]');
+    if (shareBtn){ otdShareItem(otdItems[Number(shareBtn.dataset.otdShare)]); return; }
     const card = e.target.closest('[data-otd-item]');
     if (card) otdOpenItem(otdItems[Number(card.dataset.otdItem)]);
+  });
+  // The cards are divs now (role="button"), not real <button>s, so Enter/
+  // Space needs wiring by hand — same fix as the trip timeline's own cards.
+  otdContent.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.target.closest('[data-otd-share], [data-otd-photos], #otd-done-btn')) return; // those are real buttons; the browser already handles them
+    const card = e.target.closest('[data-otd-item]');
+    if (!card) return;
+    e.preventDefault();
+    card.click();
   });
   otdCloseBtn.addEventListener('click', otdTryClose);
   otdBackdrop.addEventListener('click', otdTryClose);
