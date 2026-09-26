@@ -3684,6 +3684,23 @@
   .grid-card:hover .grid-card-rank{
     transform: translate(0, 0);
   }
+  /* Ranked photos need their number visible right away, not only on a
+     hover that touch devices can't even trigger — same look as
+     .grid-card-rank, just always shown. */
+  .photo-rank-badge{
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: rgba(15,33,36,0.88);
+    color: #FFFFFF;
+    font-family: 'Figtree', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    z-index: 3;
+    pointer-events: none;
+  }
 
   .results-actions{
     display: flex;
@@ -4842,6 +4859,7 @@
      Viewing (tabs, dropdown, gallery navigation) is untouched — only
      controls that create, remove, or modify something are hidden. */
   body.guest-view-active #restaurant-tiers-panel{ display: none; }
+  body.guest-view-active #photo-duel-btn,
   body.guest-view-active #photo-edit-toggle-btn,
   body.guest-view-active #yir-add-btn,
   body.guest-view-active .activity-photo-add-tile,
@@ -4957,6 +4975,21 @@
   .af-photo.is-cover{ box-shadow: 0 0 0 2px var(--amber); }
   .af-photo-star{ position: absolute; left: 4px; bottom: 4px; padding: 1px 5px; border-radius: 999px; background: rgba(15,33,36,0.8); color: var(--amber); font-size: 10px; font-weight: 800; line-height: 1.5; }
   .af-photo-hint{ margin: 8px 0 0; font-size: 12.5px; color: var(--chalk-dim); }
+  /* ---------- Photo Duels (see PHOTO DUELS in the script) ----------
+     Reuses the same duel-card/duel-stage/tally-bar/done-message classes
+     Albums and Songs already use, just with photos filling the card edge
+     to edge instead of centered text. */
+  .photo-duel-screen{ margin-top: 8px; }
+  .photo-duel-card{ padding: 0; overflow: hidden; background: #0F1E20; }
+  .photo-duel-card img{
+    width: 100%; height: 100%;
+    min-height: 260px;
+    object-fit: cover;
+    display: block;
+    border-radius: inherit;
+  }
+  .photo-duel-stage{ min-height: 320px; }
+  @media (max-width: 560px){ .photo-duel-card img{ min-height: 220px; } }
   /* ================= MOTION (see MOTION in the script) =================
      One set of timings and easings for the whole app:
        --dur-fast 150ms  small changes (color, hover, press)
@@ -5708,6 +5741,7 @@
           <button class="group-sub-tab-btn active" id="nature-subtab-photos-btn-3" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
         <div class="restaurant-heading-actions">
+          <button class="btn-ghost" id="photo-duel-btn" type="button">🥊 Duels</button>
           <button class="btn-ghost" id="photo-edit-toggle-btn" type="button">Edit</button>
           <button class="btn-primary" id="photo-add-btn" type="button" aria-label="Add photos">+ New</button>
         </div>
@@ -5724,6 +5758,41 @@
       <div class="results-list grid-mode" id="photo-grid"></div>
       <ol class="results-list" id="photo-edit-list" style="display:none;"></ol>
       <p class="restaurant-course-empty" id="photo-empty-message" style="display:none;">No photos yet — add some to get started.</p>
+
+      <div class="photo-duel-screen" id="photo-duel-screen" style="display:none;">
+        <div class="tally-wrap">
+          <div class="tally-bar"><div class="tally-fill" id="photo-duel-tally-fill"></div></div>
+          <span class="tally-count" id="photo-duel-tally-count">0 / 0</span>
+        </div>
+
+        <div class="duel-active-view" id="photo-duel-active-view">
+          <p class="duel-title">Which photo do you prefer?</p>
+          <div class="duel-stage photo-duel-stage">
+            <div class="duel-card photo-duel-card" id="photo-duel-card-left" tabindex="0">
+              <img id="photo-duel-img-left" alt="">
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="duel-card photo-duel-card" id="photo-duel-card-right" tabindex="0">
+              <img id="photo-duel-img-right" alt="">
+            </div>
+          </div>
+          <p class="key-hint">Click a photo, or use <kbd>←</kbd> <kbd>→</kbd></p>
+        </div>
+
+        <div class="done-message" id="photo-duel-done-message">
+          <p class="done-emoji">🎉</p>
+          <p class="done-text">All duels complete — your photos are ranked.</p>
+          <button class="btn-primary" id="photo-duel-done-btn" type="button">View Ranked Photos →</button>
+        </div>
+
+        <div class="duel-actions">
+          <button class="btn-ghost" id="photo-duel-undo-btn">Undo last pick</button>
+          <button class="btn-ghost" id="photo-duel-exit-btn">Pause &amp; save for later</button>
+          <button class="btn-ghost" id="photo-duel-restart-btn">Start Over</button>
+        </div>
+
+        <p class="autosave-note">Your progress saves automatically — close and come back anytime.</p>
+      </div>
     </div>
   </div>
 
@@ -6694,6 +6763,20 @@
   const photoEmptyMessage = document.getElementById('photo-empty-message');
   const photoAddBtn = document.getElementById('photo-add-btn');
   const photoEditToggleBtn = document.getElementById('photo-edit-toggle-btn');
+  const photoDuelBtn = document.getElementById('photo-duel-btn');
+  const photoDuelScreen = document.getElementById('photo-duel-screen');
+  const photoDuelTallyFill = document.getElementById('photo-duel-tally-fill');
+  const photoDuelTallyCount = document.getElementById('photo-duel-tally-count');
+  const photoDuelActiveView = document.getElementById('photo-duel-active-view');
+  const photoDuelCardLeft = document.getElementById('photo-duel-card-left');
+  const photoDuelCardRight = document.getElementById('photo-duel-card-right');
+  const photoDuelImgLeft = document.getElementById('photo-duel-img-left');
+  const photoDuelImgRight = document.getElementById('photo-duel-img-right');
+  const photoDuelDoneMessage = document.getElementById('photo-duel-done-message');
+  const photoDuelDoneBtn = document.getElementById('photo-duel-done-btn');
+  const photoDuelUndoBtn = document.getElementById('photo-duel-undo-btn');
+  const photoDuelExitBtn = document.getElementById('photo-duel-exit-btn');
+  const photoDuelRestartBtn = document.getElementById('photo-duel-restart-btn');
   const photoReorderBar = document.getElementById('photo-reorder-bar');
   const photoReorderControls = document.getElementById('photo-reorder-controls');
   const photoEditSaveBtn = document.getElementById('photo-edit-save-btn');
@@ -7100,7 +7183,7 @@
       hikes: { hikeRows, hikeSavedAt: hikeLastSavedAt, hikeFullListText, hikeFullListTextSavedAt },
       roads: { roadRows, roadSavedAt: roadLastSavedAt },
       parks: { parkRows, parkSavedAt: parkLastSavedAt },
-      photos: { photoRows, photoSavedAt: photoLastSavedAt },
+      photos: { photoRows, photoSavedAt: photoLastSavedAt, photoDuelItems, photoDuelHistory, photoDuelIsComplete, photoDuelFinalRanking, photoDuelSavedAt: photoDuelLastSavedAt },
       trips: { tripRows, tripSavedAt: tripLastSavedAt },
       activities: { activityRows, activityMemorable, activitySavedAt: activityLastSavedAt },
       artists: { artistRows, artistSavedAt: artistLastSavedAt },
@@ -7425,6 +7508,20 @@
         photoRows = existing.photoRows;
         photoLastSavedAt = existing.photoSavedAt || null;
         try{ await window.storage.set(PHOTOS_STORAGE_KEY, JSON.stringify({ photoRows, savedAt: photoLastSavedAt }), false); }catch(e){ /* best effort */ }
+        renderPhotosPage();
+      }
+    }
+    // Duels changes independently of photoRows (a pick never touches it) —
+    // its own savedAt inside the same "photos" part, same dual-timestamp
+    // pattern as hikeFullListText living inside the hikes part below.
+    if (Array.isArray(existing.photoDuelItems) || Array.isArray(existing.photoDuelFinalRanking)){
+      const remoteTime = new Date(existing.photoDuelSavedAt || 0).getTime();
+      const localTime = new Date(photoDuelLastSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        photoDuelResumeFromData(existing);
+        photoDuelLastSavedAt = existing.photoDuelSavedAt || null;
+        try{ await window.storage.set(PHOTO_DUEL_STORAGE_KEY, photoDuelPayload(), false); }catch(e){ /* best effort */ }
+        photoDuelReconcile(); // the remote copy may not know about photos only this device has yet, or vice versa
         renderPhotosPage();
       }
     }
@@ -7766,6 +7863,18 @@
       photoRows = localPhotoParsed.photoRows;
       photoLastSavedAt = localPhotoParsed.savedAt || null;
     }
+
+    // Same independent-local-key pattern as Songs — see resumeSongDataFromSync above.
+    let localPhotoDuelParsed = null;
+    try{
+      const res = await window.storage.get(PHOTO_DUEL_STORAGE_KEY, false);
+      if (res && res.value) localPhotoDuelParsed = JSON.parse(res.value);
+    }catch(e){ /* no local photo-duel save */ }
+    if (localPhotoDuelParsed && Array.isArray(localPhotoDuelParsed.photoDuelItems) && localPhotoDuelParsed.photoDuelItems.length){
+      photoDuelResumeFromData(localPhotoDuelParsed);
+      photoDuelLastSavedAt = localPhotoDuelParsed.savedAt || null;
+    }
+    photoDuelReconcile(); // covers a local photoRows/photo-duel save pair left out of step by anything unexpected (e.g. an interrupted write)
 
     let localTripParsed = null;
     try{
@@ -16139,7 +16248,300 @@
     photoLastSavedAt = new Date().toISOString();
     try{ window.storage.set(PHOTOS_STORAGE_KEY, JSON.stringify({ photoRows, savedAt: photoLastSavedAt }), false); }catch(e){ /* best effort */ }
     scheduleSyncWrite();
+    photoDuelReconcile(); // keeps Duels' working set in step with whatever just changed in photoRows — a no-op unless Duels has ever been turned on
   }
+
+  // ---------- PHOTO DUELS ----------
+  // Turns the Photos tab from a plain date-ordered list into a ranked one —
+  // a third duel-ranking pipeline alongside Albums and Songs, built on the
+  // same shared, item-agnostic mergeSortGen/estimateComparisons (see SONG
+  // RANKER's own comment for why these three stay independent rather than
+  // sharing state). Compares two photos at a time; a photo's id is all
+  // that's stored here — the image itself always comes from photoRows, so
+  // renaming nothing, deleting a photo elsewhere, or a Cloudinary URL
+  // changing under a reshrink never orphans anything.
+  //
+  // Duels are opt-in and per-collection, not per-upload: turning it on
+  // once ranks every photo currently in the tab; after that, any change to
+  // photoRows (a new batch uploaded, a photo removed in Edit mode, a newer
+  // copy landing from the cloud) is folded in automatically by
+  // photoDuelReconcile, called from savePhotoProgress. The merge sort has
+  // no way to resume mid-way with a different set of items, so — exactly
+  // like pullFromActiveDuelPool already does for Albums when an item is
+  // pulled out mid-duel — reconciling just reseeds with whatever's already
+  // known (the live estimate, or the finished ranking) and duels the whole
+  // set again; most of it reconfirms in a few taps since the order barely
+  // moves. A device that never turns Duels on for Photos is completely
+  // unaffected — the tab just stays in plain date order forever.
+  const PHOTO_DUEL_STORAGE_KEY = 'photo-duel-progress';
+  let photoDuelItems = [];          // photo ids currently being sorted (meaningful only pre-completion)
+  let photoDuelHistory = [];
+  let photoDuelIsComplete = false;
+  let photoDuelFinalRanking = [];   // photo ids, in rank order, once complete
+  let photoDuelCurrentPair = null;  // [idA, idB]
+  let photoDuelGen = null;
+  let photoDuelItemStats = {};
+  let photoDuelEstimatedTotal = 0;
+  let photoDuelSwapDisplay = false;
+  let photoDuelLastSavedAt = null;
+  let photoDuelScreenOpen = false;  // is the active duel screen currently showing (session-only, not persisted)
+
+  function photoDuelEngaged(){ return photoDuelItems.length > 0 || photoDuelFinalRanking.length > 0; }
+
+  function photoDuelPayload(){
+    return JSON.stringify({ photoDuelItems, photoDuelHistory, photoDuelIsComplete, photoDuelFinalRanking, savedAt: photoDuelLastSavedAt });
+  }
+  function savePhotoDuelProgress(){
+    photoDuelLastSavedAt = new Date().toISOString();
+    try{ window.storage.set(PHOTO_DUEL_STORAGE_KEY, photoDuelPayload(), false); }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+
+  // ---------- driver (mirrors runGenerator/handleGenResult/advance/pick/undo) ----------
+  function runPhotoDuelGenerator(choices){
+    photoDuelItemStats = {};
+    photoDuelItems.forEach(id => { photoDuelItemStats[id] = { wins: 0, losses: 0 }; });
+    photoDuelGen = mergeSortGen(photoDuelItems);
+    photoDuelHistory = [];
+    let res = photoDuelGen.next(undefined);
+    for (const choice of choices){
+      if (res.done) break;
+      const [a, b] = res.value;
+      const winner = choice ? a : b;
+      const loser = choice ? b : a;
+      photoDuelItemStats[winner].wins++;
+      photoDuelItemStats[loser].losses++;
+      photoDuelHistory.push(choice);
+      res = photoDuelGen.next(choice);
+    }
+    return res;
+  }
+
+  function handlePhotoDuelGenResult(res){
+    if (res.done){
+      photoDuelIsComplete = true;
+      photoDuelFinalRanking = res.value;
+    } else {
+      photoDuelIsComplete = false;
+      photoDuelCurrentPair = res.value;
+    }
+    savePhotoDuelProgress();
+    renderPhotosPage();
+  }
+
+  function photoDuelAdvance(choice){
+    if (choice !== undefined && photoDuelCurrentPair){
+      const [a, b] = photoDuelCurrentPair;
+      const winner = choice ? a : b;
+      const loser = choice ? b : a;
+      photoDuelItemStats[winner].wins++;
+      photoDuelItemStats[loser].losses++;
+    }
+    const res = photoDuelGen.next(choice);
+    handlePhotoDuelGenResult(res);
+  }
+
+  function photoDuelPick(sideIsLeft){
+    const leftWins = photoDuelSwapDisplay ? !sideIsLeft : sideIsLeft;
+    photoDuelHistory.push(leftWins);
+    photoDuelAdvance(leftWins);
+  }
+
+  function photoDuelUndo(){
+    if (photoDuelHistory.length === 0) return;
+    const res = runPhotoDuelGenerator(photoDuelHistory.slice(0, -1));
+    handlePhotoDuelGenResult(res);
+  }
+
+  function computePhotoLiveEstimate(){
+    const scored = photoDuelItems.map(id => {
+      const s = photoDuelItemStats[id] || { wins: 0, losses: 0 };
+      const total = s.wins + s.losses;
+      return { id, wins: s.wins, total, winRate: total > 0 ? s.wins / total : null };
+    });
+    const compared = scored.filter(s => s.total > 0).sort((a, b) => {
+      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return b.total - a.total;
+    });
+    const uncompared = scored.filter(s => s.total === 0);
+    return compared.map(s => s.id).concat(uncompared.map(s => s.id));
+  }
+
+  // The ids currently best-known to be in rank order — the finished
+  // ranking once complete, otherwise the live estimate from whatever's
+  // been compared so far.
+  function photoDuelBestKnownOrder(){
+    return photoDuelIsComplete ? photoDuelFinalRanking : computePhotoLiveEstimate();
+  }
+
+  // photoRows, reordered to match Duels — every id Duels doesn't know about
+  // yet (never engaged, or a race with reconcile) falls back to plain
+  // photoRows order, so the grid is never simply empty.
+  function photoDisplayRows(){
+    if (!photoDuelEngaged()) return photoRows;
+    const byId = new Map(photoRows.map(p => [p.id, p]));
+    return photoDuelBestKnownOrder().map(id => byId.get(id)).filter(Boolean);
+  }
+
+  // Called from savePhotoProgress every time photoRows changes — a no-op
+  // unless Duels has been engaged at least once. See this block's own
+  // opening comment for why a full restart (not a resumable insert) is the
+  // right fix here, same as pullFromActiveDuelPool for Albums.
+  function photoDuelReconcile(){
+    if (!photoDuelEngaged()) return;
+    const liveIds = new Set(photoRows.map(p => p.id));
+    const known = photoDuelBestKnownOrder();
+    const kept = known.filter(id => liveIds.has(id));
+    const keptSet = new Set(kept);
+    const added = photoRows.map(p => p.id).filter(id => !keptSet.has(id));
+    if (kept.length === known.length && !added.length) return; // nothing changed
+    photoDuelItems = kept.concat(added);
+    photoDuelIsComplete = false;
+    photoDuelFinalRanking = [];
+    // Silent — the upload flow already toasts its own outcome, and the
+    // Duels button's own label (now showing a percentage again) and the
+    // grid's returning rank badges make the fold-in obvious on their own.
+    const res = runPhotoDuelGenerator([]);
+    handlePhotoDuelGenResult(res);
+  }
+
+  // Rebuilds photoDuelGen/photoDuelItemStats/photoDuelCurrentPair from a
+  // saved history without re-saving — same reasoning as resumeFromData
+  // (Albums): just opening the app on old, still-incomplete local data
+  // must never itself stamp a fresh save and push it to the cloud.
+  function photoDuelResumeFromData(parsed){
+    photoDuelItems = Array.isArray(parsed.photoDuelItems) ? parsed.photoDuelItems : [];
+    photoDuelEstimatedTotal = estimateComparisons(photoDuelItems.length);
+    if (parsed.photoDuelIsComplete && Array.isArray(parsed.photoDuelFinalRanking)){
+      photoDuelIsComplete = true;
+      photoDuelFinalRanking = parsed.photoDuelFinalRanking;
+      photoDuelHistory = Array.isArray(parsed.photoDuelHistory) ? parsed.photoDuelHistory : [];
+    } else {
+      const res = runPhotoDuelGenerator(Array.isArray(parsed.photoDuelHistory) ? parsed.photoDuelHistory : []);
+      if (res.done){
+        photoDuelIsComplete = true;
+        photoDuelFinalRanking = res.value;
+      } else {
+        photoDuelIsComplete = false;
+        photoDuelCurrentPair = res.value;
+      }
+    }
+  }
+
+  async function loadPhotoDuelProgress(){
+    try{
+      const res = await window.storage.get(PHOTO_DUEL_STORAGE_KEY, false);
+      if (res && res.value){
+        const parsed = JSON.parse(res.value);
+        if (Array.isArray(parsed.photoDuelItems) && parsed.photoDuelItems.length){
+          photoDuelResumeFromData(parsed);
+          photoDuelLastSavedAt = parsed.savedAt || null;
+        }
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+
+  // ---------- the screen ----------
+  function updatePhotoDuelBtn(){
+    if (!photoDuelEngaged()){
+      photoDuelBtn.textContent = '🥊 Duels';
+      photoDuelBtn.title = 'Rank your photos head-to-head';
+    } else if (photoDuelIsComplete){
+      photoDuelBtn.textContent = '🥊 Ranked';
+      photoDuelBtn.title = 'Ranked by Duels';
+    } else {
+      const pct = photoDuelEstimatedTotal > 0 ? Math.min(97, Math.round((photoDuelHistory.length / photoDuelEstimatedTotal) * 100)) : 0;
+      photoDuelBtn.textContent = '🥊 Duels · ' + pct + '%';
+      photoDuelBtn.title = 'Resume ranking your photos';
+    }
+  }
+
+  function startPhotoDuels(){
+    photoDuelItems = photoRows.map(p => p.id);
+    photoDuelEstimatedTotal = estimateComparisons(photoDuelItems.length);
+    const res = runPhotoDuelGenerator([]);
+    handlePhotoDuelGenResult(res);
+    openPhotoDuelScreen();
+  }
+
+  function openPhotoDuelScreen(){
+    photoDuelScreenOpen = true;
+    renderPhotosPage();
+    window.scrollTo({ top: 0 });
+  }
+  function closePhotoDuelScreen(){
+    photoDuelScreenOpen = false;
+    renderPhotosPage();
+  }
+
+  photoDuelBtn.addEventListener('click', () => {
+    if (guestViewEnabled) return;
+    if (!photoDuelEngaged()) startPhotoDuels();
+    else openPhotoDuelScreen();
+  });
+
+  function renderPhotoDuelScreen(){
+    if (photoDuelIsComplete){
+      photoDuelActiveView.style.display = 'none';
+      photoDuelDoneMessage.style.display = 'block';
+      photoDuelExitBtn.style.display = 'none'; // the done message's own button already leads back to the grid
+      photoDuelTallyFill.style.width = '100%';
+      photoDuelTallyCount.textContent = photoDuelHistory.length + ' / ' + photoDuelHistory.length + ' — all done';
+    } else {
+      const byId = new Map(photoRows.map(p => [p.id, p]));
+      const [a, b] = photoDuelCurrentPair || [];
+      const leftPhoto = byId.get(a), rightPhoto = byId.get(b);
+      if (!photoDuelCurrentPair || !leftPhoto || !rightPhoto){
+        // A photo this pair needed is gone (a race with a deletion elsewhere) — reconcile and try again.
+        photoDuelReconcile();
+        return;
+      }
+      photoDuelActiveView.style.display = 'block';
+      photoDuelDoneMessage.style.display = 'none';
+      photoDuelExitBtn.style.display = 'inline-block';
+      photoDuelSwapDisplay = Math.random() < 0.5;
+      const leftId = photoDuelSwapDisplay ? b : a;
+      const rightId = photoDuelSwapDisplay ? a : b;
+      photoDuelImgLeft.src = cloudinaryThumbUrl(byId.get(leftId).url, 900);
+      photoDuelImgRight.src = cloudinaryThumbUrl(byId.get(rightId).url, 900);
+      photoDuelCardLeft.style.animation = 'none'; void photoDuelCardLeft.offsetWidth; photoDuelCardLeft.style.animation = '';
+      photoDuelCardRight.style.animation = 'none'; void photoDuelCardRight.offsetWidth; photoDuelCardRight.style.animation = '';
+
+      const done = photoDuelHistory.length;
+      const pct = photoDuelEstimatedTotal > 0 ? Math.min(97, Math.round((done / photoDuelEstimatedTotal) * 100)) : 0;
+      photoDuelTallyFill.style.width = pct + '%';
+      photoDuelTallyCount.textContent = done + ' / ~' + photoDuelEstimatedTotal;
+    }
+    photoDuelUndoBtn.style.visibility = photoDuelHistory.length > 0 ? 'visible' : 'hidden';
+  }
+
+  photoDuelCardLeft.addEventListener('click', () => photoDuelPick(true));
+  photoDuelCardRight.addEventListener('click', () => photoDuelPick(false));
+  photoDuelUndoBtn.addEventListener('click', photoDuelUndo);
+  photoDuelExitBtn.addEventListener('click', closePhotoDuelScreen);
+  photoDuelDoneBtn.addEventListener('click', closePhotoDuelScreen);
+  photoDuelRestartBtn.addEventListener('click', () => {
+    showConfirmModal('Start the photo ranking over?', "This clears your Duels progress and puts Photos back in plain date order. Your photos themselves are never touched.", () => {
+      photoDuelItems = [];
+      photoDuelHistory = [];
+      photoDuelIsComplete = false;
+      photoDuelFinalRanking = [];
+      photoDuelCurrentPair = null;
+      photoDuelGen = null;
+      photoDuelItemStats = {};
+      savePhotoDuelProgress();
+      closePhotoDuelScreen();
+      showToast('Duels reset — back to date order');
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!photoDuelScreenOpen || photoDuelIsComplete) return;
+    if (modalOverlay.classList.contains('show') || artLightboxOverlay.classList.contains('show')) return;
+    if (!pagePhotos.classList.contains('active')) return;
+    if (e.key === 'ArrowLeft'){ photoDuelPick(true); }
+    else if (e.key === 'ArrowRight'){ photoDuelPick(false); }
+  });
 
   // ---------- TRIPS: data ----------
   // Past trips only — somewhere to look back on where you went. A trip is a
@@ -16363,12 +16765,24 @@
 
   function renderPhotosPage(){
     const empty = !photoRows.length;
-    if (empty) photoEditMode = false;
+    if (empty){ photoEditMode = false; photoDuelScreenOpen = false; }
     photoEmptyMessage.style.display = empty ? 'block' : 'none';
     photoAddBtn.style.display = photoEditMode ? 'none' : 'inline-block';
-    photoEditToggleBtn.style.display = (!empty && !photoEditMode) ? 'inline-block' : 'none';
+    photoEditToggleBtn.style.display = (!empty && !photoEditMode && !photoDuelScreenOpen) ? 'inline-block' : 'none';
+    const duelBtnEligible = !guestViewEnabled && photoRows.length >= 2 && !photoEditMode && !photoDuelScreenOpen;
+    photoDuelBtn.style.display = duelBtnEligible ? 'inline-block' : 'none';
+    if (duelBtnEligible) updatePhotoDuelBtn();
     photoReorderBar.style.display = photoEditMode ? 'flex' : 'none';
     photoReorderControls.style.display = photoEditMode ? 'flex' : 'none';
+
+    if (photoDuelScreenOpen){
+      photoGrid.style.display = 'none';
+      photoEditList.style.display = 'none';
+      photoDuelScreen.style.display = 'block';
+      renderPhotoDuelScreen();
+      return; // the duel screen has the page; nothing else to draw
+    }
+    photoDuelScreen.style.display = 'none';
     photoGrid.style.display = (photoEditMode || empty) ? 'none' : '';
     photoEditList.style.display = photoEditMode ? '' : 'none';
 
@@ -16380,15 +16794,21 @@
     photoEditList.innerHTML = '';
     photoGrid.innerHTML = '';
     if (empty) return;
-    photoRows.forEach((p, idx) => {
+    const order = photoDisplayRows();
+    const ranked = photoDuelEngaged();
+    order.forEach((p, idx) => {
       const card = document.createElement('div');
       card.className = 'grid-card';
       card.dataset.photoId = p.id;
-      card.innerHTML = '<div class="art-drop" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 500)) + '" alt="" loading="lazy" decoding="async"></div>';
+      card.innerHTML =
+        (ranked ? '<span class="photo-rank-badge">#' + (idx + 1) + '</span>' : '') +
+        '<div class="art-drop" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 500)) + '" alt="" loading="lazy" decoding="async"></div>';
       photoGrid.appendChild(card);
-      makePhotoDraggable(card);
+      // Drag-to-reorder only makes sense for the plain date list — once
+      // Duels has a say, the order comes from picks instead.
+      if (!ranked) makePhotoDraggable(card);
       card.addEventListener('click', () => {
-        openPhotoLightbox(photoRows.map(x => x.url), idx, null);
+        openPhotoLightbox(order.map(x => x.url), idx, null);
       });
     });
   }
@@ -18888,6 +19308,7 @@
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
       hikeRows, parkRows, roadRows, photoRows, tripRows, artistRows, activityRows, activityMemorable,
+      photoDuelItems, photoDuelHistory, photoDuelIsComplete, photoDuelFinalRanking,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
       hikeFullListText, dishFullListText,
@@ -18926,6 +19347,10 @@
         resumeSongDataFromSync(parsed);
         saveSongProgress(); // same fix, for songs
         restoredParts.push(parsed.songItems.length + ' song' + (parsed.songItems.length === 1 ? '' : 's'));
+      }
+      if (Array.isArray(parsed.photoDuelItems) && parsed.photoDuelItems.length){
+        photoDuelResumeFromData(parsed);
+        savePhotoDuelProgress(); // same fix, for photo duels
       }
       if (Array.isArray(parsed.restaurantRows) && parsed.restaurantRows.length){
         restaurantRows = parsed.restaurantRows;
@@ -24501,6 +24926,7 @@
   loadRoadProgress();
   loadArtistProgress();
   loadPhotoProgress();
+  loadPhotoDuelProgress();
   loadTripProgress().then(() => renderTripsPage());
   loadMediaProgress('book');
   loadMediaProgress('movie');
