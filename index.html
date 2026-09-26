@@ -6279,9 +6279,11 @@
         <div class="share-preview-status" id="share-preview-status">Preparing…</div>
         <canvas id="share-preview-canvas" style="display:none;"></canvas>
       </div>
-      <div class="share-photos-head"><span>PHOTOS</span><span id="share-count"></span></div>
-      <div class="share-thumbs" id="share-thumbs"></div>
-      <p class="share-note">Only the name, location and photos are shared — never notes, scores, rankings or dates.</p>
+      <div class="share-picker" id="share-picker">
+        <div class="share-photos-head"><span>PHOTOS</span><span id="share-count"></span></div>
+        <div class="share-thumbs" id="share-thumbs"></div>
+        <p class="share-note">Only the name, location and photos are shared — never notes, scores, rankings or dates.</p>
+      </div>
     </div>
     <div class="share-footer"><button type="button" class="share-go" id="share-go-btn" disabled>Preparing…</button></div>
   </div>
@@ -20231,30 +20233,21 @@
     const card = e.target.closest('[data-otd-item]');
     if (card) otdOpenItem(otdItems[Number(card.dataset.otdItem)]);
   });
-  // One image for the whole day — every hike, restaurant visit, activity
-  // and Photos-tab photo shown above, across every year, combined into a
-  // single card (see SHARE CARD, further down, for the actual drawing).
-  // Reuses whatever otdRender just displayed, so what's shared always
-  // matches what's on screen; most recent year's photos come first, since
-  // that's also how the timeline above reads.
+  // One image that looks like the pop-up itself — the header and each
+  // year's "N years ago" section with its hikes/restaurants/activities/
+  // photos underneath, minus the descriptive sentence, the "That's
+  // everything" line and the buttons (see SHARE: ON THIS DAY AS A WHOLE,
+  // further down, for the actual drawing). Reuses whatever otdRender just
+  // displayed, so what's shared always matches what's on screen.
   function shareOnThisDayWhole(){
     if (!otdLastData) return;
     const data = otdLastData;
-    const now = data.now;
-    const monthDay = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-    const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
-    const c = data.counts;
-    const sub = weekday + ' · ' + otdPlural(c.memories, 'memory', 'memories') + (c.years > 1 ? ' across ' + c.years + ' years' : '');
-    const urls = [];
-    const add = (u) => { if (u && urls.indexOf(u) === -1) urls.push(u); };
-    data.groups.forEach(g => {
-      g.hikes.forEach(m => (m.photos || []).forEach(add));
-      g.restaurants.forEach(m => { if (m.cover) add(m.cover); });
-      g.activities.forEach(m => (m.photos || []).forEach(add));
-      g.photos.forEach(p => add(p.url));
+    const monthDay = data.now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    openShareCanvasLoading(monthDay, shareSlug(monthDay) + '.jpg');
+    shareDrawOtdDay(data).then(fillShareCanvas).catch(err => {
+      console.error('Whole-day share card failed to draw', err);
+      shareSetStatus("Couldn't build the card.");
     });
-    if (!urls.length){ showToast("Nothing with a photo to share yet"); return; }
-    openShare({ title: monthDay, location: sub, urls });
   }
   otdShareDayBtn.addEventListener('click', shareOnThisDayWhole);
   otdCloseBtn.addEventListener('click', otdTryClose);
@@ -21283,6 +21276,219 @@
     return canvas;
   }
 
+  // ---------- SHARE: ON THIS DAY AS A WHOLE ----------
+  // Builds one big canvas that reads like the pop-up itself: the header,
+  // then each year's "N years ago" section with a row per hike, restaurant
+  // visit and activity (plus a row for that year's Photos-tab photos, if
+  // any) underneath it. Every entry shown in the pop-up gets a row here,
+  // whether or not it has a photo — a plain-colored tile stands in for one
+  // that doesn't, same as the pop-up's own thumbnails do. Score/dish/
+  // insight detail is simplified to a single line per row, so a day
+  // spanning several years stays readable instead of turning into a wall
+  // of text.
+  function shareOtdRowsFor(data){
+    return data.groups.map(g => {
+      const ago = data.now.getFullYear() - g.year;
+      const items = [];
+      g.hikes.forEach(m => items.push({
+        kicker: 'HIKE',
+        name: m.hike.name || 'Untitled hike',
+        meta: otdHikePlace(m.hike),
+        stat: (m.history && m.history[0]) || '',
+        photoUrl: m.photos[0] || m.cover || ''
+      }));
+      g.restaurants.forEach(m => items.push({
+        kicker: 'RESTAURANT',
+        name: m.restaurant.name || 'Untitled restaurant',
+        meta: otdRestaurantPlace(m.restaurant),
+        stat: m.avg !== null ? ('Visit score ' + m.avg.toFixed(1)) : ((m.history && m.history[0]) || ''),
+        photoUrl: m.cover || ''
+      }));
+      g.activities.forEach(m => {
+        const a = m.activity;
+        const cat = activityCategory(a.category);
+        items.push({
+          kicker: cat ? cat.label.toUpperCase() : 'ACTIVITY',
+          name: a.name || 'Activity',
+          meta: [a.category === 'concert' ? a.artistName : '', a.location, m.trip ? (m.trip.name || 'Trip') : ''].filter(Boolean).join(' · '),
+          stat: a.description || '',
+          photoUrl: (m.photos && m.photos[0]) || ''
+        });
+      });
+      if (g.photos.length){
+        items.push({
+          kicker: 'PHOTOS',
+          name: otdPlural(g.photos.length, 'photo', 'photos'),
+          meta: '', stat: '',
+          photoUrl: g.photos[0].url
+        });
+      }
+      return { label: otdPlural(ago, 'year', 'years') + ' ago', dateLabel: otdLongDate(g.dateStr), items };
+    });
+  }
+
+  async function shareDrawOtdDay(data){
+    try{ await Promise.all([document.fonts.load('700 72px Figtree'), document.fonts.load('700 30px Figtree'), document.fonts.load('500 24px Figtree')]); }catch(e){ /* falls back to the system font */ }
+    const groups = shareOtdRowsFor(data);
+    const urls = [];
+    groups.forEach(g => g.items.forEach(it => { if (it.photoUrl && urls.indexOf(it.photoUrl) === -1) urls.push(it.photoUrl); }));
+    const loaded = await Promise.all(urls.map(u => shareLoadImage(u)));
+    const byUrl = new Map(urls.map((u, i) => [u, loaded[i]]));
+
+    const PAD = 64, cw = SHARE_CARD_W - PAD * 2;
+    const measure = document.createElement('canvas').getContext('2d');
+
+    const now = data.now;
+    const monthDay = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const c = data.counts;
+    const sub = weekday + ' · ' + otdPlural(c.memories, 'memory', 'memories') + (c.years > 1 ? ' across ' + c.years + ' years' : '');
+
+    measure.font = '700 72px ' + SHARE_FONT;
+    const titleLines = shareWrapText(measure, monthDay, cw, 2);
+    measure.font = '500 32px ' + SHARE_FONT;
+    const subLines = shareWrapText(measure, sub, cw, 2);
+
+    // Every row is measured up front (text wraps to a known width) so the
+    // canvas height — and every row's own y position — is known before
+    // anything is actually drawn.
+    const ROW_PAD = 20, THUMB = 108, TEXT_GAP = 24, MIN_ROW_H = THUMB + ROW_PAD * 2, LINE_H = 34;
+    const textW = cw - ROW_PAD * 2 - THUMB - TEXT_GAP;
+    groups.forEach(g => {
+      g.items.forEach(it => {
+        measure.font = '700 30px ' + SHARE_FONT;
+        it.nameLines = shareWrapText(measure, it.name, textW, 2);
+        measure.font = '500 24px ' + SHARE_FONT;
+        it.metaLines = it.meta ? shareWrapText(measure, it.meta, textW, 1) : [];
+        it.statLines = it.stat ? shareWrapText(measure, it.stat, textW, 1) : [];
+        const textH = LINE_H + it.nameLines.length * LINE_H + (it.metaLines.length ? LINE_H : 0) + (it.statLines.length ? LINE_H : 0);
+        it.rowH = Math.max(MIN_ROW_H, textH + ROW_PAD * 2);
+      });
+    });
+
+    const ROW_GAP = 14, GROUP_GAP = 44, HEADER_H = 40;
+    let height = PAD + titleLines.length * 82 + 6 + subLines.length * 40 + 40;
+    groups.forEach((g, gi) => {
+      height += HEADER_H;
+      g.items.forEach((it, ii) => { height += it.rowH + (ii < g.items.length - 1 ? ROW_GAP : 0); });
+      if (gi < groups.length - 1) height += GROUP_GAP;
+    });
+    height += PAD;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = SHARE_CARD_W;
+    canvas.height = Math.round(height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#142A2E';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.textBaseline = 'alphabetic';
+
+    let y = PAD;
+    ctx.fillStyle = '#E8A33D';
+    ctx.font = '700 20px ' + SHARE_FONT;
+    ctx.fillText('ON THIS DAY', PAD, y + 18);
+    y += 34;
+    ctx.fillStyle = '#F1ECDE';
+    ctx.font = '700 72px ' + SHARE_FONT;
+    titleLines.forEach((line, i) => ctx.fillText(line, PAD, y + 62 + i * 82));
+    y += titleLines.length * 82 + 6;
+    ctx.fillStyle = 'rgba(241, 236, 222, 0.68)';
+    ctx.font = '500 32px ' + SHARE_FONT;
+    subLines.forEach((line, i) => ctx.fillText(line, PAD, y + 28 + i * 40));
+    y += subLines.length * 40 + 40;
+
+    groups.forEach((g, gi) => {
+      ctx.fillStyle = '#E8A33D';
+      ctx.font = '700 26px ' + SHARE_FONT;
+      ctx.fillText(g.label, PAD, y + 24);
+      ctx.fillStyle = 'rgba(241, 236, 222, 0.56)';
+      ctx.font = '500 22px ' + SHARE_FONT;
+      ctx.fillText(g.dateLabel, PAD + cw - ctx.measureText(g.dateLabel).width, y + 24);
+      y += HEADER_H;
+
+      g.items.forEach((it, ii) => {
+        const rowH = it.rowH;
+        ctx.fillStyle = '#1B3236';
+        shareRoundRect(ctx, PAD, y, cw, rowH, 18);
+        ctx.fill();
+        const img = it.photoUrl ? byUrl.get(it.photoUrl) : null;
+        const thumbY = y + (rowH - THUMB) / 2;
+        if (img){
+          shareDrawCover(ctx, img, PAD + ROW_PAD, thumbY, THUMB, THUMB, 14);
+        } else {
+          ctx.fillStyle = '#2F4C4A';
+          shareRoundRect(ctx, PAD + ROW_PAD, thumbY, THUMB, THUMB, 14);
+          ctx.fill();
+        }
+        let ty = y + ROW_PAD;
+        const tx = PAD + ROW_PAD + THUMB + TEXT_GAP;
+        ctx.fillStyle = '#E8A33D';
+        ctx.font = '700 18px ' + SHARE_FONT;
+        ctx.fillText(it.kicker, tx, ty + 16);
+        ty += LINE_H;
+        ctx.fillStyle = '#F1ECDE';
+        ctx.font = '700 30px ' + SHARE_FONT;
+        it.nameLines.forEach((line, i) => ctx.fillText(line, tx, ty + 24 + i * LINE_H));
+        ty += it.nameLines.length * LINE_H;
+        if (it.metaLines.length){
+          ctx.fillStyle = 'rgba(241, 236, 222, 0.7)';
+          ctx.font = '500 24px ' + SHARE_FONT;
+          ctx.fillText(it.metaLines[0], tx, ty + 20);
+          ty += LINE_H;
+        }
+        if (it.statLines.length){
+          ctx.fillStyle = 'rgba(241, 236, 222, 0.56)';
+          ctx.font = '500 24px ' + SHARE_FONT;
+          ctx.fillText(it.statLines[0], tx, ty + 20);
+        }
+        y += rowH + (ii < g.items.length - 1 ? ROW_GAP : 0);
+      });
+      if (gi < groups.length - 1) y += GROUP_GAP;
+    });
+
+    return canvas;
+  }
+
+  // A second, lighter path through the same sheet/preview/go-button
+  // machinery above, for a card that's already whole (no per-photo picker
+  // to show) — the whole-day recap is the only caller today.
+  function openShareCanvasLoading(title, filename){
+    shareState = { title, filename: filename || (shareSlug(title) + '.jpg'), blob: null, token: 0, canSend: shareCanSendFiles() };
+    shareReturnFocus = document.activeElement;
+    document.getElementById('share-picker').style.display = 'none';
+    sharePreviewCanvas.style.display = 'none';
+    shareSetStatus('Preparing…');
+    shareGoBtn.disabled = true;
+    shareGoBtn.textContent = 'Preparing…';
+    document.getElementById('share-scroll').scrollTop = 0;
+    shareOverlay.classList.add('open');           // the back-button observer adds its history entry
+    shareOverlay.setAttribute('aria-hidden', 'false');
+    setTimeout(() => { try{ shareCloseBtn.focus({ preventScroll: true }); }catch(e){} }, 60);
+  }
+
+  function fillShareCanvas(canvas){
+    if (!shareOverlay.classList.contains('open') || !shareState) return; // closed before it finished
+    const st = shareState;
+    sharePreviewCanvas.width = canvas.width;
+    sharePreviewCanvas.height = canvas.height;
+    sharePreviewCanvas.getContext('2d').drawImage(canvas, 0, 0);
+    sharePreviewCanvas.style.display = 'block';
+    shareSetStatus('');
+    try{
+      canvas.toBlob((blob) => {
+        if (shareState !== st) return; // a newer card (or a close) has taken over
+        if (!blob){ shareSetStatus("Couldn't prepare the image."); return; }
+        st.blob = blob;
+        shareGoBtn.disabled = false;
+        shareGoBtn.textContent = st.canSend ? 'Share' : 'Download image';
+      }, 'image/jpeg', 0.92);
+    }catch(e){
+      console.error('Share card export failed', e);
+      sharePreviewCanvas.style.display = 'none';
+      shareSetStatus("Couldn't prepare the image.");
+    }
+  }
+
   // ---- the preview sheet ----
   function shareSlug(s){
     return (String(s || 'share').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'share').slice(0, 60);
@@ -21360,6 +21566,7 @@
 
   function openShare(spec){
     if (!spec.urls.length) return;
+    document.getElementById('share-picker').style.display = ''; // restores it if the whole-day card (below) hid it last time
     shareState = {
       title: spec.title, location: spec.location, urls: spec.urls, filename: shareSlug(spec.title) + '.jpg',
       selected: new Set(spec.urls.slice(0, SHARE_MAX_PHOTOS)), token: 0, blob: null, canSend: shareCanSendFiles()
