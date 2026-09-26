@@ -7807,15 +7807,7 @@
     if (localParsed && Array.isArray(localParsed.items) && localParsed.items.length >= 2){
       resumeFromData(localParsed);
       lastSavedAt = localParsed.savedAt || null;
-      const dockCount = Array.isArray(localParsed.loadingDock) ? localParsed.loadingDock.length : 0;
-      const dockNote = dockCount ? ', ' + dockCount + ' in the Loading Dock' : '';
-      if (localParsed.isComplete && Array.isArray(localParsed.finalRanking)){
-        showToast('Resumed — ' + localParsed.finalRanking.length + ' items, ranking complete' + dockNote);
-      } else {
-        const est = estimateComparisons(localParsed.items.length);
-        const historyLen = Array.isArray(localParsed.history) ? localParsed.history.length : 0;
-        showToast('Resumed — ' + localParsed.items.length + ' items, ' + historyLen + ' of ~' + est + ' duels done' + dockNote);
-      }
+      showToast('Synced');
     }
 
     // Songs has its own local key so "Start Over" on one doesn't wipe the other.
