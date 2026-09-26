@@ -1660,6 +1660,12 @@
     transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   #otd-overlay.open .otd-sheet{ transform: translateY(0); }
+  @keyframes otdGuardNudge{
+    0%, 100%{ transform: translateY(0); }
+    25%{ transform: translateY(0) translateX(-6px); }
+    75%{ transform: translateY(0) translateX(6px); }
+  }
+  #otd-overlay.open .otd-sheet.otd-guard-nudge{ animation: otdGuardNudge 0.28s ease; }
   .otd-grabber{
     position: relative;
     z-index: 4;
@@ -20054,8 +20060,12 @@
   }
 
   // ---------- opening / closing ----------
+  let otdOpenedAt = 0;
+  const OTD_CLOSE_GUARD_MS = 1000; // ignores an accidental tap-to-dismiss in the first second, so it can't vanish before there's anything to read
+
   function openOnThisDay(data){
     otdRender(data);
+    otdOpenedAt = Date.now();
     otdReturnFocus = document.activeElement;
     otdScroll.scrollTop = 0;
     otdCompact.classList.remove('scrolled');
@@ -20077,12 +20087,37 @@
     otdReturnFocus = null;
   }
 
+  // A small shake to say "I felt that tap" instead of the pop-up just
+  // silently ignoring it while the close guard is active.
+  function otdGuardNudge(){
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    otdSheet.classList.remove('otd-guard-nudge');
+    void otdSheet.offsetWidth; // restart the animation if it's already mid-nudge
+    otdSheet.classList.add('otd-guard-nudge');
+  }
+
+  // What the ✕, the backdrop, Escape and the pull-down-to-dismiss gesture
+  // all actually call — ignores the very first second after opening, so a
+  // reflexive tap (or a swipe that was really meant to scroll) can't close
+  // it before there's been a moment to actually read anything. Tapping
+  // into a hike/restaurant/activity card, the "Done" button at the very
+  // bottom, and the browser's own back button all still call
+  // closeOnThisDay() directly and are unaffected — those are read as
+  // deliberate rather than accidental.
+  function otdTryClose(){
+    if (Date.now() - otdOpenedAt < OTD_CLOSE_GUARD_MS){
+      otdGuardNudge();
+      return;
+    }
+    closeOnThisDay();
+  }
+
   function otdOpenItem(item){
     if (!item) return;
     if (item.type === 'hike'){
       const idx = hikeRows.indexOf(item.hike);
       if (idx === -1) return;
-      closeOnThisDay();
+      closeOnThisDay(); // tapping into a card is a deliberate action, so this bypasses the close guard below by calling closeOnThisDay directly
       switchTopGroup('nature');
       switchNatureSubPage('hikes');
       openHikeDetailsPanel(idx);
@@ -20113,11 +20148,11 @@
     const card = e.target.closest('[data-otd-item]');
     if (card) otdOpenItem(otdItems[Number(card.dataset.otdItem)]);
   });
-  otdCloseBtn.addEventListener('click', closeOnThisDay);
-  otdBackdrop.addEventListener('click', closeOnThisDay);
+  otdCloseBtn.addEventListener('click', otdTryClose);
+  otdBackdrop.addEventListener('click', otdTryClose);
   document.addEventListener('keydown', (e) => {
     if (!otdOverlay.classList.contains('open')) return;
-    if (e.key === 'Escape' && !artLightboxOverlay.classList.contains('show')){ closeOnThisDay(); return; }
+    if (e.key === 'Escape' && !artLightboxOverlay.classList.contains('show')){ otdTryClose(); return; }
     if (e.key === 'Tab'){ // keep keyboard focus inside the pop-up while it's open
       const focusable = Array.from(otdSheet.querySelectorAll('button')).filter(b => b.offsetParent !== null);
       if (!focusable.length) return;
@@ -20159,7 +20194,12 @@
       if (!pulling){ tracking = false; return; }
       pulling = false; tracking = false;
       otdSheet.style.transition = '';
-      if (dy > 110){ closeOnThisDay(); } else { otdSheet.style.transform = ''; }
+      if (dy > 110 && Date.now() - otdOpenedAt >= OTD_CLOSE_GUARD_MS){
+        closeOnThisDay();
+      } else {
+        otdSheet.style.transform = ''; // snap back — either it wasn't pulled far enough, or it was too soon to close
+        if (dy > 110) otdGuardNudge();
+      }
     };
     otdSheet.addEventListener('touchend', finish, { passive: true });
     otdSheet.addEventListener('touchcancel', finish, { passive: true });
