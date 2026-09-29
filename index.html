@@ -4862,7 +4862,6 @@
      Viewing (tabs, dropdown, gallery navigation) is untouched — only
      controls that create, remove, or modify something are hidden. */
   body.guest-view-active #restaurant-tiers-panel{ display: none; }
-  body.guest-view-active #photo-duel-btn,
   body.guest-view-active #photo-edit-toggle-btn,
   body.guest-view-active #yir-add-btn,
   body.guest-view-active .activity-photo-add-tile,
@@ -4978,21 +4977,6 @@
   .af-photo.is-cover{ box-shadow: 0 0 0 2px var(--amber); }
   .af-photo-star{ position: absolute; left: 4px; bottom: 4px; padding: 1px 5px; border-radius: 999px; background: rgba(15,33,36,0.8); color: var(--amber); font-size: 10px; font-weight: 800; line-height: 1.5; }
   .af-photo-hint{ margin: 8px 0 0; font-size: 12.5px; color: var(--chalk-dim); }
-  /* ---------- Photo Duels (see PHOTO DUELS in the script) ----------
-     Reuses the same duel-card/duel-stage/tally-bar/done-message classes
-     Albums and Songs already use, just with photos filling the card edge
-     to edge instead of centered text. */
-  .photo-duel-screen{ margin-top: 8px; }
-  .photo-duel-card{ padding: 0; overflow: hidden; background: #0F1E20; }
-  .photo-duel-card img{
-    width: 100%; height: 100%;
-    min-height: 260px;
-    object-fit: cover;
-    display: block;
-    border-radius: inherit;
-  }
-  .photo-duel-stage{ min-height: 320px; }
-  @media (max-width: 560px){ .photo-duel-card img{ min-height: 220px; } }
   /* ================= MOTION (see MOTION in the script) =================
      One set of timings and easings for the whole app:
        --dur-fast 150ms  small changes (color, hover, press)
@@ -5744,7 +5728,6 @@
           <button class="group-sub-tab-btn active" id="nature-subtab-photos-btn-3" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
         <div class="restaurant-heading-actions">
-          <button class="btn-ghost" id="photo-duel-btn" type="button">🥊 Duels</button>
           <button class="btn-ghost" id="photo-edit-toggle-btn" type="button">Edit</button>
           <button class="btn-primary" id="photo-add-btn" type="button" aria-label="Add photos">+ New</button>
         </div>
@@ -5762,39 +5745,18 @@
       <ol class="results-list" id="photo-edit-list" style="display:none;"></ol>
       <p class="restaurant-course-empty" id="photo-empty-message" style="display:none;">No photos yet — add some to get started.</p>
 
-      <div class="photo-duel-screen" id="photo-duel-screen" style="display:none;">
-        <div class="tally-wrap">
-          <div class="tally-bar"><div class="tally-fill" id="photo-duel-tally-fill"></div></div>
-          <span class="tally-count" id="photo-duel-tally-count">0 / 0</span>
+      <div class="insights-section" id="photo-insights-section">
+        <p class="eyebrow">Insights</p>
+
+        <div class="insights-block" id="photo-year-block">
+          <p class="insights-block-title">By Year</p>
+          <div class="artist-list" id="photo-year-list"></div>
         </div>
 
-        <div class="duel-active-view" id="photo-duel-active-view">
-          <p class="duel-title">Which photo do you prefer?</p>
-          <div class="duel-stage photo-duel-stage">
-            <div class="duel-card photo-duel-card" id="photo-duel-card-left" tabindex="0">
-              <img id="photo-duel-img-left" alt="">
-            </div>
-            <div class="vs-badge">VS</div>
-            <div class="duel-card photo-duel-card" id="photo-duel-card-right" tabindex="0">
-              <img id="photo-duel-img-right" alt="">
-            </div>
-          </div>
-          <p class="key-hint">Click a photo, or use <kbd>←</kbd> <kbd>→</kbd></p>
+        <div class="insights-block" id="photo-month-block">
+          <p class="insights-block-title">By Month</p>
+          <div class="artist-list" id="photo-month-list"></div>
         </div>
-
-        <div class="done-message" id="photo-duel-done-message">
-          <p class="done-emoji">🎉</p>
-          <p class="done-text">All duels complete — your photos are ranked.</p>
-          <button class="btn-primary" id="photo-duel-done-btn" type="button">View Ranked Photos →</button>
-        </div>
-
-        <div class="duel-actions">
-          <button class="btn-ghost" id="photo-duel-undo-btn">Undo last pick</button>
-          <button class="btn-ghost" id="photo-duel-exit-btn">Pause &amp; save for later</button>
-          <button class="btn-ghost" id="photo-duel-restart-btn">Start Over</button>
-        </div>
-
-        <p class="autosave-note">Your progress saves automatically — close and come back anytime.</p>
       </div>
     </div>
   </div>
@@ -6771,20 +6733,6 @@
   const photoEmptyMessage = document.getElementById('photo-empty-message');
   const photoAddBtn = document.getElementById('photo-add-btn');
   const photoEditToggleBtn = document.getElementById('photo-edit-toggle-btn');
-  const photoDuelBtn = document.getElementById('photo-duel-btn');
-  const photoDuelScreen = document.getElementById('photo-duel-screen');
-  const photoDuelTallyFill = document.getElementById('photo-duel-tally-fill');
-  const photoDuelTallyCount = document.getElementById('photo-duel-tally-count');
-  const photoDuelActiveView = document.getElementById('photo-duel-active-view');
-  const photoDuelCardLeft = document.getElementById('photo-duel-card-left');
-  const photoDuelCardRight = document.getElementById('photo-duel-card-right');
-  const photoDuelImgLeft = document.getElementById('photo-duel-img-left');
-  const photoDuelImgRight = document.getElementById('photo-duel-img-right');
-  const photoDuelDoneMessage = document.getElementById('photo-duel-done-message');
-  const photoDuelDoneBtn = document.getElementById('photo-duel-done-btn');
-  const photoDuelUndoBtn = document.getElementById('photo-duel-undo-btn');
-  const photoDuelExitBtn = document.getElementById('photo-duel-exit-btn');
-  const photoDuelRestartBtn = document.getElementById('photo-duel-restart-btn');
   const photoReorderBar = document.getElementById('photo-reorder-bar');
   const photoReorderControls = document.getElementById('photo-reorder-controls');
   const photoEditSaveBtn = document.getElementById('photo-edit-save-btn');
@@ -16326,28 +16274,30 @@
     if (!(opts && opts.skipDuelReconcile)) photoDuelReconcile(); // keeps Duels' working set in step with whatever just changed in photoRows — a no-op unless Duels has ever been turned on
   }
 
-  // ---------- PHOTO DUELS ----------
-  // Turns the Photos tab from a plain date-ordered list into a ranked one —
-  // a third duel-ranking pipeline alongside Albums and Songs, built on the
-  // same shared, item-agnostic mergeSortGen/estimateComparisons (see SONG
-  // RANKER's own comment for why these three stay independent rather than
-  // sharing state). Compares two photos at a time; a photo's id is all
-  // that's stored here — the image itself always comes from photoRows, so
-  // renaming nothing, deleting a photo elsewhere, or a Cloudinary URL
-  // changing under a reshrink never orphans anything.
+  // ---------- PHOTO DUELS (retired UI, order kept) ----------
+  // Used to turn the Photos tab from a plain date-ordered list into a
+  // ranked one via head-to-head comparisons — a third duel-ranking
+  // pipeline alongside Albums and Songs, built on the same shared,
+  // item-agnostic mergeSortGen/estimateComparisons (see SONG RANKER's own
+  // comment for why these three stay independent rather than sharing
+  // state). The comparison screen itself is gone (nothing left to rank —
+  // see the Photos tab's own history), but whatever order Duels last
+  // settled on lives on as the grid's order, same as a manually dragged
+  // one: a photo's id is all that's stored here — the image itself always
+  // comes from photoRows, so renaming nothing, deleting a photo elsewhere,
+  // or a Cloudinary URL changing under a reshrink never orphans anything.
   //
-  // Duels are opt-in and per-collection, not per-upload: turning it on
-  // once ranks every photo currently in the tab; after that, any change to
-  // photoRows (a new batch uploaded, a photo removed in Edit mode, a newer
-  // copy landing from the cloud) is folded in automatically by
-  // photoDuelReconcile, called from savePhotoProgress. The merge sort has
-  // no way to resume mid-way with a different set of items, so — exactly
-  // like pullFromActiveDuelPool already does for Albums when an item is
-  // pulled out mid-duel — reconciling just reseeds with whatever's already
-  // known (the live estimate, or the finished ranking) and duels the whole
-  // set again; most of it reconfirms in a few taps since the order barely
-  // moves. A device that never turns Duels on for Photos is completely
-  // unaffected — the tab just stays in plain date order forever.
+  // Any change to photoRows (a new batch uploaded, a photo removed in Edit
+  // mode, a newer copy landing from the cloud) is folded in automatically
+  // by photoDuelReconcile, called from savePhotoProgress: known photos
+  // keep their position, newly-seen ones are appended at the end — no
+  // merge sort actually runs anymore since there's no screen left to
+  // supply comparisons, but reconcile still goes through
+  // runPhotoDuelGenerator/handlePhotoDuelGenResult (fed zero choices) to
+  // reuse that bookkeeping rather than duplicate it. A device that never
+  // turned Duels on for Photos is completely unaffected — the tab just
+  // stays in plain date order forever, and dragging or Edit Mode is the
+  // only way left to reorder either kind of tab.
   const PHOTO_DUEL_STORAGE_KEY = 'photo-duel-progress';
   let photoDuelItems = [];          // photo ids currently being sorted (meaningful only pre-completion)
   let photoDuelHistory = [];
@@ -16357,9 +16307,7 @@
   let photoDuelGen = null;
   let photoDuelItemStats = {};
   let photoDuelEstimatedTotal = 0;
-  let photoDuelSwapDisplay = false;
   let photoDuelLastSavedAt = null;
-  let photoDuelScreenOpen = false;  // is the active duel screen currently showing (session-only, not persisted)
 
   function photoDuelEngaged(){ return photoDuelItems.length > 0 || photoDuelFinalRanking.length > 0; }
 
@@ -16402,30 +16350,6 @@
     }
     savePhotoDuelProgress();
     renderPhotosPage();
-  }
-
-  function photoDuelAdvance(choice){
-    if (choice !== undefined && photoDuelCurrentPair){
-      const [a, b] = photoDuelCurrentPair;
-      const winner = choice ? a : b;
-      const loser = choice ? b : a;
-      photoDuelItemStats[winner].wins++;
-      photoDuelItemStats[loser].losses++;
-    }
-    const res = photoDuelGen.next(choice);
-    handlePhotoDuelGenResult(res);
-  }
-
-  function photoDuelPick(sideIsLeft){
-    const leftWins = photoDuelSwapDisplay ? !sideIsLeft : sideIsLeft;
-    photoDuelHistory.push(leftWins);
-    photoDuelAdvance(leftWins);
-  }
-
-  function photoDuelUndo(){
-    if (photoDuelHistory.length === 0) return;
-    const res = runPhotoDuelGenerator(photoDuelHistory.slice(0, -1));
-    handlePhotoDuelGenResult(res);
   }
 
   function computePhotoLiveEstimate(){
@@ -16475,8 +16399,9 @@
     photoDuelIsComplete = false;
     photoDuelFinalRanking = [];
     // Silent — the upload flow already toasts its own outcome, and the
-    // Duels button's own label (now showing a percentage again) and the
-    // grid's returning rank badges make the fold-in obvious on their own.
+    // reseeded order (kept photos first, new ones after) makes the fold-in
+    // obvious on its own. There's no Duels screen left to finish sorting
+    // with, but a drag or an Edit Mode save re-settles the order at any time.
     const res = runPhotoDuelGenerator([]);
     handlePhotoDuelGenResult(res);
   }
@@ -16516,107 +16441,6 @@
       }
     }catch(e){ /* nothing saved yet */ }
   }
-
-  // ---------- the screen ----------
-  function updatePhotoDuelBtn(){
-    if (!photoDuelEngaged()){
-      photoDuelBtn.textContent = '🥊 Duels';
-      photoDuelBtn.title = 'Rank your photos head-to-head';
-    } else if (photoDuelIsComplete){
-      photoDuelBtn.textContent = '🥊 Ranked';
-      photoDuelBtn.title = 'Ranked by Duels';
-    } else {
-      const pct = photoDuelEstimatedTotal > 0 ? Math.min(97, Math.round((photoDuelHistory.length / photoDuelEstimatedTotal) * 100)) : 0;
-      photoDuelBtn.textContent = '🥊 Duels · ' + pct + '%';
-      photoDuelBtn.title = 'Resume ranking your photos';
-    }
-  }
-
-  function startPhotoDuels(){
-    photoDuelItems = photoRows.map(p => p.id);
-    photoDuelEstimatedTotal = estimateComparisons(photoDuelItems.length);
-    const res = runPhotoDuelGenerator([]);
-    handlePhotoDuelGenResult(res);
-    openPhotoDuelScreen();
-  }
-
-  function openPhotoDuelScreen(){
-    photoDuelScreenOpen = true;
-    renderPhotosPage();
-    window.scrollTo({ top: 0 });
-  }
-  function closePhotoDuelScreen(){
-    photoDuelScreenOpen = false;
-    renderPhotosPage();
-  }
-
-  photoDuelBtn.addEventListener('click', () => {
-    if (guestViewEnabled) return;
-    if (!photoDuelEngaged()) startPhotoDuels();
-    else openPhotoDuelScreen();
-  });
-
-  function renderPhotoDuelScreen(){
-    if (photoDuelIsComplete){
-      photoDuelActiveView.style.display = 'none';
-      photoDuelDoneMessage.style.display = 'block';
-      photoDuelExitBtn.style.display = 'none'; // the done message's own button already leads back to the grid
-      photoDuelTallyFill.style.width = '100%';
-      photoDuelTallyCount.textContent = photoDuelHistory.length + ' / ' + photoDuelHistory.length + ' — all done';
-    } else {
-      const byId = new Map(photoRows.map(p => [p.id, p]));
-      const [a, b] = photoDuelCurrentPair || [];
-      const leftPhoto = byId.get(a), rightPhoto = byId.get(b);
-      if (!photoDuelCurrentPair || !leftPhoto || !rightPhoto){
-        // A photo this pair needed is gone (a race with a deletion elsewhere) — reconcile and try again.
-        photoDuelReconcile();
-        return;
-      }
-      photoDuelActiveView.style.display = 'block';
-      photoDuelDoneMessage.style.display = 'none';
-      photoDuelExitBtn.style.display = 'inline-block';
-      photoDuelSwapDisplay = Math.random() < 0.5;
-      const leftId = photoDuelSwapDisplay ? b : a;
-      const rightId = photoDuelSwapDisplay ? a : b;
-      photoDuelImgLeft.src = cloudinaryThumbUrl(byId.get(leftId).url, 900);
-      photoDuelImgRight.src = cloudinaryThumbUrl(byId.get(rightId).url, 900);
-      photoDuelCardLeft.style.animation = 'none'; void photoDuelCardLeft.offsetWidth; photoDuelCardLeft.style.animation = '';
-      photoDuelCardRight.style.animation = 'none'; void photoDuelCardRight.offsetWidth; photoDuelCardRight.style.animation = '';
-
-      const done = photoDuelHistory.length;
-      const pct = photoDuelEstimatedTotal > 0 ? Math.min(97, Math.round((done / photoDuelEstimatedTotal) * 100)) : 0;
-      photoDuelTallyFill.style.width = pct + '%';
-      photoDuelTallyCount.textContent = done + ' / ~' + photoDuelEstimatedTotal;
-    }
-    photoDuelUndoBtn.style.visibility = photoDuelHistory.length > 0 ? 'visible' : 'hidden';
-  }
-
-  photoDuelCardLeft.addEventListener('click', () => photoDuelPick(true));
-  photoDuelCardRight.addEventListener('click', () => photoDuelPick(false));
-  photoDuelUndoBtn.addEventListener('click', photoDuelUndo);
-  photoDuelExitBtn.addEventListener('click', closePhotoDuelScreen);
-  photoDuelDoneBtn.addEventListener('click', closePhotoDuelScreen);
-  photoDuelRestartBtn.addEventListener('click', () => {
-    showConfirmModal('Start the photo ranking over?', "This clears your Duels progress and puts Photos back in plain date order. Your photos themselves are never touched.", () => {
-      photoDuelItems = [];
-      photoDuelHistory = [];
-      photoDuelIsComplete = false;
-      photoDuelFinalRanking = [];
-      photoDuelCurrentPair = null;
-      photoDuelGen = null;
-      photoDuelItemStats = {};
-      savePhotoDuelProgress();
-      closePhotoDuelScreen();
-      showToast('Duels reset — back to date order');
-    });
-  });
-  document.addEventListener('keydown', (e) => {
-    if (!photoDuelScreenOpen || photoDuelIsComplete) return;
-    if (modalOverlay.classList.contains('show') || artLightboxOverlay.classList.contains('show')) return;
-    if (!pagePhotos.classList.contains('active')) return;
-    if (e.key === 'ArrowLeft'){ photoDuelPick(true); }
-    else if (e.key === 'ArrowRight'){ photoDuelPick(false); }
-  });
 
   // ---------- TRIPS: data ----------
   // Past trips only — somewhere to look back on where you went. A trip is a
@@ -16838,28 +16662,69 @@
     });
   }
 
+  // Mirrors Hikes' "Outings by Year"/"By Month" charts, but by photo date
+  // rather than outing date — a photo with no date attached (nothing
+  // matching parsePhotoFilenameDateTime when it was added) sits outside
+  // both charts, same as an undated hike outing would.
+  function renderPhotoInsights(){
+    const section = document.getElementById('photo-insights-section');
+    if (photoEditMode || !photoRows.length){ section.style.display = 'none'; return; }
+    const show = (id, on) => { document.getElementById(id).style.display = on ? 'block' : 'none'; };
+
+    const years = {};
+    const months = Array.from({ length: 12 }, () => 0);
+    photoRows.forEach(p => {
+      const pd = otdParse(p.date);
+      if (!pd) return;
+      years[pd.y] = (years[pd.y] || 0) + 1;
+      months[pd.m - 1]++;
+    });
+
+    const yearKeys = Object.keys(years).map(Number).sort((a, b) => a - b);
+    show('photo-year-block', yearKeys.length >= 2);
+    if (yearKeys.length >= 2){
+      const maxYear = Math.max.apply(null, yearKeys.map(y => years[y]));
+      document.getElementById('photo-year-list').innerHTML = yearKeys.map(y => {
+        const count = years[y];
+        const pct = Math.max(6, Math.round((count / maxYear) * 100));
+        return '<div class="artist-row">' +
+          '<span class="artist-rank year-label">' + y + '</span>' +
+          '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+          '<span class="artist-count">' + count + ' photo' + (count === 1 ? '' : 's') + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    const totalMonthPhotos = months.reduce((a, b) => a + b, 0);
+    show('photo-month-block', totalMonthPhotos >= 2);
+    if (totalMonthPhotos >= 2){
+      const maxMonth = Math.max.apply(null, months);
+      document.getElementById('photo-month-list').innerHTML = months.map((count, i) => {
+        const label = new Date(2000, i, 1).toLocaleDateString('en-US', { month: 'short' });
+        const pct = count ? Math.max(6, Math.round((count / maxMonth) * 100)) : 0;
+        return '<div class="artist-row">' +
+          '<span class="artist-rank year-label" style="min-width:34px;">' + label + '</span>' +
+          '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+          '<span class="artist-count">' + (count ? count + ' photo' + (count === 1 ? '' : 's') : '—') + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    section.style.display = (yearKeys.length >= 2 || totalMonthPhotos >= 2) ? 'block' : 'none';
+  }
+
   function renderPhotosPage(){
     const empty = !photoRows.length;
-    if (empty){ photoEditMode = false; photoDuelScreenOpen = false; }
+    if (empty) photoEditMode = false;
     photoEmptyMessage.style.display = empty ? 'block' : 'none';
     photoAddBtn.style.display = photoEditMode ? 'none' : 'inline-block';
-    photoEditToggleBtn.style.display = (!empty && !photoEditMode && !photoDuelScreenOpen) ? 'inline-block' : 'none';
-    const duelBtnEligible = !guestViewEnabled && photoRows.length >= 2 && !photoEditMode && !photoDuelScreenOpen;
-    photoDuelBtn.style.display = duelBtnEligible ? 'inline-block' : 'none';
-    if (duelBtnEligible) updatePhotoDuelBtn();
+    photoEditToggleBtn.style.display = (!empty && !photoEditMode) ? 'inline-block' : 'none';
     photoReorderBar.style.display = photoEditMode ? 'flex' : 'none';
     photoReorderControls.style.display = photoEditMode ? 'flex' : 'none';
 
-    if (photoDuelScreenOpen){
-      photoGrid.style.display = 'none';
-      photoEditList.style.display = 'none';
-      photoDuelScreen.style.display = 'block';
-      renderPhotoDuelScreen();
-      return; // the duel screen has the page; nothing else to draw
-    }
-    photoDuelScreen.style.display = 'none';
     photoGrid.style.display = (photoEditMode || empty) ? 'none' : '';
     photoEditList.style.display = photoEditMode ? '' : 'none';
+    renderPhotoInsights();
 
     if (photoEditMode){
       photoGrid.innerHTML = '';
