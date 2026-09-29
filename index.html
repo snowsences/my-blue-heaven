@@ -3705,24 +3705,6 @@
   .grid-card:hover .grid-card-rank{
     transform: translate(0, 0);
   }
-  /* Ranked photos need their number visible right away, not only on a
-     hover that touch devices can't even trigger — same look as
-     .grid-card-rank, just always shown. */
-  .photo-rank-badge{
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    background: rgba(15,33,36,0.88);
-    color: #FFFFFF;
-    font-family: 'Figtree', sans-serif;
-    font-weight: 700;
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 999px;
-    z-index: 3;
-    pointer-events: none;
-  }
-
   .results-actions{
     display: flex;
     gap: 10px;
@@ -16888,18 +16870,17 @@
     photoGrid.innerHTML = '';
     if (empty) return;
     const order = photoDisplayRows();
-    const ranked = photoDuelEngaged();
     order.forEach((p, idx) => {
       const card = document.createElement('div');
       card.className = 'grid-card';
       card.dataset.photoId = p.id;
       card.innerHTML =
-        (ranked ? '<span class="photo-rank-badge">#' + (idx + 1) + '</span>' : '') +
         '<div class="art-drop" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 500)) + '" alt="" loading="lazy" decoding="async"></div>';
       photoGrid.appendChild(card);
-      // Drag-to-reorder only makes sense for the plain date list — once
-      // Duels has a say, the order comes from picks instead.
-      if (!ranked) makePhotoDraggable(card);
+      // Always draggable, same as Albums — dragging a photo while Duels
+      // has ranked the grid settles that ranking to the dragged order
+      // rather than fighting it (see commitPhotoDragOrder).
+      makePhotoDraggable(card);
       card.addEventListener('click', () => {
         openPhotoLightbox(order.map(x => x.url), idx, null);
       });
@@ -16929,7 +16910,7 @@
 
   function renderPhotoEditRows(){
     photoEditList.innerHTML = '';
-    photoRows.forEach((p, idx) => {
+    photoDisplayRows().forEach((p, idx) => {
       const label = photoEditRowLabel(p);
       const li = document.createElement('li');
       li.dataset.photoId = p.id;
@@ -17044,6 +17025,13 @@
       const wanted = photoEditTrip.get(row.id);
       if (wanted) row.tripId = wanted; else delete row.tripId;
     });
+    if (photoDuelEngaged()){
+      // Same reasoning as commitPhotoDragOrder: reordering by hand here settles
+      // Duels to match, so the grid keeps showing what was just saved.
+      photoDuelFinalRanking = photoRows.map(row => row.id);
+      photoDuelIsComplete = true;
+      savePhotoDuelProgress();
+    }
     photoEditMode = false;
     savePhotoProgress();
     renderTripsPage();
@@ -17079,7 +17067,15 @@
     if (photoDragSourceEl) photoDragSourceEl.classList.remove('dragging');
     photoDragSourceEl = null;
     const newOrderIds = Array.from(photoGrid.children).map(c => c.dataset.photoId);
-    photoRows = newOrderIds.map(id => photoRows.find(p => p.id === id)).filter(Boolean);
+    if (photoDuelEngaged()){
+      // A manual drag IS the order the person wants — settle Duels to it
+      // rather than let the next reconcile snap back to picks/estimates.
+      photoDuelFinalRanking = newOrderIds;
+      photoDuelIsComplete = true;
+      savePhotoDuelProgress();
+    } else {
+      photoRows = newOrderIds.map(id => photoRows.find(p => p.id === id)).filter(Boolean);
+    }
     savePhotoProgress();
     renderPhotosPage(); // re-render so each card's click handler captures its new, correct index for the lightbox
   }
