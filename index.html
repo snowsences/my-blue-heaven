@@ -3012,6 +3012,21 @@
   .rank-item{ font-size: 15px; flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .rank-album{ font-size: 15px; font-weight: 600; }
   .rank-meta{ font-size: 12px; color: var(--chalk-dim); }
+  /* Photos' own Edit Mode rows are the only ones that can be dateless in
+     the first place — this replaces the plain "No date" text there with
+     something tappable, styled like a small text link rather than another
+     boxed button so it doesn't compete with the row's other icon buttons. */
+  .rank-date-add-btn{
+    align-self: flex-start;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--amber);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .rank-date-add-btn:hover{ text-decoration: underline; }
   /* Games' List view — the only place all 6 score categories are visible
      at once, since there's no details tray. A row of small labeled chips
      rather than a single combined meta line. */
@@ -16801,30 +16816,77 @@
   // drag the numbers reset to match the new order). Removing a row and every
   // other change are plain edits to the list on screen until Save — nothing
   // touches photoRows until then, so Cancel simply re-renders from truth.
-  function photoEditRowLabel(p){
-    const main = p.date ? formatVisitDate(p.date) : 'No date';
+  // `draft` (from photoEditDates below) overrides p.date/p.time when a date
+  // has just been added but not yet saved, so the row reflects it immediately.
+  function photoEditRowLabel(p, draft){
+    const effDate = draft && draft.date !== undefined ? draft.date : p.date;
+    const effTime = draft && draft.time !== undefined ? draft.time : p.time;
+    const main = effDate ? formatVisitDate(effDate) : 'No date';
     let meta = '';
-    if (p.time){
-      const t = new Date('1970-01-01T' + p.time);
+    if (effTime){
+      const t = new Date('1970-01-01T' + effTime);
       if (!isNaN(t.getTime())) meta = t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     }
-    return { main, meta };
+    return { main, meta, hasDate: !!effDate };
+  }
+
+  // Builds the rank-item's inner HTML: the date/time text when the photo
+  // has one, or a clickable "+ Add date" affordance when it doesn't —
+  // Photos is the only tab whose items can be dateless in the first place
+  // (every other tab requires a date up front), so this is the one place
+  // that needs a way to add one after the fact.
+  function photoEditRankItemHtml(label){
+    return label.hasDate
+      ? '<span class="rank-album">' + escapeHtml(label.main) + '</span>' + (label.meta ? '<span class="rank-meta">' + escapeHtml(label.meta) + '</span>' : '')
+      : '<button type="button" class="rank-date-add-btn">+ Add date</button>';
   }
 
   // Trip links chosen while editing are held here and only written on Save (like every other change in this mode).
   let photoEditTrip = new Map();
+  // Dates added while editing an otherwise-undated photo — same draft-until-Save treatment as photoEditTrip.
+  let photoEditDates = new Map();
+
+  // Opens a small sheet to pick a date (required) and time (optional) for
+  // one photo, then updates just that row in place — a full re-render
+  // would lose any in-progress drag reorder or typed position numbers
+  // elsewhere in the list.
+  function photoEditOpenDateSheet(p, li){
+    const draft = photoEditDates.get(p.id);
+    const curDate = (draft && draft.date !== undefined) ? draft.date : (p.date || '');
+    const curTime = (draft && draft.time !== undefined) ? draft.time : (p.time || '');
+    tsheetOpen({
+      title: 'Add a date',
+      bodyHtml:
+        '<label class="tf-label" for="photo-date-edit-date">Date</label>' +
+        '<input type="date" class="tf-input" id="photo-date-edit-date" value="' + escapeAttr(curDate) + '">' +
+        '<label class="tf-label" for="photo-date-edit-time" style="margin-top:14px;">Time (optional)</label>' +
+        '<input type="time" class="tf-input" id="photo-date-edit-time" value="' + escapeAttr(curTime ? curTime.slice(0, 5) : '') + '">',
+      actions: [
+        { label: 'Cancel', onClick: tsheetClose },
+        { label: 'Save', primary: true, onClick: () => {
+            const dateVal = document.getElementById('photo-date-edit-date').value;
+            const timeVal = document.getElementById('photo-date-edit-time').value;
+            if (!dateVal) return;
+            photoEditDates.set(p.id, { date: dateVal, time: timeVal ? timeVal + ':00' : '' });
+            tsheetClose();
+            const label = photoEditRowLabel(p, photoEditDates.get(p.id));
+            li.querySelector('.rank-item').innerHTML = photoEditRankItemHtml(label);
+          }
+        }
+      ]
+    });
+  }
 
   function renderPhotoEditRows(){
     photoEditList.innerHTML = '';
     photoDisplayRows(true).forEach((p, idx) => {
-      const label = photoEditRowLabel(p);
+      const label = photoEditRowLabel(p, photoEditDates.get(p.id));
       const li = document.createElement('li');
       li.dataset.photoId = p.id;
       li.innerHTML =
         '<div class="art-drop has-art" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 200)) + '" alt="" loading="lazy" decoding="async"></div>' +
         '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '" aria-label="Position">' +
-        '<span class="rank-item"><span class="rank-album">' + escapeHtml(label.main) + '</span>' +
-          (label.meta ? '<span class="rank-meta">' + escapeHtml(label.meta) + '</span>' : '') + '</span>' +
+        '<span class="rank-item">' + photoEditRankItemHtml(label) + '</span>' +
         '<button class="row-trip-btn' + (photoEditTrip.get(p.id) ? ' has-trip' : '') + '" type="button" title="' + escapeAttr(photoEditTrip.get(p.id) ? ('Trip: ' + ((tripFind(photoEditTrip.get(p.id)) || {}).name || '')) : 'Add to a trip') + '" aria-label="Trip">🧳</button>' +
         '<button class="row-remove-btn" type="button" title="Remove this photo" aria-label="Remove this photo">✕</button>' +
         '<span class="row-drag-handle" title="Drag to reorder">' +
@@ -16842,6 +16904,9 @@
         const urls = rows.map(r => (photoRows.find(x => x.id === r.dataset.photoId) || {}).url).filter(Boolean);
         openPhotoLightbox(urls, Math.max(0, rows.indexOf(li)), null);
       });
+      if (!label.hasDate){
+        li.querySelector('.rank-date-add-btn').addEventListener('click', () => photoEditOpenDateSheet(p, li));
+      }
       li.querySelector('.row-trip-btn').addEventListener('click', (ev) => {
         const btn = ev.currentTarget;
         tripOpenChooser({
@@ -16904,12 +16969,14 @@
     if (!photoRows.length) return;
     photoEditMode = true;
     photoEditTrip = new Map(photoRows.map(p => [p.id, p.tripId || '']));
+    photoEditDates = new Map();
     renderPhotosPage();
     window.scrollTo({ top: 0 });
   }
 
   function cancelPhotoEdit(){
     photoEditMode = false;
+    photoEditDates = new Map();
     renderPhotosPage();
   }
 
@@ -16931,6 +16998,13 @@
       const wanted = photoEditTrip.get(row.id);
       if (wanted) row.tripId = wanted; else delete row.tripId;
     });
+    photoRows.forEach(row => {
+      const d = photoEditDates.get(row.id);
+      if (!d) return;
+      row.date = d.date;
+      if (d.time) row.time = d.time; else delete row.time;
+    });
+    photoEditDates = new Map();
     if (photoDuelEngaged()){
       // Same reasoning as commitPhotoDragOrder: reordering by hand here settles
       // Duels to match, so the grid keeps showing what was just saved.
