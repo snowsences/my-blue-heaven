@@ -5729,6 +5729,11 @@
         </div>
         <div class="restaurant-heading-actions">
           <button class="btn-ghost" id="photo-edit-toggle-btn" type="button">Edit</button>
+          <div class="filter-wrap">
+            <input type="text" class="filter-input year-filter-input" id="photo-year-filter-input" list="photo-year-filter-datalist" placeholder="Years" autocomplete="off">
+            <datalist id="photo-year-filter-datalist"></datalist>
+            <button class="filter-clear" id="photo-year-filter-clear" type="button" title="Clear year filter" style="display:none;">✕</button>
+          </div>
           <button class="btn-primary" id="photo-add-btn" type="button" aria-label="Add photos">+ New</button>
         </div>
       </div>
@@ -6733,6 +6738,9 @@
   const photoEmptyMessage = document.getElementById('photo-empty-message');
   const photoAddBtn = document.getElementById('photo-add-btn');
   const photoEditToggleBtn = document.getElementById('photo-edit-toggle-btn');
+  const photoYearFilterInput = document.getElementById('photo-year-filter-input');
+  const photoYearFilterDatalist = document.getElementById('photo-year-filter-datalist');
+  const photoYearFilterClear = document.getElementById('photo-year-filter-clear');
   const photoReorderBar = document.getElementById('photo-reorder-bar');
   const photoReorderControls = document.getElementById('photo-reorder-controls');
   const photoEditSaveBtn = document.getElementById('photo-edit-save-btn');
@@ -8143,6 +8151,7 @@
   wireDatalistGating(songArtistFilterInput, songArtistFilterDatalist);
   wireDatalistGating(songGroupingFilterInput, songGroupingFilterDatalist);
   wireDatalistGating(dishRestaurantFilterInput, dishRestaurantFilterDatalist);
+  wireDatalistGating(photoYearFilterInput, photoYearFilterDatalist);
 
   // Resets to 'auto' first so shrinking (e.g. deleting text) is picked up
   // correctly — scrollHeight alone only ever reports the larger of the two
@@ -16250,6 +16259,7 @@
   const PHOTOS_STORAGE_KEY = 'photo-list';
   let photoRows = [];
   let photoLastSavedAt = null;
+  let photoYearFilter = '';  // '' = show all years; otherwise a 4-digit year string — session-only, not persisted
 
   async function loadPhotoProgress(){
     try{
@@ -16376,11 +16386,16 @@
 
   // photoRows, reordered to match Duels — every id Duels doesn't know about
   // yet (never engaged, or a race with reconcile) falls back to plain
-  // photoRows order, so the grid is never simply empty.
-  function photoDisplayRows(){
-    if (!photoDuelEngaged()) return photoRows;
-    const byId = new Map(photoRows.map(p => [p.id, p]));
-    return photoDuelBestKnownOrder().map(id => byId.get(id)).filter(Boolean);
+  // photoRows order, so the grid is never simply empty. `skipYearFilter`
+  // is for Edit Mode, same as Albums' own `editMode ? '' : yearFilter` —
+  // editing always works on the full list, whatever the grid is filtered to.
+  function photoDisplayRows(skipYearFilter){
+    const base = !photoDuelEngaged() ? photoRows : (() => {
+      const byId = new Map(photoRows.map(p => [p.id, p]));
+      return photoDuelBestKnownOrder().map(id => byId.get(id)).filter(Boolean);
+    })();
+    if (skipYearFilter || !photoYearFilter) return base;
+    return base.filter(p => { const pd = otdParse(p.date); return pd && String(pd.y) === photoYearFilter; });
   }
 
   // Called from savePhotoProgress every time photoRows changes — a no-op
@@ -16662,6 +16677,19 @@
     });
   }
 
+  // Same idea as Albums' own Year filter (renderYearFilterOptions): a
+  // datalist of every year currently present, gated to an exact match so
+  // mid-typing never flashes an empty/wrong grid. Undated photos are
+  // simply never matched by any year, same as they sit outside both
+  // insights charts below.
+  function renderPhotoYearFilterOptions(){
+    const years = Array.from(new Set(photoRows.map(p => { const pd = otdParse(p.date); return pd ? String(pd.y) : ''; }).filter(Boolean))).sort();
+    setGatedDatalistOptions(photoYearFilterDatalist, photoYearFilterInput, years.map(y => '<option value="' + y + '">').join(''));
+    if (!years.includes(photoYearFilter)) photoYearFilter = '';
+    photoYearFilterInput.value = photoYearFilter;
+    photoYearFilterClear.style.display = photoYearFilter ? 'flex' : 'none';
+  }
+
   // Mirrors Hikes' "Outings by Year"/"By Month" charts, but by photo date
   // rather than outing date — a photo with no date attached (nothing
   // matching parsePhotoFilenameDateTime when it was added) sits outside
@@ -16684,7 +16712,8 @@
     show('photo-year-block', yearKeys.length >= 2);
     if (yearKeys.length >= 2){
       const maxYear = Math.max.apply(null, yearKeys.map(y => years[y]));
-      document.getElementById('photo-year-list').innerHTML = yearKeys.map(y => {
+      const yearList = document.getElementById('photo-year-list');
+      yearList.innerHTML = yearKeys.map(y => {
         const count = years[y];
         const pct = Math.max(6, Math.round((count / maxYear) * 100));
         return '<div class="artist-row">' +
@@ -16693,6 +16722,15 @@
           '<span class="artist-count">' + count + ' photo' + (count === 1 ? '' : 's') + '</span>' +
         '</div>';
       }).join('');
+      // Same as Albums' own By Year insight — tapping a row jumps straight
+      // to that year filtered, instead of only being settable from the input.
+      yearList.querySelectorAll('.artist-row').forEach((el, i) => {
+        el.addEventListener('click', () => {
+          photoYearFilter = String(yearKeys[i]);
+          renderPhotosPage();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
     }
 
     const totalMonthPhotos = months.reduce((a, b) => a + b, 0);
@@ -16719,11 +16757,13 @@
     photoEmptyMessage.style.display = empty ? 'block' : 'none';
     photoAddBtn.style.display = photoEditMode ? 'none' : 'inline-block';
     photoEditToggleBtn.style.display = (!empty && !photoEditMode) ? 'inline-block' : 'none';
+    photoYearFilterInput.closest('.filter-wrap').style.display = (!empty && !photoEditMode) ? '' : 'none';
     photoReorderBar.style.display = photoEditMode ? 'flex' : 'none';
     photoReorderControls.style.display = photoEditMode ? 'flex' : 'none';
 
     photoGrid.style.display = (photoEditMode || empty) ? 'none' : '';
     photoEditList.style.display = photoEditMode ? '' : 'none';
+    renderPhotoYearFilterOptions();
     renderPhotoInsights();
 
     if (photoEditMode){
@@ -16775,7 +16815,7 @@
 
   function renderPhotoEditRows(){
     photoEditList.innerHTML = '';
-    photoDisplayRows().forEach((p, idx) => {
+    photoDisplayRows(true).forEach((p, idx) => {
       const label = photoEditRowLabel(p);
       const li = document.createElement('li');
       li.dataset.photoId = p.id;
@@ -16908,6 +16948,24 @@
   photoEditSaveBtn.addEventListener('click', savePhotoEdit);
   photoEditCancelBtn.addEventListener('click', cancelPhotoEdit);
 
+  photoYearFilterInput.addEventListener('input', () => {
+    const val = photoYearFilterInput.value.trim();
+    if (!val){
+      if (photoYearFilter){ photoYearFilter = ''; renderPhotosPage(); }
+      return;
+    }
+    const known = Array.from(photoYearFilterDatalist.options).map(o => o.value);
+    if (known.includes(val) && val !== photoYearFilter){
+      photoYearFilter = val;
+      renderPhotosPage();
+    }
+  });
+  photoYearFilterClear.addEventListener('click', () => {
+    photoYearFilterInput.value = '';
+    photoYearFilter = '';
+    renderPhotosPage();
+  });
+
   let photoDragSourceEl = null;
   function makePhotoDraggable(card){
     card.setAttribute('draggable', 'true');
@@ -16932,6 +16990,7 @@
     if (photoDragSourceEl) photoDragSourceEl.classList.remove('dragging');
     photoDragSourceEl = null;
     const newOrderIds = Array.from(photoGrid.children).map(c => c.dataset.photoId);
+    if (newOrderIds.length !== photoRows.length) return; // filtered/partial view — bail rather than risk dropping hidden photos
     if (photoDuelEngaged()){
       // A manual drag IS the order the person wants — settle Duels to it
       // rather than let the next reconcile snap back to picks/estimates.
