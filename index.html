@@ -4038,7 +4038,6 @@
     background: rgba(10,20,22,0.9);
     align-items: center;
     justify-content: center;
-    padding: 40px;
     cursor: pointer;
   }
   .art-lightbox-overlay.show{ display: flex; }
@@ -4052,12 +4051,14 @@
   }
   /* Nav arrows/counter only ever render when the overlay has .multi — plain
      single-image mode (album art) never gets them, matching its existing
-     "click anywhere closes" behavior with nothing to intercept that click. */
+     "click anywhere closes" behavior with nothing to intercept that click.
+     Sit at the bottom rather than vertically centered, clearing the
+     corner delete/hide-dish buttons (44px tall, bottom:24px) and the
+     caption above the counter with room to spare. */
   .lightbox-nav-btn{
     display: none;
     position: fixed;
-    top: 50%;
-    transform: translateY(-50%);
+    bottom: 84px;
     width: 48px;
     height: 48px;
     border-radius: 50%;
