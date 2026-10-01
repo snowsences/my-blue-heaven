@@ -3623,6 +3623,11 @@
     #page-movies .restaurant-heading-actions .btn-ghost, #page-movies .restaurant-heading-actions .btn-primary{ padding-left: 14px; padding-right: 14px; }
     .heading-actions-right{ gap: 6px; }
   }
+  /* Photos' row has four things to fit (Edit, two filters, +) — tighter
+     than the 10px/6px other tabs use, and not just at the narrowest
+     widths; placed after the max-width:360px block above so it wins at
+     those widths too, not only wider ones. */
+  #page-photos .restaurant-heading-actions{ gap: 4px; }
   .heading-actions-right{ display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-left: auto; flex: 0 0 auto; max-width: 100%; } /* keeps its full width beside a filter (the filter gives way instead); only wraps inside itself if even the whole row is too narrow */
   /* Edit mode's three buttons (Save Changes / Cancel / + Add Row): a slightly tighter gap so they fit one line on a phone, and if they ever don't, the wrapped line hugs the right edge too. */
   .heading-actions-right .reorder-edit-controls{ gap: 8px; justify-content: flex-end; }
