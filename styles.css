@@ -3640,10 +3640,10 @@
   .year-filter-input{ width: 120px; }
   /* Photos' own Year/Season filters sit next to each other AND the +
      button in one already-tight header row, so they're narrower than the
-     120px base .year-filter-input width (40%/33% off respectively) —
-     scoped by id so Albums' own (roomier) year filter is untouched. */
-  #photo-year-filter-input{ width: 72px; }
-  #photo-season-filter-input{ width: 80px; }
+     120px base .year-filter-input width — scoped by id so Albums' own
+     (roomier) year filter is untouched. */
+  #photo-year-filter-input{ width: 82px; }
+  #photo-season-filter-input{ width: 110px; }
   .artist-filter-input{ width: 160px; }
   .grouping-filter-input{ width: 160px; }
   .restaurant-search-filter-input{ width: 280px; }
