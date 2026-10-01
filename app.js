@@ -10768,6 +10768,7 @@
       const files = Array.from(input.files || []);
       if (!files.length) return;
       const originalText = photoAddBtn.textContent;
+      if (files.length > 1) photoAddBtn.classList.add('is-uploading');
       let addedCount = 0, undatedCount = 0;
       for (let i = 0; i < files.length; i++){
         if (files.length > 1) photoAddBtn.textContent = 'Uploading ' + (i + 1) + '/' + files.length + '...';
@@ -10799,6 +10800,7 @@
         if (addedCount % 10 === 0 || i === files.length - 1) renderPhotosPage();
       }
       photoAddBtn.textContent = originalText;
+      photoAddBtn.classList.remove('is-uploading');
       if (addedCount){
         photoDuelReconcile(); // once, now that the whole batch has landed — see savePhotoProgress's own comment
         renderPhotosPage();

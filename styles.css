@@ -3576,7 +3576,31 @@
   #park-new-btn{ margin-left: auto; flex: none; }
   /* Photos: Edit stays at the left, + New goes to the right edge. */
   #page-photos .restaurant-heading-actions{ flex: 1 1 100%; }
-  #photo-add-btn{ margin-left: auto; }
+  /* Just a "+" in a circle rather than the usual "+ New" pill — Photos'
+     header row already has two filter inputs to fit beside it, more than
+     any other tab's "+ New" button has to share space with. */
+  #photo-add-btn{
+    margin-left: auto;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Mid-upload, the button's own text becomes "Uploading 2/5..." — too
+     long for the 44px circle, so it reverts to a normal pill for as long
+     as that text is showing (see the upload handler in app.js). */
+  #photo-add-btn.is-uploading{
+    width: auto;
+    height: auto;
+    padding: 13px 20px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
   /* Books, Games and Shows: the List/Grid toggle leads the row on the left; Edit and + New (or the edit-mode buttons) sit together on the right. */
   #page-books .restaurant-heading-actions, #page-games .restaurant-heading-actions, #page-shows .restaurant-heading-actions{ flex: 1 1 100%; }
   /* Movies: the filter takes the left of the row, the buttons the right — the same arrangement as Roads. */
@@ -3609,6 +3633,12 @@
   #song-results-controls .filter-input{ width: 100%; min-width: 0; }
   #song-results-controls .btn-ghost{ flex: none; }
   .year-filter-input{ width: 120px; }
+  /* Photos' own Year/Season filters sit next to each other AND the +
+     button in one already-tight header row, so they're narrower than the
+     120px base .year-filter-input width (40%/33% off respectively) —
+     scoped by id so Albums' own (roomier) year filter is untouched. */
+  #photo-year-filter-input{ width: 72px; }
+  #photo-season-filter-input{ width: 80px; }
   .artist-filter-input{ width: 160px; }
   .grouping-filter-input{ width: 160px; }
   .restaurant-search-filter-input{ width: 280px; }
