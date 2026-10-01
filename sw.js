@@ -6,8 +6,8 @@
 //    never changes, so a cached copy is never stale.
 //  - Google Fonts: served from cache, refreshed in the background.
 // Everything else — Firestore, sign-in, Last.fm, Cloudinary — isn't touched.
-const CACHE = 'mbh-v2';
-const SHELL = ['./', './index.html', './manifest.json', './icon-192-v2.png', './favicon-32-v2.png'];
+const CACHE = 'mbh-v3';
+const SHELL = ['./', './index.html', './styles.css', './app.js', './manifest.json', './icon-192-v2.png', './favicon-32-v2.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
