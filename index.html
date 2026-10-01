@@ -5750,6 +5750,11 @@
             <datalist id="photo-year-filter-datalist"></datalist>
             <button class="filter-clear" id="photo-year-filter-clear" type="button" title="Clear year filter" style="display:none;">✕</button>
           </div>
+          <div class="filter-wrap">
+            <input type="text" class="filter-input year-filter-input" id="photo-season-filter-input" list="photo-season-filter-datalist" placeholder="Seasons" autocomplete="off">
+            <datalist id="photo-season-filter-datalist"></datalist>
+            <button class="filter-clear" id="photo-season-filter-clear" type="button" title="Clear season filter" style="display:none;">✕</button>
+          </div>
           <button class="btn-primary" id="photo-add-btn" type="button" aria-label="Add photos">+ New</button>
         </div>
       </div>
@@ -6757,6 +6762,9 @@
   const photoYearFilterInput = document.getElementById('photo-year-filter-input');
   const photoYearFilterDatalist = document.getElementById('photo-year-filter-datalist');
   const photoYearFilterClear = document.getElementById('photo-year-filter-clear');
+  const photoSeasonFilterInput = document.getElementById('photo-season-filter-input');
+  const photoSeasonFilterDatalist = document.getElementById('photo-season-filter-datalist');
+  const photoSeasonFilterClear = document.getElementById('photo-season-filter-clear');
   const photoReorderBar = document.getElementById('photo-reorder-bar');
   const photoReorderControls = document.getElementById('photo-reorder-controls');
   const photoEditSaveBtn = document.getElementById('photo-edit-save-btn');
@@ -8168,6 +8176,7 @@
   wireDatalistGating(songGroupingFilterInput, songGroupingFilterDatalist);
   wireDatalistGating(dishRestaurantFilterInput, dishRestaurantFilterDatalist);
   wireDatalistGating(photoYearFilterInput, photoYearFilterDatalist);
+  wireDatalistGating(photoSeasonFilterInput, photoSeasonFilterDatalist);
 
   // Resets to 'auto' first so shrinking (e.g. deleting text) is picked up
   // correctly — scrollHeight alone only ever reports the larger of the two
@@ -16276,6 +16285,17 @@
   let photoRows = [];
   let photoLastSavedAt = null;
   let photoYearFilter = '';  // '' = show all years; otherwise a 4-digit year string — session-only, not persisted
+  let photoSeasonFilter = '';  // '' = show all seasons; otherwise 'Winter'/'Spring'/'Summer'/'Fall' — session-only, not persisted
+
+  // Meteorological seasons (Dec/Jan/Feb = Winter, etc.), not astronomical —
+  // simpler, and matches how most photo apps bucket "season" already.
+  const PHOTO_SEASONS = ['Winter', 'Spring', 'Summer', 'Fall'];
+  function photoSeasonOf(month){ // 1-12
+    if (month === 12 || month <= 2) return 'Winter';
+    if (month <= 5) return 'Spring';
+    if (month <= 8) return 'Summer';
+    return 'Fall';
+  }
 
   async function loadPhotoProgress(){
     try{
@@ -16402,16 +16422,22 @@
 
   // photoRows, reordered to match Duels — every id Duels doesn't know about
   // yet (never engaged, or a race with reconcile) falls back to plain
-  // photoRows order, so the grid is never simply empty. `skipYearFilter`
+  // photoRows order, so the grid is never simply empty. `skipFilters`
   // is for Edit Mode, same as Albums' own `editMode ? '' : yearFilter` —
   // editing always works on the full list, whatever the grid is filtered to.
-  function photoDisplayRows(skipYearFilter){
+  function photoDisplayRows(skipFilters){
     const base = !photoDuelEngaged() ? photoRows : (() => {
       const byId = new Map(photoRows.map(p => [p.id, p]));
       return photoDuelBestKnownOrder().map(id => byId.get(id)).filter(Boolean);
     })();
-    if (skipYearFilter || !photoYearFilter) return base;
-    return base.filter(p => { const pd = otdParse(p.date); return pd && String(pd.y) === photoYearFilter; });
+    if (skipFilters || (!photoYearFilter && !photoSeasonFilter)) return base;
+    return base.filter(p => {
+      const pd = otdParse(p.date);
+      if (!pd) return false;
+      if (photoYearFilter && String(pd.y) !== photoYearFilter) return false;
+      if (photoSeasonFilter && photoSeasonOf(pd.m) !== photoSeasonFilter) return false;
+      return true;
+    });
   }
 
   // Called from savePhotoProgress every time photoRows changes — a no-op
@@ -16706,6 +16732,15 @@
     photoYearFilterClear.style.display = photoYearFilter ? 'flex' : 'none';
   }
 
+  // Same idea, same gating, bucketing by meteorological season instead of year.
+  function renderPhotoSeasonFilterOptions(){
+    const seasons = PHOTO_SEASONS.filter(s => photoRows.some(p => { const pd = otdParse(p.date); return pd && photoSeasonOf(pd.m) === s; }));
+    setGatedDatalistOptions(photoSeasonFilterDatalist, photoSeasonFilterInput, seasons.map(s => '<option value="' + s + '">').join(''));
+    if (!seasons.includes(photoSeasonFilter)) photoSeasonFilter = '';
+    photoSeasonFilterInput.value = photoSeasonFilter;
+    photoSeasonFilterClear.style.display = photoSeasonFilter ? 'flex' : 'none';
+  }
+
   // Mirrors Hikes' "Outings by Year"/"By Month" charts, but by photo date
   // rather than outing date — a photo with no date attached (nothing
   // matching parsePhotoFilenameDateTime when it was added) sits outside
@@ -16774,12 +16809,14 @@
     photoAddBtn.style.display = photoEditMode ? 'none' : 'inline-block';
     photoEditToggleBtn.style.display = (!empty && !photoEditMode) ? 'inline-block' : 'none';
     photoYearFilterInput.closest('.filter-wrap').style.display = (!empty && !photoEditMode) ? '' : 'none';
+    photoSeasonFilterInput.closest('.filter-wrap').style.display = (!empty && !photoEditMode) ? '' : 'none';
     photoReorderBar.style.display = photoEditMode ? 'flex' : 'none';
     photoReorderControls.style.display = photoEditMode ? 'flex' : 'none';
 
     photoGrid.style.display = (photoEditMode || empty) ? 'none' : '';
     photoEditList.style.display = photoEditMode ? '' : 'none';
     renderPhotoYearFilterOptions();
+    renderPhotoSeasonFilterOptions();
     renderPhotoInsights();
 
     if (photoEditMode){
@@ -17038,6 +17075,24 @@
   photoYearFilterClear.addEventListener('click', () => {
     photoYearFilterInput.value = '';
     photoYearFilter = '';
+    renderPhotosPage();
+  });
+
+  photoSeasonFilterInput.addEventListener('input', () => {
+    const val = photoSeasonFilterInput.value.trim();
+    if (!val){
+      if (photoSeasonFilter){ photoSeasonFilter = ''; renderPhotosPage(); }
+      return;
+    }
+    const known = Array.from(photoSeasonFilterDatalist.options).map(o => o.value);
+    if (known.includes(val) && val !== photoSeasonFilter){
+      photoSeasonFilter = val;
+      renderPhotosPage();
+    }
+  });
+  photoSeasonFilterClear.addEventListener('click', () => {
+    photoSeasonFilterInput.value = '';
+    photoSeasonFilter = '';
     renderPhotosPage();
   });
 
