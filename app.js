@@ -12600,6 +12600,7 @@
   }
 
   function renderRestaurantVisitMetaHtml(visit){
+    const linkedTrip = tripFind(visit.tripId);
     if (restaurantVisitEditMode){
       return (
         '<div class="restaurant-edit-form restaurant-visit-edit-form">' +
@@ -12624,7 +12625,12 @@
             '<button class="view-toggle-btn' + (restaurantVisitThumbnailMode ? ' active' : '') + '" id="restaurant-visit-view-thumb-btn" type="button">Thumbnails</button>' +
           '</div>'
         ) +
-        (guestViewEnabled ? '' : '<button class="btn-ghost trip-link-btn" data-trip-visit="' + visit.id + '" type="button" aria-label="Trip">' + tripChipHtml(visit.tripId) + '</button>') +
+        (guestViewEnabled ? '' : (linkedTrip
+          ? '<span class="restaurant-trip-link-controls">' +
+              '<button class="btn-ghost trip-link-btn" data-trip-visit-open="' + escapeAttr(linkedTrip.id) + '" type="button" aria-label="Open trip ' + escapeAttr(linkedTrip.name || 'Untitled trip') + '">' + tripChipHtml(linkedTrip.id) + '</button>' +
+              '<button class="restaurant-trip-clear-btn" data-trip-visit-clear="' + escapeAttr(visit.id) + '" type="button" aria-label="Clear trip" title="Clear trip">✕</button>' +
+            '</span>'
+          : '<button class="btn-ghost trip-link-btn" data-trip-visit="' + escapeAttr(visit.id) + '" type="button" aria-label="Choose a trip">' + tripChipHtml('') + '</button>')) +
         '<span class="share-actions">' +
           (((visit.photos || []).some(Boolean) || (visit.courses || []).some(c => otdCoursePhotos(c).length))
             ? '<button class="btn-ghost share-btn" data-share-visit="' + visit.id + '" type="button">Share</button>' : '') +
@@ -18958,8 +18964,27 @@
 
   // ---------- from a visit or hike date: choose its trip ----------
   restaurantDetailsPanelInner.addEventListener('click', (e) => {
+    if (guestViewEnabled) return;
+    const openBtn = e.target.closest('[data-trip-visit-open]');
+    if (openBtn){
+      openTrip(openBtn.dataset.tripVisitOpen);
+      return;
+    }
+    const clearBtn = e.target.closest('[data-trip-visit-clear]');
+    if (clearBtn){
+      const vid = clearBtn.dataset.tripVisitClear;
+      let visit = null;
+      restaurantRows.forEach(r => (r.visits || []).forEach(v => { if (v.id === vid) visit = v; }));
+      if (!visit) return;
+      delete visit.tripId;
+      saveRestaurantProgress();
+      renderRestaurantDetailsContent();
+      renderTripsPage();
+      if (tripOpenId) tripRender();
+      return;
+    }
     const btn = e.target.closest('[data-trip-visit]');
-    if (!btn || guestViewEnabled) return;
+    if (!btn) return;
     const vid = btn.dataset.tripVisit;
     let found = null;
     restaurantRows.forEach(r => (r.visits || []).forEach(v => { if (v.id === vid) found = { r, v }; }));
