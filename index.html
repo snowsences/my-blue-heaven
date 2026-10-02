@@ -1053,6 +1053,20 @@
       </div>
 
       <div class="settings-section">
+        <h2 class="settings-section-title">Cover Photos</h2>
+        <div class="import-row">
+          <label for="cover-rotation-select">Change selected cover photos</label>
+          <select class="settings-select" id="cover-rotation-select">
+            <option value="refresh">Every refresh</option>
+            <option value="30m">30 minutes</option>
+            <option value="2h">2 hours</option>
+            <option value="1d" selected>1 day</option>
+          </select>
+        </div>
+        <p class="footer-note" style="margin-top:10px;">The interval is checked only when the app loads or refreshes. Cover photos never change while the app remains open.</p>
+      </div>
+
+      <div class="settings-section">
         <h2 class="settings-section-title">Photo Cleanup</h2>
         <p class="footer-note" style="margin-top:0;">Some photos may still be stored directly in your data instead of on Cloudinary — from before a fix, before Cloudinary was connected, or an upload that failed silently. Those can make the app crash when shown, and bloat what gets synced (Firestore caps a document at 1MB). This checks every restaurant, hike, park, road, photo and trip: with Cloudinary connected, it moves any of those photos there; otherwise it shrinks any still oversized. It can take a few minutes with a lot of photos, and it's safe to run more than once.</p>
         <div class="import-row" style="margin-top:10px;">
