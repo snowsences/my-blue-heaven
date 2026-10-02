@@ -251,6 +251,26 @@
   let activeNatureSubPage = 'hikes';
   let activeArtSubPage = 'books';
 
+  // Browser refreshes should reopen the same navigation screen in this tab,
+  // without turning transient UI state into a synced or permanent setting.
+  const NAV_SESSION_KEY = 'mbh-active-page';
+  const NAV_SESSION_PAGES = new Set([
+    'albums', 'songs', 'artists', 'restaurants', 'dishes',
+    'hikes', 'parks', 'roads', 'photos',
+    'books', 'movies', 'games', 'shows',
+    'trips', 'fun', 'settings'
+  ]);
+  function rememberSessionPage(page){
+    if (!NAV_SESSION_PAGES.has(page)) return;
+    try{ window.sessionStorage.setItem(NAV_SESSION_KEY, page); }catch(e){ /* best effort */ }
+  }
+  function readSessionPage(){
+    try{
+      const page = window.sessionStorage.getItem(NAV_SESSION_KEY);
+      return NAV_SESSION_PAGES.has(page) ? page : '';
+    }catch(e){ return ''; }
+  }
+
   // Each sub-tab has 2 or 3 copies — one per sub-page in its group, since
   // only one sub-page is ever visible at a time (see this file's HTML).
   const musicSubtabAlbumsBtn = document.getElementById('music-subtab-albums-btn');
@@ -1402,7 +1422,7 @@
   }
 
   async function checkSavedProgress(){
-    await coverRotationReadyPromise;
+    await Promise.all([coverRotationReadyPromise, guestViewReadyPromise]);
     let localParsed = null;
     try{
       const res = await window.storage.get(STORAGE_KEY, false);
@@ -1563,6 +1583,7 @@
       }
     }catch(e){ /* nothing saved yet */ }
 
+    restoreSessionPage();
     resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, parks, roads, photos, books, movies, games, shows) has finished loading — safe for Firebase sync to compare/write now
   }
 
@@ -4163,6 +4184,7 @@
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
       trips: pageTrips, fun: pageFun, settings: pageSettings
     };
+    rememberSessionPage(page);
     Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
 
     if (page !== 'photos' && photoEditMode){
@@ -4311,6 +4333,43 @@
     [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3, artSubtabGamesBtn4].forEach(b => b.classList.toggle('active', page === 'games'));
     [artSubtabShowsBtn, artSubtabShowsBtn2, artSubtabShowsBtn3, artSubtabShowsBtn4].forEach(b => b.classList.toggle('active', page === 'shows'));
     switchTopPage(page);
+  }
+
+  function restoreSessionPage(){
+    const page = readSessionPage();
+    if (!page) return;
+
+    // Guest View has a deliberately smaller navigation surface. The owner
+    // can still restore Settings in preview mode; the locked guest account
+    // can never do so.
+    if (guestViewEnabled){
+      if (page === 'settings' && !isLockedGuestAccount){
+        switchToolsSubPage('settings');
+        switchTopGroup('tools');
+      } else {
+        switchGuestPage(['restaurants', 'hikes', 'trips', 'fun'].includes(page) ? page : 'restaurants');
+      }
+      return;
+    }
+
+    if (['albums', 'songs', 'artists'].includes(page)){
+      switchMusicSubPage(page);
+      switchTopGroup('music');
+    } else if (['restaurants', 'dishes'].includes(page)){
+      switchFoodSubPage(page);
+      switchTopGroup('food');
+    } else if (['hikes', 'parks', 'roads', 'photos'].includes(page)){
+      switchNatureSubPage(page);
+      switchTopGroup('nature');
+    } else if (['books', 'movies', 'games', 'shows'].includes(page)){
+      switchArtSubPage(page);
+      switchTopGroup('art');
+    } else if (page === 'trips'){
+      switchTopGroup('trips');
+    } else {
+      switchToolsSubPage(page);
+      switchTopGroup('tools');
+    }
   }
 
   topNavMusicBtn.addEventListener('click', () => switchTopGroup('music'));
@@ -13375,7 +13434,7 @@
   const coverRotationReadyPromise = loadCoverRotationSetting();
   loadLastfmConfig();
   loadMusicbeeLibrary();
-  loadGuestViewSetting();
+  const guestViewReadyPromise = loadGuestViewSetting();
   const localSettingsLoadedPromise = Promise.all([loadDishOrder(), loadRestaurantTierRecord()]);
   loadHikeProgress();
   loadParkProgress();
