@@ -1313,6 +1313,17 @@
     font-size: 13px;
     flex-wrap: wrap;
   }
+  .settings-select{
+    min-width: 150px;
+    padding: 8px 34px 8px 14px;
+    border: 1px solid var(--panel-line);
+    border-radius: 999px;
+    background-color: var(--bg-2);
+    color: var(--chalk);
+    font: 500 13px/1.2 'Figtree', sans-serif;
+    cursor: pointer;
+  }
+  .settings-select:focus{ outline: none; border-color: var(--amber); }
   .toggle-switch{
     position: relative;
     display: inline-block;
