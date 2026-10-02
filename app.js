@@ -8475,7 +8475,9 @@
   }
 
   function getEffectiveParkCover(p){
-    const photos = gatherAllParkPhotos(p);
+    // A Park can use either its own uploads or photos inherited from linked
+    // hikes, so every photo offered by its lightbox is eligible to rotate.
+    const photos = gatherAllParkLightboxPhotos(p);
     return dailyCoverPhoto(p, photos);
   }
 
