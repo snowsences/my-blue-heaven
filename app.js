@@ -2106,16 +2106,19 @@
     const setStatus = (msg) => { statusEl.textContent = msg; };
     setStatus('Checking photos\u2026');
 
+    const cleanupResults = new Map();
     const process = async (getUrl, setUrl, tag) => {
       const url = getUrl();
       checked++;
       if (checked % 4 === 0) setStatus('Checked ' + checked + ' photos, shrunk ' + fixed + '\u2026');
-      const newUrl = await shrinkStoredPhotoIfNeeded(url);
-      if (newUrl){ setUrl(newUrl); fixed++; touched.add(tag); }
+      const reused = cleanupResults.has(url);
+      const newUrl = reused ? cleanupResults.get(url) : await shrinkStoredPhotoIfNeeded(url);
+      if (!reused) cleanupResults.set(url, newUrl || '');
+      if (newUrl){ setUrl(newUrl); if (!reused) fixed++; touched.add(tag); }
     };
 
     for (const r of restaurantRows){
-      if (r.coverPhoto) await process(() => r.coverPhoto, (u) => { r.coverPhoto = u; }, 'restaurant');
+      for (const coverUrl of getSelectedCoverPhotos(r)) await process(() => coverUrl, (u) => { replaceSelectedCoverPhotoUrl(r, coverUrl, u); }, 'restaurant');
       for (const v of (r.visits || [])){
         for (const c of (v.courses || [])){
           const arr = ensureCoursePhotosArray(c);
@@ -2127,7 +2130,7 @@
     }
 
     for (const h of hikeRows){
-      if (h.coverPhoto) await process(() => h.coverPhoto, (u) => { h.coverPhoto = u; }, 'hike');
+      for (const coverUrl of getSelectedCoverPhotos(h)) await process(() => coverUrl, (u) => { replaceSelectedCoverPhotoUrl(h, coverUrl, u); }, 'hike');
       for (const d of (h.dates || [])){
         for (const p of (d.photos || [])){
           if (!p) continue;
@@ -2137,7 +2140,7 @@
     }
 
     for (const pk of parkRows){
-      if (pk.coverPhoto) await process(() => pk.coverPhoto, (u) => { pk.coverPhoto = u; }, 'park');
+      for (const coverUrl of getSelectedCoverPhotos(pk)) await process(() => coverUrl, (u) => { replaceSelectedCoverPhotoUrl(pk, coverUrl, u); }, 'park');
       for (const p of (pk.photos || [])){
         if (!p) continue;
         await process(() => p.url, (u) => { p.url = u; }, 'park');
@@ -2145,7 +2148,7 @@
     }
 
     for (const rd of roadRows){
-      if (rd.coverPhoto) await process(() => rd.coverPhoto, (u) => { rd.coverPhoto = u; }, 'road');
+      for (const coverUrl of getSelectedCoverPhotos(rd)) await process(() => coverUrl, (u) => { replaceSelectedCoverPhotoUrl(rd, coverUrl, u); }, 'road');
       for (const p of (rd.photos || [])){
         if (!p) continue;
         await process(() => p.url, (u) => { p.url = u; }, 'road');
@@ -2158,7 +2161,7 @@
     }
 
     for (const t of tripRows){
-      if (t.coverPhoto) await process(() => t.coverPhoto, (u) => { t.coverPhoto = u; }, 'trip');
+      for (const coverUrl of getSelectedCoverPhotos(t)) await process(() => coverUrl, (u) => { replaceSelectedCoverPhotoUrl(t, coverUrl, u); }, 'trip');
       for (const p of (t.photos || [])){
         if (!p) continue;
         await process(() => p.url, (u) => { p.url = u; }, 'trip');
@@ -2355,6 +2358,54 @@
     return (entry && typeof entry === 'object') ? entry.url : entry;
   }
 
+  // Restaurants, hikes, parks, roads and trips can each have any number of
+  // selected covers. coverPhoto stays in sync with the first selection so
+  // older backups and older app versions still retain a usable cover.
+  function getSelectedCoverPhotos(row){
+    if (!row) return [];
+    const selected = Array.isArray(row.coverPhotos) ? row.coverPhotos : [];
+    const combined = selected.slice();
+    if (row.coverPhoto && combined.indexOf(row.coverPhoto) === -1) combined.unshift(row.coverPhoto);
+    return combined.filter((url, i, all) => typeof url === 'string' && url && all.indexOf(url) === i);
+  }
+  function applySelectedCoverPhotos(row, urls){
+    if (!row) return;
+    const selected = (Array.isArray(urls) ? urls : []).filter((url, i, all) => typeof url === 'string' && url && all.indexOf(url) === i);
+    row.coverPhotos = selected;
+    row.coverPhoto = selected[0] || '';
+  }
+  function toggleSelectedCoverPhoto(row, url){
+    if (!row || !url) return;
+    const selected = getSelectedCoverPhotos(row);
+    const i = selected.indexOf(url);
+    if (i === -1) selected.push(url); else selected.splice(i, 1);
+    applySelectedCoverPhotos(row, selected);
+  }
+  function removeSelectedCoverPhoto(row, url){
+    applySelectedCoverPhotos(row, getSelectedCoverPhotos(row).filter(u => u !== url));
+  }
+  function replaceSelectedCoverPhotoUrl(row, oldUrl, newUrl){
+    applySelectedCoverPhotos(row, getSelectedCoverPhotos(row).map(url => url === oldUrl ? newUrl : url));
+  }
+  // Deterministic for the device's local calendar day: the cover never jumps
+  // during a day or between renders, but the daily hash chooses among all of
+  // the selected photos. With no manual choices, the first gallery photo is
+  // still the automatic fallback.
+  function dailyCoverPhoto(row, availableUrls){
+    const available = (availableUrls || []).filter(Boolean);
+    const selected = getSelectedCoverPhotos(row).filter(url => available.indexOf(url) !== -1);
+    if (!selected.length) return available[0] || '';
+    const now = new Date();
+    const dayKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    const seed = dayKey + '|' + String(row.id || row.key || row.name || '');
+    let hash = 2166136261;
+    for (let i = 0; i < seed.length; i++){
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return selected[(hash >>> 0) % selected.length];
+  }
+
   function openArtLightbox(src){
     lightboxPhotos = null;
     lightboxCoverContext = null;
@@ -2409,22 +2460,22 @@
   function resolveLightboxCoverHandler(context){
     if (!context) return null;
     if (context.restaurantIndex !== undefined){
-      return { row: restaurantRows[context.restaurantIndex], index: context.restaurantIndex, setCover: setRestaurantCoverPhoto, deletePhoto: deleteRestaurantPhoto, gatherPhotos: gatherAllRestaurantPhotos };
+      return { row: restaurantRows[context.restaurantIndex], index: context.restaurantIndex, setCover: setRestaurantCoverPhoto, deletePhoto: deleteRestaurantPhoto, gatherPhotos: gatherAllRestaurantPhotos, multiCover: true };
     }
     if (context.roadIndex !== undefined){
-      return { row: roadRows[context.roadIndex], index: context.roadIndex, setCover: setRoadCoverPhoto, deletePhoto: deleteRoadPhoto, gatherPhotos: gatherAllRoadPhotos };
+      return { row: roadRows[context.roadIndex], index: context.roadIndex, setCover: setRoadCoverPhoto, deletePhoto: deleteRoadPhoto, gatherPhotos: gatherAllRoadPhotos, multiCover: true };
     }
     if (context.hikeIndex !== undefined){
-      return { row: hikeRows[context.hikeIndex], index: context.hikeIndex, setCover: setHikeCoverPhoto, deletePhoto: deleteHikePhoto, gatherPhotos: gatherAllHikePhotos };
+      return { row: hikeRows[context.hikeIndex], index: context.hikeIndex, setCover: setHikeCoverPhoto, deletePhoto: deleteHikePhoto, gatherPhotos: gatherAllHikePhotos, multiCover: true };
     }
     if (context.parkIndex !== undefined){
-      return { row: parkRows[context.parkIndex], index: context.parkIndex, setCover: setParkCoverPhoto, deletePhoto: deleteParkPhoto, gatherPhotos: gatherAllParkLightboxPhotos };
+      return { row: parkRows[context.parkIndex], index: context.parkIndex, setCover: setParkCoverPhoto, deletePhoto: deleteParkPhoto, gatherPhotos: gatherAllParkLightboxPhotos, multiCover: true };
     }
     if (context.activityId !== undefined){
       return { row: activityFind(context.activityId), index: context.activityId, setCover: setActivityCoverPhoto, deletePhoto: deleteActivityPhoto, gatherPhotos: gatherAllActivityPhotos };
     }
     if (context.tripId !== undefined){
-      return { row: tripFind(context.tripId), index: context.tripId, setCover: setTripCoverPhoto, deletePhoto: null, gatherPhotos: null };
+      return { row: tripFind(context.tripId), index: context.tripId, setCover: setTripCoverPhoto, deletePhoto: null, gatherPhotos: null, multiCover: true };
     }
     return null;
   }
@@ -2433,7 +2484,10 @@
     if (!lightboxCoverContext) return;
     const handler = resolveLightboxCoverHandler(lightboxCoverContext);
     if (!handler || !handler.row) return;
-    const isCover = handler.row.coverPhoto === lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
+    const currentUrl = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
+    const isCover = handler.multiCover
+      ? getSelectedCoverPhotos(handler.row).indexOf(currentUrl) !== -1
+      : handler.row.coverPhoto === currentUrl;
     // Once a restaurant's course photos can also have their OWN separate
     // cover (below), the generic label needs to say which cover this is —
     // every other type here still has just the one, so their wording stays as-is.
@@ -2635,10 +2689,12 @@
     const handler = resolveLightboxCoverHandler(lightboxCoverContext);
     if (!handler || !handler.row) return;
     const currentUrl = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
-    // Toggling off just clears the cover entirely — there's always at most
-    // one, never a "previous" one to fall back to.
-    const newCover = handler.row.coverPhoto === currentUrl ? '' : currentUrl;
-    handler.setCover(handler.index, newCover);
+    if (handler.multiCover){
+      handler.setCover(handler.index, currentUrl);
+    } else {
+      const newCover = handler.row.coverPhoto === currentUrl ? '' : currentUrl;
+      handler.setCover(handler.index, newCover);
+    }
     updateLightboxCoverToggle();
   });
   lightboxDeleteBtn.addEventListener('click', (e) => {
@@ -6410,19 +6466,17 @@
   function setRestaurantCoverPhoto(index, dataUrl){
     if (guestViewEnabled) return;
     if (!restaurantRows[index]) return;
-    restaurantRows[index].coverPhoto = dataUrl;
+    toggleSelectedCoverPhoto(restaurantRows[index], dataUrl);
     saveRestaurantProgress();
     renderRestaurantsPage();
     if (openRestaurantIndex === index) renderRestaurantDetailsContent();
   }
 
-  // There's no direct-upload path for covers anymore — a cover is either
-  // explicitly picked via the gallery's "set as cover" toggle, or, absent
-  // that, defaults to the first photo added via a course or More Photos.
-  // gatherAllRestaurantPhotos already puts an explicit r.coverPhoto first
-  // when one is set, so its own first entry is exactly this either way.
+  // There's no direct-upload path for covers anymore. Any number can be
+  // selected with the gallery toggle; one remains stable for each local day.
   function getEffectiveRestaurantCover(r){
-    return gatherAllRestaurantPhotos(r)[0] || '';
+    const photos = gatherAllRestaurantPhotos(r);
+    return dailyCoverPhoto(r, photos);
   }
 
   function restaurantTotal(r){
@@ -6496,7 +6550,7 @@
         visit.photos = visit.photos.filter(p => p !== url);
       }
     });
-    if (r.coverPhoto === url) r.coverPhoto = '';
+    removeSelectedCoverPhoto(r, url);
     saveRestaurantProgress();
     renderRestaurantsPage();
     if (openRestaurantIndex === index) renderRestaurantDetailsContent();
@@ -7361,13 +7415,14 @@
   }
 
   function getEffectiveHikeCover(h){
-    return h.coverPhoto || gatherAllHikePhotos(h)[0] || '';
+    const photos = gatherAllHikePhotos(h);
+    return dailyCoverPhoto(h, photos);
   }
 
   function setHikeCoverPhoto(index, url){
     if (guestViewEnabled) return;
     if (!hikeRows[index]) return;
-    hikeRows[index].coverPhoto = url;
+    toggleSelectedCoverPhoto(hikeRows[index], url);
     saveHikeProgress();
     renderHikesPage();
     if (openHikeIndex === index) renderHikeDetailsContent();
@@ -7382,7 +7437,7 @@
     sortedHikeDates(h).forEach(d => {
       d.photos = (d.photos || []).filter(p => p.url !== url);
     });
-    if (h.coverPhoto === url) h.coverPhoto = '';
+    removeSelectedCoverPhoto(h, url);
     saveHikeProgress();
     renderHikesPage();
     if (openHikeIndex === index) renderHikeDetailsContent();
@@ -7945,7 +8000,7 @@
       if (!file) return;
       const url = await uploadRestaurantPhoto(file, 'RankHeaven/HikeCovers');
       if (url){
-        updateOpenHike(hike => { hike.coverPhoto = url; });
+        updateOpenHike(hike => { applySelectedCoverPhotos(hike, [url]); });
       }
     });
   }
@@ -8420,13 +8475,14 @@
   }
 
   function getEffectiveParkCover(p){
-    return p.coverPhoto || gatherAllParkPhotos(p)[0] || '';
+    const photos = gatherAllParkPhotos(p);
+    return dailyCoverPhoto(p, photos);
   }
 
   function setParkCoverPhoto(index, url){
     if (guestViewEnabled) return;
     if (!parkRows[index]) return;
-    parkRows[index].coverPhoto = url;
+    toggleSelectedCoverPhoto(parkRows[index], url);
     saveParkProgress();
     renderParksPage();
     if (openParkIndex === index) renderParkDetailsContent();
@@ -8437,7 +8493,7 @@
     const p = parkRows[index];
     if (!p || !url) return;
     p.photos = (p.photos || []).filter(photo => photo.url !== url);
-    if (p.coverPhoto === url) p.coverPhoto = '';
+    removeSelectedCoverPhoto(p, url);
     saveParkProgress();
     renderParksPage();
     if (openParkIndex === index) renderParkDetailsContent();
@@ -8792,7 +8848,7 @@
       if (!file) return;
       const url = await uploadRestaurantPhoto(file, 'RankHeaven/ParkCovers');
       if (url){
-        updateOpenPark(park => { park.coverPhoto = url; });
+        updateOpenPark(park => { applySelectedCoverPhotos(park, [url]); });
       }
     });
   }
@@ -9400,13 +9456,14 @@
   }
 
   function getEffectiveRoadCover(r){
-    return r.coverPhoto || gatherAllRoadPhotos(r)[0] || '';
+    const photos = gatherAllRoadPhotos(r);
+    return dailyCoverPhoto(r, photos);
   }
 
   function setRoadCoverPhoto(index, url){
     if (guestViewEnabled) return;
     if (!roadRows[index]) return;
-    roadRows[index].coverPhoto = url;
+    toggleSelectedCoverPhoto(roadRows[index], url);
     saveRoadProgress();
     renderRoadsPage();
     if (openRoadIndex === index) renderRoadDetailsContent();
@@ -9417,7 +9474,7 @@
     const r = roadRows[index];
     if (!r || !url) return;
     r.photos = (r.photos || []).filter(p => p.url !== url);
-    if (r.coverPhoto === url) r.coverPhoto = '';
+    removeSelectedCoverPhoto(r, url);
     saveRoadProgress();
     renderRoadsPage();
     if (openRoadIndex === index) renderRoadDetailsContent();
@@ -9760,7 +9817,7 @@
       if (!file) return;
       const url = await uploadRestaurantPhoto(file, 'RankHeaven/RoadCovers');
       if (url){
-        updateOpenRoad(road => { road.coverPhoto = url; });
+        updateOpenRoad(road => { applySelectedCoverPhotos(road, [url]); });
       }
     });
   }
@@ -10163,7 +10220,7 @@
       coverPhoto: a.coverPhoto || '',          // picked in the photo viewer from its tray (see ONE-OFF ACTIVITIES)
       ...(a.hideFromYear ? { hideFromYear: true } : {}) // switched off from Year in Review
     }));
-    t.coverPhoto = t.coverPhoto || '';
+    applySelectedCoverPhotos(t, getSelectedCoverPhotos(t));
     t.endDate = t.endDate || '';
     return t;
   }
@@ -10296,13 +10353,12 @@
     if (guestViewEnabled) return;
     const t = tripFind(tripId);
     if (!t) return;
-    t.coverPhoto = url;
+    toggleSelectedCoverPhoto(t, url);
     saveTripProgress();
     tripRefresh();
   }
   function tripCoverUrl(t, gallery){
-    if (t.coverPhoto && gallery.some(g => g.url === t.coverPhoto)) return t.coverPhoto;
-    return gallery.length ? gallery[0].url : '';
+    return dailyCoverPhoto(t, gallery.map(g => g.url));
   }
 
   // Which place a visit, hike or photo sits under on the timeline. In order:
@@ -13497,7 +13553,7 @@
           }));
           slot(e.p).hikes.push({
             type: 'hike', hike: h, dateId: e.entries[0].id, dateStr: e.p.str,
-            photos, cover: h.coverPhoto || '',
+            photos, cover: getEffectiveHikeCover(h),
             rank: ordered.indexOf(h) + 1, total: hikeRows.length,
             history: otdHistoryLines(distinct, e.p.str, 'hike')
           });
@@ -13540,7 +13596,7 @@
           if (!cover){
             for (const c of courses){ const ph = otdCoursePhotos(c); if (ph.length){ cover = ph[0]; break; } }
           }
-          if (!cover) cover = r.coverPhoto || '';
+          if (!cover) cover = getEffectiveRestaurantCover(r);
 
           // Score for the day, and how it compares with the rest of this place's scored visits.
           const nums = scored.map(c => Number(c.score));
@@ -17568,9 +17624,9 @@
       start: t && !tripIsMonth(t) ? t.startDate : '',
       end: t && !tripIsMonth(t) ? (t.endDate || '') : '',
       places: t ? t.places.map(p => ({ id: p.id, name: p.name, days: p.days.slice(), geo: p.geo })) : [],
-      cover: t ? t.coverPhoto : ''
+      covers: t ? getSelectedCoverPhotos(t) : []
     };
-    const gallery = t ? tripGallery(t, tripLinked(t)).slice(0, 30) : [];
+    const gallery = t ? tripGallery(t, tripLinked(t)) : [];
     // Places are rows you can rename, move up or down (that order is the order of the timeline) or remove.
     const placesHtml = () => draft.places.map((p, i) =>
       '<div class="tf-place-item-wrap"><div class="tf-place-item"><span class="tf-place-btns">' +
@@ -17595,7 +17651,7 @@
         '<label class="tf-label" for="tf-place">Places</label><p class="tf-hint">Cities or parks, in the order you went — they become the headings on the timeline. No addresses needed.</p>' +
         '<div class="tf-place-row"><input type="text" class="tf-input" id="tf-place" placeholder="Add a city or park" autocomplete="off"><button type="button" class="btn-ghost" id="tf-place-add">Add</button></div>' +
         '<div class="tf-places" id="tf-places">' + placesHtml() + '</div>' +
-        (gallery.length ? '<label class="tf-label">Cover photo</label><div class="tf-covers" id="tf-covers"></div>' : ''),
+        (gallery.length ? '<label class="tf-label">Cover photos</label><p class="tf-hint">Tap any photo to toggle it on or off. One selected photo is shown each day.</p><div class="tf-covers" id="tf-covers"></div>' : ''),
       actions: [
         !isNew ? { label: 'Delete trip', danger: true, onClick: () => tripConfirmDelete(t) } : null,
         { label: 'Cancel', onClick: tsheetClose },
@@ -17620,7 +17676,7 @@
             trip.name = name; trip.startDate = startDate; trip.endDate = endDate;
             // A place keeps its map pin unless it was renamed — then it's looked up again.
             trip.places = draft.places.map(p => ({ id: p.id, name: p.name.trim(), days: p.days || [], geo: (p.geo && p.geo.query === p.name.trim()) ? p.geo : undefined })).filter(p => p.name);
-            trip.coverPhoto = draft.cover || '';
+            applySelectedCoverPhotos(trip, draft.covers.filter(url => gallery.some(g => g.url === url)));
             // Anything that pointed at a place that's gone stops pointing at it: hand-picked places are cleared, memories go back to the trip.
             const placeIds = new Set(trip.places.map(p => p.id));
             Object.keys(trip.assign).forEach(k => { if (!placeIds.has(trip.assign[k])) delete trip.assign[k]; });
@@ -17675,14 +17731,24 @@
         const covers = body.querySelector('#tf-covers');
         if (covers){
           const drawCovers = () => {
-            covers.innerHTML = '<button type="button" class="tf-cover auto' + (!draft.cover ? ' on' : '') + '" data-cover="">Auto</button>' +
-              gallery.map(g => '<button type="button" class="tf-cover' + (draft.cover === g.url ? ' on' : '') + '" data-cover="' + escapeAttr(g.url) + '" aria-label="Use as cover"><img src="' + escapeAttr(cloudinaryThumbUrl(g.url, 160)) + '" alt="" loading="lazy" decoding="async"></button>').join('');
+            covers.innerHTML = '<button type="button" class="tf-cover auto' + (!draft.covers.length ? ' on' : '') + '" data-cover-auto="1" aria-pressed="' + (!draft.covers.length ? 'true' : 'false') + '">Auto</button>' +
+              gallery.map(g => {
+                const on = draft.covers.indexOf(g.url) !== -1;
+                return '<button type="button" class="tf-cover' + (on ? ' on' : '') + '" data-cover="' + escapeAttr(g.url) + '" aria-label="' + (on ? 'Remove from cover photos' : 'Add to cover photos') + '" aria-pressed="' + (on ? 'true' : 'false') + '"><img src="' + escapeAttr(cloudinaryThumbUrl(g.url, 160)) + '" alt="" loading="lazy" decoding="async"></button>';
+              }).join('');
           };
           drawCovers();
           covers.addEventListener('click', (e) => {
+            const auto = e.target.closest('[data-cover-auto]');
             const b = e.target.closest('[data-cover]');
-            if (!b) return;
-            draft.cover = b.dataset.cover;
+            if (!auto && !b) return;
+            if (auto){
+              draft.covers = [];
+            } else {
+              const url = b.dataset.cover;
+              const i = draft.covers.indexOf(url);
+              if (i === -1) draft.covers.push(url); else draft.covers.splice(i, 1);
+            }
             drawCovers();
           });
         }
