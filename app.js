@@ -807,7 +807,7 @@
         showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt
       },
       dishes: { dishFullListText, dishFullListTextSavedAt, dishOrder, dishOrderSavedAt },
-      settings: { lastfmApiKey, lastfmUsername, lastManualExportAt, pointsAlgorithm, pointsAlgorithmSavedAt }
+      settings: { lastfmApiKey, lastfmUsername, lastManualExportAt, pointsAlgorithm, pointsAlgorithmSavedAt, coverRotationInterval, coverRotationIntervalSavedAt }
     };
   }
 
@@ -1286,6 +1286,21 @@
         renderResultsTab();
       }
     }
+    if (coverRotationIntervalValid(existing.coverRotationInterval)){
+      const remoteTime = new Date(existing.coverRotationIntervalSavedAt || 0).getTime();
+      const localTime = new Date(coverRotationIntervalSavedAt || 0).getTime();
+      if (remoteTime > localTime){
+        coverRotationInterval = existing.coverRotationInterval;
+        coverRotationIntervalSavedAt = existing.coverRotationIntervalSavedAt || null;
+        try{
+          await window.storage.set(COVER_ROTATION_INTERVAL_KEY, coverRotationInterval, false);
+          await window.storage.set(COVER_ROTATION_INTERVAL_SAVED_AT_KEY, coverRotationIntervalSavedAt || '', false);
+        }catch(e){ /* best effort */ }
+        refreshCoverRotationSettingUI();
+        // The cloud preference takes effect on the next refresh. Never alter
+        // this already-open session's frozen rotation token.
+      }
+    }
 
     const hasCurrentData = (Array.isArray(items) && items.length >= 2)
       || (Array.isArray(dishOrder) && dishOrder.length >= 1)
@@ -1387,6 +1402,7 @@
   }
 
   async function checkSavedProgress(){
+    await coverRotationReadyPromise;
     let localParsed = null;
     try{
       const res = await window.storage.get(STORAGE_KEY, false);
@@ -2387,17 +2403,86 @@
   function replaceSelectedCoverPhotoUrl(row, oldUrl, newUrl){
     applySelectedCoverPhotos(row, getSelectedCoverPhotos(row).map(url => url === oldUrl ? newUrl : url));
   }
-  // Deterministic for the device's local calendar day: the cover never jumps
-  // during a day or between renders, but the daily hash chooses among all of
-  // the selected photos. With no manual choices, the first gallery photo is
-  // still the automatic fallback.
-  function dailyCoverPhoto(row, availableUrls){
+  const COVER_ROTATION_INTERVAL_KEY = 'cover-rotation-interval';
+  const COVER_ROTATION_INTERVAL_SAVED_AT_KEY = 'cover-rotation-interval-saved-at';
+  const COVER_ROTATION_STATE_KEY = 'cover-rotation-state'; // device-only: { at, token }
+  const COVER_ROTATION_INTERVALS = { refresh: 0, '30m': 30 * 60 * 1000, '2h': 2 * 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000 };
+  let coverRotationInterval = '1d';
+  let coverRotationIntervalSavedAt = null;
+  // Frozen for the entire page session. No timer ever mutates it, so a cover
+  // cannot change merely because 30 minutes (or any other interval) passes
+  // while the app remains open.
+  let coverRotationToken = 'boot-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+  function coverRotationIntervalValid(value){
+    return Object.prototype.hasOwnProperty.call(COVER_ROTATION_INTERVALS, value);
+  }
+  function refreshCoverRotationSettingUI(){
+    const select = document.getElementById('cover-rotation-select');
+    if (select) select.value = coverRotationInterval;
+  }
+  async function loadCoverRotationSetting(){
+    try{
+      const intervalRes = await window.storage.get(COVER_ROTATION_INTERVAL_KEY, false);
+      if (intervalRes && coverRotationIntervalValid(intervalRes.value)) coverRotationInterval = intervalRes.value;
+      const savedAtRes = await window.storage.get(COVER_ROTATION_INTERVAL_SAVED_AT_KEY, false);
+      coverRotationIntervalSavedAt = (savedAtRes && savedAtRes.value) ? savedAtRes.value : null;
+
+      let state = null;
+      const stateRes = await window.storage.get(COVER_ROTATION_STATE_KEY, false);
+      if (stateRes && stateRes.value){
+        try{ state = JSON.parse(stateRes.value); }catch(e){ state = null; }
+      }
+      const now = Date.now();
+      const elapsed = state && Number(state.at) ? now - Number(state.at) : Infinity;
+      const shouldRotate = coverRotationInterval === 'refresh'
+        || !state || !state.token
+        || elapsed >= COVER_ROTATION_INTERVALS[coverRotationInterval];
+      if (shouldRotate){
+        state = { at: now, token: now.toString(36) + '-' + Math.random().toString(36).slice(2) };
+        try{ await window.storage.set(COVER_ROTATION_STATE_KEY, JSON.stringify(state), false); }catch(e){ /* best effort */ }
+      }
+      coverRotationToken = state.token;
+    }catch(e){ /* keep the one-day default and this page session's token */ }
+    refreshCoverRotationSettingUI();
+
+    // This load starts before the domain loaders, but storage is async and a
+    // fast domain may render first. Redrawing here guarantees the final screen
+    // uses the persisted token without creating any in-session timer.
+    if (typeof renderRestaurantsPage === 'function') renderRestaurantsPage();
+    if (typeof renderHikesPage === 'function') renderHikesPage();
+    if (typeof renderParksPage === 'function') renderParksPage();
+    if (typeof renderRoadsPage === 'function') renderRoadsPage();
+    if (typeof renderTripsPage === 'function') renderTripsPage();
+  }
+  async function saveCoverRotationSetting(){
+    coverRotationIntervalSavedAt = new Date().toISOString();
+    try{
+      await window.storage.set(COVER_ROTATION_INTERVAL_KEY, coverRotationInterval, false);
+      await window.storage.set(COVER_ROTATION_INTERVAL_SAVED_AT_KEY, coverRotationIntervalSavedAt, false);
+    }catch(e){ /* best effort */ }
+    scheduleSyncWrite();
+  }
+  const coverRotationSelect = document.getElementById('cover-rotation-select');
+  if (coverRotationSelect){
+    coverRotationSelect.addEventListener('change', () => {
+      const value = coverRotationSelect.value;
+      if (!coverRotationIntervalValid(value)) return;
+      coverRotationInterval = value;
+      saveCoverRotationSetting();
+      // Deliberately don't change coverRotationToken or redraw: the new
+      // cadence begins on the next page load, exactly like the setting says.
+    });
+  }
+
+  // A session token chooses among the selected photos. It is created or
+  // reused only during page load according to the setting above, then stays
+  // fixed through every render until the app is refreshed.
+  function rotatingCoverPhoto(row, availableUrls){
     const available = (availableUrls || []).filter(Boolean);
     const selected = getSelectedCoverPhotos(row).filter(url => available.indexOf(url) !== -1);
     if (!selected.length) return available[0] || '';
-    const now = new Date();
-    const dayKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-    const seed = dayKey + '|' + String(row.id || row.key || row.name || '');
+    const seed = coverRotationToken + '|' + String(row.id || row.key || row.name || '');
     let hash = 2166136261;
     for (let i = 0; i < seed.length; i++){
       hash ^= seed.charCodeAt(i);
@@ -6476,7 +6561,7 @@
   // selected with the gallery toggle; one remains stable for each local day.
   function getEffectiveRestaurantCover(r){
     const photos = gatherAllRestaurantPhotos(r);
-    return dailyCoverPhoto(r, photos);
+    return rotatingCoverPhoto(r, photos);
   }
 
   function restaurantTotal(r){
@@ -7416,7 +7501,7 @@
 
   function getEffectiveHikeCover(h){
     const photos = gatherAllHikePhotos(h);
-    return dailyCoverPhoto(h, photos);
+    return rotatingCoverPhoto(h, photos);
   }
 
   function setHikeCoverPhoto(index, url){
@@ -8478,7 +8563,7 @@
     // A Park can use either its own uploads or photos inherited from linked
     // hikes, so every photo offered by its lightbox is eligible to rotate.
     const photos = gatherAllParkLightboxPhotos(p);
-    return dailyCoverPhoto(p, photos);
+    return rotatingCoverPhoto(p, photos);
   }
 
   function setParkCoverPhoto(index, url){
@@ -9459,7 +9544,7 @@
 
   function getEffectiveRoadCover(r){
     const photos = gatherAllRoadPhotos(r);
-    return dailyCoverPhoto(r, photos);
+    return rotatingCoverPhoto(r, photos);
   }
 
   function setRoadCoverPhoto(index, url){
@@ -10360,7 +10445,7 @@
     tripRefresh();
   }
   function tripCoverUrl(t, gallery){
-    return dailyCoverPhoto(t, gallery.map(g => g.url));
+    return rotatingCoverPhoto(t, gallery.map(g => g.url));
   }
 
   // Which place a visit, hike or photo sits under on the timeline. In order:
@@ -13156,6 +13241,7 @@
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
       hikeFullListText, dishFullListText,
+      coverRotationInterval, coverRotationIntervalSavedAt,
       savedAt: new Date().toISOString()
     }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
@@ -13182,6 +13268,12 @@
       let parsed;
       try{ parsed = JSON.parse(reader.result); }catch(err){ showToast('Could not read that file'); return; }
       const restoredParts = [];
+      if (coverRotationIntervalValid(parsed.coverRotationInterval)){
+        coverRotationInterval = parsed.coverRotationInterval;
+        refreshCoverRotationSettingUI();
+        saveCoverRotationSetting();
+        restoredParts.push('cover photo refresh setting');
+      }
       if (Array.isArray(parsed.items) && parsed.items.length >= 2){
         resumeFromData(parsed);
         saveProgress(); // persist the import itself — see the individual album import handler's identical comment
@@ -13280,6 +13372,7 @@
   });
 
   updateCount();
+  const coverRotationReadyPromise = loadCoverRotationSetting();
   loadLastfmConfig();
   loadMusicbeeLibrary();
   loadGuestViewSetting();
