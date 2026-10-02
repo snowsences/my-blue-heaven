@@ -2850,6 +2850,23 @@
   .trip-link-row{ margin: 6px 0 10px; }
   body.guest-view-active .trip-link-row{ display: none; }
   .trip-link-btn{ max-width: 100%; min-height: 34px; padding: 4px 14px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .restaurant-trip-link-controls{ display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .restaurant-trip-link-controls .trip-link-btn{ min-width: 0; }
+  .restaurant-trip-clear-btn{
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--panel-line);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--chalk-dim);
+    font: 600 13px/1 'Figtree', sans-serif;
+    cursor: pointer;
+  }
+  .restaurant-trip-clear-btn:hover{ border-color: var(--amber); color: var(--chalk); background: rgba(232, 163, 61, 0.12); }
   .row-trip-btn{ flex: none; width: 36px; height: 36px; padding: 0; border-radius: 999px; border: 1px solid var(--panel-line); background: transparent; font-size: 16px; opacity: 0.55; cursor: pointer; }
   .row-trip-btn.has-trip{ opacity: 1; border-color: var(--amber); background: rgba(232, 163, 61, 0.16); }
 
