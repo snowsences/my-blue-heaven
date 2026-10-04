@@ -6629,6 +6629,26 @@
     return (a !== null && b !== null && !isNaN(a) && !isNaN(b)) ? a + b : null;
   }
 
+  // Shared by regular list rows and Edit mode so Price/Rating always use
+  // exactly the same values, markup and visual treatment in both places.
+  function restaurantStatsHtml(r, extraClass){
+    const price = formatRestaurantPrice(r.price);
+    const total = restaurantTotal(r);
+    const scoreLineParts = [];
+    if (r.bestFlavor) scoreLineParts.push('<span class="restaurant-score-part">' + escapeHtml(r.bestFlavor) + '</span>');
+    if (r.flavorVariety) scoreLineParts.push('<span class="restaurant-score-part">' + escapeHtml(r.flavorVariety) + '</span>');
+    if (total) scoreLineParts.push('<span class="restaurant-total">' + escapeHtml(total) + '</span>');
+    const scoreLineHtml = scoreLineParts.length
+      ? '<span class="restaurant-scores-line">' + scoreLineParts.join('<span class="restaurant-score-sep">|</span>') + '</span>'
+      : '';
+    return (
+      '<span class="restaurant-stats' + (extraClass ? ' ' + extraClass : '') + '">' +
+        scoreLineHtml +
+        (price ? '<span class="restaurant-price">' + escapeHtml(price) + '</span>' : '') +
+      '</span>'
+    );
+  }
+
   // Restaurants are purely manually ordered — no auto-sort by score like
   // Hikes/Roads/Games — so a tie in total score doesn't put two restaurants
   // anywhere near each other unless the person drags them there themselves.
@@ -7270,11 +7290,14 @@
       restaurantListEl.innerHTML = restaurantRows.map((r, idx) => {
         const meta = [r.cuisine, r.location].filter(Boolean).join(' • ');
         return (
-          '<li data-original-index="' + idx + '">' +
+          '<li class="restaurant-rearrange-row" data-original-index="' + idx + '">' +
             '<input type="number" class="rank-num-input" value="' + ((idx + 1) * 10) + '">' +
-            '<span class="rank-item">' +
-              '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(r.name) + '</span></span>' +
-              (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+            '<span class="restaurant-rearrange-columns">' +
+              '<span class="rank-item">' +
+                '<span class="restaurant-name-row"><span class="rank-album">' + escapeHtml(r.name) + '</span></span>' +
+                (meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '') +
+              '</span>' +
+              restaurantStatsHtml(r, 'restaurant-rearrange-stats') +
             '</span>' +
             '<span class="row-drag-handle" title="Drag to reorder">' +
               '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" draggable="false">' +
@@ -7339,20 +7362,8 @@
       const visitsHtml = visits >= 2
         ? '<span class="restaurant-visits" title="Visited ' + visits + ' times">×' + visits + '</span>'
         : '';
-      const price = formatRestaurantPrice(r.price);
-      const total = restaurantTotal(r);
-      // Best Flavor / Flavor Variety / Total now share one line (separated
-      // by "|"), rather than Total alone on its own line above a separate
-      // "12 + 14" breakdown line — drops the card from 3 lines to 2 on this
-      // side. Total keeps its existing larger/amber styling; the other two
-      // reuse the plainer style the old breakdown line had.
-      const scoreLineParts = [];
-      if (r.bestFlavor) scoreLineParts.push('<span class="restaurant-score-part">' + escapeHtml(r.bestFlavor) + '</span>');
-      if (r.flavorVariety) scoreLineParts.push('<span class="restaurant-score-part">' + escapeHtml(r.flavorVariety) + '</span>');
-      if (total) scoreLineParts.push('<span class="restaurant-total">' + escapeHtml(total) + '</span>');
-      const scoreLineHtml = scoreLineParts.length
-        ? '<span class="restaurant-scores-line">' + scoreLineParts.join('<span class="restaurant-score-sep">|</span>') + '</span>'
-        : '';
+      // Price and the three-part rating use the shared renderer above so
+      // regular and Edit-mode rows cannot drift apart.
 
       let tierChipHtml = '';
       let borderAttr = '';
@@ -7374,10 +7385,7 @@
               return meta ? '<span class="rank-meta">' + escapeHtml(meta) + '</span>' : '';
             })() +
           '</span>' +
-          '<span class="restaurant-stats">' +
-            scoreLineHtml +
-            (price ? '<span class="restaurant-price">' + escapeHtml(price) + '</span>' : '') +
-          '</span>' +
+          restaurantStatsHtml(r) +
           tierChipHtml +
         '</li>'
       );
