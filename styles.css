@@ -3188,6 +3188,22 @@
     color: var(--chalk-dim);
     font-weight: 600;
   }
+  /* Restaurants Edit mode: keep the name/meta and Price/Rating as two
+     left-anchored columns instead of letting the stats drift to the far
+     right. The first track can shrink on phones; the gutter stays exact. */
+  .restaurant-rearrange-columns{
+    display: grid;
+    grid-template-columns: minmax(0, 300px) max-content;
+    align-items: center;
+    justify-content: start;
+    gap: 24px;
+    flex: 1;
+    min-width: 0;
+  }
+  .restaurant-rearrange-stats{
+    align-items: flex-start;
+    text-align: left;
+  }
 
   /* ---------- GOLD TIER GRID (Michelin-style photo cards) ----------
      Desktop: 5 columns. Mobile override below drops to 2. Only gold-tier
