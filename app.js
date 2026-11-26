@@ -18358,6 +18358,9 @@
     .trip-detail-tabs button{flex:1;min-width:0;padding:12px 3px;border:0;border-bottom:3px solid transparent;background:none;color:var(--chalk-dim);font:600 14px Figtree,sans-serif;cursor:pointer}
     .trip-detail-tabs button.active{color:var(--amber);border-bottom-color:var(--amber)}
     .trip-overview-photos{min-width:0;overflow:hidden}
+    /* This is a static preview inside a real button, not an interactive map. */
+    #trip-content .trip-map-slot,#trip-content .trip-map-slot *{pointer-events:none!important}
+    #trip-content .trip-hero-shade{pointer-events:none}
     .trip-overview-photos .yir-row{flex-wrap:wrap}
     .trip-overview-photo-strip{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;max-width:100%;min-width:0;margin-top:10px;padding:2px 2px 8px;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:var(--panel-line) transparent;-webkit-overflow-scrolling:touch}
     .trip-overview-photo{flex:0 0 min(176px,70%);aspect-ratio:1/1;border-radius:10px;scroll-snap-align:start}
@@ -18406,7 +18409,10 @@
         '<p class="trip-dates">' + escapeHtml(tripDateLabel(t)) + '</p></div></div></section>' +
       tabs +
       (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripView === 'day' ? tripByDayHtml(t,linked,gallery,owner) : tripView === 'restaurants' ? tripRestaurantsHtml(t,linked,owner) : tripMapBlockHtml(t,stops,owner)+memoryBtn+tripTimelineHtml(t,linked,owner));
-    tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
+    tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => {
+      img.draggable = false; // native image dragging competes with mouse clicks and card reordering
+      img.addEventListener('error', () => img.remove());
+    });
     tripWireItemDrag(t);
     tripScroll.scrollTop = prevTop;
     tripMountOverview(t, stops);
@@ -19530,7 +19536,33 @@
   }
 
   function tripPinsChanged(t){
-    if (tripOpenId === t.id) tripRender();
+    // Geocoding is asynchronous and may finish between pointerdown and
+    // pointerup. Replacing the whole timeline cancels that native click
+    // and resets the horizontal photo strips. Only refresh the map region.
+    if (tripOpenId === t.id && tripView === 'timeline'){
+      const stops = tripStops(t, tripLinked(t));
+      const mapBlock = tripContent.querySelector('.trip-map-block');
+      const html = tripMapBlockHtml(t, stops, !guestViewEnabled);
+      if (mapBlock && html){
+        // Preserve the existing button and canvas so even clicks on the
+        // map during a pin update keep their original target.
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        const next = template.content.firstElementChild;
+        const cap = mapBlock.querySelector('.trip-map-cap');
+        const nextCap = next.querySelector('.trip-map-cap');
+        if (cap && nextCap && cap.innerHTML !== nextCap.innerHTML) cap.innerHTML = nextCap.innerHTML;
+        const pins = mapBlock.querySelector('[data-trip-pins]');
+        const nextPins = next.querySelector('[data-trip-pins]');
+        if (pins && nextPins){
+          pins.className = nextPins.className;
+          if (pins.textContent !== nextPins.textContent) pins.textContent = nextPins.textContent;
+        }
+        tripMountOverview(t, stops);
+      } else if (mapBlock || html){
+        tripRender();
+      }
+    }
     if (tmapTripId === t.id && tmapOverlay && tmapOverlay.classList.contains('open')) tmapDraw();
     if (tripsViewMode === 'world') tripWorldRefreshSoon();
   }
@@ -19620,8 +19652,9 @@
       message(tripPinsRunning.has(t.id) ? 'Finding places on the map…' : (guestViewEnabled ? 'These places aren’t on the map yet.' : 'Couldn’t put these places on the map yet.'));
       return;
     }
+    block.classList.remove('empty');
     if (!tovEl){ tovEl = document.createElement('div'); tovEl.className = 'trip-map-canvas'; }
-    slot.appendChild(tovEl);
+    if (tovEl.parentNode !== slot){ slot.replaceChildren(tovEl); }
     let lib;
     try{ lib = await loadMapLibre(); }
     catch(e){ if (slot.isConnected) message('The map needs an internet connection.'); return; }
@@ -20591,6 +20624,8 @@
     if (motionReduced() || e.button > 0) return;
     const el = e.target.closest(PRESSABLE);
     if (!el || el.disabled || el.closest('.maplibregl-map, .trip-world, .tmap-overlay')) return;
+    // Mouse hit testing must not move the control under a stationary cursor.
+    if (e.pointerType === 'mouse' && el.closest('#trip-overlay')) return;
     pressRelease();
     pressedEl = el;
     if (el.__pressAnim) el.__pressAnim.cancel();
