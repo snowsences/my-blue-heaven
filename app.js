@@ -407,9 +407,29 @@
   const photoYearFilterInput = document.getElementById('photo-year-filter-input');
   const photoYearFilterDatalist = document.getElementById('photo-year-filter-datalist');
   const photoYearFilterClear = document.getElementById('photo-year-filter-clear');
-  const photoSeasonFilterInput = document.getElementById('photo-season-filter-input');
-  const photoSeasonFilterDatalist = document.getElementById('photo-season-filter-datalist');
-  const photoSeasonFilterClear = document.getElementById('photo-season-filter-clear');
+  const photoMonthFilterInput = document.getElementById('photo-season-filter-input');
+  const photoMonthFilterClear = document.getElementById('photo-season-filter-clear');
+  // Upgrade the existing filter in place so the header retains its layout.
+  const photoMonthFilterWrap = photoMonthFilterInput.closest('.filter-wrap');
+  const photoMonthFilterButton = document.createElement('button');
+  photoMonthFilterButton.type = 'button';
+  photoMonthFilterButton.id = 'photo-month-filter-button';
+  photoMonthFilterButton.className = photoMonthFilterInput.className;
+  photoMonthFilterButton.setAttribute('aria-expanded', 'false');
+  photoMonthFilterButton.setAttribute('aria-controls', 'photo-month-filter-menu');
+  photoMonthFilterInput.replaceWith(photoMonthFilterButton);
+  document.getElementById('photo-season-filter-datalist').remove();
+  photoMonthFilterClear.title = 'Clear month filter';
+  photoMonthFilterClear.setAttribute('aria-label', 'Clear month filter');
+  const photoMonthFilterMenu = document.createElement('div');
+  photoMonthFilterMenu.id = 'photo-month-filter-menu';
+  photoMonthFilterMenu.hidden = true;
+  photoMonthFilterMenu.setAttribute('role', 'group');
+  photoMonthFilterMenu.setAttribute('aria-label', 'Filter by months');
+  photoMonthFilterWrap.appendChild(photoMonthFilterMenu);
+  const photoMonthStyle = document.createElement('style');
+  photoMonthStyle.textContent = '#photo-month-filter-button{width:110px;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:inherit;font-size:13px;color:var(--chalk);padding-right:25px} #photo-month-filter-button:not(.has-months){color:var(--chalk-dim)} #photo-month-filter-menu{position:absolute;top:calc(100% + 6px);left:0;width:170px;max-height:60vh;overflow:auto;z-index:120;background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.35)} #photo-month-filter-menu[hidden]{display:none} #photo-month-filter-menu label{display:flex;align-items:center;gap:10px;padding:8px;border-radius:6px;cursor:pointer;font-size:14px;color:var(--chalk)} #photo-month-filter-menu label:hover{background:var(--bg-2)} #photo-month-filter-menu input{accent-color:var(--amber);width:16px;height:16px;margin:0} #photo-month-list .artist-row.is-selected{background:var(--bg-2);outline:1px solid var(--amber);outline-offset:-1px} #photo-month-list .artist-row.is-selected .artist-rank{color:var(--amber)} #photo-month-list .artist-row:focus-visible,#photo-month-filter-button:focus-visible{outline:2px solid var(--amber)}';
+  document.head.appendChild(photoMonthStyle);
   const photoReorderBar = document.getElementById('photo-reorder-bar');
   const photoReorderControls = document.getElementById('photo-reorder-controls');
   const photoEditSaveBtn = document.getElementById('photo-edit-save-btn');
@@ -1838,7 +1858,6 @@
   wireDatalistGating(songGroupingFilterInput, songGroupingFilterDatalist);
   wireDatalistGating(dishRestaurantFilterInput, dishRestaurantFilterDatalist);
   wireDatalistGating(photoYearFilterInput, photoYearFilterDatalist);
-  wireDatalistGating(photoSeasonFilterInput, photoSeasonFilterDatalist);
 
   // Resets to 'auto' first so shrinking (e.g. deleting text) is picked up
   // correctly — scrollHeight alone only ever reports the larger of the two
@@ -2568,9 +2587,9 @@
     closeArtLightbox();
     // Existing grid drag requires the complete unfiltered ranking.
     photoYearFilter = '';
-    photoSeasonFilter = '';
+    photoMonthFilter.clear();
     photoYearFilterInput.value = '';
-    photoSeasonFilterInput.value = '';
+    closePhotoMonthMenu();
     renderPhotosPage();
     const card = Array.from(photoGrid.children).find(el => el.dataset.photoId === state.selected.id);
     if (card) card.scrollIntoView({block:'center'});
@@ -10250,17 +10269,8 @@
   let photoRows = [];
   let photoLastSavedAt = null;
   let photoYearFilter = '';  // '' = show all years; otherwise a 4-digit year string — session-only, not persisted
-  let photoSeasonFilter = '';  // '' = show all seasons; otherwise 'Winter'/'Spring'/'Summer'/'Fall' — session-only, not persisted
-
-  // Meteorological seasons (Dec/Jan/Feb = Winter, etc.), not astronomical —
-  // simpler, and matches how most photo apps bucket "season" already.
-  const PHOTO_SEASONS = ['Winter', 'Spring', 'Summer', 'Fall'];
-  function photoSeasonOf(month){ // 1-12
-    if (month === 12 || month <= 2) return 'Winter';
-    if (month <= 5) return 'Spring';
-    if (month <= 8) return 'Summer';
-    return 'Fall';
-  }
+  const photoMonthFilter = new Set(); // calendar months 1–12; empty = all
+  const PHOTO_MONTHS = Array.from({length:12}, (_, i) => new Date(2000,i,1).toLocaleDateString('en-US',{month:'long'}));
 
   async function loadPhotoProgress(){
     try{
@@ -10395,12 +10405,12 @@
       const byId = new Map(photoRows.map(p => [p.id, p]));
       return photoDuelBestKnownOrder().map(id => byId.get(id)).filter(Boolean);
     })();
-    if (skipFilters || (!photoYearFilter && !photoSeasonFilter)) return base;
+    if (skipFilters || (!photoYearFilter && !photoMonthFilter.size)) return base;
     return base.filter(p => {
       const pd = otdParse(p.date);
       if (!pd) return false;
       if (photoYearFilter && String(pd.y) !== photoYearFilter) return false;
-      if (photoSeasonFilter && photoSeasonOf(pd.m) !== photoSeasonFilter) return false;
+      if (photoMonthFilter.size && !photoMonthFilter.has(Number(pd.m))) return false;
       return true;
     });
   }
@@ -10696,13 +10706,35 @@
     photoYearFilterClear.style.display = photoYearFilter ? 'flex' : 'none';
   }
 
-  // Same idea, same gating, bucketing by meteorological season instead of year.
-  function renderPhotoSeasonFilterOptions(){
-    const seasons = PHOTO_SEASONS.filter(s => photoRows.some(p => { const pd = otdParse(p.date); return pd && photoSeasonOf(pd.m) === s; }));
-    setGatedDatalistOptions(photoSeasonFilterDatalist, photoSeasonFilterInput, seasons.map(s => '<option value="' + s + '">').join(''));
-    if (!seasons.includes(photoSeasonFilter)) photoSeasonFilter = '';
-    photoSeasonFilterInput.value = photoSeasonFilter;
-    photoSeasonFilterClear.style.display = photoSeasonFilter ? 'flex' : 'none';
+  function closePhotoMonthMenu(){
+    photoMonthFilterMenu.hidden = true;
+    photoMonthFilterButton.setAttribute('aria-expanded','false');
+  }
+  function togglePhotoMonth(month){
+    if (photoMonthFilter.has(month)) photoMonthFilter.delete(month);
+    else photoMonthFilter.add(month);
+    renderPhotosPage();
+  }
+  function renderPhotoMonthFilterOptions(){
+    const selected = Array.from(photoMonthFilter).sort((a,b)=>a-b);
+    photoMonthFilterButton.textContent = !selected.length ? 'Months' : selected.length === 1 ? PHOTO_MONTHS[selected[0]-1] : selected.length + ' months';
+    photoMonthFilterButton.title = selected.length ? selected.map(m=>PHOTO_MONTHS[m-1]).join(', ') : 'Filter by months';
+    photoMonthFilterButton.setAttribute('aria-label', selected.length ? 'Months: ' + photoMonthFilterButton.title : 'Filter by months');
+    photoMonthFilterButton.classList.toggle('has-months', !!selected.length);
+    photoMonthFilterClear.style.display = selected.length ? 'flex' : 'none';
+    if (!photoMonthFilterMenu.children.length){
+      PHOTO_MONTHS.forEach((name,i)=>{
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = String(i+1);
+        checkbox.addEventListener('change',()=>togglePhotoMonth(i+1));
+        label.append(checkbox,document.createTextNode(name));
+        photoMonthFilterMenu.appendChild(label);
+      });
+    }
+    photoMonthFilterMenu.querySelectorAll('input').forEach(input=>{ input.checked = photoMonthFilter.has(Number(input.value)); });
+    if (photoEditMode || !photoRows.length) closePhotoMonthMenu();
   }
 
   // Mirrors Hikes' "Outings by Year"/"By Month" charts, but by photo date
@@ -10752,15 +10784,25 @@
     show('photo-month-block', totalMonthPhotos >= 2);
     if (totalMonthPhotos >= 2){
       const maxMonth = Math.max.apply(null, months);
-      document.getElementById('photo-month-list').innerHTML = months.map((count, i) => {
+      const monthList = document.getElementById('photo-month-list');
+      monthList.innerHTML = months.map((count, i) => {
         const label = new Date(2000, i, 1).toLocaleDateString('en-US', { month: 'short' });
         const pct = count ? Math.max(6, Math.round((count / maxMonth) * 100)) : 0;
-        return '<div class="artist-row">' +
+        return '<div class="artist-row' + (photoMonthFilter.has(i+1) ? ' is-selected' : '') + '" role="button" tabindex="0" aria-pressed="' + photoMonthFilter.has(i+1) + '" aria-label="' + PHOTO_MONTHS[i] + '">' +
           '<span class="artist-rank year-label" style="min-width:34px;">' + label + '</span>' +
           '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
           '<span class="artist-count">' + (count ? count + ' photo' + (count === 1 ? '' : 's') : '—') + '</span>' +
         '</div>';
       }).join('');
+      monthList.querySelectorAll('.artist-row').forEach((el,i)=>{
+        const activate = ()=>{
+          closePhotoMonthMenu();
+          togglePhotoMonth(i+1);
+          window.scrollTo({top:0,behavior:'smooth'});
+        };
+        el.addEventListener('click',activate);
+        el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();} });
+      });
     }
 
     section.style.display = (yearKeys.length >= 2 || totalMonthPhotos >= 2) ? 'block' : 'none';
@@ -10773,14 +10815,14 @@
     photoAddBtn.style.display = photoEditMode ? 'none' : 'inline-block';
     photoEditToggleBtn.style.display = (!empty && !photoEditMode) ? 'inline-block' : 'none';
     photoYearFilterInput.closest('.filter-wrap').style.display = (!empty && !photoEditMode) ? '' : 'none';
-    photoSeasonFilterInput.closest('.filter-wrap').style.display = (!empty && !photoEditMode) ? '' : 'none';
+    photoMonthFilterWrap.style.display = (!empty && !photoEditMode) ? '' : 'none';
     photoReorderBar.style.display = photoEditMode ? 'flex' : 'none';
     photoReorderControls.style.display = photoEditMode ? 'flex' : 'none';
 
     photoGrid.style.display = (photoEditMode || empty) ? 'none' : '';
     photoEditList.style.display = photoEditMode ? '' : 'none';
     renderPhotoYearFilterOptions();
-    renderPhotoSeasonFilterOptions();
+    renderPhotoMonthFilterOptions();
     renderPhotoInsights();
 
     if (photoEditMode){
@@ -11042,22 +11084,24 @@
     renderPhotosPage();
   });
 
-  photoSeasonFilterInput.addEventListener('input', () => {
-    const val = photoSeasonFilterInput.value.trim();
-    if (!val){
-      if (photoSeasonFilter){ photoSeasonFilter = ''; renderPhotosPage(); }
-      return;
-    }
-    const known = Array.from(photoSeasonFilterDatalist.options).map(o => o.value);
-    if (known.includes(val) && val !== photoSeasonFilter){
-      photoSeasonFilter = val;
-      renderPhotosPage();
-    }
+  photoMonthFilterButton.addEventListener('click',()=>{
+    const open = photoMonthFilterMenu.hidden;
+    photoMonthFilterMenu.hidden = !open;
+    photoMonthFilterButton.setAttribute('aria-expanded',String(open));
   });
-  photoSeasonFilterClear.addEventListener('click', () => {
-    photoSeasonFilterInput.value = '';
-    photoSeasonFilter = '';
+  photoMonthFilterClear.addEventListener('click',()=>{
+    photoMonthFilter.clear();
     renderPhotosPage();
+  });
+  document.addEventListener('click',e=>{
+    if (!photoMonthFilterWrap.contains(e.target)) closePhotoMonthMenu();
+  });
+  photoMonthFilterWrap.addEventListener('keydown',e=>{
+    if(e.key==='Escape' && !photoMonthFilterMenu.hidden){
+      e.stopPropagation();
+      closePhotoMonthMenu();
+      photoMonthFilterButton.focus();
+    }
   });
 
   let photoDragSourceEl = null;
