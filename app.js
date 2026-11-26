@@ -1118,6 +1118,7 @@
       const localTime = new Date(restaurantLastSavedAt || 0).getTime();
       if (remoteTime > localTime){
         restaurantRows = existing.restaurantRows;
+        backfillRestaurantVisitPrices(restaurantRows);
         restaurantLastSavedAt = existing.restaurantSavedAt || null;
         try{ await window.storage.set(RESTAURANT_STORAGE_KEY, JSON.stringify({ restaurantRows, savedAt: restaurantLastSavedAt }), false); }catch(e){ /* best effort */ }
         renderRestaurantsPage();
@@ -1477,6 +1478,10 @@
     if (localRestaurantParsed && Array.isArray(localRestaurantParsed.restaurantRows) && localRestaurantParsed.restaurantRows.length){
       restaurantRows = localRestaurantParsed.restaurantRows;
       restaurantLastSavedAt = localRestaurantParsed.savedAt || null;
+      // Keep the original timestamp so migration cannot outrank a newer cloud copy.
+      if(backfillRestaurantVisitPrices(restaurantRows)){
+        try{await window.storage.set(RESTAURANT_STORAGE_KEY,JSON.stringify({restaurantRows,savedAt:restaurantLastSavedAt}),false);}catch(e){}
+      }
     }
 
     // Same independent-local-key pattern, for the domains that were missing
@@ -6676,7 +6681,44 @@
   let restaurantRows = []; // array of { name, notes, cuisine, location, bestFlavor, flavorVariety, total, price, year, bests }
   let restaurantLastSavedAt = null;
 
+  // Idempotent additive migration: explicit blanks are never backfilled again.
+  function backfillRestaurantVisitPrices(rows){
+    let changed=false;
+    for(const r of rows){
+      for(const v of (Array.isArray(r.visits)?r.visits:[])){
+        if(!Object.prototype.hasOwnProperty.call(v,'price')){
+          v.price=String(r.price??'').trim();
+          changed=true;
+        }
+      }
+    }
+    return changed;
+  }
+  // Preserve raw historical prices, including ranges and qualitative tiers.
+  function restaurantVisitPriceNumber(raw){
+    const t=String(raw??'').trim().replace(/,/g,'');
+    const m=t.match(/^\$?\s*(\d+(?:\.\d+)?)\s*(?:(?:[-–—]|to)\s*\$?\s*(\d+(?:\.\d+)?))?$/i);
+    if(!m)return null;
+    const a=Number(m[1]),b=m[2]===undefined?a:Number(m[2]);
+    const n=(a+b)/2;
+    return Number.isFinite(n)?n:null;
+  }
+  function restaurantAveragePrice(r){
+    const visits=Array.isArray(r.visits)?r.visits:[];
+    if(!visits.length)return restaurantVisitPriceNumber(r.price);
+    const values=visits.map(v=>restaurantVisitPriceNumber(Object.prototype.hasOwnProperty.call(v,'price')?v.price:r.price)).filter(n=>n!==null);
+    return values.length?values.reduce((a,b)=>a+b,0)/values.length:null;
+  }
+  function restaurantDisplayedPrice(r){
+    const visits=Array.isArray(r.visits)?r.visits:[];
+    const average=restaurantAveragePrice(r);
+    if(average!==null)return formatRestaurantPrice(String(Math.round(average)));
+    if(!visits.length)return formatRestaurantPrice(r.price);
+    const labels=[...new Set(visits.map(v=>String(Object.prototype.hasOwnProperty.call(v,'price')?v.price??'':r.price??'').trim()).filter(Boolean))];
+    return labels.length===1?formatRestaurantPrice(labels[0]):'';
+  }
   async function saveRestaurantProgress(){
+    backfillRestaurantVisitPrices(restaurantRows);
     restaurantLastSavedAt = new Date().toISOString();
     try{
       await window.storage.set(RESTAURANT_STORAGE_KEY, JSON.stringify({
@@ -6732,7 +6774,7 @@
   }
 
   function formatRestaurantPrice(raw){
-    const trimmed = (raw || '').trim();
+    const trimmed = String(raw ?? '').trim();
     if (!trimmed) return '';
     if (/^\d+(\.\d+)?$/.test(trimmed)) return '$' + trimmed; // a bare number -> prefix as USD
     return trimmed; // already has $ or its own formatting (e.g. "$$") -> leave as-is
@@ -6780,7 +6822,7 @@
   // Shared by regular list rows and Edit mode so Price/Rating always use
   // exactly the same values, markup and visual treatment in both places.
   function restaurantStatsHtml(r, extraClass){
-    const price = formatRestaurantPrice(r.price);
+    const price = restaurantDisplayedPrice(r);
     const total = restaurantTotal(r);
     const scoreLineParts = [];
     if (r.bestFlavor) scoreLineParts.push('<span class="restaurant-score-part">' + escapeHtml(r.bestFlavor) + '</span>');
@@ -7307,7 +7349,7 @@
     // with how many places ahead of "typical" they sit. Needs 6+ priced
     // restaurants with at least two different prices to mean anything.
     const priced = restaurantRows
-      .map((r, idx) => ({ r, idx, rank: idx + 1, value: restaurantPriceValue(r.price) }))
+      .map((r, idx) => ({ r, idx, rank: idx + 1, value: restaurantAveragePrice(r) }))
       .filter(x => x.value !== null);
     let valueRows = [];
     if (priced.length >= 6 && new Set(priced.map(x => x.value)).size >= 2){
@@ -7348,7 +7390,7 @@
       const maxScore = valueRows[0].valueScore; // bars show the same combined score the list is ordered by
       const listEl = document.getElementById('rest-value-list');
       listEl.innerHTML = valueRows.map((x, i) => {
-        const priceLabel = formatRestaurantPrice(x.r.price);
+        const priceLabel = restaurantDisplayedPrice(x.r);
         const pct = Math.max(6, Math.round((x.valueScore / maxScore) * 100));
         return '<div class="rest-value" data-value-index="' + i + '">' +
           '<div class="rest-value-top"><span class="rest-value-name">' + escapeHtml((x.r.name || '').trim()) +
@@ -7665,6 +7707,7 @@
         r.visits.push({
           id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2),
           date: '',
+          price: String(r.price??'').trim(),
           notes: '',
           courses: r.courses || [],
           photos: r.photos || []
@@ -12499,6 +12542,7 @@
       visits.push({
         id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2),
         date: dateKey,
+        price: '',
         notes: '',
         courses,
         photos: []
@@ -12642,7 +12686,7 @@
     const location = restaurantDetailsPanelInner.querySelector('#restaurant-edit-location').value.trim();
     const stars = restaurantDetailsPanelInner.querySelector('#restaurant-edit-stars').value;
     const website = restaurantDetailsPanelInner.querySelector('#restaurant-edit-website').value.trim();
-    const price = restaurantDetailsPanelInner.querySelector('#restaurant-edit-price').value.trim();
+    const price = restaurantDetailsPanelInner.querySelector('#restaurant-edit-price')?.value.trim() || '';
 
     if (!name){
       showToast('Give it a name first');
@@ -12671,7 +12715,7 @@
         rest.location = location;
         rest.stars = stars;
         rest.website = website;
-        rest.price = price;
+        if (!Array.isArray(rest.visits) || !rest.visits.length) rest.price = price;
       });
       renderRestaurantsPage(); // list card reflects a renamed restaurant too
     }
@@ -13137,10 +13181,10 @@
             '<button class="btn-ghost restaurant-tie-move-btn" id="restaurant-tie-move-btn" type="button" style="display:none;"></button>' +
           '</span>' +
         '</div>' +
-        (r.price ? (
+        (restaurantDisplayedPrice(r) ? (
           '<div class="restaurant-score-block">' +
-            '<span class="restaurant-score-label">Price</span>' +
-            '<span class="restaurant-score-price-value">' + escapeHtml(formatRestaurantPrice(r.price)) + '</span>' +
+            '<span class="restaurant-score-label" title="Average of priced visits">Price</span>' +
+            '<span class="restaurant-score-price-value">' + escapeHtml(restaurantDisplayedPrice(r)) + '</span>' +
           '</div>'
         ) : '') +
       '</div>'
@@ -13200,8 +13244,7 @@
           '</select>' +
           '<label class="restaurant-edit-label">Website</label>' +
           '<input type="text" class="restaurant-edit-input" id="restaurant-edit-website" placeholder="restaurant-website.com" value="' + escapeAttr(r.website || '') + '">' +
-          '<label class="restaurant-edit-label">Price</label>' +
-          '<input type="text" class="restaurant-edit-input" id="restaurant-edit-price" placeholder="$$ or 45" value="' + escapeAttr(r.price || '') + '">' +
+          (!Array.isArray(r.visits)||!r.visits.length ? '<label class="restaurant-edit-label">Price (until visits are logged)</label><input type="text" class="restaurant-edit-input" id="restaurant-edit-price" placeholder="$$ or 45" value="' + escapeAttr(String(r.price??'')) + '">' : '') +
         '</div>' +
         '<div class="restaurant-edit-actions">' +
           '<button class="btn-primary" id="restaurant-edit-save-btn" type="button">Save</button>' +
@@ -13219,7 +13262,7 @@
     restaurantVisitEditMode = false;
     updateOpenRestaurant(rest => {
       const visits = ensureRestaurantVisits(rest);
-      const newVisit = { id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2), date: otdDateKey(new Date()), notes: '', courses: [], photos: [] };
+      const newVisit = { id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2), date: otdDateKey(new Date()), price: '', notes: '', courses: [], photos: [] };
       visits.push(newVisit);
       restaurantActiveVisitId = newVisit.id;
       restaurantVisitEditMode = true; // jump straight into editing so a date can be set right away
@@ -13245,12 +13288,14 @@
   function saveVisitEdit(){
     const date = restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-date').value;
     const notes = restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-notes').value.trim();
+    const price = restaurantDetailsPanelInner.querySelector('#restaurant-visit-edit-price').value.trim();
     restaurantVisitEditMode = false;
     updateOpenRestaurant(rest => {
       const visit = getActiveVisit(rest);
       if (visit){
         visit.date = date;
         visit.notes = notes;
+        visit.price = price;
       }
     });
   }
@@ -13299,6 +13344,8 @@
         '<div class="restaurant-edit-form restaurant-visit-edit-form">' +
           '<label class="restaurant-edit-label">Date</label>' +
           '<input type="date" class="restaurant-edit-input" id="restaurant-visit-edit-date" value="' + escapeAttr(visit.date || '') + '">' +
+          '<label class="restaurant-edit-label" for="restaurant-visit-edit-price">Price (USD)</label>' +
+          '<input type="text" class="restaurant-edit-input" id="restaurant-visit-edit-price" placeholder="e.g. 150 or 125-175" value="' + escapeAttr(String(visit.price??'')) + '">' +
           '<label class="restaurant-edit-label">Notes</label>' +
           '<textarea class="restaurant-edit-input restaurant-visit-edit-notes" id="restaurant-visit-edit-notes" placeholder="Notes about this visit...">' + escapeHtml(visit.notes || '') + '</textarea>' +
           '<div class="restaurant-edit-actions">' +
@@ -13312,6 +13359,7 @@
     return (
       '<div class="restaurant-visit-meta-row">' +
         '<span class="restaurant-visit-date-display">' + escapeHtml(formatVisitDate(visit.date)) + '</span>' +
+        (guestViewEnabled || isLockedGuestAccount || !formatRestaurantPrice(visit.price) ? '' : '<span class="restaurant-visit-price" title="Price for this visit" style="color:var(--amber);font-size:13px;font-weight:600;white-space:nowrap">' + escapeHtml(formatRestaurantPrice(visit.price)) + '</span>') +
         (guestViewEnabled ? '' :
           '<div class="view-toggle restaurant-visit-view-toggle">' +
             '<button class="view-toggle-btn' + (restaurantVisitThumbnailMode ? '' : ' active') + '" id="restaurant-visit-view-full-btn" type="button">Full</button>' +
@@ -13436,7 +13484,7 @@
     const tier=restaurantTierBoundaries?getRestaurantTierForRank(openRestaurantIndex+1,restaurantTierBoundaries):null;
     return '<div class="rd-extra"><section class="rd-card"><h3>Restaurant scores</h3>'+renderRestaurantScoresRowHtml(r)+'</section><section class="rd-card"><h3>Visit history</h3>'+
       rdMetrics([['Recorded visits',stats.visits.length],['Total courses',stats.courses.length],['Average course',rdFmt(stats.mean)],['Scored courses',stats.scored.length],['12+ courses',stats.exceptional],['Best visit',rdFmt(stats.best?.avg)]])+
-      [['Price',formatRestaurantPrice(r.price)||'—'],['Tier',tier?.name||'—'],['First visit',dates.length?rdDate(dates[0].v):'—'],['Most recent',dates.length?rdDate(dates[dates.length-1].v):'—']].map(([k,v])=>'<div class="rd-overview-row"><span class="rd-muted">'+escapeHtml(k)+'</span><span>'+escapeHtml(String(v))+'</span></div>').join('')+
+      [['Tier',tier?.name||'—'],['First visit',dates.length?rdDate(dates[0].v):'—'],['Most recent',dates.length?rdDate(dates[dates.length-1].v):'—']].map(([k,v])=>'<div class="rd-overview-row"><span class="rd-muted">'+escapeHtml(k)+'</span><span>'+escapeHtml(String(v))+'</span></div>').join('')+
       (stats.best?'<div class="rd-overview-row"><span class="rd-muted">Highest-scoring visit</span>'+rdVisitButton(stats.best.v,rdDate(stats.best.v)+' · '+rdFmt(stats.best.avg))+'</div>':'')+'</section></div>';
   }
   function rdBar(label,sub,value,width,high,attrs){
@@ -13615,7 +13663,7 @@
         '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
         (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
       '</div>' + tabBar + '</div><div class="rd-body">' +
-      (isVisits ? (guestViewEnabled?'':'<div style="padding:12px 24px 0">'+renderRestaurantScoresRowHtml(r)+'</div>')+visitsSectionHtml : restaurantDetailTab==='overview'?rdOverview(r,stats):restaurantDetailTab==='graphs'?rdGraphs(r,stats):rdCourses(stats))+'</div>';
+      (isVisits ? visitsSectionHtml : restaurantDetailTab==='overview'?rdOverview(r,stats):restaurantDetailTab==='graphs'?rdGraphs(r,stats):rdCourses(stats))+'</div>';
     restaurantDetailCoverSync();
     restaurantDetailsPanel.scrollTop=oldScroll;
     restaurantDetailCoverSync();
