@@ -12838,6 +12838,7 @@
   const courseAudioTranscribing = new Set();
   const courseAudioStyle = document.createElement('style');
   courseAudioStyle.textContent = '.course-audio-row{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--chalk-dim);font-size:12px;min-height:34px} .course-audio-row button{border:0;background:none;color:inherit;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;padding:4px;cursor:pointer;flex:none} .course-audio-row button:disabled{opacity:.4;cursor:default} .course-audio-row button[hidden],.course-audio-row span[hidden]{display:none} .course-audio-row svg{width:21px;height:21px} .course-audio-row .is-recording svg{animation:courseAudioSpin 4s linear infinite;color:var(--amber)} @keyframes courseAudioSpin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.course-audio-row .is-recording svg{animation:none;color:var(--amber)}}';
+  courseAudioStyle.textContent += '.course-transcript{margin:0 10px 8px 40px;padding:8px 10px;border-left:2px solid var(--panel-line);font-size:13px;line-height:1.5;color:var(--chalk-dim);white-space:pre-wrap;overflow-wrap:anywhere}.course-transcript[hidden]{display:none}';
   document.head.appendChild(courseAudioStyle);
   function courseAudioDb(){
     if (!courseAudioDbPromise) courseAudioDbPromise = new Promise((resolve,reject)=>{
@@ -12977,24 +12978,32 @@
     let endpoint=localStorage.getItem('mbh-transcription-endpoint')||'';
     if(!endpoint){endpoint=(window.prompt('Secure transcription endpoint URL (HTTPS):')||'').trim();if(!endpoint)return;}
     let url;try{url=new URL(endpoint);if(url.protocol!=='https:')throw Error();}catch(e){showToast('Use a secure HTTPS endpoint');return;}
+    if(url.origin !== (localStorage.getItem('mbh-transcription-token-origin')||'')){
+      localStorage.removeItem('mbh-transcription-token');
+    }
+    let token=localStorage.getItem('mbh-transcription-token')||'';
+    if(!token){token=(window.prompt('Enter your private Worker access token:')||'').trim();if(!token)return;}
     localStorage.setItem('mbh-transcription-endpoint',url.href);
-    if(!window.confirm('Send this recording to the configured transcription service?'))return;
+    localStorage.setItem('mbh-transcription-token',token);
+    localStorage.setItem('mbh-transcription-token-origin',url.origin);
+    if(!window.confirm('Send this recording to Cloudflare for transcription?'))return;
     courseAudioTranscribing.add(id);refreshCourseAudioRows();
     try{
       const body=new FormData();const ext=record.blob.type.includes('mp4')?'m4a':record.blob.type.includes('ogg')?'ogg':'webm';
       body.append('file',record.blob,'course.'+ext);
-      const response=await fetch(url.href,{method:'POST',body,credentials:'omit'});
+      const response=await fetch(url.href,{method:'POST',body,credentials:'omit',redirect:'error',headers:{Authorization:'Bearer '+token}});
+      if(response.status===401||response.status===403){localStorage.removeItem('mbh-transcription-token');throw Error('Access denied — check your token');}
       if(!response.ok)throw Error('Transcription failed');
       const result=await response.json();
       const text=typeof result.text==='string'?result.text.trim():'';
       if(!text)throw Error('Empty transcript');
       if(guestViewEnabled||isLockedGuestAccount)return;
       const course=findCourseByDishId(id);if(!course)return;
-      course.text=[(course.text||'').trim(),text].filter(Boolean).join('\\n');
+      course.transcript=text;
       await saveRestaurantProgress();
       const row=Array.from(restaurantDetailsPanelInner.querySelectorAll('[data-audio-id]')).find(el=>el.dataset.audioId===id);
-      const input=row?.closest('.restaurant-course-card')?.querySelector('textarea[data-course-index]');
-      if(input){input.value=course.text;autoGrowTextarea(input);}
+      const transcript=row?.closest('.restaurant-course-card')?.querySelector('[data-course-transcript]');
+      if(transcript){transcript.textContent=text;transcript.hidden=false;}
       showToast('Transcription added');
     }catch(e){showToast('Transcription failed — recording retained');}
     finally{courseAudioTranscribing.delete(id);refreshCourseAudioRows();}
@@ -13043,6 +13052,7 @@
                 pairingBtnHtml +
                 '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
               '</div>' +
+              '<div data-course-transcript class="course-transcript"' + (course.transcript ? '' : ' hidden') + '>' + escapeHtml(course.transcript || '') + '</div>' +
               courseAudioHtml(course) +
             '</div>' +
             renderDrinkPairingCardHtml(course, i)
