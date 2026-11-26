@@ -5218,7 +5218,8 @@
   .pc-day{position:relative;aspect-ratio:1;border:0;border-radius:4px;display:block;}
   .pc-day img,.pc-day-empty>div{width:100%;height:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--panel);}
   .pc-day small{font-size:10px;color:rgba(255,255,255,.8);}
-  .pc-day-empty{cursor:default;background:#112629;}.pc-day-empty>div{background:#112629;}
+  .pc-day-empty{cursor:default;background:#0d2023;display:grid;place-items:center;}
+  .pc-day-empty svg{width:clamp(16px,24%,30px);height:auto;color:var(--chalk);opacity:.16;pointer-events:none;}
   .pc-day-header{flex-wrap:nowrap;justify-content:center;margin-bottom:16px;}
   .pc-day-header>div{flex:1;text-align:center;min-width:0;}
   .pc-day-header h2{font-size:20px;margin:0 0 4px;}
