@@ -11645,33 +11645,45 @@
     photoTagModal.showModal();
     if(rename){const input=photoTagModal.querySelector('input');input.focus();input.select();}
   }
+  // Filters are view-only; selecting a chip never changes a photo's tags.
+  let photoTagLocationFilter='', photoTagOtherFilters=new Set();
+  let photoTagManageId='';
   function renderPhotoTags(){
     if(!photoTagsHost)return;
-    const ranked=pcRanked(), active=photoTagFind(photoTagOpenId), members=effectivePhotoTagMembers(photoTags);
-    if(!active){
-      photoTagOpenId='';
-      const tags=sortedPhotoTags();
-      photoTagsHost.innerHTML=tags.length?groupedPhotoTags().map(({category,tags})=>'<section class="pt-tag-section"><h2 class="pt-tag-section-heading">'+escapeHtml(category)+'</h2>'+(tags.length?'<div class="pt-tag-grid">'+tags.map(t=>{
-        const ids=members.get(t.id), rows=ranked.filter(x=>ids.has(x.p.id)), cover=rows[0];
-        return '<button type="button" class="pt-tag-card" data-tag-id="'+escapeAttr(t.id)+'">'+(cover?pcThumb(cover,650):'<div class="pt-empty-cover" aria-hidden="true">🏷️</div>')+'<span><strong>'+escapeHtml(t.name)+'</strong><small>'+pcCount(rows.length)+'</small></span></button>';
-      }).join('')+'</div>':'<p class="pt-muted">No tags yet.</p>')+'</section>').join(''):'<p class="pt-muted pt-empty">No tags yet. Open a photo in Gallery and tap Add Tags to create one.</p>';
-      photoTagsHost.querySelectorAll('[data-tag-id]').forEach(b=>b.onclick=()=>{
-        photoTagListY=window.scrollY;photoTagOpenId=b.dataset.tagId;renderPhotoTags();window.scrollTo(0,0);
-      });
-      return;
-    }
-    const ids=members.get(active.id), rows=ranked.filter(x=>ids.has(x.p.id));
-    photoTagsHost.innerHTML='<div class="pt-detail-header"><button type="button" class="btn-ghost" data-back aria-label="Back to Tags">‹ Tags</button><div><h2>'+escapeHtml(active.name)+'</h2><p class="pt-muted">'+pcCount(rows.length)+'</p></div>'+
-      (photoTagsWritable()?'<div class="pt-menu-wrap"><button type="button" class="btn-ghost pt-menu-btn" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout" hidden><button type="button" data-rename>Edit</button><button type="button" data-delete>Delete</button></div></div>':'')+'</div>'+
-      (rows.length?'<div class="results-list grid-mode pt-detail-grid">'+rows.map((x,i)=>'<button type="button" class="grid-card pt-detail-photo" data-photo-index="'+i+'" aria-label="View photo ranked '+x.rank+'"><div class="art-drop">'+pcThumb(x,500)+'</div></button>').join('')+'</div>':'<p class="pt-muted pt-empty">No photos with this tag yet.</p>');
-    photoTagsHost.querySelector('[data-back]').onclick=()=>{photoTagOpenId='';renderPhotoTags();window.scrollTo(0,photoTagListY);};
+    const oldRails=[...photoTagsHost.querySelectorAll('.pt-filter-rail')].map(el=>el.scrollLeft);
+    const ranked=pcRanked(), members=effectivePhotoTagMembers(photoTags), tags=sortedPhotoTags();
+    const locations=tags.filter(t=>photoTagCategory(t.category)==='Location');
+    const others=['Scenery','Season'].flatMap(category=>tags.filter(t=>photoTagCategory(t.category)===category));
+    if(!locations.some(t=>t.id===photoTagLocationFilter))photoTagLocationFilter='';
+    photoTagOtherFilters=new Set([...photoTagOtherFilters].filter(id=>others.some(t=>t.id===id)));
+    const filters=[...(photoTagLocationFilter?[photoTagLocationFilter]:[]),...photoTagOtherFilters];
+    const rows=ranked.filter(x=>filters.every(id=>members.get(id)?.has(x.p.id)));
+    const chip=(id,label,on,kind)=>'<button type="button" class="pt-filter-chip" data-pt-filter="'+escapeAttr(id)+'" data-pt-kind="'+kind+'" aria-pressed="'+on+'">'+escapeHtml(label)+'</button>';
+    const locationChips=chip('','All locations',!photoTagLocationFilter,'location')+locations.map(t=>chip(t.id,t.name,photoTagLocationFilter===t.id,'location')).join('');
+    const otherChips=chip('','All scenery & seasons',!photoTagOtherFilters.size,'other')+others.map(t=>chip(t.id,t.name,photoTagOtherFilters.has(t.id),'other')).join('');
+    const manage=photoTagsWritable()&&tags.length?'<div class="pt-menu-wrap"><button type="button" class="pt-menu-btn btn-ghost" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout pt-manage-menu" hidden><label for="pt-manage-select">Manage tags</label><select id="pt-manage-select" class="tf-input">'+groupedPhotoTags().filter(g=>g.tags.length).map(g=>'<optgroup label="'+escapeAttr(g.category)+'">'+g.tags.map(t=>'<option value="'+escapeAttr(t.id)+'"'+(t.id===photoTagManageId?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')+'</optgroup>').join('')+'</select><button type="button" data-rename>Edit tag</button><button type="button" data-delete>Delete tag</button></div></div>':'';
+    photoTagsHost.innerHTML='<div class="pt-gallery-heading"><span class="pt-muted" aria-live="polite">'+pcCount(rows.length)+'</span>'+manage+'</div>'+
+      (rows.length?'<div class="results-list grid-mode pt-detail-grid pt-filter-grid">'+rows.map((x,i)=>'<button type="button" class="grid-card pt-detail-photo" data-photo-index="'+i+'" aria-label="View photo ranked '+x.rank+'"><div class="art-drop">'+pcThumb(x,500)+'</div></button>').join('')+'</div>':'<p class="pt-muted pt-empty">No photos match these tags.</p>')+
+      '<div class="pt-filter-dock"><div class="pt-filter-rail" role="group" aria-label="Location filters">'+locationChips+'</div><div class="pt-filter-rail" role="group" aria-label="Scenery and season filters">'+otherChips+'</div></div>';
+    photoTagsHost.querySelectorAll('.pt-filter-rail').forEach((el,i)=>{el.scrollLeft=oldRails[i]||0;});
+    photoTagsHost.querySelectorAll('[data-pt-filter]').forEach(b=>b.onclick=()=>{
+      const id=b.dataset.ptFilter;
+      if(b.dataset.ptKind==='location')photoTagLocationFilter=photoTagLocationFilter===id?'':id;
+      else if(!id)photoTagOtherFilters.clear();
+      else if(photoTagOtherFilters.has(id))photoTagOtherFilters.delete(id);
+      else photoTagOtherFilters.add(id);
+      renderPhotoTags();window.scrollTo(0,0);
+    });
     photoTagsHost.querySelectorAll('[data-photo-index]').forEach(b=>b.onclick=()=>openPhotoLightbox(rows.map(x=>x.p.url),Number(b.dataset.photoIndex),null,rows.map(x=>x.p.id)));
     const menu=photoTagsHost.querySelector('.pt-menu-btn'), flyout=photoTagsHost.querySelector('.pt-flyout');
     if(menu){
       const close=()=>{flyout.hidden=true;menu.setAttribute('aria-expanded','false');};
+      const select=flyout.querySelector('select');
+      select.onchange=()=>{photoTagManageId=select.value;};
       menu.onclick=e=>{e.stopPropagation();flyout.hidden=!flyout.hidden;menu.setAttribute('aria-expanded',String(!flyout.hidden));};
-      flyout.querySelector('[data-rename]').onclick=()=>{close();photoTagShowModal(active,'rename');};
-      flyout.querySelector('[data-delete]').onclick=()=>{close();photoTagShowModal(active,'delete');};
+      const action=mode=>{const tag=photoTagFind(select.value);photoTagManageId=select.value;close();if(tag)photoTagShowModal(tag,mode);};
+      flyout.querySelector('[data-rename]').onclick=()=>action('rename');
+      flyout.querySelector('[data-delete]').onclick=()=>action('delete');
     }
   }
   document.addEventListener('click',e=>{
