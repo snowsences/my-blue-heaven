@@ -4581,14 +4581,14 @@
        row, with its label centered in that half. (width, not flex, on the
        bar: Music's bars sit in a column-direction flex parent, where a flex
        basis would mean height rather than width.) */
-    [id^="music-sub-tabs"], [id^="food-sub-tabs"], [id^="tools-sub-tabs"]{
+    [id^="music-sub-tabs"], [id^="food-sub-tabs"], [id^="tools-sub-tabs"], [id^="photos-sub-tabs-"]{
       width: 100%;
       flex-wrap: nowrap;
       gap: 0;
     }
     /* Equal-width tabs on a phone: a little room each side of every label, the first flush left. */
     .group-sub-tabs .group-sub-tab-btn{ padding-left: 4px; padding-right: 4px; }
-    [id^="music-sub-tabs"] .group-sub-tab-btn, [id^="food-sub-tabs"] .group-sub-tab-btn, [id^="tools-sub-tabs"] .group-sub-tab-btn{
+    [id^="music-sub-tabs"] .group-sub-tab-btn, [id^="food-sub-tabs"] .group-sub-tab-btn, [id^="tools-sub-tabs"] .group-sub-tab-btn, [id^="photos-sub-tabs-"] .group-sub-tab-btn{
       flex: 1 1 0;
       min-width: 0;
       font-size: clamp(12px, 4vw, 17px);
@@ -4920,7 +4920,7 @@
   body.guest-view-active #food-sub-tabs-2,
   body.guest-view-active #nature-sub-tabs-hikes,
   body.guest-view-active #nature-sub-tabs-roads,
-  body.guest-view-active #nature-sub-tabs-photos{ display: none; }
+  body.guest-view-active [id^="photos-sub-tabs-"]{ display: none; }
 
   /* Rank/score/tier indicators — restaurant grid + list */
   body.guest-view-active .restaurant-gold-card-rank,
@@ -5173,4 +5173,15 @@
     #restaurant-details-panel-inner .rd-card :is(.restaurant-score-select, .restaurant-score-total-value, .restaurant-score-price-value){
       font-size: 21px;
     }
+  }
+
+  /* Seven main nav destinations must still fit on compact desktop and mobile. */
+  @media (min-width:769px) and (max-width:1050px){
+    .top-nav-inner{gap:clamp(12px,2vw,24px);padding-inline:16px}
+    .top-nav:not(.guest-top-nav){gap:clamp(10px,1.8vw,24px)}
+    .top-nav-btn{gap:5px;font-size:13px;white-space:nowrap}
+  }
+  @media(max-width:768px){
+    body:not(.guest-view-active) .top-nav-btn,body:not(.guest-view-active) .top-nav-settings-btn{min-width:0}
+    [id^="photos-sub-tabs-"] .group-sub-tab-btn{font-size:clamp(12px,3.6vw,17px)}
   }

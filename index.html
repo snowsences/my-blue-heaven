@@ -71,6 +71,7 @@
       <div class="top-nav">
         <button class="top-nav-btn active" id="top-nav-music-btn" type="button"><span class="top-nav-icon">🎧</span><span class="top-nav-label">Music</span></button>
         <button class="top-nav-btn" id="top-nav-food-btn" type="button"><span class="top-nav-icon">🍅</span><span class="top-nav-label">Food</span></button>
+        <button class="top-nav-btn" id="top-nav-photos-btn" type="button"><span class="top-nav-icon">📸</span><span class="top-nav-label">Photos</span></button>
         <button class="top-nav-btn" id="top-nav-nature-btn" type="button"><span class="top-nav-icon">🏔️</span><span class="top-nav-label">Nature</span></button>
         <button class="top-nav-btn" id="top-nav-art-btn" type="button"><span class="top-nav-icon">🎭</span><span class="top-nav-label">Art</span></button>
         <button class="top-nav-btn" id="top-nav-trips-btn" type="button"><span class="top-nav-icon">🧳</span><span class="top-nav-label">Trips</span></button>
@@ -551,7 +552,6 @@
           <button class="group-sub-tab-btn active" id="nature-subtab-hikes-btn" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
           <button class="group-sub-tab-btn" id="nature-subtab-parks-btn" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
           <button class="group-sub-tab-btn" id="nature-subtab-roads-btn" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
-          <button class="group-sub-tab-btn" id="nature-subtab-photos-btn" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
         <div class="restaurant-heading-actions">
           <div class="view-toggle" id="hike-view-toggle">
@@ -623,7 +623,6 @@
           <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-4" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
           <button class="group-sub-tab-btn active" id="nature-subtab-parks-btn-2" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
           <button class="group-sub-tab-btn" id="nature-subtab-roads-btn-4" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
-          <button class="group-sub-tab-btn" id="nature-subtab-photos-btn-4" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
         <div class="restaurant-heading-actions">
           <div class="filter-wrap">
@@ -646,7 +645,6 @@
           <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-2" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
           <button class="group-sub-tab-btn" id="nature-subtab-parks-btn-3" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
           <button class="group-sub-tab-btn active" id="nature-subtab-roads-btn-2" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
-          <button class="group-sub-tab-btn" id="nature-subtab-photos-btn-2" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
         </div>
         <div class="restaurant-heading-actions">
           <div class="filter-wrap">
@@ -670,11 +668,10 @@
   <div id="page-photos" class="top-page">
     <div class="page-content">
       <div class="page-heading-row">
-        <div class="group-sub-tabs" id="nature-sub-tabs-photos">
-          <button class="group-sub-tab-btn" id="nature-subtab-hikes-btn-3" type="button"><span class="group-sub-tab-icon">🏕️</span>Hikes</button>
-          <button class="group-sub-tab-btn" id="nature-subtab-parks-btn-4" type="button"><span class="group-sub-tab-icon">🏞️</span>Parks</button>
-          <button class="group-sub-tab-btn" id="nature-subtab-roads-btn-3" type="button"><span class="group-sub-tab-icon">🏎️</span>Roads</button>
-          <button class="group-sub-tab-btn active" id="nature-subtab-photos-btn-3" type="button"><span class="group-sub-tab-icon">🖼️</span>Photos</button>
+        <div class="group-sub-tabs" id="photos-sub-tabs-photos">
+          <button class="group-sub-tab-btn active" data-photo-subpage="photos" type="button"><span class="group-sub-tab-icon">🖼️</span>Gallery</button>
+          <button class="group-sub-tab-btn" data-photo-subpage="photo-collections" type="button"><span class="group-sub-tab-icon">📦</span>Collections</button>
+          <button class="group-sub-tab-btn" data-photo-subpage="photo-calendar" type="button"><span class="group-sub-tab-icon">🗓️</span>Calendar</button>
         </div>
         <div class="restaurant-heading-actions">
           <button class="btn-ghost" id="photo-edit-toggle-btn" type="button">Edit</button>
@@ -717,6 +714,32 @@
           <div class="artist-list" id="photo-month-list"></div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="page-photo-collections" class="top-page">
+    <div class="page-content">
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="photos-sub-tabs-photo-collections">
+          <button class="group-sub-tab-btn" data-photo-subpage="photos" type="button"><span class="group-sub-tab-icon">🖼️</span>Gallery</button>
+          <button class="group-sub-tab-btn active" data-photo-subpage="photo-collections" type="button"><span class="group-sub-tab-icon">📦</span>Collections</button>
+          <button class="group-sub-tab-btn" data-photo-subpage="photo-calendar" type="button"><span class="group-sub-tab-icon">🗓️</span>Calendar</button>
+        </div>
+      </div>
+      <p class="restaurant-course-empty">Collections coming soon.</p>
+    </div>
+  </div>
+
+  <div id="page-photo-calendar" class="top-page">
+    <div class="page-content">
+      <div class="page-heading-row">
+        <div class="group-sub-tabs" id="photos-sub-tabs-photo-calendar">
+          <button class="group-sub-tab-btn" data-photo-subpage="photos" type="button"><span class="group-sub-tab-icon">🖼️</span>Gallery</button>
+          <button class="group-sub-tab-btn" data-photo-subpage="photo-collections" type="button"><span class="group-sub-tab-icon">📦</span>Collections</button>
+          <button class="group-sub-tab-btn active" data-photo-subpage="photo-calendar" type="button"><span class="group-sub-tab-icon">🗓️</span>Calendar</button>
+        </div>
+      </div>
+      <p class="restaurant-course-empty">Calendar coming soon.</p>
     </div>
   </div>
 

@@ -240,6 +240,8 @@
   const pageParks = document.getElementById('page-parks');
   const pageRoads = document.getElementById('page-roads');
   const pagePhotos = document.getElementById('page-photos');
+  const pagePhotoCollections = document.getElementById('page-photo-collections');
+  const pagePhotoCalendar = document.getElementById('page-photo-calendar');
   const pageBooks = document.getElementById('page-books');
   const pageMovies = document.getElementById('page-movies');
   const pageGames = document.getElementById('page-games');
@@ -256,12 +258,14 @@
   const topNavTripsBtn = document.getElementById('top-nav-trips-btn');
   const topNavFoodBtn = document.getElementById('top-nav-food-btn');
   const topNavNatureBtn = document.getElementById('top-nav-nature-btn');
+  const topNavPhotosBtn = document.getElementById('top-nav-photos-btn');
   const topNavArtBtn = document.getElementById('top-nav-art-btn');
   let activeTopGroup = 'music';
   let activeMusicSubPage = 'albums';
   let activeFoodSubPage = 'restaurants';
   let activeToolsSubPage = 'fun';
   let activeNatureSubPage = 'hikes';
+  let activePhotosSubPage = 'photos';
   let activeArtSubPage = 'books';
 
   // Browser refreshes should reopen the same navigation screen in this tab,
@@ -269,7 +273,7 @@
   const NAV_SESSION_KEY = 'mbh-active-page';
   const NAV_SESSION_PAGES = new Set([
     'albums', 'songs', 'artists', 'restaurants', 'dishes',
-    'hikes', 'parks', 'roads', 'photos',
+    'hikes', 'parks', 'roads', 'photos', 'photo-collections', 'photo-calendar',
     'books', 'movies', 'games', 'shows',
     'trips', 'fun', 'settings'
   ]);
@@ -305,20 +309,13 @@
   const toolsSubtabSettingsBtn2 = document.getElementById('tools-subtab-settings-btn-2');
   const natureSubtabHikesBtn = document.getElementById('nature-subtab-hikes-btn');
   const natureSubtabHikesBtn2 = document.getElementById('nature-subtab-hikes-btn-2');
-  const natureSubtabHikesBtn3 = document.getElementById('nature-subtab-hikes-btn-3');
   const natureSubtabHikesBtn4 = document.getElementById('nature-subtab-hikes-btn-4');
   const natureSubtabParksBtn = document.getElementById('nature-subtab-parks-btn');
   const natureSubtabParksBtn2 = document.getElementById('nature-subtab-parks-btn-2');
   const natureSubtabParksBtn3 = document.getElementById('nature-subtab-parks-btn-3');
-  const natureSubtabParksBtn4 = document.getElementById('nature-subtab-parks-btn-4');
   const natureSubtabRoadsBtn = document.getElementById('nature-subtab-roads-btn');
   const natureSubtabRoadsBtn2 = document.getElementById('nature-subtab-roads-btn-2');
-  const natureSubtabRoadsBtn3 = document.getElementById('nature-subtab-roads-btn-3');
   const natureSubtabRoadsBtn4 = document.getElementById('nature-subtab-roads-btn-4');
-  const natureSubtabPhotosBtn = document.getElementById('nature-subtab-photos-btn');
-  const natureSubtabPhotosBtn2 = document.getElementById('nature-subtab-photos-btn-2');
-  const natureSubtabPhotosBtn3 = document.getElementById('nature-subtab-photos-btn-3');
-  const natureSubtabPhotosBtn4 = document.getElementById('nature-subtab-photos-btn-4');
   const artSubtabBooksBtn = document.getElementById('art-subtab-books-btn');
   const artSubtabBooksBtn2 = document.getElementById('art-subtab-books-btn-2');
   const artSubtabBooksBtn3 = document.getElementById('art-subtab-books-btn-3');
@@ -4401,6 +4398,7 @@
     const pages = {
       albums: pageAlbums, songs: pageSongs, artists: pageArtists, restaurants: pageRestaurants, dishes: pageDishes,
       hikes: pageHikes, parks: pageParks, roads: pageRoads, photos: pagePhotos,
+      'photo-collections': pagePhotoCollections, 'photo-calendar': pagePhotoCalendar,
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
       trips: pageTrips, fun: pageFun, settings: pageSettings
     };
@@ -4502,12 +4500,14 @@
     topNavMusicBtn.classList.toggle('active', group === 'music');
     topNavFoodBtn.classList.toggle('active', group === 'food');
     topNavNatureBtn.classList.toggle('active', group === 'nature');
+    topNavPhotosBtn.classList.toggle('active', group === 'photos');
     topNavArtBtn.classList.toggle('active', group === 'art');
     topNavTripsBtn.classList.toggle('active', group === 'trips');
     topNavToolsBtn.classList.toggle('active', group === 'tools');
     if (group === 'music') switchTopPage(activeMusicSubPage);
     else if (group === 'food') switchTopPage(activeFoodSubPage);
     else if (group === 'nature') switchTopPage(activeNatureSubPage);
+    else if (group === 'photos') switchTopPage(activePhotosSubPage);
     else if (group === 'art') switchTopPage(activeArtSubPage);
     else if (group === 'trips') switchTopPage('trips');
     // Tools holds Fun and Settings as sub-tabs. In Guest View (the owner
@@ -4538,12 +4538,16 @@
     [toolsSubtabSettingsBtn, toolsSubtabSettingsBtn2].forEach(b => b.classList.toggle('active', page === 'settings'));
     switchTopPage(page);
   }
+  function switchPhotosSubPage(page){
+    activePhotosSubPage = page;
+    document.querySelectorAll('[data-photo-subpage]').forEach(b => b.classList.toggle('active', b.dataset.photoSubpage === page));
+    switchTopPage(page);
+  }
   function switchNatureSubPage(page){
     activeNatureSubPage = page;
-    [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3, natureSubtabHikesBtn4].forEach(b => b.classList.toggle('active', page === 'hikes'));
-    [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3, natureSubtabParksBtn4].forEach(b => b.classList.toggle('active', page === 'parks'));
-    [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3, natureSubtabRoadsBtn4].forEach(b => b.classList.toggle('active', page === 'roads'));
-    [natureSubtabPhotosBtn, natureSubtabPhotosBtn2, natureSubtabPhotosBtn3, natureSubtabPhotosBtn4].forEach(b => b.classList.toggle('active', page === 'photos'));
+    [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn4].forEach(b => b.classList.toggle('active', page === 'hikes'));
+    [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3].forEach(b => b.classList.toggle('active', page === 'parks'));
+    [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn4].forEach(b => b.classList.toggle('active', page === 'roads'));
     switchTopPage(page);
   }
   function switchArtSubPage(page){
@@ -4578,7 +4582,10 @@
     } else if (['restaurants', 'dishes'].includes(page)){
       switchFoodSubPage(page);
       switchTopGroup('food');
-    } else if (['hikes', 'parks', 'roads', 'photos'].includes(page)){
+    } else if (['photos', 'photo-collections', 'photo-calendar'].includes(page)){
+      switchPhotosSubPage(page);
+      switchTopGroup('photos');
+    } else if (['hikes', 'parks', 'roads'].includes(page)){
       switchNatureSubPage(page);
       switchTopGroup('nature');
     } else if (['books', 'movies', 'games', 'shows'].includes(page)){
@@ -4595,6 +4602,8 @@
   topNavMusicBtn.addEventListener('click', () => switchTopGroup('music'));
   topNavFoodBtn.addEventListener('click', () => switchTopGroup('food'));
   topNavNatureBtn.addEventListener('click', () => switchTopGroup('nature'));
+  topNavPhotosBtn.addEventListener('click', () => switchTopGroup('photos'));
+  document.querySelectorAll('[data-photo-subpage]').forEach(b => b.addEventListener('click', () => switchPhotosSubPage(b.dataset.photoSubpage)));
   topNavArtBtn.addEventListener('click', () => switchTopGroup('art'));
   topNavTripsBtn.addEventListener('click', () => switchTopGroup('trips'));
   topNavToolsBtn.addEventListener('click', () => switchTopGroup('tools'));
@@ -4606,10 +4615,9 @@
   [musicSubtabArtistsBtn, musicSubtabArtistsBtn2, musicSubtabArtistsBtn3].forEach(b => b.addEventListener('click', () => switchMusicSubPage('artists')));
   [foodSubtabRestaurantsBtn, foodSubtabRestaurantsBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('restaurants')));
   [foodSubtabDishesBtn, foodSubtabDishesBtn2].forEach(b => b.addEventListener('click', () => switchFoodSubPage('dishes')));
-  [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn3, natureSubtabHikesBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
-  [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3, natureSubtabParksBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('parks')));
-  [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn3, natureSubtabRoadsBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('roads')));
-  [natureSubtabPhotosBtn, natureSubtabPhotosBtn2, natureSubtabPhotosBtn3, natureSubtabPhotosBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('photos')));
+  [natureSubtabHikesBtn, natureSubtabHikesBtn2, natureSubtabHikesBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('hikes')));
+  [natureSubtabParksBtn, natureSubtabParksBtn2, natureSubtabParksBtn3].forEach(b => b.addEventListener('click', () => switchNatureSubPage('parks')));
+  [natureSubtabRoadsBtn, natureSubtabRoadsBtn2, natureSubtabRoadsBtn4].forEach(b => b.addEventListener('click', () => switchNatureSubPage('roads')));
   [artSubtabBooksBtn, artSubtabBooksBtn2, artSubtabBooksBtn3, artSubtabBooksBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('books')));
   [artSubtabMoviesBtn, artSubtabMoviesBtn2, artSubtabMoviesBtn3, artSubtabMoviesBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('movies')));
   [artSubtabGamesBtn, artSubtabGamesBtn2, artSubtabGamesBtn3, artSubtabGamesBtn4].forEach(b => b.addEventListener('click', () => switchArtSubPage('games')));
@@ -4623,13 +4631,15 @@
   const GROUP_SUBPAGES = {
     music: ['albums', 'songs', 'artists'],
     food: ['restaurants', 'dishes'],
-    nature: ['hikes', 'parks', 'roads', 'photos'],
+    photos: ['photos', 'photo-collections', 'photo-calendar'],
+    nature: ['hikes', 'parks', 'roads'],
     art: ['books', 'movies', 'games', 'shows'],
     tools: ['fun', 'settings'],
   };
   const GROUP_SWITCHERS = {
     music: switchMusicSubPage,
     food: switchFoodSubPage,
+    photos: switchPhotosSubPage,
     nature: switchNatureSubPage,
     art: switchArtSubPage,
     tools: switchToolsSubPage,
@@ -4638,6 +4648,7 @@
     if (group === 'music') return activeMusicSubPage;
     if (group === 'food') return activeFoodSubPage;
     if (group === 'nature') return activeNatureSubPage;
+    if (group === 'photos') return activePhotosSubPage;
     if (group === 'art') return activeArtSubPage;
     if (group === 'tools') return activeToolsSubPage;
     return null;
