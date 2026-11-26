@@ -670,7 +670,6 @@
       <div class="page-heading-row">
         <div class="group-sub-tabs" id="photos-sub-tabs-photos">
           <button class="group-sub-tab-btn active" data-photo-subpage="photos" type="button"><span class="group-sub-tab-icon">🖼️</span>Gallery</button>
-          <button class="group-sub-tab-btn" data-photo-subpage="photo-collections" type="button"><span class="group-sub-tab-icon">🏷️</span>Tags</button>
           <button class="group-sub-tab-btn" data-photo-subpage="photo-calendar" type="button"><span class="group-sub-tab-icon">🗓️</span>Calendar</button>
         </div>
         <div class="restaurant-heading-actions">
@@ -685,6 +684,7 @@
             <datalist id="photo-season-filter-datalist"></datalist>
             <button class="filter-clear" id="photo-season-filter-clear" type="button" title="Clear season filter" style="display:none;">✕</button>
           </div>
+          <button class="btn-ghost photo-tag-filter-toggle" id="photo-tag-filter-toggle" type="button" aria-label="Show tag filters" aria-pressed="false" aria-controls="photo-tags-content" title="Show tag filters"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13 11 4H4v7l9 9a2 2 0 0 0 2.8 0l4.2-4.2a2 2 0 0 0 0-2.8Z"/><circle cx="8" cy="8" r="1"/></svg></button>
           <button class="btn-primary" id="photo-add-btn" type="button" aria-label="Add photos" title="Add photos">+</button>
         </div>
       </div>
@@ -697,7 +697,9 @@
         </div>
       </div>
 
+      <div id="photo-tags-content" hidden></div>
       <div class="results-list grid-mode" id="photo-grid"></div>
+      <p class="restaurant-course-empty" id="photo-filter-empty" hidden>No photos match these filters.</p>
       <ol class="results-list" id="photo-edit-list" style="display:none;"></ol>
       <p class="restaurant-course-empty" id="photo-empty-message" style="display:none;">No photos yet — add some to get started.</p>
 
@@ -717,25 +719,11 @@
     </div>
   </div>
 
-  <div id="page-photo-collections" class="top-page">
-    <div class="page-content">
-      <div class="page-heading-row">
-        <div class="group-sub-tabs" id="photos-sub-tabs-photo-collections">
-          <button class="group-sub-tab-btn" data-photo-subpage="photos" type="button"><span class="group-sub-tab-icon">🖼️</span>Gallery</button>
-          <button class="group-sub-tab-btn active" data-photo-subpage="photo-collections" type="button"><span class="group-sub-tab-icon">🏷️</span>Tags</button>
-          <button class="group-sub-tab-btn" data-photo-subpage="photo-calendar" type="button"><span class="group-sub-tab-icon">🗓️</span>Calendar</button>
-        </div>
-      </div>
-      <div id="photo-tags-content"></div>
-    </div>
-  </div>
-
   <div id="page-photo-calendar" class="top-page">
     <div class="page-content">
       <div class="page-heading-row">
         <div class="group-sub-tabs" id="photos-sub-tabs-photo-calendar">
           <button class="group-sub-tab-btn" data-photo-subpage="photos" type="button"><span class="group-sub-tab-icon">🖼️</span>Gallery</button>
-          <button class="group-sub-tab-btn" data-photo-subpage="photo-collections" type="button"><span class="group-sub-tab-icon">🏷️</span>Tags</button>
           <button class="group-sub-tab-btn active" data-photo-subpage="photo-calendar" type="button"><span class="group-sub-tab-icon">🗓️</span>Calendar</button>
         </div>
       </div>
