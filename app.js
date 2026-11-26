@@ -2586,6 +2586,19 @@
     const known = new Set(order.map(p => p.id));
     return order.concat(photoRows.filter(p => !known.has(p.id)));
   }
+  // Use the entire master ranking, not the filtered lightbox's position.
+  function photoSortHelperEligible(order, id){
+    if (!id || order.length < 2) return false;
+    const index = order.findIndex(p => p.id === id);
+    return index >= Math.ceil(order.length / 2);
+  }
+  function updatePhotoSortHelperVisibility(){
+    const id = photoSortHelperIds && photoSortHelperIds[lightboxIndex];
+    const visible = !!id && !guestViewEnabled && !isLockedGuestAccount && !photoEditMode
+      && photoSortHelperEligible(photoSortHelperOrder(), id);
+    photoSortHelperButton.hidden = !visible;
+    photoSortHelperButton.classList.toggle('show', visible);
+  }
   function finishPhotoSortHelper(){
     const state = photoSortHelperState;
     if (!state) return;
@@ -2650,7 +2663,7 @@
     if (!photoSortHelperIds || guestViewEnabled || isLockedGuestAccount || photoEditMode) return;
     const order = photoSortHelperOrder();
     const selected = order.find(p => p.id === photoSortHelperIds[lightboxIndex]);
-    if (!selected || order.length < 2) return;
+    if (!selected || !photoSortHelperEligible(order, selected.id)) return;
     const others = order.filter(p => p.id !== selected.id);
     // Small lists already fit the manual-refinement range; don't move a
     // photo without a preference. Run one duel before applying the midpoint.
@@ -2704,8 +2717,7 @@
     lightboxPhotos = photos;
     lightboxIndex = startIndex;
     photoSortHelperIds = rankedPhotoIds || null;
-    photoSortHelperButton.hidden = !photoSortHelperIds || photoRows.length < 2 || guestViewEnabled || isLockedGuestAccount;
-    photoSortHelperButton.classList.toggle('show', !photoSortHelperButton.hidden);
+    updatePhotoSortHelperVisibility();
     lightboxCoverContext = coverContext || null;
     updatePhotoCalendarLightbox();
     artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(photos[lightboxIndex]), 1600);
@@ -2859,6 +2871,7 @@
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
+    updatePhotoSortHelperVisibility();
     updatePhotoCalendarLightbox();
     artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(lightboxPhotos[lightboxIndex]), 1600);
     updateLightboxCounter();
@@ -11065,6 +11078,7 @@
   }
 
   function renderPhotosPage(){
+    updatePhotoSortHelperVisibility();
     refreshPhotoCalendar();
     refreshPhotoTags();
     const empty = !photoRows.length;
@@ -11263,16 +11277,20 @@
     if(pagePhotoCollections.classList.contains('active'))renderPhotoTags();
     updatePhotoTagLightbox();
   }
+  function photoTagCountLabel(count){
+    return count === 0 ? 'Add Tag' : count === 1 ? '1 Tag' : count + ' Tags';
+  }
   function updatePhotoTagLightbox(){
     if(!photoTagButton)return;
     const id=photoSortHelperIds&&photoSortHelperIds[lightboxIndex];
     const valid=photoTagsWritable()&&id&&photoRows.some(p=>p.id===id);
     photoTagButton.hidden=!valid;
     if(!valid){photoTagButton.textContent='Add Tag';photoTagButton.removeAttribute('title');return;}
-    const label=photoTagsFor(id).map(t=>t.name).join(', ')||'Add Tag';
+    const assigned=photoTagsFor(id);
+    const label=photoTagCountLabel(assigned.length);
     photoTagButton.textContent=label;
-    photoTagButton.title=label;
-    photoTagButton.setAttribute('aria-label',label==='Add Tag'?'Add Tag':'Edit tags: '+label);
+    photoTagButton.title=assigned.length?assigned.map(t=>t.name).join(', '):'Add Tag';
+    photoTagButton.setAttribute('aria-label',assigned.length?'Edit tags: '+label:'Add Tag');
   }
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
@@ -11322,6 +11340,7 @@
         });
         if(changed)savePhotoTags();
       }
+      updatePhotoTagLightbox();
       photoTagTray.close();
     };
     render();
