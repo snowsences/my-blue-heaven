@@ -14488,10 +14488,16 @@
   const otdUndatedToggle = document.getElementById('otd-undated-toggle');
   const otdUndatedList = document.getElementById('otd-undated-list');
   let otdUndatedTargets = [];
+  const otdFixPhotosBtn = document.createElement('button');
+  otdFixPhotosBtn.type = 'button';
+  otdFixPhotosBtn.className = 'otd-undated-toggle';
+  otdFixPhotosBtn.style.display = 'none';
+  otdFixPhotosBtn.textContent = 'Fix undated photos';
+  otdUndatedToggle.before(otdFixPhotosBtn);
 
   // Things that can never show up here because they have no usable date.
   function otdFindUndated(){
-    const out = { hikes: [], restaurants: [], photos: 0 };
+    const out = { hikes: [], restaurants: [], photos: [] };
     if (otdSettings.hikes){
       hikeRows.forEach(h => (h.dates || []).forEach(d => { if (!otdParse(d.date)) out.hikes.push({ type: 'hike', hike: h, dateId: d.id }); }));
     }
@@ -14499,7 +14505,7 @@
       restaurantRows.forEach(r => (Array.isArray(r.visits) ? r.visits : []).forEach(v => { if (!otdParse(v.date)) out.restaurants.push({ type: 'restaurant', restaurant: r, visitId: v.id }); }));
     }
     if (otdSettings.photos){
-      photoRows.forEach(ph => { if (ph && !otdParse(ph.date)) out.photos++; });
+      photoRows.forEach(ph => { if (ph && !otdParse(ph.date)) out.photos.push(ph); });
     }
     return out;
   }
@@ -14516,14 +14522,16 @@
     // shouldn't stop you looking whenever you like.
 
     const u = otdFindUndated();
-    const total = u.hikes.length + u.restaurants.length + u.photos;
+    const total = u.hikes.length + u.restaurants.length + u.photos.length;
+    otdFixPhotosBtn.style.display = u.photos.length ? 'inline-block' : 'none';
+    otdFixPhotosBtn.textContent = 'Fix ' + otdPlural(u.photos.length, 'undated photo', 'undated photos');
     otdUndatedBox.style.display = total > 0 ? 'block' : 'none';
     if (!total) return;
     otdUndatedTitle.textContent = otdPlural(total, 'item', 'items') + " can't appear yet";
     const parts = [];
     if (u.restaurants.length) parts.push(otdPlural(u.restaurants.length, 'restaurant visit', 'restaurant visits') + (u.restaurants.length === 1 ? ' has' : ' have') + ' no date');
     if (u.hikes.length) parts.push(otdPlural(u.hikes.length, 'hike outing', 'hike outings') + (u.hikes.length === 1 ? ' has' : ' have') + ' no date');
-    if (u.photos) parts.push(otdPlural(u.photos, 'photo', 'photos') + (u.photos === 1 ? ' was' : ' were') + ' added without a date in the file name');
+    if (u.photos.length) parts.push(otdPlural(u.photos.length, 'photo', 'photos') + (u.photos.length === 1 ? ' was' : ' were') + ' added without a date in the file name');
     otdUndatedText.textContent = otdJoin(parts) + '.';
 
     otdUndatedTargets = u.restaurants.concat(u.hikes).slice(0, 40);
@@ -14551,6 +14559,63 @@
     if (r === 'busy') showToast('Close what is open first');
     else if (!r) showToast('Nothing on this date in earlier years');
   });
+  // Uploads retain their URL and extracted date/time, not their original
+  // filename. Repair the same metadata used by the existing Photos editor;
+  // never rename/reupload the asset or disturb its rank or trip association.
+  function otdOpenUndatedPhotos(){
+    if (guestViewEnabled || isLockedGuestAccount || photoEditMode){
+      showToast('Finish editing photos first');
+      return;
+    }
+    const photos = otdFindUndated().photos;
+    if (!photos.length){ refreshOtdSettingsUI(); return; }
+    let form;
+    tsheetOpen({
+      title: 'Fix undated photos',
+      bodyHtml: '<p style="color:var(--chalk-dim);font-size:14px;margin:0 0 16px">Add a date to any photo below so it can appear in On This Day. Time is optional.</p>' +
+        photos.map((p,i)=>'<div data-fix-photo="' + i + '" style="padding:0 0 18px;margin:0 0 18px;border-bottom:1px solid var(--panel-line)">' +
+          '<button type="button" data-preview="' + i + '" aria-label="View photo ' + (i+1) + '" style="display:block;width:100%;padding:0;border:0;background:var(--bg-2);border-radius:12px;overflow:hidden;cursor:pointer"><img src="' + escapeAttr(cloudinaryThumbUrl(p.url,900)) + '" alt="Undated photo ' + (i+1) + '" loading="lazy" style="display:block;width:100%;max-height:300px;object-fit:contain"></button>' +
+          '<label class="tf-label" for="otd-fix-date-' + i + '" style="margin-top:12px">Date</label>' +
+          '<input type="date" class="tf-input" id="otd-fix-date-' + i + '" data-date>' +
+          '<label class="tf-label" for="otd-fix-time-' + i + '" style="margin-top:10px">Time (optional)</label>' +
+          '<input type="time" class="tf-input" id="otd-fix-time-' + i + '" data-time value="' + escapeAttr((p.time || '').slice(0,5)) + '"></div>').join(''),
+      onOpen: inner=>{
+        form = inner;
+        inner.addEventListener('click',e=>{
+          const btn = e.target.closest('[data-preview]');
+          if (btn) openPhotoLightbox(photos.map(p=>p.url),Number(btn.dataset.preview),null);
+        });
+      },
+      actions:[
+        {label:'Cancel',onClick:tsheetClose},
+        {label:'Save dates',primary:true,onClick:()=>{
+          if (!form || guestViewEnabled || isLockedGuestAccount || photoEditMode) return;
+          const changes = [];
+          for (const el of form.querySelectorAll('[data-fix-photo]')){
+            const date = el.querySelector('[data-date]').value;
+            if (!date) continue;
+            if (!otdParse(date)){ showToast('Enter a valid date'); return; }
+            const time = el.querySelector('[data-time]').value;
+            const original = photos[Number(el.dataset.fixPhoto)];
+            const row = photoRows.find(p=>p.id===original.id && p.url===original.url);
+            if (row && !otdParse(row.date)) changes.push({row,date,time});
+          }
+          if (!changes.length){ showToast('Add at least one date'); return; }
+          changes.forEach(({row,date,time})=>{
+            row.date = date;
+            if (time) row.time = time + ':00'; else delete row.time;
+          });
+          savePhotoProgress();
+          tsheetClose();
+          renderPhotosPage();
+          renderTripsPage();
+          refreshOtdSettingsUI();
+          showToast(otdPlural(changes.length,'photo','photos') + ' updated');
+        }}
+      ]
+    });
+  }
+  otdFixPhotosBtn.addEventListener('click',otdOpenUndatedPhotos);
   otdUndatedToggle.addEventListener('click', () => {
     const open = otdUndatedList.style.display === 'block';
     otdUndatedList.style.display = open ? 'none' : 'block';
