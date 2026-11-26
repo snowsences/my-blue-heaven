@@ -4310,7 +4310,8 @@
   }
   function renderSongSortHelper(){
     const state=songSortHelperState;if(!state)return;
-    if(state.history.length&&state.hi-state.lo+1<=20){finishSongSortHelper();return;}
+    // Inclusive insertion bounds: finish only when one exact slot remains.
+    if(state.lo===state.hi){finishSongSortHelper();return;}
     state.mid=Math.floor((state.lo+state.hi)/2);
     songSortHelperDialog.querySelector('[data-progress]').textContent='Duel '+(state.history.length+1);
     songSortHelperDialog.querySelector('[data-undo]').disabled=!state.history.length;
