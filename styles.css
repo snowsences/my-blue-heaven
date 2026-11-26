@@ -5421,3 +5421,19 @@
     border:0;
     border-radius:4px;
   }
+
+  /* Tags gallery: ranked photos above two independently scrolling filter rails. */
+  #photo-tags-content{padding-bottom:104px;}
+  .pt-gallery-heading{display:flex;align-items:center;justify-content:space-between;min-height:36px;margin:0 0 8px;}
+  .pt-gallery-heading .pt-menu-btn{padding:6px 10px;}
+  .pt-manage-menu{width:min(250px,80vw);padding:10px;}
+  .pt-manage-menu label{display:block;padding:5px 8px;font-size:13px;color:var(--chalk-dim);}
+  .pt-manage-menu select{margin:4px 0 6px;}
+  .pt-filter-grid.results-list.grid-mode{width:calc(100% + 40px);margin-inline:-20px;gap:2px;}
+  .pt-filter-dock{position:fixed;z-index:90;bottom:0;left:0;right:0;background:var(--bg-2);box-shadow:0 -4px 10px rgba(0,0,0,.2);padding:6px 0;display:flex;flex-direction:column;gap:4px;}
+  .pt-filter-rail{display:flex;align-items:center;gap:6px;padding:2px 12px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;min-height:40px;}
+  .pt-filter-rail::-webkit-scrollbar{display:none;}
+  .pt-filter-chip{flex:none;white-space:nowrap;min-height:36px;border:0;border-radius:4px;padding:7px 12px;background:var(--panel);color:var(--chalk);font:600 13px Figtree,sans-serif;cursor:pointer;touch-action:manipulation;}
+  .pt-filter-chip[aria-pressed="true"]{background:var(--amber);color:var(--ink);}
+  @media(hover:hover){.pt-filter-chip:not([aria-pressed="true"]):hover{background:var(--bg);}}
+  @media(max-width:768px){.pt-filter-dock{bottom:calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom,0px));}}
