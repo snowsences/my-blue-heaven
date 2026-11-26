@@ -13406,7 +13406,7 @@
     const v=c.score;
     if(v===null||v===undefined||String(v).trim()==='')return null;
     const n=Number(v);
-    return Number.isFinite(n)&&n>=6&&n<=13?n:null;
+    return Number.isInteger(n)&&n>=6&&n<=13?n:null;
   }
   function rdStats(r){
     const visits=(r.visits||[]).map((v,vi)=>{
@@ -13471,7 +13471,12 @@
     const f=restaurantCourseFilters;
     const q=f.search.trim().toLowerCase();
     const rows=stats.courses.filter(d=>(!f.visit||d.v.id===f.visit)&&(!f.score||(f.score==='unrated'?d.score===null:d.score===Number(f.score)))&&(!q||[d.c.text,d.c.transcript].some(t=>String(t||'').toLowerCase().includes(q))));
-    rows.sort((a,b)=>f.sort==='newest'||f.sort==='oldest'?(f.sort==='newest'?String(b.v.date||'').localeCompare(String(a.v.date||'')):String(a.v.date||'').localeCompare(String(b.v.date||'')))||a.vi-b.vi||a.i-b.i:(a.score===null?1:b.score===null?-1:0)||(f.sort==='lowest'?(a.score||0)-(b.score||0):(b.score||0)-(a.score||0))||String(b.v.date||'').localeCompare(String(a.v.date||''))||a.i-b.i);
+    rows.sort((a,b)=>{
+      const ad=otdParse(a.v.date)?a.v.date:'',bd=otdParse(b.v.date)?b.v.date:'';
+      const dateOrder=(!ad&&!bd?0:!ad?1:!bd?-1:f.sort==='oldest'?ad.localeCompare(bd):bd.localeCompare(ad));
+      const scoreOrder=(a.score===null&&b.score===null?0:a.score===null?1:b.score===null?-1:f.sort==='lowest'?a.score-b.score:b.score-a.score);
+      return (f.sort==='newest'||f.sort==='oldest'?dateOrder:scoreOrder||dateOrder)||a.vi-b.vi||a.i-b.i;
+    });
     return '<p class="rd-muted">'+rows.length+' of '+stats.courses.length+' courses</p><div class="rd-course-grid">'+rows.map(d=>{
       const cover=getDishCoverPhoto(d.c)||d.c.photo;
       const label=d.c.text||d.c.transcript||'Course '+(d.i+1);
