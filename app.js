@@ -19196,7 +19196,26 @@
     const trips = tripWorldPins();
     const visited = tripWorldVisited(trips, countries);
     tripWorldMapEl.setAttribute('aria-label', visited.size ? 'A globe with the ' + otdPlural(visited.size, 'country', 'countries') + ' you’ve visited highlighted' : 'A globe');
-    const data = { type: 'FeatureCollection', features: countries.map((f, i) => ({ type: 'Feature', id: i, geometry: f.geometry, properties: { v: visited.has(f) ? 1 : 0 } })) };
+    // France's atlas feature includes disconnected overseas territories and
+    // islands. Only the mainland polygon inherits the country-wide visit;
+    // another French component needs an actual pin inside its own outline.
+    const features = [];
+    const pins = trips.flat();
+    countries.forEach(f => {
+      const add = (geometry, v) => features.push({type:'Feature', id:features.length, geometry, properties:{v:v?1:0}});
+      if (String(f.properties.name).toLowerCase() === 'france' && f.geometry.type === 'MultiPolygon'){
+        f.geometry.coordinates.forEach(poly => {
+          const geometry = {type:'Polygon',coordinates:poly};
+          const component = {geometry};
+          // Paris is safely inside the contiguous mainland polygon.
+          const mainland = geoInFeature({lng:2.3522,lat:48.8566},component);
+          add(geometry, mainland ? visited.has(f) && pins.some(p=>geoInFeature(p,component) || (String(p.country || '').trim().toLowerCase() === 'france' && p.lng >= -5.5 && p.lng <= 8.5 && p.lat >= 42 && p.lat <= 51.5 && !f.geometry.coordinates.some(other=>other!==poly && geoInFeature(p,{geometry:{type:'Polygon',coordinates:other}})))) : pins.some(p=>geoInFeature(p,component)));
+        });
+      } else {
+        add(f.geometry,visited.has(f));
+      }
+    });
+    const data = {type:'FeatureCollection',features};
     if (!worldMap){
       worldMap = new lib.Map({ container: tripWorldMapEl, style: worldGlobeStyle(), attributionControl: false, fadeDuration: 0, maxZoom: 4.5, center: [-40, 25], zoom: 1 }); // world copies on: shapes unwrapped past ±180° are drawn back in place
       worldMap.dragRotate.disable();            // north stays up — spinning the globe is dragging it
