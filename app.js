@@ -3336,10 +3336,15 @@
       ? '<p class="details-lastfm-plays">🎧 <strong>' + parsed.userplaycount + '</strong> play' + (parsed.userplaycount === 1 ? '' : 's') + ' by you</p>'
       : '';
     const tracklistHtml = skipTracklist ? '' : (parsed.tracks.length
-      ? '<ol class="details-tracklist">' + parsed.tracks.map(t =>
-          '<li><span class="details-track-name">' + escapeHtml(t.name) + '</span>' +
-          (t.duration ? '<span class="details-track-duration">' + t.duration + '</span>' : '') + '</li>'
-        ).join('') + '</ol>'
+      ? '<ol class="details-tracklist">' + (() => {
+          const songRankIndex = buildSongRankIndex();
+          return parsed.tracks.map(t => {
+            const rank = songRankIndex?.[songTrackMatchKey(artist, album, t.name)];
+            return '<li' + (rank ? ' class="details-track-ranked"' : '') + '><span class="details-track-name">' + escapeHtml(t.name) + '</span>' +
+              detailsTrackSongControlHtml(artist, album, t.name, rank) +
+              (t.duration ? '<span class="details-track-duration">' + t.duration + '</span>' : '') + '</li>';
+          }).join('');
+        })() + '</ol>'
       : '<p class="details-lastfm-status">No tracklist available.</p>');
     const linkHtml = parsed.url
       ? '<a class="details-lastfm-link" href="' + escapeAttr(parsed.url) + '" target="_blank" rel="noopener noreferrer">View on Last.fm →</a>'
@@ -3705,6 +3710,38 @@
     return index;
   }
 
+  function canAddDetailsTrackToSongs(){
+    // Do not disturb an in-progress duel ranking or unsaved manual edits.
+    return songIsComplete && !songEditMode && !guestViewEnabled && !isLockedGuestAccount;
+  }
+
+  function detailsTrackSongControlHtml(artist, album, title, rank){
+    if (rank) return '<span class="details-track-song-rank" title="Ranked #' + rank + ' in your Song Rankings">#' + rank + '</span>';
+    if (!artist || !album || !title || !canAddDetailsTrackToSongs()) return '';
+    return '<button type="button" class="details-track-add-song" data-track-title="' + escapeAttr(title) +
+      '" title="Add to end of Songs" aria-label="Add ' + escapeAttr(title) + ' to Songs">+</button>';
+  }
+
+  function addDetailsTrackToSongs(button){
+    if (!selectedItem || !canAddDetailsTrackToSongs()) return;
+    const p = parseEntry(selectedItem);
+    const title = button.dataset.trackTitle;
+    if (!p.artist || !p.album || !title) return;
+    const key = songTrackMatchKey(p.artist, p.album, title);
+    let rank = buildSongRankIndex()?.[key];
+    if (!rank){
+      songFinalRanking = songFinalRanking.concat(p.artist + ' - ' + title + ' (' + p.album + ')');
+      songItems = songFinalRanking.slice();
+      songHistory = [];
+      rank = songFinalRanking.length;
+      saveSongProgress();
+      renderSongResultsTab();
+      showToast('Added to Songs at #' + rank);
+    }
+    button.closest('li').classList.add('details-track-ranked');
+    button.outerHTML = detailsTrackSongControlHtml(p.artist, p.album, title, rank);
+  }
+
   function renderMusicbeeTracklistHtml(tracks, artist, album){
     const songRankIndex = buildSongRankIndex();
     return '<p class="details-lastfm-status" style="margin-bottom:10px;">'+(isManualRedPaintingsAlbum(artist,album)?'🎵 Manually recorded tracklist':'🎵 From your MusicBee library')+'</p>' +
@@ -3719,13 +3756,7 @@
         const ratingHtml = '<span class="details-track-rating">' + (t.rating !== null ? starString(t.rating) : '') + '</span>';
         const loveHtml = '<span class="details-track-loved"' + (t.loved ? ' title="Loved">❤' : '>') + '</span>';
         const songRank = (songRankIndex && artist) ? songRankIndex[songTrackMatchKey(artist, album, t.title)] : undefined;
-        // Unlike rating/loved, this one deliberately does NOT reserve fixed
-        // width on every row — only a small fraction of tracks will ever
-        // have one, so a row that has it is *meant* to look different from
-        // the rest, not slot into a uniform column.
-        const songRankHtml = songRank
-          ? '<span class="details-track-song-rank" title="Ranked #' + songRank + ' in your Song Rankings">#' + songRank + '</span>'
-          : '';
+        const songRankHtml = detailsTrackSongControlHtml(artist, album, t.title, songRank);
         const rowClass = songRank ? ' class="details-track-ranked"' : '';
         return '<li' + rowClass + '>' + trackNumHtml + '<span class="details-track-name">' + escapeHtml(t.title) + '</span>' + songRankHtml + ratingHtml + loveHtml + '</li>';
       }).join('') + '</ol>';
@@ -5181,6 +5212,14 @@
     if (artLightboxOverlay.contains(e.target) || modalOverlay.contains(e.target) || tsheetOverlay.contains(e.target)) return;
     closeDetailsPanel();
   }, true);
+
+  // Delegate so Last.fm tracklists loaded asynchronously get the same action.
+  detailsPanelInner.addEventListener('click', e => {
+    const button = e.target.closest('.details-track-add-song');
+    if (!button) return;
+    e.stopPropagation();
+    addDetailsTrackToSongs(button);
+  });
 
   function renderDetailsPanelContent(item){
     const p = parseEntry(item);
