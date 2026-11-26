@@ -4431,7 +4431,8 @@
   function renderAlbumSortHelper(){
     const state = albumSortHelperState;
     if (!state) return;
-    if (state.history.length && state.hi - state.lo + 1 <= 20){ finishAlbumSortHelper(); return; }
+    // Finish only when the inclusive insertion bounds identify one exact rank.
+    if (state.lo === state.hi){ finishAlbumSortHelper(); return; }
     state.mid = Math.floor((state.lo + state.hi) / 2);
     albumSortHelperDialog.querySelector('[data-progress]').textContent = 'Duel ' + (state.history.length + 1);
     albumSortHelperDialog.querySelector('[data-undo]').disabled = !state.history.length;
