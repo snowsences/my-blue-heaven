@@ -862,7 +862,7 @@
         showRows: mediaState.show.rows, showSavedAt: mediaState.show.lastSavedAt
       },
       dishes: { dishFullListText, dishFullListTextSavedAt, dishOrder, dishOrderSavedAt },
-      settings: { lastfmApiKey, lastfmUsername, lastManualExportAt, pointsAlgorithm, pointsAlgorithmSavedAt, coverRotationInterval, coverRotationIntervalSavedAt }
+      settings: { lastfmApiKey, lastfmUsername, lastManualExportAt, pointsAlgorithm, pointsAlgorithmSavedAt, coverRotationInterval, coverRotationIntervalSavedAt, almManual, almSavedAt }
     };
   }
 
@@ -1186,6 +1186,9 @@
         renderPhotosPage();
       }
     }
+    if (Array.isArray(existing.almManual) && new Date(existing.almSavedAt || 0).getTime() > new Date(almSavedAt || 0).getTime()){
+      almManual=almManualNormalize(existing.almManual);almSavedAt=existing.almSavedAt;almPersist();
+    }
     if (Array.isArray(existing.photoTags) && new Date(existing.photoTagsSavedAt || 0).getTime() > new Date(photoTagsSavedAt || 0).getTime()){
       photoTags = normalizePhotoTags(existing.photoTags);
       photoTagsSavedAt = existing.photoTagsSavedAt;
@@ -1378,7 +1381,7 @@
       || (Array.isArray(roadRows) && roadRows.length >= 1)
       || (Array.isArray(parkRows) && parkRows.length >= 1)
       || (Array.isArray(photoRows) && photoRows.length >= 1)
-      || photoTags.length > 0 || !!photoTagsSavedAt
+      || photoTags.length > 0 || !!photoTagsSavedAt || almManual.length > 0 || !!almSavedAt
       || (Array.isArray(tripRows) && tripRows.length >= 1)
       || (Array.isArray(activityRows) && activityRows.length >= 1)
       || (Array.isArray(mediaState.book.rows) && mediaState.book.rows.length >= 1)
@@ -1392,6 +1395,7 @@
     cloudReadOk = true;
     if (hasCurrentData) writeFirestoreData();
     yirRefreshIfOpen(); // if Year in Review is open while the cloud copy lands, show what just arrived
+    almRefresh();
     calRefreshIfOpen();
   }
 
@@ -1497,6 +1501,7 @@
     }
 
     await loadPhotoTags();
+    await almLoadManual();
     // Same independent-local-key pattern as Songs.
     let localRestaurantParsed = null;
     try{
@@ -1737,7 +1742,7 @@
   // regardless of which function created it or when.
   document.addEventListener('load', (e) => {
     const img = e.target;
-    if (img && img.tagName === 'IMG' && (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb, .pc-day-hero, .pc-photo-tile'))){
+    if (img && img.tagName === 'IMG' && (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb, .pc-day-hero, .pc-photo-tile') || img.classList.contains('alm-image'))){
       img.classList.add('img-loaded');
     }
   }, true);
@@ -1757,7 +1762,7 @@
   document.addEventListener('error', (e) => {
     const img = e.target;
     if (!img || img.tagName !== 'IMG') return;
-    if (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb, .pc-day-hero, .pc-photo-tile')){
+    if (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb, .pc-day-hero, .pc-photo-tile') || img.classList.contains('alm-image')){
       img.classList.add('img-loaded'); // stops the shimmer even on failure, rather than animating forever on a broken image
     }
     if (!img.dataset.brokenFallback){ // only once, so a failing placeholder can never loop
@@ -15025,7 +15030,7 @@
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
       hikeFullListText, dishFullListText,
-      coverRotationInterval, coverRotationIntervalSavedAt,
+      coverRotationInterval, coverRotationIntervalSavedAt, almManual, almSavedAt,
       savedAt: new Date().toISOString()
     }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
@@ -15260,6 +15265,7 @@
     if (calOverlay.classList.contains('open')){ closeActivityCalendar(); return; }
     if (tmapOverlay && tmapOverlay.classList.contains('open')){ closeTripMap(); return; }
     if (tripOverlay.classList.contains('open')){ closeTrip(); return; }
+    if (almOverlay.classList.contains('open')){ almClose(); return; }
   }
 
   window.addEventListener('popstate', () => {
@@ -18530,6 +18536,294 @@
   BACK_BUTTON_OVERLAYS.push({ el: activityDetailsPanel, openClass: 'open' });
   new MutationObserver(handleOverlayClassChange).observe(activityDetailsPanel, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(handleOverlayClassChange).observe(yirOverlay, { attributes: true, attributeFilter: ['class'] });
+
+
+  // ---------- PERSONAL ALMANAC ----------
+  // Derived data only. Manual historical countries are an independent, timestamped setting.
+  const ALM_KEY='personal-almanac-countries-v1';
+  const ALM_SECTIONS=['Overview','Food','Nature','Photos','Travel'];
+  const almOverlay=document.getElementById('alm-overlay'), almPanel=document.getElementById('alm-panel');
+  const almScroll=document.getElementById('alm-scroll'), almContent=document.getElementById('alm-content');
+  const almTabs=document.getElementById('alm-tabs'), almCloseBtn=document.getElementById('alm-close');
+  const almCard=document.getElementById('fun-card-almanac'), almLaunch=document.getElementById('alm-launch');
+  let almManual=[], almSavedAt=null, almData=null, almSection='Overview', almFocus=null, almActions=[], almCountryDetail='';
+  let almPhotoYear='', almPhotoTags=['','',''], almCountrySort='first', almChartType='Food', almLimits={}, almAtlas=null, almAtlasLoading=false;
+  const almOwner=()=>!guestViewEnabled&&!isLockedGuestAccount&&!document.body.classList.contains('guest-view-active');
+  const almEsc=x=>escapeHtml(String(x??''));
+  const almAttr=x=>escapeAttr(String(x??''));
+  const almNum=n=>Number(n||0).toLocaleString('en-US',{maximumFractionDigits:1});
+  const almCodes='AF AL DZ AD AO AG AR AM AU AT AZ BS BH BD BB BY BE BZ BJ BT BO BA BW BR BN BG BF BI CV KH CM CA CF TD CL CN CO KM CG CD CR CI HR CU CY CZ DK DJ DM DO EC EG SV GQ ER EE SZ ET FJ FI FR GA GM GE DE GH GR GD GT GN GW GY HT HN HU IS IN ID IR IQ IE IL IT JM JP JO KZ KE KI KP KR KW KG LA LV LB LS LR LY LI LT LU MG MW MY MV ML MT MH MR MU MX FM MD MC MN ME MA MZ MM NA NR NP NL NZ NI NE NG MK NO OM PK PW PS PA PG PY PE PH PL PT QA RO RU RW KN LC VC WS SM ST SA SN RS SC SL SG SK SI SB SO ZA SS ES LK SD SR SE CH SY TW TJ TZ TH TL TG TO TT TN TR TM TV UG UA AE GB US UY UZ VU VA VE VN YE ZM ZW XK'.split(' ');
+  const almCountryNames=new Map(), almCountryKeys=new Map();
+  function almNorm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[.]/g,'').replace(/[’']/g,'').replace(/\s+/g,' ').trim();}
+  const almDisplayNames=new Intl.DisplayNames(['en'],{type:'region'});
+  almCodes.forEach(c=>{const n=c==='XK'?'Kosovo':almDisplayNames.of(c);almCountryNames.set(c,n);almCountryKeys.set(almNorm(n),c);});
+  const almAliases={'united states of america':'US','united states':'US','usa':'US','us':'US','america':'US','united kingdom':'GB','uk':'GB','great britain':'GB','britain':'GB','england':'GB','scotland':'GB','wales':'GB','northern ireland':'GB','czech republic':'CZ','south korea':'KR','s korea':'KR','republic of korea':'KR','north korea':'KP','n korea':'KP','dem rep congo':'CD','democratic republic of the congo':'CD','congo - kinshasa':'CD','congo - brazzaville':'CG','republic of the congo':'CG','ivory coast':'CI','cote divoire':'CI','swaziland':'SZ','turkey':'TR','viet nam':'VN','laos':'LA','burma':'MM','macedonia':'MK','bosnia and herz':'BA','dominican rep':'DO','central african rep':'CF','equatorial guinea':'GQ','solomon is':'SB','cape verde':'CV','vatican city':'VA','holy see':'VA','palestine':'PS','hong kong':'CN','macau':'CN','macao':'CN','puerto rico':'US','guam':'US','us virgin islands':'US','french polynesia':'FR','reunion':'FR','martinique':'FR','guadeloupe':'FR','french guiana':'FR','greenland':'DK','faroe islands':'DK','aruba':'NL','curacao':'NL','bermuda':'GB'};
+  Object.entries(almAliases).forEach(([k,v])=>almCountryKeys.set(almNorm(k),v));
+  function almCountry(value, allowCode=true){
+    const s=String(value||'').trim();
+    if(allowCode&&/^[A-Z]{2}$/.test(s)&&almCountryNames.has(s))return s;
+    return almCountryKeys.get(almNorm(s))||'';
+  }
+  function almCountryOf(row){
+    const direct=almCountry(row?.country);if(direct)return direct;
+    const loc=String(row?.location||'').split(',').map(x=>x.trim()).filter(Boolean);
+    if(loc.length>1){const last=loc.at(-1), state=String(row?.state||last).trim();
+      if(Object.prototype.hasOwnProperty.call(US_STATE_NAMES,state.toUpperCase()))return 'US';
+      const match=almCountry(last,false);if(match)return match;
+      if(Object.values(US_STATE_NAMES).some(n=>almNorm(n)===almNorm(last))&&almNorm(last)!=='georgia')return 'US';
+      if(/^(BC|AB|ON|QC|MB|SK|NS|NB|NL|PE|NT|NU|YT|British Columbia|Alberta|Ontario|Quebec|Manitoba|Saskatchewan|Nova Scotia|New Brunswick|Newfoundland and Labrador|Prince Edward Island|Yukon)$/i.test(last))return 'CA';
+    }
+    const state=String(row?.state||'').trim();
+    if(state&&(Object.prototype.hasOwnProperty.call(US_STATE_NAMES,state.toUpperCase())||Object.values(US_STATE_NAMES).some(n=>almNorm(n)===almNorm(state)&&almNorm(n)!=='georgia')))return 'US';
+    return loc.length===1?almCountry(loc[0],false):'';
+  }
+  function almFlag(c){return c==='XK'?'🇽🇰':Array.from(c,x=>String.fromCodePoint(127397+x.charCodeAt(0))).join('');}
+  function almManualNormalize(raw){
+    const out=new Map(), max=new Date().getFullYear();
+    (Array.isArray(raw)?raw:[]).slice(0,250).forEach(x=>{if(!x||!almCountryNames.has(x.code))return;const y=Number(x.year);out.set(x.code,{code:x.code,year:Number.isInteger(y)&&y>=1900&&y<=max?y:null});});
+    return [...out.values()];
+  }
+  async function almLoadManual(){
+    try{const r=await window.storage.get(ALM_KEY,false);if(r?.value){const p=JSON.parse(r.value);almManual=almManualNormalize(p.countries);almSavedAt=p.savedAt||null;}}catch(e){}
+  }
+  function almPersist(){try{window.storage.set(ALM_KEY,JSON.stringify({countries:almManual,savedAt:almSavedAt}),false);}catch(e){}}
+  function almSaveManual(){if(!almOwner())return;almSavedAt=new Date().toISOString();almPersist();scheduleSyncWrite('non-art');almRefresh();}
+  const almDate=(s,today)=>{const p=otdParse(s);return p&&p.str<=today?p:null;};
+  function almCollect(today=otdDateKey(new Date())){
+    const years=new Map(), countries=new Map(), days=new Map(), months=new Map(), restaurants=[], hikes=[], parks=[], roads=[], trips=[];
+    const year=y=>{if(!years.has(y))years.set(y,{y,visits:0,dishes:0,meals:[],newRestaurants:0,hikes:0,newHikes:0,miles:0,feet:0,photos:0,photoDays:0,top:[0,0,0,0],countries:new Set(),tripDays:new Set()});return years.get(y);};
+    const country=code=>{if(!code||!almCountryNames.has(code))return null;if(!countries.has(code))countries.set(code,{code,name:almCountryNames.get(code),first:null,last:null,years:new Set(),trips:new Set(),restaurants:new Set(),visits:0,hikes:new Set(),parks:new Set(),roads:new Set(),photos:new Set(),manual:false});return countries.get(code);};
+    function evidence(code,date,kind,value){
+      const c=country(code);if(!c)return null;
+      if(date){const y=typeof date==='number'?date:date.y;if(y){c.years.add(y);year(y).countries.add(code);c.first=c.first===null?y:Math.min(c.first,y);c.last=c.last===null?y:Math.max(c.last,y);}}
+      if(kind&&c[kind] instanceof Set&&value!==undefined)c[kind].add(value);
+      return c;
+    }
+    const totals={visits:0,dishes:0,outings:0,miles:0,feet:0};
+    const completeTrips=tripRows.filter(t=>{const r=tripRange(t);return !!almDate(r.startKey,today)&&!!almDate(r.endKey,today)&&r.endKey>=r.startKey;});
+    const tripById=new Map(completeTrips.map(t=>[t.id,t]));
+    const tripDate=t=>almDate(tripRange(t).startKey,today);
+    restaurantRows.forEach(r=>{
+      const completed=(r.visits||[]).map(v=>({v,p:almDate(v.date,today)})).filter(x=>x.p);
+      if(!completed.length)return;
+      const code=almCountryOf(r), entry={r,code,visits:completed,first:completed.map(x=>x.p.str).sort()[0],last:completed.map(x=>x.p.str).sort().at(-1)};
+      restaurants.push(entry);year(Number(entry.first.slice(0,4))).newRestaurants++;
+      completed.forEach(({v,p})=>{
+        const y=year(p.y);y.visits++;totals.visits++;
+        const rated=(v.courses||[]).filter(c=>rdScore(c)!==null).length; y.dishes+=rated;totals.dishes+=rated;
+        const m=bestMealScore(v);if(m){const meal={r,v,p,...m};y.meals.push(meal);}
+        const c=evidence(code,p,'restaurants',r);if(c){c.visits++;if(tripById.has(v.tripId))c.trips.add(tripById.get(v.tripId));}
+      });
+    });
+    getOrderedHikes().forEach((h,i)=>{
+      const visits=(h.dates||[]).map(d=>({d,p:almDate(d.date,today)})).filter(x=>x.p);
+      if(!visits.length)return;
+      const byDay=new Map(visits.map(x=>[x.p.str,x])), code=almCountryOf(h), score=hikeTotal(h);
+      const dates=[...byDay.values()].sort((a,b)=>a.p.str.localeCompare(b.p.str)), entry={h,code,dates,rank:i+1,score};
+      hikes.push(entry);year(dates[0].p.y).newHikes++;
+      dates.forEach(({d,p})=>{
+        const y=year(p.y), miles=yirNum(h.distance),feet=yirNum(h.elevation);
+        y.hikes++;y.miles+=miles;y.feet+=feet;totals.outings++;totals.miles+=miles;totals.feet+=feet;
+        const c=evidence(code,p,'hikes',h);if(c&&tripById.has(d.tripId))c.trips.add(tripById.get(d.tripId));
+      });
+    });
+    parkRows.forEach(p=>{
+      const score=parkTotal(p);if(score===null&&!p.coverPhoto&&!(p.photos||[]).length)return;
+      const code=almCountryOf(p), t=tripById.get(p.tripId);parks.push({p,score,code});evidence(code,t?tripDate(t):null,'parks',p);
+    });
+    roadRows.forEach(r=>{
+      const score=roadTotal(r),t=tripById.get(r.tripId);if(score===null&&!r.coverPhoto&&!(r.photos||[]).length&&!t)return;
+      const code=almCountryOf(r);roads.push({r,score,code});const c=evidence(code,t?tripDate(t):null,'roads',r);if(c&&t)c.trips.add(t);
+    });
+    // Build a single linked-record index; do not scan every record for each trip.
+    const linked=new Map(completeTrips.map(t=>[t.id,{visits:[],hikes:[],roads:[],photos:[]}]));
+    restaurants.forEach(e=>e.visits.forEach(({v,p})=>linked.get(v.tripId)?.visits.push({r:e.r,v,date:p.str})));
+    hikes.forEach(e=>e.dates.forEach(({d,p})=>linked.get(d.tripId)?.hikes.push({h:e.h,d,date:p.str})));
+    roads.forEach(e=>linked.get(e.r.tripId)?.roads.push({rd:e.r,date:''}));
+    completeTrips.forEach(t=>{
+      const range=tripRange(t), start=almDate(range.startKey,today);trips.push(t);
+      // A set of ISO dates avoids double-counting overlapping trips.
+      const first=Date.parse(range.startKey+'T00:00:00Z'), last=Date.parse(range.endKey+'T00:00:00Z');
+      if(!tripIsMonth(t)&&Number.isFinite(first)&&Number.isFinite(last)&&last-first<=3660*86400000)
+        for(let d=first;d<=last;d+=86400000){const key=new Date(d).toISOString().slice(0,10);year(Number(key.slice(0,4))).tripDays.add(key);}
+      tripStops(t,linked.get(t.id)).forEach(s=>{
+        if(/\b(airport|layover|connection|transit only)\b/i.test(s.name||''))return;
+        const parsed=(s.days||[]).map(d=>almDate(d,today)).filter(Boolean), dates=parsed.length?parsed:[start];
+        let code=tripStopPinned(s)?almCountry(s.geo.country):'';
+        if(!code&&tripStopPinned(s)&&almAtlas){const f=almAtlas.find(f=>geoInFeature(s.geo,f));if(f)code=almCountry(f.properties.name);}
+        if(!code)code=almCountryOf({location:s.query});
+        if(!code)return;
+        dates.forEach(p=>evidence(code,p,'trips',t));
+      });
+    });
+    const ranked=pcRanked(),members=effectivePhotoTagMembers(photoTags),countryByPhoto=new Map(),seenPhoto=new Set();
+    // Only unambiguous country-level location tags; hierarchy is already expanded.
+    photoTags.forEach(t=>{if(photoTagCategory(t.category)!=='Location')return;const code=almCountry(t.name,false);if(!code)return;(members.get(t.id)||[]).forEach(id=>{if(!countryByPhoto.has(id))countryByPhoto.set(id,new Set());countryByPhoto.get(id).add(code);});});
+    const photos=[];
+    ranked.forEach(x=>{
+      if(!x.p?.url||!x.p.id||seenPhoto.has(x.p.id))return;seenPhoto.add(x.p.id);
+      const p=almDate(x.p.date,today);if(x.date&&!p)return;photos.push(x);
+      const codes=countryByPhoto.get(x.p.id);if(codes?.size===1){const code=[...codes][0], c=evidence(code,p,'photos',x.p);const t=tripById.get(x.p.tripId);if(c&&t)c.trips.add(t);}
+      if(!p)return;
+      const y=year(p.y);y.photos++;y.top[x.rank<=100?0:x.rank<=250?1:x.rank<=500?2:3]++;
+      if(!days.has(p.str)){days.set(p.str,[]);y.photoDays++;}days.get(p.str).push(x);
+      if(!months.has(p.m))months.set(p.m,x);
+    });
+    almManual.forEach(m=>{const c=evidence(m.code,m.year,null);if(c)c.manual=true;});
+    const ys=[...years.values()].sort((a,b)=>a.y-b.y);
+    const meals=ys.flatMap(y=>y.meals);
+    const mealOrder=(a,b)=>b.rank-a.rank||b.avg-a.avg||b.p.str.localeCompare(a.p.str);
+    ys.forEach(y=>y.meals.sort(mealOrder));
+    const knownYears=ys.map(y=>y.y);
+    return {years:ys,countries,days,months,restaurants,hikes,parks,roads,trips,photos,totals,members,meals,mealOrder,first:knownYears[0],last:knownYears.at(-1)};
+  }
+  function almAction(fn){almActions.push(fn);return ' data-alm-action="'+(almActions.length-1)+'"';}
+  function almImg(url,w=240){if(!url)return '';const u=String(url);if(!/^https?:\/\//i.test(u)&&!/^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(u)&&!/^blob:/i.test(u))return '';return '<img class="alm-image" src="'+almAttr(cloudinaryThumbUrl(u,w))+'" alt="" loading="lazy" decoding="async">';}
+  const almSectionHtml=(title,note,body)=>'<section class="alm-section"><h2>'+almEsc(title)+'</h2>'+(note?'<p class="alm-note">'+almEsc(note)+'</p>':'')+body+'</section>';
+  const almEmpty=msg=>'<p class="alm-empty">'+almEsc(msg)+'</p>';
+  const almDateLabel=s=>new Date(s+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  function almRow(title,sub,value,fn,url='',eyebrow='',valueSub='',flag=''){
+    return '<button type="button" class="alm-row"'+almAction(fn)+'>'+(flag?'<span class="alm-country-flag" aria-hidden="true">'+almEsc(flag)+'</span>':url?'<span class="alm-thumb">'+almImg(url)+'</span>':'')+'<span class="alm-row-copy">'+(eyebrow?'<small>'+almEsc(eyebrow)+'</small>':'')+'<strong>'+almEsc(title)+'</strong>'+(sub?'<span>'+almEsc(sub)+'</span>':'')+'</span>'+(value!==''?'<span class="alm-value">'+almEsc(value)+(valueSub?'<small>'+almEsc(valueSub)+'</small>':'')+'</span>':'')+'<span class="alm-chevron" aria-hidden="true">›</span></button>';
+  }
+  function almList(key,rows,render,limit=10){
+    if(!rows.length)return almEmpty('Not enough recorded data yet.');
+    const cap=almLimits[key]||limit;
+    return rows.slice(0,cap).map(render).join('')+(rows.length>cap?'<button type="button" class="alm-plain alm-link"'+almAction(()=>{almLimits[key]=Math.min(rows.length,cap+50);almRender(true);})+'>Show '+Math.min(50,rows.length-cap)+' more · '+rows.length+' total ›</button>':'');
+  }
+  function almMetrics(items){return '<div class="alm-metrics">'+items.map(([n,label,action])=>'<button class="alm-metric" type="button"'+almAction(action)+'><strong>'+almNum(n)+'</strong><span>'+almEsc(label)+'</span></button>').join('')+'</div>';}
+  function almChart(rows,fn,format=almNum,stack=false){
+    if(!rows.length)return almEmpty('No dated records yet.');
+    const values=rows.map(fn), max=Math.max(1,...values.map(v=>Array.isArray(v)?v.reduce((a,b)=>a+b,0):v));
+    const colors=['#EDA93F','#54898A','#83A6A4','#B7C8C5'];
+    return '<div class="alm-chart-scroll"><div class="alm-chart">'+rows.map((r,i)=>{
+      const arr=Array.isArray(values[i])?values[i]:[values[i]],v=arr.reduce((a,b)=>a+b,0),label=r.y+': '+format(v);
+      return '<button type="button" class="alm-chart-bar" aria-label="'+almAttr(label)+'; open Year in Review" title="'+almAttr(label)+'"'+almAction(()=>almOpenYear(r.y))+'><span class="alm-chart-value">'+almEsc(format(v))+'</span><span class="alm-chart-track">'+arr.map((x,j)=>'<span class="alm-chart-fill'+(stack?' alm-stack':'')+'" style="height:'+Math.max(0,x/max*100).toFixed(3)+'%;'+(stack?'background:'+colors[j]:'')+'"></span>').join('')+'</span><small>'+r.y+'</small></button>';
+    }).join('')+'</div></div>'+(stack?'<div class="alm-legend">'+['Top 100','101–250','251–500','501+'].map((s,i)=>'<span><i style="background:'+colors[i]+'"></i>'+s+'</span>').join('')+'</div>':'');
+  }
+  function almYearLeaders(items){return items.filter(x=>x.row).map(x=>almRow(x.label,x.row.y,almNum(x.value),()=>almOpenYear(x.row.y))).join('')||almEmpty('Not enough recorded data yet.');}
+  function almLeader(label,fn,eligible=()=>true){const r=almData.years.filter(eligible).slice().sort((a,b)=>fn(b)-fn(a)||b.y-a.y)[0];return {label,row:r&&fn(r)>0?r:null,value:r?fn(r):0};}
+  function almOpenYear(y){if(y<YIR_FIRST_YEAR){showToast('Year in Review starts in '+YIR_FIRST_YEAR);return;}openYearInReview();yirYear=y;yirSignature='';yirRender(false);}
+  function almGoRestaurant(r,v){const i=restaurantRows.indexOf(r);if(i<0)return;funShowPage('restaurants');if(v)restaurantActiveVisitId=v.id;openRestaurantDetailsPanel(i);}
+  function almGoHike(h,d){const i=hikeRows.indexOf(h);if(i<0)return;funShowPage('hikes');openHikeDetailsPanel(i);if(d){const section=[...hikeDetailsPanelInner.querySelectorAll('[data-date-id]')].find(x=>x.dataset.dateId===d.id);section?.scrollIntoView({block:'start'});}}
+  function almGoPark(p){const i=parkRows.indexOf(p);if(i>=0){funShowPage('parks');openParkDetailsPanel(i);}}
+  function almGoRoad(r){const i=roadRows.indexOf(r);if(i>=0){funShowPage('roads');openRoadDetailsPanel(i);}}
+  function almGoPhoto(x,rows=almData.photos){const i=rows.findIndex(y=>y.p.id===x.p.id);if(i>=0)openPhotoLightbox(rows.map(y=>y.p.url),i,null,rows.map(y=>y.p.id));}
+  function almGoDay(key){const p=otdParse(key);if(!p)return;almClose(false);switchTopGroup('photos');switchPhotosSubPage('photo-calendar');pcalYear=String(p.y);pcalRememberYear();pcalOpenDay(p.m+'-'+p.d);}
+  function almGoWorld(){almClose(false);switchTopGroup('trips');setTripsView('world');}
+  function almSwitch(s){if(!ALM_SECTIONS.includes(s))return;almSection=s;almCountryDetail='';try{sessionStorage.setItem('mbh-almanac-section',s);}catch(e){}almRender(false);almTabs.querySelector('[aria-selected=true]')?.scrollIntoView({block:'nearest',inline:'nearest'});}
+  function almSelect(label,key,items,selected){return '<label>'+almEsc(label)+'<select data-alm-filter="'+almAttr(key)+'">'+items.map(([v,n])=>'<option value="'+almAttr(v)+'"'+(String(v)===String(selected)?' selected':'')+'>'+almEsc(n)+'</option>').join('')+'</select></label>';}
+  function almOverview(){
+    const d=almData,t=d.totals, ys=d.years, metric=s=>()=>almSwitch(s);
+    const fns={Food:y=>y.visits,Hiking:y=>y.hikes,Photography:y=>y.photos,Travel:y=>y.tripDays.size};
+    return '<div class="alm-hero"><strong>'+almNum(d.countries.size)+'</strong><span class="alm-hero-label">Countries visited</span><p class="alm-note">Known from your recorded experiences</p><button class="alm-plain alm-link" type="button"'+almAction(metric('Travel'))+'>Explore travel history ›</button></div>'+
+      almMetrics([[d.restaurants.length,'Restaurants',metric('Food')],[t.visits,'Restaurant visits',metric('Food')],[t.dishes,'Rated dishes',metric('Food')],[d.hikes.length,'Unique hikes',metric('Nature')],[t.outings,'Hiking outings',metric('Nature')],[t.miles,'Miles hiked',metric('Nature')],[t.feet,'Feet climbed',metric('Nature')],[d.parks.length,'Parks',metric('Nature')],[d.roads.length,'Scenic roads',metric('Nature')],[d.photos.length,'Gallery photos',metric('Photos')],[d.days.size,'Photography days',metric('Photos')],[d.trips.length,'Completed trips',metric('Travel')]])+
+      almSectionHtml('A lifetime in numbers','Tap a year to open Year in Review.','<div class="alm-filters">'+almSelect('Annual activity','chart',Object.keys(fns).map(s=>[s,s]),almChartType)+'</div>'+almChart(ys,fns[almChartType]));
+  }
+  function almMealRow(m){const url=(m.v.courses||[]).slice().sort((a,b)=>(rdScore(b)||0)-(rdScore(a)||0)).flatMap(c=>otdCoursePhotos(c))[0]||(m.v.photos||[])[0]||m.r.coverPhoto;return almRow(m.r.name,almDateLabel(m.p.str)+' · '+m.count+' rated courses',m.avg.toFixed(1),()=>almGoRestaurant(m.r,m.v),url,String(m.p.y));}
+  function almFood(){
+    const d=almData,ys=d.years, best=ys.filter(y=>y.meals.length).slice().reverse().map(y=>y.meals[0]), visits=d.restaurants.slice().sort((a,b)=>b.visits.length-a.visits.length||a.r.name.localeCompare(b.r.name));
+    const quality=y=>y.meals.slice(0,5).reduce((s,m)=>s+m.rank,0)/5;
+    const top=ys.filter(y=>y.meals.length>=5).slice().sort((a,b)=>quality(b)-quality(a)||b.y-a.y);
+    return almMetrics([[d.restaurants.length,'Restaurants',()=>{}],[d.totals.visits,'Visits',()=>{}],[d.totals.dishes,'Rated dishes',()=>{}]])+
+      '<div class="alm-columns">'+almSectionHtml('Best meal of each year','Same award rules as Year in Review: 6+ rated courses, weighted for sample size.',almList('meal',best,almMealRow))+
+      almSectionHtml('Most visited restaurants','Completed visits, including multiple visits on the same day.',almList('visits',visits,(x,i)=>almRow(x.r.name,almDateLabel(x.first)+' – '+almDateLabel(x.last),x.visits.length,()=>almGoRestaurant(x.r),x.r.coverPhoto,'#'+(i+1),'visits')))+
+      almSectionHtml('Best years for dining','Average weighted score of the five best qualifying meals; at least five are required.',almList('foodYears',top,y=>almRow(String(y.y),y.meals.length+' qualifying meals',quality(y).toFixed(2),()=>almOpenYear(y.y))))+
+      almSectionHtml('Restaurant visits by year','',almChart(ys,y=>y.visits))+almSectionHtml('New restaurants by year','',almChart(ys,y=>y.newRestaurants))+almSectionHtml('Rated dishes by year','',almChart(ys,y=>y.dishes))+
+      almSectionHtml('Average qualifying meal score','Actual average of eligible meal averages; no sample penalty in this chart.',almChart(ys.filter(y=>y.meals.length),y=>y.meals.reduce((s,m)=>s+m.avg,0)/y.meals.length,n=>n.toFixed(1)))+'</div>';
+  }
+  function almNature(){
+    const d=almData,ys=d.years, best=new Map(), bestP=new Map();
+    d.hikes.forEach(x=>{if(x.code&&x.score!==null&&!best.has(x.code))best.set(x.code,x);});
+    d.parks.slice().sort((a,b)=>(b.score??-1)-(a.score??-1)).forEach(x=>{if(x.code&&x.score!==null&&!bestP.has(x.code))bestP.set(x.code,x);});
+    const repeat=d.hikes.filter(x=>x.dates.length>1).slice().sort((a,b)=>b.dates.length-a.dates.length||a.rank-b.rank);
+    return almMetrics([[d.hikes.length,'Unique hikes',()=>{}],[d.totals.outings,'Outings',()=>{}],[d.totals.miles,'Miles',()=>{}],[d.totals.feet,'Feet climbed',()=>{}],[d.parks.length,'Parks',()=>{}],[d.roads.length,'Roads',()=>{}]])+
+      '<div class="alm-columns">'+almSectionHtml('Highest-ranked hike by country','Using the existing overall hike ranking.',almList('bestHikes',[...best.values()],x=>almRow(x.h.name,'#'+x.rank+' overall',x.score,()=>almGoHike(x.h),x.h.coverPhoto,almCountryNames.get(x.code))))+
+      almSectionHtml('Highest-ranked park by country','Parks with a known country and both scores.',almList('bestParks',[...bestP.values()],x=>almRow(x.p.name,'Overall score',x.score,()=>almGoPark(x.p),x.p.coverPhoto,almCountryNames.get(x.code))))+
+      almSectionHtml('Most revisited hikes','Unique outing dates on each trail.',almList('repeatHike',repeat,x=>almRow(x.h.name,almCountryNames.get(x.code)||'',x.dates.length,()=>almGoHike(x.h),x.h.coverPhoto,'','outings')))+
+      almSectionHtml('Hiking mileage by year','',almChart(ys,y=>y.miles))+almSectionHtml('Elevation gain by year','Feet climbed across outings.',almChart(ys,y=>y.feet))+almSectionHtml('New trails by year','',almChart(ys,y=>y.newHikes))+'</div>';
+  }
+  function almPhotoDays(){
+    const d=almData, filters=almPhotoTags.filter(Boolean), result=[];
+    d.days.forEach((rows,date)=>{if(almPhotoYear&&date.slice(0,4)!==almPhotoYear)return;const shown=filters.length?rows.filter(x=>filters.every(id=>d.members.get(id)?.has(x.p.id))):rows;if(shown.length)result.push({date,rows:shown});});
+    return result.sort((a,b)=>b.rows.length-a.rows.length||a.rows[0].rank-b.rows[0].rank||b.date.localeCompare(a.date));
+  }
+  function almPhotos(){
+    const d=almData,ys=d.years, days=almPhotoDays();
+    const filters='<div class="alm-filters">'+almSelect('Year','photoYear',[['','All years'],...ys.filter(y=>y.photos).slice().reverse().map(y=>[y.y,y.y])],almPhotoYear)+['Location','Scenery','Season'].map((c,i)=>almSelect(c,'photoTag'+i,[['','All '+c.toLowerCase()+' tags'],...sortedPhotoTags().filter(t=>photoTagCategory(t.category)===c).map(t=>[t.id,t.name])],almPhotoTags[i])).join('')+'</div>';
+    const dayList=almList('photoDays',days,(x,i)=>'<button type="button" class="alm-day"'+almAction(()=>almGoDay(x.date))+'><span class="alm-day-head"><span class="alm-rank">#'+(i+1)+'</span><b>'+almEsc(almDateLabel(x.date))+'</b><span class="alm-day-count">'+x.rows.length+' photos ›</span></span><span class="alm-day-photos">'+x.rows.slice(0,4).map(p=>'<span class="alm-day-image">'+almImg(p.p.url,400)+'</span>').join('')+'</span></button>');
+    const months='<div class="alm-months">'+PHOTO_MONTHS.map((m,i)=>{const p=d.months.get(i+1);return '<button type="button" class="alm-month"'+(p?almAction(()=>almGoPhoto(p)):' disabled')+'><span class="alm-month-image">'+(p?almImg(p.p.url,400):'')+'</span><strong>'+almEsc(m)+'</strong><small>'+(p?p.date.y+' · #'+p.rank:'No photo')+'</small></button>';}).join('')+'</div>';
+    return almMetrics([[d.photos.length,'Gallery photos',()=>{}],[d.days.size,'Photography days',()=>{}],[d.photos.filter(p=>!p.date).length,'Undated photos',()=>{}]])+
+      almSectionHtml('Most productive photography days','Gallery-worthy photographs by exact capture date, ranked by count; ties use the best photo rank.',filters+dayList)+
+      almSectionHtml('Best photograph of every month','Highest current Gallery rank for each calendar month, across all years.',months)+
+      '<div class="alm-columns">'+almSectionHtml('Best years for photography','Three complementary measures of productivity and quality.',almYearLeaders([almLeader('Most photographs',y=>y.photos),almLeader('Most top-100 photos',y=>y.top[0]),almLeader('Most photography days',y=>y.photoDays)]))+
+      almSectionHtml('Gallery ranking by year','Current master ranking; undated photographs are excluded.',almChart(ys,y=>y.top,almNum,true))+almSectionHtml('Photography days by year','',almChart(ys,y=>y.photoDays))+'</div>';
+  }
+  function almCountryPage(c){
+    const d=almData;
+    return '<button class="alm-plain alm-link alm-subnav" type="button"'+almAction(()=>{almCountryDetail='';almRender(false);})+'>‹ All countries</button>'+
+      '<div class="alm-country-head"><strong>'+almFlag(c.code)+'</strong><h2>'+almEsc(c.name)+'</h2></div><p class="alm-note">'+almEsc(c.first?'First known visit '+c.first+(c.last!==c.first?' · Most recent '+c.last:''):'Visit year unknown')+'</p>'+
+      almMetrics([[c.trips.size,'Trips',()=>{}],[c.restaurants.size,'Restaurants',()=>{}],[c.visits,'Restaurant visits',()=>{}],[c.hikes.size,'Hikes',()=>{}],[c.parks.size,'Parks',()=>{}],[c.photos.size,'Gallery photos',()=>{}]])+
+      '<div class="alm-columns">'+almSectionHtml('Trips','',almList('ctTrips',[...c.trips],t=>almRow(t.name||'Trip',tripDateLabel(t),'',()=>openTrip(t.id),t.coverPhoto)))+
+      almSectionHtml('Restaurants','',almList('ctRestaurants',d.restaurants.filter(x=>c.restaurants.has(x.r)),x=>almRow(x.r.name,x.visits.length+' visits','',()=>almGoRestaurant(x.r),x.r.coverPhoto)))+
+      almSectionHtml('Hikes','',almList('ctHikes',d.hikes.filter(x=>c.hikes.has(x.h)),x=>almRow(x.h.name,'#'+x.rank+' overall',x.score??'',()=>almGoHike(x.h),x.h.coverPhoto)))+
+      almSectionHtml('Parks','',almList('ctParks',d.parks.filter(x=>c.parks.has(x.p)),x=>almRow(x.p.name,'',x.score??'',()=>almGoPark(x.p),x.p.coverPhoto)))+
+      almSectionHtml('Scenic roads','',almList('ctRoads',d.roads.filter(x=>c.roads.has(x.r)),x=>almRow(x.r.name,'',x.score??'',()=>almGoRoad(x.r),x.r.coverPhoto)))+'</div>'+
+      almSectionHtml('Gallery photographs','Country-level Location tags, including inherited tags.',(()=>{const rows=d.photos.filter(x=>c.photos.has(x.p));if(!rows.length)return almEmpty('No Gallery photographs tagged with this country.');const cap=almLimits.ctPhotos||48;return '<div class="alm-months">'+rows.slice(0,cap).map(x=>'<button class="alm-month" type="button"'+almAction(()=>almGoPhoto(x,rows))+'><span class="alm-month-image">'+almImg(x.p.url,400)+'</span><small>#'+x.rank+'</small></button>').join('')+'</div>'+(rows.length>cap?'<button class="alm-plain alm-link" type="button"'+almAction(()=>{almLimits.ctPhotos=cap+48;almRender(true);})+'>Show more ›</button>':'');})());
+  }
+  function almTravel(){
+    const d=almData, cs=[...d.countries.values()], ys=d.years;if(almCountryDetail&&d.countries.has(almCountryDetail))return almCountryPage(d.countries.get(almCountryDetail));
+    const sort={alpha:(a,b)=>a.name.localeCompare(b.name),first:(a,b)=>(a.first??Infinity)-(b.first??Infinity),recent:(a,b)=>(b.last??0)-(a.last??0),trips:(a,b)=>b.trips.size-a.trips.size,photos:(a,b)=>b.photos.size-a.photos.size};
+    cs.sort((a,b)=>sort[almCountrySort](a,b)||a.name.localeCompare(b.name));
+    const unknown=cs.filter(c=>c.first===null).length;
+    const firstCount=y=>cs.filter(c=>c.first===y.y).length;
+    const countryRows=almList('countries',cs,c=>almRow(c.name,c.first?'First known visit '+c.first:'Year unknown',c.trips.size,()=>{almCountryDetail=c.code;Object.keys(almLimits).filter(k=>k.startsWith('ct')).forEach(k=>delete almLimits[k]);almRender(false);},'',c.manual?'Historical entry':'','trips',almFlag(c.code)),30);
+    const manual='<form class="alm-form" id="alm-country-form"><label>Country<select name="country" required><option value="">Select country</option>'+[...almCountryNames].sort((a,b)=>a[1].localeCompare(b[1])).map(([c,n])=>'<option value="'+c+'">'+almEsc(n)+'</option>').join('')+'</select></label><label>First visit year (optional)<input name="year" type="number" min="1900" max="'+new Date().getFullYear()+'" placeholder="Unknown"></label><button type="submit" class="btn-primary">Add / update</button></form>'+
+      (almManual.length?'<div class="alm-manual-list">'+almManual.map(m=>'<button type="button"'+almAction(()=>{if(!almOwner())return;almManual=almManual.filter(x=>x.code!==m.code);almSaveManual();})+' aria-label="Remove historical entry for '+almAttr(almCountryNames.get(m.code))+'">'+almEsc(almCountryNames.get(m.code)+(m.year?' · '+m.year:''))+' ×</button>').join('')+'</div>':'');
+    return '<div class="alm-hero"><strong>'+cs.length+'</strong><span class="alm-hero-label">Countries visited</span><p class="alm-note">'+unknown+' without a known first-visit year</p><button type="button" class="alm-plain alm-link"'+almAction(almGoWorld)+'>Open Trips World View ›</button></div>'+
+      '<div class="alm-columns">'+almSectionHtml('Countries over time','Cumulative known first-visit years; undated countries are not placed in the chart.',almChart(ys,y=>cs.filter(c=>c.first!==null&&c.first<=y.y).length))+
+      almSectionHtml('Best years for travel','Separate measures, not a subjective trip-quality score.',almYearLeaders([almLeader('Most new countries',firstCount),almLeader('Most countries visited',y=>y.countries.size),almLeader('Most trip days',y=>y.tripDays.size)]))+
+      almSectionHtml('Countries visited each year','Countries with dated evidence in that year.',almChart(ys,y=>y.countries.size))+almSectionHtml('Days on trips each year','Exact completed trip dates only; overlapping days count once.',almChart(ys,y=>y.tripDays.size))+'</div>'+
+      almSectionHtml('Country directory','Countries with known evidence; unrecognized locations are not guessed. Dependencies are grouped with their parent country where mapped.', '<div class="alm-filters">'+almSelect('Sort by','countrySort',[['first','First known visit'],['recent','Most recent visit'],['alpha','Alphabetical'],['trips','Trips'],['photos','Photographs']],almCountrySort)+'</div>'+countryRows)+
+      almSectionHtml('Add a historical country','For travel before you kept records here. Removing an entry only removes this manual evidence, never the original records.',manual);
+  }
+  function almRender(keep=false){
+    if(!almOwner()||!almData)return;
+    const y=almScroll.scrollTop;almActions=[];
+    document.getElementById('alm-period').textContent='A lifetime of experiences'+(almData.first?' · '+almData.first+(almData.last!==almData.first?'–'+almData.last:''):'');
+    almTabs.innerHTML=ALM_SECTIONS.map(s=>'<button type="button" class="alm-tab" data-alm-section="'+s+'" aria-selected="'+(s===almSection)+'" role="tab" id="alm-tab-'+s+'">'+s+'</button>').join('');
+    almTabs.setAttribute('role','tablist');almContent.setAttribute('role','tabpanel');almContent.setAttribute('aria-labelledby','alm-tab-'+almSection);
+    almContent.innerHTML=({Overview:almOverview,Food:almFood,Nature:almNature,Photos:almPhotos,Travel:almTravel})[almSection]();
+    // Cached images can finish before the delegated event is observed.
+    almContent.querySelectorAll('.alm-image').forEach(img=>{if(img.complete&&img.naturalWidth)img.classList.add('img-loaded');});
+    almScroll.scrollTop=keep?y:0;
+  }
+  function almRefresh(){if(!almOverlay.classList.contains('open'))return;if(!almOwner()){almClose(false);return;}almData=almCollect();almRender(true);}
+  function almOpen(){
+    if(!almOwner()||almOverlay.classList.contains('open'))return;
+    almFocus=document.activeElement;almLimits={};almCountryDetail='';
+    try{const saved=sessionStorage.getItem('mbh-almanac-section');if(ALM_SECTIONS.includes(saved))almSection=saved;}catch(e){}
+    almData=almCollect();almRender(false);almOverlay.classList.add('open');almOverlay.setAttribute('aria-hidden','false');document.body.classList.add('details-open-lock');almCloseBtn.focus({preventScroll:true});
+    // Cached geographic outlines only; never geocode or mutate records for Almanac.
+    if(!almAtlas&&!almAtlasLoading){almAtlasLoading=true;tripWorldCountries().then(f=>{almAtlas=f;almRefresh();}).catch(()=>{}).finally(()=>almAtlasLoading=false);}
+  }
+  function almClose(restore=true){
+    if(!almOverlay.classList.contains('open'))return;
+    almOverlay.classList.remove('open');almOverlay.setAttribute('aria-hidden','true');almContent.innerHTML='';almActions=[];almData=null;
+    if(countOpenOverlays()===0)document.body.classList.remove('details-open-lock');
+    if(restore&&almFocus?.isConnected){if(!pageFun.classList.contains('active'))funShowPage('fun');almFocus.focus({preventScroll:true});}almFocus=null;
+  }
+  function almUpdateAccess(){almCard.hidden=!almOwner();if(!almOwner())almClose(false);}
+  almLaunch.addEventListener('click',almOpen);almCloseBtn.addEventListener('click',()=>almClose());
+  almTabs.addEventListener('click',e=>{const b=e.target.closest('[data-alm-section]');if(b&&almOwner())almSwitch(b.dataset.almSection);});
+  almTabs.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const i=ALM_SECTIONS.indexOf(almSection);const next=e.key==='Home'?0:e.key==='End'?4:(i+(e.key==='ArrowRight'?1:4))%5;e.preventDefault();almSwitch(ALM_SECTIONS[next]);almTabs.querySelector('[aria-selected=true]')?.focus();});
+  almContent.addEventListener('click',e=>{const b=e.target.closest('[data-alm-action]');if(b&&almOwner()){const fn=almActions[Number(b.dataset.almAction)];if(fn)fn();}});
+  almContent.addEventListener('change',e=>{if(!almOwner())return;const key=e.target.dataset.almFilter,v=e.target.value;if(!key)return;if(key==='chart'&&['Food','Hiking','Photography','Travel'].includes(v))almChartType=v;else if(key==='photoYear'){almPhotoYear=v;delete almLimits.photoDays;}else if(/^photoTag[0-2]$/.test(key)){almPhotoTags[Number(key.at(-1))]=v;delete almLimits.photoDays;}else if(key==='countrySort'&&['alpha','first','recent','trips','photos'].includes(v))almCountrySort=v;almRender(true);});
+  almContent.addEventListener('submit',e=>{if(e.target.id!=='alm-country-form')return;e.preventDefault();if(!almOwner())return;const f=new FormData(e.target),code=f.get('country'),raw=f.get('year'),year=raw?Number(raw):null;if(!almCountryNames.has(code)||raw&&(!Number.isInteger(year)||year<1900||year>new Date().getFullYear()))return;almManual=almManualNormalize([...almManual.filter(x=>x.code!==code),{code,year}]);almSaveManual();showToast('Historical country saved');});
+  document.addEventListener('keydown',e=>{if(!almOverlay.classList.contains('open')||countOpenOverlays()>1)return;if(e.key==='Escape'){e.preventDefault();almClose();return;}if(e.key==='Tab'){const f=[...almPanel.querySelectorAll('button:not([disabled]),select,input')].filter(x=>x.offsetParent!==null);if(!f.length)return;if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===f.at(-1)){e.preventDefault();f[0].focus();}}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')almRefresh();});
+  ['touchstart','touchend'].forEach(t=>almOverlay.addEventListener(t,e=>e.stopPropagation(),{passive:true}));
+  BACK_BUTTON_OVERLAYS.push({el:almOverlay,openClass:'open'});new MutationObserver(handleOverlayClassChange).observe(almOverlay,{attributes:true,attributeFilter:['class']});
+  new MutationObserver(almUpdateAccess).observe(document.body,{attributes:true,attributeFilter:['class']});almUpdateAccess();
 
   // ---------- ACTIVITY CALENDAR ----------
   // A year at a glance: one square per day, colored by how much happened —
