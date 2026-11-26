@@ -4238,6 +4238,81 @@
   }
 
 
+  // Same bounded insertion search as the photo Sort Helper. Only the
+  // selected song moves; all other songs retain their relative order.
+  let songSortHelperState=null;
+  const songSortHelperDialog=document.createElement('dialog');
+  songSortHelperDialog.setAttribute('aria-label','Sort Helper');
+  songSortHelperDialog.className='song-sort-helper';
+  songSortHelperDialog.style.cssText=photoSortHelperDialog.style.cssText;
+  songSortHelperDialog.innerHTML='<div style="display:flex;flex-direction:column;height:100%;gap:12px"><header style="display:flex;align-items:center;gap:12px;flex:none"><strong style="font-size:18px">Sort Helper</strong><span data-progress style="color:var(--chalk-dim);font-size:13px;margin-left:auto" aria-live="polite"></span><button data-undo type="button" title="Undo last choice" aria-label="Undo last choice">↶</button><button data-close type="button" title="Cancel" aria-label="Cancel">✕</button></header><div style="text-align:center;font-size:14px;color:var(--chalk-dim)">Which song is better?</div><div data-pair style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:12px;flex:1;min-height:0"><button data-choice="selected" type="button" aria-label="Choose selected song"></button><button data-choice="other" type="button" aria-label="Choose comparison song"></button></div></div>';
+  const songSortHelperStyle=document.createElement('style');
+  songSortHelperStyle.textContent='.song-sort-helper-btn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:36px;min-height:40px;padding:0;border:0;border-radius:4px;background:transparent;color:var(--chalk-dim);cursor:pointer;touch-action:manipulation}.song-sort-helper-btn:hover{color:var(--amber)}.song-sort-helper-btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}dialog.song-sort-helper [data-choice]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px;text-align:center;border:0;border-radius:4px}dialog.song-sort-helper .song-helper-art{display:grid;place-items:center;min-height:0;width:min(100%,360px);max-height:65%;aspect-ratio:1;flex:0 1 auto;overflow:hidden;font-size:48px;color:var(--chalk-dim)}dialog.song-sort-helper .song-helper-art img{object-fit:contain}dialog.song-sort-helper .song-helper-copy{display:flex;flex-direction:column;gap:5px;max-width:100%;overflow-wrap:anywhere}dialog.song-sort-helper .song-helper-copy strong{font-size:clamp(17px,3vw,25px);font-weight:500}dialog.song-sort-helper .song-helper-copy span{font-size:14px;color:var(--chalk-dim)}dialog.song-sort-helper [data-choice]:hover{background:var(--panel)}';
+  document.head.appendChild(songSortHelperStyle);
+  document.body.appendChild(songSortHelperDialog);
+  function closeSongSortHelper(){
+    songSortHelperState=null;
+    if(songSortHelperDialog.open)songSortHelperDialog.close();
+  }
+  function songSortHelperEligible(index){
+    return songIsComplete&&!songEditMode&&!guestViewEnabled&&!isLockedGuestAccount&&songFinalRanking.length>=2&&index>=Math.ceil(songFinalRanking.length/2)&&index<songFinalRanking.length;
+  }
+  function songSortHelperCard(raw){
+    const p=parseSongEntry(raw),albumRaw=findAlbumRawForSong(p),art=albumRaw?artCache[albumRaw]:null;
+    return '<span class="song-helper-art">'+(art?'<img alt="" src="'+escapeAttr(cloudinaryThumbUrl(art,600))+'">':'🎵')+'</span><span class="song-helper-copy"><strong>'+escapeHtml(p.artist?p.title:raw)+'</strong><span>'+songMetaLine(p)+'</span></span>';
+  }
+  function finishSongSortHelper(){
+    const state=songSortHelperState;
+    if(!state)return;
+    if(!songIsComplete||songEditMode||guestViewEnabled||isLockedGuestAccount||songFinalRanking.length!==state.original.length||songFinalRanking.some((raw,i)=>raw!==state.original[i])){
+      closeSongSortHelper();showToast('Song ranking changed — reopen Sort Helper');return;
+    }
+    const position=Math.floor((state.lo+state.hi)/2),next=state.others.slice();
+    next.splice(position,0,state.selected);
+    songFinalRanking=next;songItems=next.slice();songHistory=[];
+    saveSongProgress();closeSongSortHelper();
+    activeSongArtistFilter='';activeSongGroupingFilter='';
+    renderSongResultsTab();
+    const row=songResultsList.children[position];
+    if(row)row.scrollIntoView({block:'center'});
+    showToast('Song moved to #'+(position+1));
+  }
+  function renderSongSortHelper(){
+    const state=songSortHelperState;if(!state)return;
+    if(state.history.length&&state.hi-state.lo+1<=20){finishSongSortHelper();return;}
+    state.mid=Math.floor((state.lo+state.hi)/2);
+    songSortHelperDialog.querySelector('[data-progress]').textContent='Duel '+(state.history.length+1);
+    songSortHelperDialog.querySelector('[data-undo]').disabled=!state.history.length;
+    songSortHelperDialog.querySelector('[data-choice="selected"]').innerHTML=songSortHelperCard(state.selected);
+    songSortHelperDialog.querySelector('[data-choice="other"]').innerHTML=songSortHelperCard(state.others[state.mid]);
+  }
+  function chooseSongSortHelper(selectedWins){
+    const state=songSortHelperState;if(!state)return;
+    state.history.push([state.lo,state.hi]);
+    if(selectedWins)state.hi=state.mid;else state.lo=state.mid+1;
+    renderSongSortHelper();
+  }
+  function openSongSortHelper(index,raw){
+    if(!songSortHelperEligible(index)||songFinalRanking[index]!==raw||songSortHelperDialog.open)return;
+    const original=songFinalRanking.slice(),others=original.slice();
+    others.splice(index,1);
+    songSortHelperState={selected:raw,others,original,lo:0,hi:others.length,history:[]};
+    songSortHelperDialog.showModal();renderSongSortHelper();
+  }
+  songSortHelperDialog.querySelector('[data-close]').addEventListener('click',closeSongSortHelper);
+  songSortHelperDialog.addEventListener('cancel',e=>{e.preventDefault();closeSongSortHelper();});
+  songSortHelperDialog.querySelector('[data-undo]').addEventListener('click',()=>{
+    const state=songSortHelperState;if(!state||!state.history.length)return;
+    [state.lo,state.hi]=state.history.pop();renderSongSortHelper();
+  });
+  songSortHelperDialog.querySelector('[data-choice="selected"]').addEventListener('click',()=>chooseSongSortHelper(true));
+  songSortHelperDialog.querySelector('[data-choice="other"]').addEventListener('click',()=>chooseSongSortHelper(false));
+  songSortHelperDialog.addEventListener('keydown',e=>{
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;
+    e.preventDefault();e.stopPropagation();
+    if(!e.repeat)chooseSongSortHelper(e.key==='ArrowLeft'||e.key==='ArrowUp');
+  });
+
   function renderSongResultsTab(){
     songDisplayedRanking = songIsComplete ? songFinalRanking : computeSongLiveEstimate();
     loadArtForItems(songDisplayedRanking.map(raw => findAlbumRawForSong(parseSongEntry(raw))).filter(Boolean));
@@ -4300,13 +4375,15 @@
               '</svg>' +
             '</span>'
           : '';
-        rightHtml = groupingChipHtml + dragHandleHtml;
+        const helperHtml=songSortHelperEligible(idx)?'<button class="song-sort-helper-btn" type="button" title="Sort Helper" aria-label="Sort Helper">'+photoSortHelperButton.innerHTML+'</button>':'';
+        rightHtml = groupingChipHtml + helperHtml + dragHandleHtml;
       }
 
       li.innerHTML = artHtml + numHtml + '<span class="rank-item">' + middleHtml + '</span>' + rightHtml;
       songResultsList.appendChild(li);
 
       makeSongRowDraggable(li, raw);
+      li.querySelector('.song-sort-helper-btn')?.addEventListener('click',e=>{e.stopPropagation();openSongSortHelper(idx,raw);});
       if (songEditMode){
         li.querySelector('.row-remove-btn').addEventListener('click', () => requestRemoveSongEditRow(li));
       }
