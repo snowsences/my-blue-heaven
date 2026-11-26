@@ -673,7 +673,7 @@
           <button class="group-sub-tab-btn" data-photo-subpage="photo-calendar" type="button"><span class="group-sub-tab-icon">🗓️</span>Calendar</button>
         </div>
         <div class="restaurant-heading-actions">
-          <button class="btn-ghost" id="photo-edit-toggle-btn" type="button">Edit</button>
+          <div class="photo-gallery-filters">
           <div class="filter-wrap">
             <input type="text" class="filter-input year-filter-input" id="photo-year-filter-input" list="photo-year-filter-datalist" placeholder="Years" autocomplete="off">
             <datalist id="photo-year-filter-datalist"></datalist>
@@ -684,9 +684,13 @@
             <datalist id="photo-season-filter-datalist"></datalist>
             <button class="filter-clear" id="photo-season-filter-clear" type="button" title="Clear season filter" style="display:none;">✕</button>
           </div>
+          </div>
+          <div class="heading-actions-right photo-gallery-actions">
+            <button class="btn-ghost" id="photo-edit-toggle-btn" type="button">Edit</button>
           <span id="photo-tag-manage-host" hidden></span>
           <button class="btn-ghost photo-tag-filter-toggle" id="photo-tag-filter-toggle" type="button" aria-label="Show tag filters" aria-pressed="false" aria-controls="photo-tags-content" title="Show tag filters"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13 11 4H4v7l9 9a2 2 0 0 0 2.8 0l4.2-4.2a2 2 0 0 0 0-2.8Z"/><circle cx="8" cy="8" r="1"/></svg></button>
           <button class="btn-primary" id="photo-add-btn" type="button" aria-label="Add photos" title="Add photos">+</button>
+          </div>
         </div>
       </div>
 

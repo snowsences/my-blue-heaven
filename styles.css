@@ -5084,7 +5084,7 @@
   @keyframes pageFade{ from{ opacity: 0; } }
   @keyframes pageRise{ from{ transform: translateY(6px); } }
   .top-page.active{ animation: pageFade 180ms var(--ease-out) backwards; }
-  .top-page.active > .page-content > :not(.trip-world):not(.trip-year-bar),
+  .top-page.active > .page-content > :not(.trip-world):not(.trip-year-bar):not(#photo-tags-content),
   .top-page.active > #app > *, .top-page.active > .song-app > *{ animation: pageRise 220ms var(--ease-out) backwards; }
 
   /* Cards fade up only when a page first appears (not on every re-render),
@@ -5668,7 +5668,18 @@
 #photo-tag-filter-toggle[aria-pressed=true]{color:var(--amber);background:var(--panel)}
 #photo-tag-manage-host{flex:none;display:inline-flex;align-items:center}
 #photo-tag-manage-host .pt-menu-btn{min-height:44px;padding:0 8px;border:0;background:transparent;font-size:24px}
+/* Keep the filters left and the entire action cluster right, even when edit/manage is hidden. */
+#page-photos .photo-gallery-filters{display:flex;align-items:center;gap:4px;flex:0 1 196px;min-width:0}
+#page-photos .photo-gallery-filters .filter-wrap{flex:1 1 0;min-width:0}
+#page-photos .photo-gallery-filters .filter-wrap:first-child{flex-grow:82}
+#page-photos .photo-gallery-filters .filter-wrap:last-child{flex-grow:110}
+#page-photos .photo-gallery-filters .filter-input{width:100%;min-width:0}
+#page-photos .photo-gallery-actions{gap:4px;flex-wrap:nowrap}
 #photo-add-btn{margin-left:0}
+@media(max-width:420px){
+  #page-photos .photo-gallery-filters{flex:1 1 128px}
+  #page-photos .photo-gallery-filters .filter-input{padding-inline:9px 20px}
+}
 #photo-tags-content .pt-gallery-heading{min-height:24px;margin-bottom:6px}
 @media(max-width:768px){#page-photos.photo-tag-filters-visible .page-content{padding-bottom:calc(110px + var(--mobile-tabbar-height) + env(safe-area-inset-bottom,0px))}}
 
