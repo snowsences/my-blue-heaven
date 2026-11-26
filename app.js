@@ -2512,7 +2512,129 @@
     return selected[(hash >>> 0) % selected.length];
   }
 
+
+  // Single-photo binary insertion into the existing Photos ranking.
+  // Bounds are inclusive insertion slots in the list with the selected photo removed.
+  let photoSortHelperIds = null;
+  let photoSortHelperState = null;
+  const photoSortHelperButton = document.createElement('button');
+  photoSortHelperButton.type = 'button';
+  photoSortHelperButton.className = 'lightbox-goto-btn';
+  photoSortHelperButton.title = 'Sort Helper';
+  photoSortHelperButton.setAttribute('aria-label', 'Sort Helper');
+  photoSortHelperButton.hidden = true;
+
+  photoSortHelperButton.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4"/></svg>';
+  artLightboxOverlay.appendChild(photoSortHelperButton);
+  const photoSortHelperDialog = document.createElement('dialog');
+  photoSortHelperDialog.setAttribute('aria-label', 'Sort Helper');
+  photoSortHelperDialog.style.cssText = 'width:95vw;height:95vh;height:95dvh;max-width:none;max-height:none;margin:auto;padding:16px;box-sizing:border-box;border:1px solid var(--panel-line);border-radius:var(--radius);background:var(--bg-2);color:var(--chalk);font-family:inherit;overflow:hidden;';
+  photoSortHelperDialog.innerHTML = '<div style="display:flex;flex-direction:column;height:100%;gap:12px"><header style="display:flex;align-items:center;gap:12px;flex:none"><strong style="font-size:18px">Sort Helper</strong><span data-progress style="color:var(--chalk-dim);font-size:13px;margin-left:auto" aria-live="polite"></span><button data-undo type="button" title="Undo last choice" aria-label="Undo last choice">↶</button><button data-close type="button" title="Cancel" aria-label="Cancel">✕</button></header><div style="text-align:center;font-size:14px;color:var(--chalk-dim)">Which photo is better?</div><div data-pair style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:12px;flex:1;min-height:0"><button data-choice="selected" type="button" aria-label="Choose selected photo"><img alt="Selected photo"></button><button data-choice="other" type="button" aria-label="Choose comparison photo"><img alt="Comparison photo"></button></div></div>';
+  const photoSortHelperStyle = document.createElement('style');
+  photoSortHelperStyle.textContent = 'dialog[aria-label="Sort Helper"]::backdrop{background:rgba(10,20,22,.9)} dialog[aria-label="Sort Helper"] button{font:inherit;cursor:pointer;color:var(--chalk);background:var(--panel);border:1px solid var(--panel-line);border-radius:8px} dialog[aria-label="Sort Helper"] header button{width:38px;height:38px;font-size:20px;flex:none} dialog[aria-label="Sort Helper"] button:disabled{opacity:.35;cursor:default} dialog[aria-label="Sort Helper"] [data-choice]{padding:0;min-width:0;min-height:0;overflow:hidden;background:var(--bg);touch-action:manipulation} dialog[aria-label="Sort Helper"] [data-choice] img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none} dialog[aria-label="Sort Helper"] button:focus-visible{outline:2px solid var(--amber);outline-offset:2px} @media(hover:hover){dialog[aria-label="Sort Helper"] [data-choice]:hover{border-color:var(--amber)}} @media(orientation:portrait){dialog[aria-label="Sort Helper"] [data-pair]{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:repeat(2,minmax(0,1fr))!important}}';
+  document.head.appendChild(photoSortHelperStyle);
+  document.body.appendChild(photoSortHelperDialog);
+  function closePhotoSortHelper(){
+    photoSortHelperState = null;
+    if (photoSortHelperDialog.open) photoSortHelperDialog.close();
+  }
+  function photoSortHelperOrder(){
+    const order = photoDisplayRows(true).slice();
+    const known = new Set(order.map(p => p.id));
+    return order.concat(photoRows.filter(p => !known.has(p.id)));
+  }
+  function finishPhotoSortHelper(){
+    const state = photoSortHelperState;
+    if (!state) return;
+    const current = photoSortHelperOrder();
+    if (guestViewEnabled || isLockedGuestAccount || current.map(p => p.id).join('\n') !== state.original.join('\n')){
+      closePhotoSortHelper();
+      showToast('Photo ranking changed — reopen Sort Helper');
+      return;
+    }
+    const next = state.others.slice();
+    const position = Math.floor((state.lo + state.hi) / 2);
+    next.splice(position, 0, state.selected);
+    const ids = next.map(p => p.id);
+    if (photoDuelEngaged()){
+      photoDuelFinalRanking = ids;
+      photoDuelIsComplete = true;
+      savePhotoDuelProgress();
+    } else {
+      photoRows = next;
+    }
+    savePhotoProgress();
+    closePhotoSortHelper();
+    closeArtLightbox();
+    // Existing grid drag requires the complete unfiltered ranking.
+    photoYearFilter = '';
+    photoSeasonFilter = '';
+    photoYearFilterInput.value = '';
+    photoSeasonFilterInput.value = '';
+    renderPhotosPage();
+    const card = Array.from(photoGrid.children).find(el => el.dataset.photoId === state.selected.id);
+    if (card) card.scrollIntoView({block:'center'});
+    showToast('Photo moved to #' + (position + 1));
+  }
+  function renderPhotoSortHelper(){
+    const state = photoSortHelperState;
+    if (!state) return;
+    if (state.history.length && state.hi - state.lo + 1 <= 20){ finishPhotoSortHelper(); return; }
+    state.mid = Math.floor((state.lo + state.hi) / 2);
+    photoSortHelperDialog.querySelector('[data-progress]').textContent = 'Duel ' + (state.history.length + 1);
+    photoSortHelperDialog.querySelector('[data-undo]').disabled = !state.history.length;
+    const selected = photoSortHelperDialog.querySelector('[data-choice="selected"] img');
+    const other = photoSortHelperDialog.querySelector('[data-choice="other"] img');
+    selected.src = cloudinaryThumbUrl(state.selected.url, 1600);
+    const url = cloudinaryThumbUrl(state.others[state.mid].url, 1600);
+    const button = other.parentElement;
+    button.disabled = true;
+    other.onload = () => { if (other.src === new URL(url, document.baseURI).href) button.disabled = false; };
+    other.onerror = () => { showToast('Comparison photo could not load — cancel and retry'); };
+    other.src = url;
+    if (other.complete && other.naturalWidth) button.disabled = false;
+  }
+  function choosePhotoSortHelper(selectedWins){
+    const state = photoSortHelperState;
+    if (!state || photoSortHelperDialog.querySelector('[data-choice="other"]').disabled) return;
+    state.history.push([state.lo, state.hi]);
+    if (selectedWins) state.hi = state.mid;
+    else state.lo = state.mid + 1;
+    renderPhotoSortHelper();
+  }
+  photoSortHelperButton.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!photoSortHelperIds || guestViewEnabled || isLockedGuestAccount || photoEditMode) return;
+    const order = photoSortHelperOrder();
+    const selected = order.find(p => p.id === photoSortHelperIds[lightboxIndex]);
+    if (!selected || order.length < 2) return;
+    const others = order.filter(p => p.id !== selected.id);
+    // Small lists already fit the manual-refinement range; don't move a
+    // photo without a preference. Run one duel before applying the midpoint.
+    photoSortHelperState = {selected, others, original:order.map(p=>p.id), lo:0, hi:others.length, history:[]};
+    photoSortHelperDialog.showModal();
+    renderPhotoSortHelper();
+  });
+  photoSortHelperDialog.querySelector('[data-close]').addEventListener('click', closePhotoSortHelper);
+  photoSortHelperDialog.addEventListener('cancel', e => { e.preventDefault(); closePhotoSortHelper(); });
+  photoSortHelperDialog.querySelector('[data-undo]').addEventListener('click', () => {
+    const state = photoSortHelperState;
+    if (!state || !state.history.length) return;
+    [state.lo,state.hi] = state.history.pop();
+    renderPhotoSortHelper();
+  });
+  photoSortHelperDialog.querySelector('[data-choice="selected"]').addEventListener('click', () => choosePhotoSortHelper(true));
+  photoSortHelperDialog.querySelector('[data-choice="other"]').addEventListener('click', () => choosePhotoSortHelper(false));
+  photoSortHelperDialog.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault(); e.stopPropagation();
+    if (!e.repeat) choosePhotoSortHelper(e.key === 'ArrowLeft' || e.key === 'ArrowUp');
+  });
+
   function openArtLightbox(src){
+    photoSortHelperButton.hidden = true;
+    photoSortHelperButton.classList.remove('show');
+    photoSortHelperIds = null;
     lightboxPhotos = null;
     lightboxCoverContext = null;
     artLightboxImg.src = cloudinaryThumbUrl(src, 1600);
@@ -2532,10 +2654,13 @@
   // toggle and the delete button — every current caller passing this is a
   // restaurant gallery; Dishes' own calls always pass null here, since
   // "set as cover" / "delete" don't apply to browsing dishes.
-  function openPhotoLightbox(photos, startIndex, coverContext){
+  function openPhotoLightbox(photos, startIndex, coverContext, rankedPhotoIds){
     if (!photos || !photos.length) return;
     lightboxPhotos = photos;
     lightboxIndex = startIndex;
+    photoSortHelperIds = rankedPhotoIds || null;
+    photoSortHelperButton.hidden = !photoSortHelperIds || photoRows.length < 2 || guestViewEnabled || isLockedGuestAccount;
+    photoSortHelperButton.classList.toggle('show', !photoSortHelperButton.hidden);
     lightboxCoverContext = coverContext || null;
     artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(photos[lightboxIndex]), 1600);
     artLightboxOverlay.classList.add('multi');
@@ -2699,6 +2824,10 @@
   }
 
   function closeArtLightbox(){
+    closePhotoSortHelper();
+    photoSortHelperButton.hidden = true;
+    photoSortHelperButton.classList.remove('show');
+    photoSortHelperIds = null;
     lightboxZoomOut(); // a snapshot flies back to the thumbnail while the real viewer closes at once
     artLightboxOverlay.classList.remove('show');
     artLightboxOverlay.classList.remove('multi');
@@ -2786,7 +2915,7 @@
   // own early-return already makes this a no-op there — no need to guard on
   // 'multi' here too.
   document.addEventListener('keydown', (e) => {
-    if (!artLightboxOverlay.classList.contains('show')) return;
+    if (!artLightboxOverlay.classList.contains('show') || photoSortHelperDialog.open) return;
     if (e.key === 'ArrowLeft') navigateLightbox(-1);
     else if (e.key === 'ArrowRight') navigateLightbox(1);
   });
@@ -10675,7 +10804,7 @@
       // rather than fighting it (see commitPhotoDragOrder).
       makePhotoDraggable(card);
       card.addEventListener('click', () => {
-        openPhotoLightbox(order.map(x => x.url), idx, null);
+        openPhotoLightbox(order.map(x => x.url), idx, null, order.map(x => x.id));
       });
     });
   }
