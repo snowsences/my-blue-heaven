@@ -5437,3 +5437,19 @@
   .pt-filter-chip[aria-pressed="true"]{background:var(--amber);color:var(--ink);}
   @media(hover:hover){.pt-filter-chip:not([aria-pressed="true"]):hover{background:var(--bg);}}
   @media(max-width:768px){.pt-filter-dock{bottom:calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom,0px));}}
+
+
+  /* Day navigation is icon-only; Trip circular actions retain their fill. */
+  #photo-calendar-content .pc-day-header button{
+    border:0 !important;
+    border-radius:0;
+    background:transparent;
+    box-shadow:none;
+  }
+  #page-trips .yir-icon-btn,
+  #trip-content .yir-icon-btn,
+  .tmap-top .yir-icon-btn,
+  #trip-add-btn,#trip-edit-btn,#trip-close-btn,
+  .trip-memory-btn,.trip-mini,.restaurant-trip-clear-btn{
+    border-color:transparent !important;
+  }
