@@ -2637,7 +2637,9 @@
     photoMonthFilter.clear();
     photoYearFilterInput.value = '';
     closePhotoMonthMenu();
+    if(!pagePhotos.classList.contains('active')){switchTopGroup('photos');switchPhotosSubPage('photos');}
     renderPhotosPage();
+    if(position>=(photoGrid.__limit||96)){photoGrid.__limit=position+24;mbhPhotoGrid(photoGrid,photoGrid.__rows,'gallery',false);}
     const card = Array.from(photoGrid.children).find(el => el.dataset.photoId === state.selected.id);
     if (card) card.scrollIntoView({block:'center'});
     showToast('Photo moved to #' + (position + 1));
@@ -4295,9 +4297,9 @@
       e.preventDefault();
       if (!songDragSourceEl || songDragSourceEl === el || !el.parentNode) return;
       if (isBeforeInDom(songDragSourceEl, el)){
-        el.parentNode.insertBefore(songDragSourceEl, el.nextSibling);
+        mbhMoveRanked(el.parentNode, songDragSourceEl, el.nextSibling);
       } else {
-        el.parentNode.insertBefore(songDragSourceEl, el);
+        mbhMoveRanked(el.parentNode, songDragSourceEl, el);
       }
     });
     el.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -5213,9 +5215,9 @@
       e.dataTransfer.dropEffect = 'move';
       if (!dragSourceEl || dragSourceEl === el || !el.parentNode) return;
       if (isBeforeInDom(dragSourceEl, el)){
-        el.parentNode.insertBefore(dragSourceEl, el.nextSibling);
+        mbhMoveRanked(el.parentNode, dragSourceEl, el.nextSibling);
       } else {
-        el.parentNode.insertBefore(dragSourceEl, el);
+        mbhMoveRanked(el.parentNode, dragSourceEl, el);
       }
     });
     el.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -7299,9 +7301,9 @@
       e.dataTransfer.dropEffect = 'move';
       if (!restaurantDragSourceEl || restaurantDragSourceEl === li || !li.parentNode) return;
       if (isBeforeInDom(restaurantDragSourceEl, li)){
-        li.parentNode.insertBefore(restaurantDragSourceEl, li.nextSibling);
+        mbhMoveRanked(li.parentNode, restaurantDragSourceEl, li.nextSibling);
       } else {
-        li.parentNode.insertBefore(restaurantDragSourceEl, li);
+        mbhMoveRanked(li.parentNode, restaurantDragSourceEl, li);
       }
     });
     li.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -8568,9 +8570,9 @@
       e.preventDefault();
       if (!hikeDragSourceEl || hikeDragSourceEl === li || !li.parentNode) return;
       if (isBeforeInDom(hikeDragSourceEl, li)){
-        li.parentNode.insertBefore(hikeDragSourceEl, li.nextSibling);
+        mbhMoveRanked(li.parentNode, hikeDragSourceEl, li.nextSibling);
       } else {
-        li.parentNode.insertBefore(hikeDragSourceEl, li);
+        mbhMoveRanked(li.parentNode, hikeDragSourceEl, li);
       }
     });
     li.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -9423,9 +9425,9 @@
       e.preventDefault();
       if (!parkDragSourceEl || parkDragSourceEl === card || !card.parentNode) return;
       if (isBeforeInDom(parkDragSourceEl, card)){
-        card.parentNode.insertBefore(parkDragSourceEl, card.nextSibling);
+        mbhMoveRanked(card.parentNode, parkDragSourceEl, card.nextSibling);
       } else {
-        card.parentNode.insertBefore(parkDragSourceEl, card);
+        mbhMoveRanked(card.parentNode, parkDragSourceEl, card);
       }
     });
     card.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -9756,8 +9758,8 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         if (artistDragEl === card || !card.parentNode) return;
-        if (isBeforeInDom(artistDragEl, card)) card.parentNode.insertBefore(artistDragEl, card.nextSibling);
-        else card.parentNode.insertBefore(artistDragEl, card);
+        if (isBeforeInDom(artistDragEl, card)) mbhMoveRanked(card.parentNode, artistDragEl, card.nextSibling);
+        else mbhMoveRanked(card.parentNode, artistDragEl, card);
       });
       card.addEventListener('drop', (e) => { if (artistDragEl) e.preventDefault(); });
     });
@@ -10388,9 +10390,9 @@
       e.preventDefault();
       if (!roadDragSourceEl || roadDragSourceEl === li || !li.parentNode) return;
       if (isBeforeInDom(roadDragSourceEl, li)){
-        li.parentNode.insertBefore(roadDragSourceEl, li.nextSibling);
+        mbhMoveRanked(li.parentNode, roadDragSourceEl, li.nextSibling);
       } else {
-        li.parentNode.insertBefore(roadDragSourceEl, li);
+        mbhMoveRanked(li.parentNode, roadDragSourceEl, li);
       }
     });
     li.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -11124,6 +11126,29 @@
   function mbhRestaurantFilter(){mbhFilterMotion(pageRestaurants,'[data-restaurant-index]',renderRestaurantsPage);}
   function mbhDishFilter(){mbhFilterMotion(pageDishes,'[data-dish-id]',renderDishesPage);}
   function mbhSearchFilter(){mbhFilterMotion(pageSearch,'[data-us-key]',usRender);}
+
+  // Animate the *contents* of neighboring items, not their hit boxes.
+  // Drag-over geometry stays fixed at the new positions, preventing the
+  // animated item from continually triggering the reverse move.
+  function mbhMoveRanked(parent,item,before){
+    if(motionReduced()||!parent.getClientRects().length){parent.insertBefore(item,before);return;}
+    const snapshots=[];
+    for(const el of parent.children){
+      if(el===item)continue;
+      const r=el.getBoundingClientRect();
+      if(r.width&&r.bottom>0&&r.top<innerHeight)snapshots.push([el,r]);
+    }
+    parent.insertBefore(item,before);
+    for(const [el,old] of snapshots){
+      const r=el.getBoundingClientRect(),x=old.left-r.left,y=old.top-r.top;
+      if(Math.abs(x)+Math.abs(y)<2)continue;
+      for(const visual of el.children){
+        if(visual.matches('button,input,select,textarea,.row-drag-handle,.rank-num-input')||visual.classList.contains('grid-card-rank'))continue;
+        visual.__rankMove?.cancel();
+        if(visual.animate)visual.__rankMove=visual.animate([{transform:'translate('+x+'px,'+y+'px)'},{transform:'none'}],{duration:180,easing:EASE_OUT});
+      }
+    }
+  }
   function mbhPhotoGrid(grid,rows,kind,animate=false){
     const ids=rows.map(p=>p.id),prior=grid.__ids||[];
     const changed=ids.length!==prior.length||ids.some((id,i)=>id!==prior[i]);
@@ -11953,9 +11978,9 @@
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
       if (!photoEditDragEl || photoEditDragEl === li || !li.parentNode) return;
       if (isBeforeInDom(photoEditDragEl, li)){
-        li.parentNode.insertBefore(photoEditDragEl, li.nextSibling);
+        mbhMoveRanked(li.parentNode, photoEditDragEl, li.nextSibling);
       } else {
-        li.parentNode.insertBefore(photoEditDragEl, li);
+        mbhMoveRanked(li.parentNode, photoEditDragEl, li);
       }
     });
     li.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -12079,9 +12104,9 @@
       e.preventDefault();
       if (!photoDragSourceEl || photoDragSourceEl === card || !card.parentNode) return;
       if (isBeforeInDom(photoDragSourceEl, card)){
-        card.parentNode.insertBefore(photoDragSourceEl, card.nextSibling);
+        mbhMoveRanked(card.parentNode, photoDragSourceEl, card.nextSibling);
       } else {
-        card.parentNode.insertBefore(photoDragSourceEl, card);
+        mbhMoveRanked(card.parentNode, photoDragSourceEl, card);
       }
     });
     card.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -12607,9 +12632,9 @@
       e.preventDefault();
       if (!showDragSourceEl || showDragSourceEl === el || !el.parentNode) return;
       if (isBeforeInDom(showDragSourceEl, el)){
-        el.parentNode.insertBefore(showDragSourceEl, el.nextSibling);
+        mbhMoveRanked(el.parentNode, showDragSourceEl, el.nextSibling);
       } else {
-        el.parentNode.insertBefore(showDragSourceEl, el);
+        mbhMoveRanked(el.parentNode, showDragSourceEl, el);
       }
     });
     el.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -12802,9 +12827,9 @@
       e.preventDefault();
       if (!mediaDragSourceEl || mediaDragSourceEl === el || !el.parentNode || mediaDragSourceType !== type) return;
       if (isBeforeInDom(mediaDragSourceEl, el)){
-        el.parentNode.insertBefore(mediaDragSourceEl, el.nextSibling);
+        mbhMoveRanked(el.parentNode, mediaDragSourceEl, el.nextSibling);
       } else {
-        el.parentNode.insertBefore(mediaDragSourceEl, el);
+        mbhMoveRanked(el.parentNode, mediaDragSourceEl, el);
       }
     });
     el.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -13197,9 +13222,9 @@
       e.preventDefault();
       if (!dishDragSourceEl || dishDragSourceEl === el || !el.parentNode) return;
       if (isBeforeInDom(dishDragSourceEl, el)){
-        el.parentNode.insertBefore(dishDragSourceEl, el.nextSibling);
+        mbhMoveRanked(el.parentNode, dishDragSourceEl, el.nextSibling);
       } else {
-        el.parentNode.insertBefore(dishDragSourceEl, el);
+        mbhMoveRanked(el.parentNode, dishDragSourceEl, el);
       }
     });
     el.addEventListener('drop', (e) => { e.preventDefault(); });
@@ -13703,8 +13728,8 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         if (!courseDragEl || courseDragEl === tile || !tile.parentNode) return;
-        if (isBeforeInDom(courseDragEl, tile)) tile.parentNode.insertBefore(courseDragEl, tile.nextSibling);
-        else tile.parentNode.insertBefore(courseDragEl, tile);
+        if (isBeforeInDom(courseDragEl, tile)) mbhMoveRanked(tile.parentNode, courseDragEl, tile.nextSibling);
+        else mbhMoveRanked(tile.parentNode, courseDragEl, tile);
       });
       tile.addEventListener('drop', (e) => { e.preventDefault(); });
     });
@@ -14443,12 +14468,34 @@
       panel.scrollTop=Math.max(0,panel.scrollTop+el.getBoundingClientRect().top-panel.getBoundingClientRect().top-compact-8);
     });
   }
+
+  function mbhUpdateRestaurantGraphs(focusSelector){
+    const r=restaurantRows[openRestaurantIndex],body=restaurantDetailsPanelInner.querySelector('.rd-body');
+    if(!r||!body||restaurantDetailTab!=='graphs'){renderRestaurantDetailsContent();return;}
+    const old=new Map();
+    body.querySelectorAll('.rd-bar').forEach(el=>{
+      const section=el.closest('.rd-card')?.querySelector('h3')?.textContent||'';
+      const key=section+'|'+el.firstElementChild?.textContent;
+      const fill=el.querySelector('.rd-fill');if(fill)old.set(key,parseFloat(fill.style.width)||0);
+    });
+    const oldScroll=restaurantDetailsPanel.scrollTop;
+    body.innerHTML=rdGraphs(r,rdStats(r));
+    body.querySelectorAll('.rd-card').forEach(el=>el.dataset.graphUpdate='true');
+    if(!motionReduced())body.querySelectorAll('.rd-bar').forEach(el=>{
+      const section=el.closest('.rd-card')?.querySelector('h3')?.textContent||'',key=section+'|'+el.firstElementChild?.textContent;
+      const fill=el.querySelector('.rd-fill');if(!fill)return;const to=parseFloat(fill.style.width)||0,from=old.get(key);
+      if(from!==undefined&&from!==to)fill.animate([{width:from+'%'},{width:to+'%'}],{duration:260,easing:EASE_OUT});
+      else if(from===undefined)fill.animate([{opacity:0},{opacity:1}],{duration:180,easing:EASE_OUT});
+    });
+    restaurantDetailsPanel.scrollTop=oldScroll;
+    if(focusSelector)body.querySelector(focusSelector)?.focus({preventScroll:true});
+  }
   function rdAction(e){
     const el=e.target.closest('[data-rd-tab],[data-rd-visit],[data-rd-course],[data-rd-photo],[data-rd-percent]');
     if(!el||guestViewEnabled||isLockedGuestAccount)return;
     if(e.type==='keydown'){if(!['Enter',' '].includes(e.key)||el.tagName.toLowerCase()==='button')return;e.preventDefault();}
     if(el.dataset.rdTab){rdSwitch(el.dataset.rdTab);return;}
-    if(el.hasAttribute('data-rd-percent')){restaurantGraphPercent=!restaurantGraphPercent;renderRestaurantDetailsContent();return;}
+    if(el.hasAttribute('data-rd-percent')){restaurantGraphPercent=!restaurantGraphPercent;mbhUpdateRestaurantGraphs('[data-rd-percent]');return;}
     if(el.dataset.rdPhoto!==undefined){
       const r=restaurantRows[openRestaurantIndex],v=(r.visits||[]).find(v=>v.id===el.dataset.rdCourseVisit);
       const c=v?.courses[Number(el.dataset.rdPhoto)];if(!c)return;
@@ -14462,8 +14509,8 @@
   restaurantDetailsPanelInner.addEventListener('keydown',rdAction);
   restaurantDetailsPanelInner.addEventListener('change',e=>{
     const el=e.target;
-    if(el.matches('[data-rd-meal]')){restaurantGraphVisit=el.value;renderRestaurantDetailsContent();}
-    else if(el.matches('[data-rd-graph-sort]')){restaurantGraphSort=el.value;renderRestaurantDetailsContent();}
+    if(el.matches('[data-rd-meal]')){restaurantGraphVisit=el.value;mbhUpdateRestaurantGraphs('[data-rd-meal]');}
+    else if(el.matches('[data-rd-graph-sort]')){restaurantGraphSort=el.value;mbhUpdateRestaurantGraphs('[data-rd-graph-sort]');}
     else if(el.matches('[data-rd-sort]')){
       restaurantCourseFilters.sort=el.value;
       const result=restaurantDetailsPanelInner.querySelector('[data-rd-results]');
@@ -19221,8 +19268,8 @@
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
           if (!dragEl || dragEl === item || !item.parentNode) return;
-          if (isBeforeInDom(dragEl, item)) item.parentNode.insertBefore(dragEl, item.nextSibling);
-          else item.parentNode.insertBefore(dragEl, item);
+          if (isBeforeInDom(dragEl, item)) mbhMoveRanked(item.parentNode, dragEl, item.nextSibling);
+          else mbhMoveRanked(item.parentNode, dragEl, item);
         });
         item.addEventListener('drop', (e) => { e.preventDefault(); });
       });
@@ -21310,7 +21357,7 @@
   // The moving parts that CSS alone can't do: the sliding tab line and
   // toggle pill, press feedback, the photo viewer growing out of the tapped
   // thumbnail, stats counting up, and bottom sheets you can drag down.
-  // (Reordering stays instant — cards swap in place while you drag.) Everything here is
+  // Reordering animates neighboring card contents without shifting hit boxes. Everything here is
   // skipped with reduced motion.
   const motionReduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const EASE_SPRING = 'cubic-bezier(0.22, 1.25, 0.36, 1)', EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)', EASE_INOUT = 'cubic-bezier(0.37, 0, 0.63, 1)';
@@ -21433,7 +21480,7 @@
       if(!entry.isIntersecting)continue;
       const el=entry.target;mbhVisibility.unobserve(el);
       if(!el.isConnected)continue;
-      if(el.matches('.rd-card'))el.classList.add('mbh-chart-enter');
+      if(el.matches('.rd-card')){if(!el.dataset.graphUpdate)el.classList.add('mbh-chart-enter');}
       else countUp(el);
     }
   }):null;
@@ -21458,7 +21505,7 @@
       else if(el.matches('.view-toggle,.tab-switcher')){
         if(el.querySelector(':scope > .view-toggle-btn, :scope > .tab-btn'))setupIndicator(el,'pill');
       }else if(mbhVisibility)mbhVisibility.observe(el);
-      else if(el.matches('.rd-card'))el.classList.add('mbh-chart-enter');
+      else if(el.matches('.rd-card')){if(!el.dataset.graphUpdate)el.classList.add('mbh-chart-enter');}
       else if(el.offsetParent)countUp(el);
     }
   }

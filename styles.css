@@ -5552,3 +5552,9 @@
     .details-art-wrap .art-img.img-loaded{transition:opacity 220ms var(--ease-out),transform 320ms var(--ease-out);}
     .pt-filter-chip,.us-filters button{transition:background 120ms var(--ease-out),color 120ms var(--ease-out);}
   }
+
+  @media(prefers-reduced-motion:no-preference){
+    .pt-flyout:not([hidden]),#photo-month-filter-menu:not([hidden]){animation:revealIn 130ms var(--ease-out) backwards;}
+    .pt-tray[open]{animation:mbhSheetEnter 200ms var(--ease-out) backwards;}
+    @keyframes mbhSheetEnter{from{transform:translateY(30px);opacity:.7}to{transform:none;opacity:1}}
+  }
