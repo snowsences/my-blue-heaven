@@ -15465,7 +15465,7 @@
   }
 
   // Where each photo goes inside the content area for 1–6 photos.
-  function shareGridCells(imgs, cw){
+  function shareGridCells(imgs, cw, twoColumns){
     const n = imgs.length, gap = 14;
     const half = Math.floor((cw - gap) / 2);
     const third = Math.floor((cw - 2 * gap) / 3);
@@ -15473,6 +15473,11 @@
     if (n === 1){
       const ratio = Math.max(0.66, Math.min(1.25, imgs[0].naturalHeight / imgs[0].naturalWidth));
       cells.push({ x: 0, y: 0, w: cw, h: Math.round(cw * ratio) });
+    } else if (twoColumns){
+      // Consistent square cells, including the last photo of an odd set.
+      for (let i=0; i<n; i++){
+        cells.push({x:i%2 ? cw-half : 0,y:Math.floor(i/2)*(half+gap),w:half,h:half});
+      }
     } else if (n === 2){
       const h = Math.round(half * 1.3);
       cells.push({ x: 0, y: 0, w: half, h }, { x: cw - half, y: 0, w: half, h });
@@ -15493,7 +15498,7 @@
     return { cells, height };
   }
 
-  async function shareDrawCard(title, location, imgs){
+  async function shareDrawCard(title, location, imgs, twoColumns){
     try{ await Promise.all([document.fonts.load('700 84px Figtree'), document.fonts.load('500 40px Figtree')]); }catch(e){ /* falls back to the system font */ }
     const PAD = 64, cw = SHARE_CARD_W - PAD * 2;
     const measure = document.createElement('canvas').getContext('2d');
@@ -15509,17 +15514,22 @@
     measure.font = '500 40px ' + SHARE_FONT;
     const locLines = location ? shareWrapText(measure, location, cw, 2) : [];
     const titleLH = Math.round(titleSize * 1.14), locLH = 52;
-    const grid = shareGridCells(imgs, cw);
+    const grid = shareGridCells(imgs, cw, twoColumns);
 
     const accentH = 10, afterAccent = 34;
     const height = PAD + accentH + afterAccent + titleLines.length * titleLH +
       (locLines.length ? 14 + locLines.length * locLH : 0) + 48 + grid.height + PAD;
     const canvas = document.createElement('canvas');
-    canvas.width = SHARE_CARD_W;
-    canvas.height = height;
+    // Large restaurant selections can exceed mobile canvas limits. Scale
+    // the entire image rather than silently dropping any selected photos.
+    const scale = twoColumns ? Math.min(1, 16384 / height, Math.sqrt(16000000 / (SHARE_CARD_W * height))) : 1;
+    canvas.width = Math.max(1, Math.floor(SHARE_CARD_W * scale));
+    canvas.height = Math.max(1, Math.floor(height * scale));
     const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas unavailable');
+    ctx.scale(scale, scale);
     ctx.fillStyle = '#142A2E';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, SHARE_CARD_W, height);
 
     let y = PAD;
     ctx.fillStyle = '#E8A33D';
@@ -15815,7 +15825,7 @@
         '<span class="share-thumb-check">' + (on ? '✓' : '') + '</span>' +
       '</button>';
     }).join('');
-    shareCount.textContent = st.selected.size + ' of ' + Math.min(SHARE_MAX_PHOTOS, st.urls.length) + (st.urls.length > SHARE_MAX_PHOTOS ? ' (max ' + SHARE_MAX_PHOTOS + ')' : '');
+    shareCount.textContent = st.selected.size + ' of ' + (st.twoColumns ? st.urls.length : Math.min(SHARE_MAX_PHOTOS, st.urls.length)) + (!st.twoColumns && st.urls.length > SHARE_MAX_PHOTOS ? ' (max ' + SHARE_MAX_PHOTOS + ')' : '');
   }
 
   function shareSetStatus(msg){
@@ -15849,7 +15859,7 @@
     }
     let card;
     try{
-      card = await shareDrawCard(st.title, st.location, imgs);
+      card = await shareDrawCard(st.title, st.location, imgs, st.twoColumns);
     }catch(e){
       console.error('Share card failed to draw', e);
       shareSetStatus("Couldn't build the card.");
@@ -15881,6 +15891,7 @@
     document.getElementById('share-picker').style.display = ''; // restores it if the whole-day card (below) hid it last time
     shareState = {
       title: spec.title, location: spec.location, urls: spec.urls, filename: shareSlug(spec.title) + '.jpg',
+      twoColumns: !!spec.twoColumns,
       selected: new Set(spec.urls.slice(0, SHARE_MAX_PHOTOS)), token: 0, blob: null, canSend: shareCanSendFiles()
     };
     shareReturnFocus = document.activeElement;
@@ -15939,7 +15950,7 @@
     if (!btn || !shareState) return;
     const url = shareState.urls[Number(btn.dataset.shareIndex)];
     if (shareState.selected.has(url)) shareState.selected.delete(url);
-    else if (shareState.selected.size >= SHARE_MAX_PHOTOS){ showToast('Up to ' + SHARE_MAX_PHOTOS + ' photos fit on a card'); return; }
+    else if (!shareState.twoColumns && shareState.selected.size >= SHARE_MAX_PHOTOS){ showToast('Up to ' + SHARE_MAX_PHOTOS + ' photos fit on a card'); return; }
     else shareState.selected.add(url);
     shareRenderThumbs();
     shareRefresh();
@@ -15980,7 +15991,7 @@
       otdCoursePhotos(c).forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); });
     });
     (v.photos || []).forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); });
-    openShare({ title: (r.name || 'Restaurant').trim(), location: (r.location || '').trim(), urls }); // location only — never cuisine
+    openShare({ title: (r.name || 'Restaurant').trim(), location: (r.location || '').trim(), urls, twoColumns: true }); // location only — never cuisine
   }
 
   hikeDetailsPanelInner.addEventListener('click', (e) => {
