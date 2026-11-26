@@ -5296,3 +5296,15 @@
   :is(.pt-tag-card,.pt-detail-photo,.pt-toggle,.pt-lightbox-btn,.pt-flyout button):focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
   @media(hover:hover){.pt-tag-card:hover,.pt-toggle:hover{border-color:var(--amber);}}
   @media(max-width:600px){.pt-tag-grid{gap:10px;}.pt-tag-card>span{padding:10px;}.pt-detail-header{gap:9px;}.pt-detail-header h2{font-size:19px;}.pt-lightbox-btn{max-width:calc(100% - 148px);padding:0 12px;}}
+
+  /* Group tag chips by category; preserve the alphabetical Tags album list. */
+  .pt-tray-list{display:flex;flex-direction:column;flex-wrap:nowrap;align-content:normal;gap:17px;}
+  .pt-category-group{min-width:0;flex:none;}
+  .pt-category-group h3{font-size:13px;font-weight:700;color:var(--chalk-dim);margin:0 0 8px;}
+  .pt-category-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .pt-category-empty{font-size:13px;color:var(--chalk-dim);}
+  .pt-tray-add form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;}
+  .pt-tray-add form input{grid-column:1/-1;}
+  .pt-category-select{width:100%;min-width:0;color-scheme:dark;font:inherit;}
+  .pt-modal-body .pt-category-label{margin-top:14px;}
+  .pt-modal-body .pt-category-select{display:block;margin-top:8px;}

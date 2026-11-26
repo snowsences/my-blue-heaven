@@ -11222,6 +11222,15 @@
   const photoTagTray = document.getElementById('photo-tag-tray');
   const photoTagModal = document.getElementById('photo-tag-modal');
   const photoTagsWritable = () => !guestViewEnabled && !isLockedGuestAccount;
+  const PHOTO_TAG_CATEGORIES = ['Location','Scenery','Season'];
+  function photoTagCategory(value){
+    return PHOTO_TAG_CATEGORIES.find(c=>c.toLowerCase()===String(value||'').trim().toLowerCase()) || 'Scenery';
+  }
+  function photoTagCategorySelect(current=''){
+    return '<select class="tf-input pt-category-select" name="category" aria-label="Category" required>'+
+      '<option value="" disabled'+(!current?' selected':'')+'>Choose category</option>'+
+      PHOTO_TAG_CATEGORIES.map(c=>'<option value="'+c+'"'+(c===current?' selected':'')+'>'+c+'</option>').join('')+'</select>';
+  }
   function normalizePhotoTags(raw){
     const ids=new Set(), names=new Set();
     return (Array.isArray(raw)?raw:[]).reduce((out,t)=>{
@@ -11233,11 +11242,15 @@
         const existing=out.find(x=>x.name.toLocaleLowerCase()===key);
         existing.photoIds=[...new Set([...existing.photoIds,...photoIds])];ids.add(t.id);return out;
       }
-      ids.add(t.id);names.add(key);out.push({id:t.id,name,photoIds:[...new Set(photoIds)]});return out;
+      ids.add(t.id);names.add(key);out.push({id:t.id,name,category:photoTagCategory(t.category),photoIds:[...new Set(photoIds)]});return out;
     },[]);
   }
   function sortedPhotoTags(){
     return photoTags.slice().sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base',numeric:true}));
+  }
+  function groupedPhotoTags(){
+    const tags=sortedPhotoTags();
+    return PHOTO_TAG_CATEGORIES.map(category=>({category,tags:tags.filter(t=>photoTagCategory(t.category)===category)}));
   }
   function photoTagsFor(id){ return sortedPhotoTags().filter(t=>t.photoIds.includes(id)); }
   function photoTagFind(id){return photoTags.find(t=>t.id===id);}
@@ -11295,12 +11308,17 @@
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
     photoTagDraft={photoId:id,selected:new Set(photoTagsFor(id).map(t=>t.id))};
-    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required><button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
+    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
     const list=photoTagTray.querySelector('.pt-tray-list'), form=photoTagTray.querySelector('form'), add=photoTagTray.querySelector('[data-add]'), error=photoTagTray.querySelector('.pt-error'), input=form.elements.name;
     function render(){
       list.replaceChildren();
-      sortedPhotoTags().forEach(t=>{
-        const b=document.createElement('button');
+      groupedPhotoTags().forEach(({category,tags})=>{
+        const section=document.createElement('section');section.className='pt-category-group';
+        const heading=document.createElement('h3');heading.textContent=category;section.appendChild(heading);
+        const chips=document.createElement('div');chips.className='pt-category-chips';section.appendChild(chips);
+        if(!tags.length){const empty=document.createElement('span');empty.className='pt-category-empty';empty.textContent='No tags';chips.appendChild(empty);}
+        tags.forEach(t=>{
+        const b=document.createElement('button');b.dataset.tagId=t.id;
         b.type='button';b.className='pt-toggle';
         b.setAttribute('aria-pressed',String(photoTagDraft.selected.has(t.id)));
         const name=document.createElement('span');name.textContent=t.name;
@@ -11311,9 +11329,10 @@
           b.setAttribute('aria-pressed',String(photoTagDraft.selected.has(t.id)));
           mark.textContent=photoTagDraft.selected.has(t.id)?'✓':'＋';
         };
-        list.appendChild(b);
+        chips.appendChild(b);
+        });
+        list.appendChild(section);
       });
-      if(!list.children.length){const p=document.createElement('p');p.className='pt-muted';p.textContent='No tags yet. Add a tag to get started.';list.appendChild(p);}
     }
     add.onclick=()=>{add.hidden=true;form.hidden=false;input.focus();};
     form.onsubmit=e=>{
@@ -11321,13 +11340,15 @@
       if(!photoTagsWritable())return;
       const name=input.value.trim();
       if(!name||!photoTagNameAvailable(name)){error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;}
-      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,photoIds:[]};
+      const category=form.elements.category.value;
+      if(!PHOTO_TAG_CATEGORIES.includes(category)){error.textContent='Choose a category.';error.hidden=false;return;}
+      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,photoIds:[]};
       photoTags.push(tag);
       savePhotoTags();
-      input.value='';form.hidden=true;add.hidden=false;error.hidden=true;render();
+      form.reset();form.hidden=true;add.hidden=false;error.hidden=true;render();
       // Creation and selection are separate: the new tag starts off.
-      const index=sortedPhotoTags().findIndex(t=>t.id===tag.id);
-      if(list.children[index])list.children[index].scrollIntoView({block:'nearest'});
+      const chip=Array.from(list.querySelectorAll('[data-tag-id]')).find(b=>b.dataset.tagId===tag.id);
+      if(chip)chip.scrollIntoView({block:'nearest'});
     };
     photoTagTray.querySelector('[data-done]').onclick=()=>{
       const draft=photoTagDraft;
@@ -11357,8 +11378,8 @@
   function photoTagShowModal(tag,mode){
     if(!photoTagsWritable())return;
     const rename=mode==='rename';
-    photoTagModal.innerHTML='<form method="dialog"><header><h2>'+(rename?'Rename tag':'Delete tag?')+'</h2></header><div class="pt-modal-body">'+(rename?
-      '<label>Tag name<input type="text" name="name" class="tf-input" required maxlength="100" value="'+escapeAttr(tag.name)+'"></label><p class="pt-error" role="alert" hidden></p>':
+    photoTagModal.innerHTML='<form method="dialog"><header><h2>'+(rename?'Edit tag':'Delete tag?')+'</h2></header><div class="pt-modal-body">'+(rename?
+      '<label>Tag name<input type="text" name="name" class="tf-input" required maxlength="100" value="'+escapeAttr(tag.name)+'"></label><label class="pt-category-label">Category'+photoTagCategorySelect(photoTagCategory(tag.category))+'</label><p class="pt-error" role="alert" hidden></p>':
       '<p>Delete <strong>'+escapeHtml(tag.name)+'</strong>? This removes the tag from all its photos. The photos themselves will not be deleted.</p>')+
       '</div><footer><button type="button" class="btn-ghost" data-cancel>Cancel</button><button type="submit" class="'+(rename?'btn-primary':'pt-delete-btn')+'">'+(rename?'Save':'Delete')+'</button></footer></form>';
     photoTagModal.querySelector('[data-cancel]').onclick=()=>photoTagModal.close();
@@ -11371,7 +11392,9 @@
           const error=photoTagModal.querySelector('.pt-error');
           error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;
         }
-        live.name=name;
+        const category=e.currentTarget.elements.category.value;
+        if(!PHOTO_TAG_CATEGORIES.includes(category))return;
+        live.name=name;live.category=category;
       }else{
         photoTags=photoTags.filter(t=>t.id!==live.id);
         photoTagOpenId='';
@@ -11399,7 +11422,7 @@
     }
     const ids=new Set(active.photoIds), rows=ranked.filter(x=>ids.has(x.p.id));
     photoTagsHost.innerHTML='<div class="pt-detail-header"><button type="button" class="btn-ghost" data-back aria-label="Back to Tags">‹ Tags</button><div><h2>'+escapeHtml(active.name)+'</h2><p class="pt-muted">'+pcCount(rows.length)+'</p></div>'+
-      (photoTagsWritable()?'<div class="pt-menu-wrap"><button type="button" class="btn-ghost pt-menu-btn" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout" hidden><button type="button" data-rename>Rename</button><button type="button" data-delete>Delete</button></div></div>':'')+'</div>'+
+      (photoTagsWritable()?'<div class="pt-menu-wrap"><button type="button" class="btn-ghost pt-menu-btn" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout" hidden><button type="button" data-rename>Edit</button><button type="button" data-delete>Delete</button></div></div>':'')+'</div>'+
       (rows.length?'<div class="results-list grid-mode pt-detail-grid">'+rows.map((x,i)=>'<button type="button" class="grid-card pt-detail-photo" data-photo-index="'+i+'" aria-label="View photo ranked '+x.rank+'"><div class="art-drop">'+pcThumb(x,500)+'</div></button>').join('')+'</div>':'<p class="pt-muted pt-empty">No photos with this tag yet.</p>');
     photoTagsHost.querySelector('[data-back]').onclick=()=>{photoTagOpenId='';renderPhotoTags();window.scrollTo(0,photoTagListY);};
     photoTagsHost.querySelectorAll('[data-photo-index]').forEach(b=>b.onclick=()=>openPhotoLightbox(rows.map(x=>x.p.url),Number(b.dataset.photoIndex),null,rows.map(x=>x.p.id)));
