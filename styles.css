@@ -5337,3 +5337,5 @@
   .pt-inherited{margin-top:10px;}
   .pt-inherited small{display:block;color:var(--chalk-dim);font-size:12px;margin-bottom:6px;}
   .pt-inherited-chip{display:inline-flex;align-items:center;min-height:30px;border:1px dashed var(--panel-line);border-radius:999px;padding:5px 10px;color:var(--chalk-dim);font-size:13px;}
+
+  #fun-card-tag-photos[hidden], .guest-view-active #fun-card-tag-photos{display:none!important;}

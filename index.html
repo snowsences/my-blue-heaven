@@ -935,6 +935,14 @@
         <button class="group-sub-tab-btn" id="tools-subtab-settings-btn" type="button"><span class="group-sub-tab-icon">⚙️</span>Settings</button>
       </div>
       <div class="fun-cards">
+        <section class="fun-card" id="fun-card-tag-photos" hidden>
+          <div class="fun-card-icon" aria-hidden="true">🏷️</div>
+          <h2 class="fun-card-title">Tag Photos</h2>
+          <p class="fun-card-text">Tag a random photo that has no tags.</p>
+          <p class="fun-card-text" id="tag-photos-remaining" aria-live="polite"></p>
+          <button class="btn-primary" id="tag-photos-launch-btn" type="button">Tag Photos</button>
+        </section>
+
         <section class="fun-card" id="fun-card-yir">
           <div class="fun-card-icon" aria-hidden="true">🗓️</div>
           <h2 class="fun-card-title">Year in Review</h2>
@@ -1335,7 +1343,7 @@
   <img class="art-lightbox-img" id="art-lightbox-img" src="" alt="">
   <button class="lightbox-nav-btn lightbox-next-btn" id="lightbox-next-btn" type="button" title="Next">›</button>
   <span class="lightbox-caption" id="lightbox-caption"></span>
-  <button id="photo-tag-lightbox-btn" class="pt-lightbox-btn" type="button" hidden>Add Tag</button>
+  <button id="photo-tag-lightbox-btn" class="pt-lightbox-btn" type="button" hidden>Add Tags</button>
   <span class="lightbox-counter" id="lightbox-counter"></span>
   <button class="lightbox-cover-toggle-btn" id="lightbox-cover-toggle-btn" type="button"></button>
   <button class="lightbox-cover-toggle-btn lightbox-dish-cover-btn" id="lightbox-dish-cover-btn" type="button"></button>

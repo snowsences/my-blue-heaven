@@ -4477,6 +4477,7 @@
       renderParksPage();
     }
     if (page === 'fun'){
+      refreshPhotoTagTool();
       refreshOtdSettingsUI(); // the undated-items count can change whenever data does
     }
     if (page === 'trips'){
@@ -11365,23 +11366,45 @@
     if(changed)savePhotoTags();
   }
   function refreshPhotoTags(){
+    refreshPhotoTagTool();
     if(pagePhotoCollections.classList.contains('active'))renderPhotoTags();
     updatePhotoTagLightbox();
   }
+  const photoTagToolCard=document.getElementById('fun-card-tag-photos');
+  const photoTagToolCount=document.getElementById('tag-photos-remaining');
+  function untaggedPhotoRows(rows,tags){
+    const tagged=new Set();
+    tags.forEach(t=>{if(!t.automaticOnly)t.photoIds.forEach(id=>tagged.add(id));});
+    return rows.filter(p=>p.url&&!tagged.has(p.id));
+  }
+  function refreshPhotoTagTool(){
+    if(!photoTagToolCard)return;
+    const count=untaggedPhotoRows(photoRows,photoTags).length;
+    photoTagToolCard.hidden=!count||!photoTagsWritable();
+    photoTagToolCount.textContent=count.toLocaleString()+' untagged '+(count===1?'photo':'photos')+' remaining';
+  }
+  document.getElementById('tag-photos-launch-btn').addEventListener('click',()=>{
+    if(!photoTagsWritable())return;
+    const rows=untaggedPhotoRows(photoRows,photoTags);
+    if(!rows.length){refreshPhotoTagTool();return;}
+    const p=rows[Math.floor(Math.random()*rows.length)];
+    openPhotoLightbox([p.url],0,null,[p.id]);
+    photoTagOpenTray(p.id);
+  });
   function photoTagCountLabel(count){
-    return count === 0 ? 'Add Tag' : count === 1 ? '1 Tag' : count + ' Tags';
+    return count === 0 ? 'Add Tags' : count === 1 ? '1 Tag' : count + ' Tags';
   }
   function updatePhotoTagLightbox(){
     if(!photoTagButton)return;
     const id=photoSortHelperIds&&photoSortHelperIds[lightboxIndex];
     const valid=photoTagsWritable()&&id&&photoRows.some(p=>p.id===id);
     photoTagButton.hidden=!valid;
-    if(!valid){photoTagButton.textContent='Add Tag';photoTagButton.removeAttribute('title');return;}
+    if(!valid){photoTagButton.textContent='Add Tags';photoTagButton.removeAttribute('title');return;}
     const assigned=photoTagsFor(id);
     const label=photoTagCountLabel(assigned.length);
     photoTagButton.textContent=label;
-    photoTagButton.title=assigned.length?assigned.map(t=>t.name).join(', '):'Add Tag';
-    photoTagButton.setAttribute('aria-label',assigned.length?'Edit tags: '+label:'Add Tag');
+    photoTagButton.title=assigned.length?assigned.map(t=>t.name).join(', '):'Add Tags';
+    photoTagButton.setAttribute('aria-label',assigned.length?'Edit tags: '+label:'Add Tags');
   }
   // Prefer an exact case-insensitive name, then allow a final plural s.
   function matchPhotoTagTerm(term,tags){
@@ -11430,7 +11453,7 @@
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
     photoTagDraft={photoId:id,selected:new Set(explicitPhotoTagIds(id))};
-    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+photoTagHierarchyFields(null)+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
+    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tags</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+photoTagHierarchyFields(null)+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
     const list=photoTagTray.querySelector('.pt-tray-list'), form=photoTagTray.querySelector('form'), add=photoTagTray.querySelector('[data-add]'), error=photoTagTray.querySelector('.pt-error'), input=form.elements.name;
     function render(){
       list.replaceChildren();
@@ -11566,7 +11589,7 @@
       photoTagsHost.innerHTML=tags.length?'<div class="pt-tag-grid">'+tags.map(t=>{
         const ids=members.get(t.id), rows=ranked.filter(x=>ids.has(x.p.id)), cover=rows[0];
         return '<button type="button" class="pt-tag-card" data-tag-id="'+escapeAttr(t.id)+'">'+(cover?pcThumb(cover,650):'<div class="pt-empty-cover" aria-hidden="true">🏷️</div>')+'<span><strong>'+escapeHtml(t.name)+'</strong><small>'+pcCount(rows.length)+'</small></span></button>';
-      }).join('')+'</div>':'<p class="pt-muted pt-empty">No tags yet. Open a photo in Gallery and tap Add Tag to create one.</p>';
+      }).join('')+'</div>':'<p class="pt-muted pt-empty">No tags yet. Open a photo in Gallery and tap Add Tags to create one.</p>';
       photoTagsHost.querySelectorAll('[data-tag-id]').forEach(b=>b.onclick=()=>{
         photoTagListY=window.scrollY;photoTagOpenId=b.dataset.tagId;renderPhotoTags();window.scrollTo(0,0);
       });
