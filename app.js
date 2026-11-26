@@ -14392,7 +14392,8 @@
     if(!head)return;
     const cover=head.querySelector('.details-art-wrap');
     const height=cover.offsetHeight;
-    const strip=Math.min(height,Math.max(76,Math.min(108,restaurantDetailsPanel.clientHeight*.15)));
+    const caption=cover.querySelector('.rd-cover-caption');
+    const strip=Math.min(height,Math.max(76,Math.min(108,restaurantDetailsPanel.clientHeight*.15),(caption?.offsetHeight||0)+48));
     const collapse=Math.max(0,height-strip);
     const shift=Math.min(collapse,Math.max(0,restaurantDetailsPanel.scrollTop));
     const minBody=Math.max(0,restaurantDetailsPanel.clientHeight-head.offsetHeight+collapse);
@@ -14635,10 +14636,10 @@
         (r.website ? '<button class="details-website-btn" type="button" title="Visit website">🌐</button>' : '') +
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
-      '</div>' +
-      '<div class="details-content" style="padding-top:20px;">' +
-        '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
-        (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
+        '<div class="rd-cover-caption restaurant-gold-card-overlay">' +
+          '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
+          (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
+        '</div>' +
       '</div>' + tabBar + '</div><div class="rd-body">' +
       (isVisits ? visitsSectionHtml : restaurantDetailTab==='overview'?rdOverview(r,stats):restaurantDetailTab==='graphs'?rdGraphs(r,stats):rdCourses(stats))+'</div>';
     restaurantDetailCoverSync();
