@@ -5273,9 +5273,9 @@
   .pt-tray h2,.pt-modal h2{margin:0;font-size:21px;}
   .pt-tray header button{min-height:42px;}
   .pt-tray-list{display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;overflow:auto;min-height:0;overscroll-behavior:contain;padding:2px;}
-  .pt-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--panel-line);border-radius:999px;background:var(--panel);color:var(--chalk);font:inherit;font-size:14px;padding:10px 14px;min-height:44px;cursor:pointer;max-width:100%;touch-action:manipulation;}
+  .pt-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--panel-line);border-radius:999px;background:var(--panel);color:var(--chalk);font:inherit;font-size:14px;font-weight:600;padding:10px 14px;min-height:44px;cursor:pointer;max-width:100%;touch-action:manipulation;}
   .pt-toggle>span:first-child{overflow-wrap:anywhere;text-align:left;}
-  .pt-checkmark{color:var(--chalk-dim);font-weight:700;flex:none;}
+  .pt-checkmark{color:var(--chalk-dim);font-weight:700;flex:0 0 16px;width:16px;text-align:center;}.pt-toggle:not(:has(.pt-checkmark))::after{content:'';flex:0 0 16px;width:16px;}
   .pt-toggle[aria-pressed=true]{color:var(--ink);background:var(--amber);border-color:var(--amber);font-weight:600;}
   .pt-toggle[aria-pressed=true] .pt-checkmark{color:var(--ink);}
   .pt-tray-add{border-top:1px solid var(--panel-line);padding-top:12px;flex:none;}
