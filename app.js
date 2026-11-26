@@ -11243,19 +11243,54 @@
       '<option value="" disabled'+(!current?' selected':'')+'>Choose category</option>'+
       PHOTO_TAG_CATEGORIES.map(c=>'<option value="'+c+'"'+(c===current?' selected':'')+'>'+c+'</option>').join('')+'</select>';
   }
+  const PHOTO_TAG_HIERARCHY_VERSION=1;
+  function photoTagClosure(selected,tags){
+    const byId=new Map(tags.map(t=>[t.id,t])), result=new Set(), stack=[...selected];
+    while(stack.length){
+      const id=stack.pop(),t=byId.get(id);
+      if(!t||result.has(id))continue;
+      result.add(id);stack.push(...(t.parentIds||[]));
+    }
+    return result;
+  }
+  function photoTagCanParent(childId,parentId,tags){
+    return childId!==parentId&&tags.some(t=>t.id===parentId)&&!photoTagClosure([parentId],tags).has(childId);
+  }
   function normalizePhotoTags(raw){
     const ids=new Set(), names=new Set();
-    return (Array.isArray(raw)?raw:[]).reduce((out,t)=>{
+    const aliases=new Map();
+    const normalized=(Array.isArray(raw)?raw:[]).reduce((out,t)=>{
       if(!t||typeof t.id!=='string'||!t.id||ids.has(t.id)||typeof t.name!=='string'||!t.name.trim())return out;
       const name=t.name.trim(), key=name.toLocaleLowerCase();
       // If older/imported data contains duplicate names, merge memberships rather than lose any.
       const photoIds=Array.isArray(t.photoIds)?t.photoIds.filter(id=>typeof id==='string'):[];
       if(names.has(key)){
         const existing=out.find(x=>x.name.toLocaleLowerCase()===key);
-        existing.photoIds=[...new Set([...existing.photoIds,...photoIds])];ids.add(t.id);return out;
+        existing.photoIds=[...new Set([...existing.photoIds,...photoIds])];aliases.set(t.id,existing.id);ids.add(t.id);return out;
       }
-      ids.add(t.id);names.add(key);out.push({id:t.id,name,category:initialPhotoTagCategory(t),categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[...new Set(photoIds)]});return out;
+      ids.add(t.id);names.add(key);out.push({id:t.id,name,category:initialPhotoTagCategory(t),categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[...new Set(photoIds)],parentIds:Array.isArray(t.parentIds)?[...new Set(t.parentIds.filter(id=>typeof id==='string'))]:[],automaticOnly:!!t.automaticOnly,hierarchyVersion:Number(t.hierarchyVersion)||0});return out;
     },[]);
+    const byName=new Map(normalized.map(t=>[t.name.toLowerCase(),t]));
+    const legacyParents={pnw:'usa',rockies:'usa',hawaii:'usa',alaska:'usa',italy:'europe',venice:'italy'};
+    normalized.forEach(t=>{
+      if(t.hierarchyVersion<PHOTO_TAG_HIERARCHY_VERSION){
+        const name=t.name.toLowerCase(),parent=byName.get(legacyParents[name]);
+        if(parent)t.parentIds.push(parent.id);
+        if(name==='usa'||name==='europe')t.automaticOnly=true;
+        t.hierarchyVersion=PHOTO_TAG_HIERARCHY_VERSION;
+      }
+      t.parentIds=[...new Set(t.parentIds.map(id=>aliases.get(id)||id))];
+    });
+    // Validate imported graphs too, dropping invalid edges and cycles.
+    const proposed=normalized.map(t=>[t,t.parentIds.slice()]);
+    normalized.forEach(t=>t.parentIds=[]);
+    proposed.forEach(([t,parents])=>parents.forEach(id=>{
+      if(photoTagCanParent(t.id,id,normalized))t.parentIds.push(id);
+    }));
+    // Preserve legacy parent-only memberships in storage, but automatic-only
+    // tags never act as explicit selections. They become visible again if
+    // the user disables automatic-only. No photo assignments are destroyed.
+    return normalized;
   }
   function sortedPhotoTags(){
     return photoTags.slice().sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base',numeric:true}));
@@ -11264,7 +11299,33 @@
     const tags=sortedPhotoTags();
     return PHOTO_TAG_CATEGORIES.map(category=>({category,tags:tags.filter(t=>photoTagCategory(t.category)===category)}));
   }
-  function photoTagsFor(id){ return sortedPhotoTags().filter(t=>t.photoIds.includes(id)); }
+  function explicitPhotoTagIds(id,tags=photoTags){
+    return tags.filter(t=>!t.automaticOnly&&t.photoIds.includes(id)).map(t=>t.id);
+  }
+  function photoTagsFor(id){
+    const effective=photoTagClosure(explicitPhotoTagIds(id),photoTags);
+    return sortedPhotoTags().filter(t=>effective.has(t.id));
+  }
+  function effectivePhotoTagMembers(tags){
+    const members=new Map(tags.map(t=>[t.id,new Set()]));
+    tags.forEach(t=>{
+      if(t.automaticOnly)return;
+      photoTagClosure([t.id],tags).forEach(id=>{
+        const set=members.get(id);t.photoIds.forEach(photoId=>set.add(photoId));
+      });
+    });
+    return members;
+  }
+  function photoTagHierarchyFields(tag){
+    const selected=new Set(tag?.parentIds||[]);
+    const options=sortedPhotoTags().filter(t=>!tag||photoTagCanParent(tag.id,t.id,photoTags));
+    return '<fieldset class="pt-hierarchy"><legend>Parent tags</legend><p class="pt-muted">Selecting this tag also applies its parents.</p><div class="pt-parent-options">'+
+      (options.length?options.map(t=>'<label class="pt-parent-option"><input type="checkbox" name="parentId" value="'+escapeAttr(t.id)+'" '+(selected.has(t.id)?'checked':'')+'><span>'+escapeHtml(t.name)+'</span></label>').join(''):'<span class="pt-muted">No eligible parent tags.</span>')+
+      '</div><label class="pt-parent-option pt-auto-only"><input type="checkbox" name="automaticOnly" '+(tag?.automaticOnly?'checked':'')+'><span>Automatic only</span></label><p class="pt-muted">Only applied through child tags, never selected directly.</p></fieldset>';
+  }
+  function photoTagReadParents(form,childId){
+    return [...form.querySelectorAll('[name=parentId]:checked')].map(x=>x.value).filter(id=>photoTagCanParent(childId,id,photoTags));
+  }
   function photoTagFind(id){return photoTags.find(t=>t.id===id);}
   function photoTagNameAvailable(name,exceptId){
     return !photoTags.some(t=>t.id!==exceptId&&t.name.toLocaleLowerCase()===name.toLocaleLowerCase());
@@ -11368,12 +11429,14 @@
   }
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
-    photoTagDraft={photoId:id,selected:new Set(photoTagsFor(id).map(t=>t.id))};
-    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
+    photoTagDraft={photoId:id,selected:new Set(explicitPhotoTagIds(id))};
+    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+photoTagHierarchyFields(null)+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
     const list=photoTagTray.querySelector('.pt-tray-list'), form=photoTagTray.querySelector('form'), add=photoTagTray.querySelector('[data-add]'), error=photoTagTray.querySelector('.pt-error'), input=form.elements.name;
     function render(){
       list.replaceChildren();
+      const effective=photoTagClosure(photoTagDraft.selected,photoTags);
       groupedPhotoTags().forEach(({category,tags})=>{
+        tags=tags.filter(t=>!t.automaticOnly);
         const section=document.createElement('section');section.className='pt-category-group';
         const heading=document.createElement('h3');heading.textContent=category;section.appendChild(heading);
         const chips=document.createElement('div');chips.className='pt-category-chips';section.appendChild(chips);
@@ -11387,11 +11450,20 @@
         b.append(name,mark);
         b.onclick=()=>{
           if(photoTagDraft.selected.has(t.id))photoTagDraft.selected.delete(t.id);else photoTagDraft.selected.add(t.id);
-          b.setAttribute('aria-pressed',String(photoTagDraft.selected.has(t.id)));
-          mark.textContent=photoTagDraft.selected.has(t.id)?'✓':'＋';
+          render();
+          const replacement=[...list.querySelectorAll('[data-tag-id]')].find(x=>x.dataset.tagId===t.id);
+          if(replacement)replacement.focus({preventScroll:true});
         };
         chips.appendChild(b);
         });
+        const inherited=sortedPhotoTags().filter(t=>photoTagCategory(t.category)===category&&effective.has(t.id)&&!photoTagDraft.selected.has(t.id));
+        if(inherited.length){
+          const row=document.createElement('div');row.className='pt-inherited';
+          const label=document.createElement('small');label.textContent='Automatically applied';row.appendChild(label);
+          const group=document.createElement('div');group.className='pt-category-chips';row.appendChild(group);
+          inherited.forEach(t=>{const chip=document.createElement('span');chip.className='pt-inherited-chip';chip.textContent='↳ '+t.name;group.appendChild(chip);});
+          section.appendChild(row);
+        }
         list.appendChild(section);
       });
     }
@@ -11399,7 +11471,7 @@
     quick.addEventListener('keydown',e=>{
       if(e.key!=='Enter'||e.isComposing)return;
       e.preventDefault();e.stopPropagation();
-      const match=matchPhotoTagTerm(quick.value,photoTags);
+      const match=matchPhotoTagTerm(quick.value,photoTags.filter(t=>!t.automaticOnly));
       quick.value='';
       if(!match||!photoTagDraft||!photoTagsWritable())return;
       photoTagDraft.selected.add(match.id);
@@ -11416,10 +11488,11 @@
       if(!name||!photoTagNameAvailable(name)){error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;}
       const category=form.elements.category.value;
       if(!PHOTO_TAG_CATEGORIES.includes(category)){error.textContent='Choose a category.';error.hidden=false;return;}
-      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[]};
+      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[],parentIds:[],automaticOnly:form.elements.automaticOnly.checked,hierarchyVersion:PHOTO_TAG_HIERARCHY_VERSION};
+      tag.parentIds=photoTagReadParents(form,tag.id);
       photoTags.push(tag);
       savePhotoTags();
-      form.reset();form.hidden=true;add.hidden=false;error.hidden=true;render();
+      form.reset();form.querySelector('.pt-hierarchy').outerHTML=photoTagHierarchyFields(null);form.hidden=true;add.hidden=false;error.hidden=true;render();
       // Creation and selection are separate: the new tag starts off.
       const chip=Array.from(list.querySelectorAll('[data-tag-id]')).find(b=>b.dataset.tagId===tag.id);
       if(chip)chip.scrollIntoView({block:'nearest'});
@@ -11429,6 +11502,7 @@
       if(draft&&photoTagsWritable()&&photoRows.some(p=>p.id===draft.photoId)){
         let changed=false;
         photoTags.forEach(t=>{
+          if(t.automaticOnly)return;
           const has=t.photoIds.includes(draft.photoId), wanted=draft.selected.has(t.id);
           if(wanted&&!has){t.photoIds.push(draft.photoId);changed=true;}
           if(!wanted&&has){t.photoIds=t.photoIds.filter(x=>x!==draft.photoId);changed=true;}
@@ -11453,7 +11527,7 @@
     if(!photoTagsWritable())return;
     const rename=mode==='rename';
     photoTagModal.innerHTML='<form method="dialog"><header><h2>'+(rename?'Edit tag':'Delete tag?')+'</h2></header><div class="pt-modal-body">'+(rename?
-      '<label>Tag name<input type="text" name="name" class="tf-input" required maxlength="100" value="'+escapeAttr(tag.name)+'"></label><label class="pt-category-label">Category'+photoTagCategorySelect(photoTagCategory(tag.category))+'</label><p class="pt-error" role="alert" hidden></p>':
+      '<label>Tag name<input type="text" name="name" class="tf-input" required maxlength="100" value="'+escapeAttr(tag.name)+'"></label><label class="pt-category-label">Category'+photoTagCategorySelect(photoTagCategory(tag.category))+'</label>'+photoTagHierarchyFields(tag)+'<p class="pt-error" role="alert" hidden></p>':
       '<p>Delete <strong>'+escapeHtml(tag.name)+'</strong>? This removes the tag from all its photos. The photos themselves will not be deleted.</p>')+
       '</div><footer><button type="button" class="btn-ghost" data-cancel>Cancel</button><button type="submit" class="'+(rename?'btn-primary':'pt-delete-btn')+'">'+(rename?'Save':'Delete')+'</button></footer></form>';
     photoTagModal.querySelector('[data-cancel]').onclick=()=>photoTagModal.close();
@@ -11469,8 +11543,12 @@
         const category=e.currentTarget.elements.category.value;
         if(!PHOTO_TAG_CATEGORIES.includes(category))return;
         live.name=name;live.category=category;live.categoryVersion=PHOTO_TAG_CATEGORY_VERSION;
+        live.parentIds=photoTagReadParents(e.currentTarget,live.id);
+        live.automaticOnly=e.currentTarget.elements.automaticOnly.checked;
+        live.hierarchyVersion=PHOTO_TAG_HIERARCHY_VERSION;
       }else{
         photoTags=photoTags.filter(t=>t.id!==live.id);
+        photoTags.forEach(t=>t.parentIds=t.parentIds.filter(id=>id!==live.id));
         photoTagOpenId='';
       }
       savePhotoTags();photoTagModal.close();
@@ -11481,12 +11559,12 @@
   }
   function renderPhotoTags(){
     if(!photoTagsHost)return;
-    const ranked=pcRanked(), active=photoTagFind(photoTagOpenId);
+    const ranked=pcRanked(), active=photoTagFind(photoTagOpenId), members=effectivePhotoTagMembers(photoTags);
     if(!active){
       photoTagOpenId='';
       const tags=sortedPhotoTags();
       photoTagsHost.innerHTML=tags.length?'<div class="pt-tag-grid">'+tags.map(t=>{
-        const ids=new Set(t.photoIds), rows=ranked.filter(x=>ids.has(x.p.id)), cover=rows[0];
+        const ids=members.get(t.id), rows=ranked.filter(x=>ids.has(x.p.id)), cover=rows[0];
         return '<button type="button" class="pt-tag-card" data-tag-id="'+escapeAttr(t.id)+'">'+(cover?pcThumb(cover,650):'<div class="pt-empty-cover" aria-hidden="true">🏷️</div>')+'<span><strong>'+escapeHtml(t.name)+'</strong><small>'+pcCount(rows.length)+'</small></span></button>';
       }).join('')+'</div>':'<p class="pt-muted pt-empty">No tags yet. Open a photo in Gallery and tap Add Tag to create one.</p>';
       photoTagsHost.querySelectorAll('[data-tag-id]').forEach(b=>b.onclick=()=>{
@@ -11494,7 +11572,7 @@
       });
       return;
     }
-    const ids=new Set(active.photoIds), rows=ranked.filter(x=>ids.has(x.p.id));
+    const ids=members.get(active.id), rows=ranked.filter(x=>ids.has(x.p.id));
     photoTagsHost.innerHTML='<div class="pt-detail-header"><button type="button" class="btn-ghost" data-back aria-label="Back to Tags">‹ Tags</button><div><h2>'+escapeHtml(active.name)+'</h2><p class="pt-muted">'+pcCount(rows.length)+'</p></div>'+
       (photoTagsWritable()?'<div class="pt-menu-wrap"><button type="button" class="btn-ghost pt-menu-btn" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout" hidden><button type="button" data-rename>Edit</button><button type="button" data-delete>Delete</button></div></div>':'')+'</div>'+
       (rows.length?'<div class="results-list grid-mode pt-detail-grid">'+rows.map((x,i)=>'<button type="button" class="grid-card pt-detail-photo" data-photo-index="'+i+'" aria-label="View photo ranked '+x.rank+'"><div class="art-drop">'+pcThumb(x,500)+'</div></button>').join('')+'</div>':'<p class="pt-muted pt-empty">No photos with this tag yet.</p>');
