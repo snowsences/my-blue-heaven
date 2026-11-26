@@ -5683,3 +5683,18 @@
 #restaurant-details-panel-inner .rd-cover-caption .details-album{color:#fff;font-size:clamp(18px,4.5vw,23px);line-height:1.2;margin:0 0 3px;overflow-wrap:anywhere;text-shadow:0 1px 5px rgba(0,0,0,.45)}
 #restaurant-details-panel-inner .rd-cover-caption .details-artist{color:rgba(255,255,255,.85);font-size:13px;margin:0;line-height:1.25;text-shadow:0 1px 4px rgba(0,0,0,.5)}
 @media(max-width:480px){#restaurant-details-panel-inner .rd-cover-caption{padding:24px 14px 9px}}
+
+/* A text-only culinary cloud: organic wrapping, no pills, no outlines except focus. */
+.rd-food-cloud{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:3px 12px;padding:20px 4px 24px;min-width:0}
+.rd-food-word{appearance:none;background:none;border:0;border-radius:4px;padding:5px 2px;color:var(--chalk);font-family:Figtree,sans-serif;font-size:var(--food-size,15px);font-weight:var(--food-weight,500);line-height:1.12;opacity:var(--food-alpha,.8);cursor:pointer;max-width:100%;overflow-wrap:anywhere;transition:color 160ms ease,opacity 160ms ease}
+.rd-food-word[data-food-top]{color:var(--amber)}
+.rd-food-word[aria-pressed=true]{color:var(--amber);opacity:1;text-decoration:underline;text-underline-offset:4px}
+.rd-food-word:focus-visible,.rd-food-match:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+@media(hover:hover){.rd-food-word:hover{color:var(--amber);opacity:1}}
+.rd-food-card h4{font-size:15px;margin:14px 0 5px}
+.rd-food-matches{display:flex;flex-direction:column}
+.rd-food-match{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-height:44px;padding:10px 0;text-align:left;color:var(--chalk);background:none;border:0;border-bottom:1px solid rgba(160,180,177,.13);font:inherit;cursor:pointer}
+.rd-food-match:last-child{border-bottom:0}
+.rd-food-match small{color:var(--chalk-dim);font-size:12px}
+@media(max-width:480px){.rd-food-cloud{gap:3px 9px}.rd-food-word{font-size:min(var(--food-size),32px)}}
+@media(prefers-reduced-motion:reduce){.rd-food-word{transition:none}}
