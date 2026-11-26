@@ -13311,9 +13311,17 @@
 
   // A best meal must have six individually rated courses in the same visit.
   const BEST_MEAL_MIN_COURSES = 6;
+  // Diminishing sample-size penalty: 1 point at six rated dishes, 0.6
+  // at ten, 0.35 at seventeen. Used for awards only, never shown as the
+  // meal's actual average or written back to any course or visit.
+  function bestMealRank(avg,count){
+    return count>=BEST_MEAL_MIN_COURSES&&Number.isFinite(avg)?avg-BEST_MEAL_MIN_COURSES/count:null;
+  }
   function bestMealScore(visit){
-    const scores=(visit.courses||[]).map(rdScore).filter(n=>n!==null);
-    return scores.length>=BEST_MEAL_MIN_COURSES?{avg:scores.reduce((a,b)=>a+b,0)/scores.length,count:scores.length}:null;
+    const scores=(visit.courses||[]).map(rdScore).filter(n=>n!==null),count=scores.length;
+    if(count<BEST_MEAL_MIN_COURSES)return null;
+    const avg=scores.reduce((a,b)=>a+b,0)/count;
+    return {avg,count,rank:bestMealRank(avg,count)};
   }
   function computeVisitAverageScore(visit){
     const scored = (visit.courses || [])
@@ -14214,7 +14222,7 @@
     const mean=nums.length?nums.reduce((a,b)=>a+b,0)/nums.length:null;
     const median=nums.length?(nums[Math.floor((nums.length-1)/2)]+nums[Math.floor(nums.length/2)])/2:null;
     const rated=visits.filter(v=>v.avg!==null),dated=rated.filter(v=>v.date).sort((a,b)=>a.date.localeCompare(b.date)||a.vi-b.vi);
-    const best=rated.filter(v=>v.scored.length>=BEST_MEAL_MIN_COURSES).sort((a,b)=>b.avg-a.avg||b.date.localeCompare(a.date))[0];
+    const best=rated.filter(v=>v.scored.length>=BEST_MEAL_MIN_COURSES).sort((a,b)=>bestMealRank(b.avg,b.scored.length)-bestMealRank(a.avg,a.scored.length)||b.avg-a.avg||b.date.localeCompare(a.date))[0];
     return {visits,courses,scored,mean,median,rated,dated,best,exceptional:nums.filter(n=>n>=12).length};
   }
   const rdFmt=n=>n===null||n===undefined?'—':Number(n).toFixed(1);
@@ -14231,7 +14239,7 @@
     return '<div class="rd-extra"><section class="rd-card"><h3>Restaurant scores</h3>'+renderRestaurantScoresRowHtml(r)+'</section><section class="rd-card"><h3>Visit history</h3>'+
       rdMetrics([['Recorded visits',stats.visits.length],['Total courses',stats.courses.length],['Average course',rdFmt(stats.mean)],['Scored courses',stats.scored.length],['12+ courses',stats.exceptional],['Best visit (6+ rated)',rdFmt(stats.best?.avg)]])+
       [['Tier',tier?.name||'—'],['First visit',dates.length?rdDate(dates[0].v):'—'],['Most recent',dates.length?rdDate(dates[dates.length-1].v):'—']].map(([k,v])=>'<div class="rd-overview-row"><span class="rd-muted">'+escapeHtml(k)+'</span><span>'+escapeHtml(String(v))+'</span></div>').join('')+
-      (stats.best?'<div class="rd-overview-row"><span class="rd-muted">Highest-scoring visit</span>'+rdVisitButton(stats.best.v,rdDate(stats.best.v)+' · '+rdFmt(stats.best.avg))+'</div>':'')+'</section></div>';
+      (stats.best?'<div class="rd-overview-row"><span class="rd-muted">Best visit (weighted)</span>'+rdVisitButton(stats.best.v,rdDate(stats.best.v)+' · '+rdFmt(stats.best.avg)+' · '+stats.best.scored.length+' rated')+'</div>':'')+'</section></div>';
   }
   function rdBar(label,sub,value,width,high,attrs){
     const tag=attrs?'button':'div';
@@ -15243,7 +15251,7 @@
         if (!matches.length) return;
         const distinct = Array.from(new Set(dated.map(x => x.p.str))).sort();
         const visitAvgs = visits.map(v => computeVisitAverageScore(v)).filter(s => s !== null);
-        const eligibleVisitAvgs=visits.map(bestMealScore).filter(Boolean).map(x=>x.avg);
+        const eligibleVisitRanks=visits.map(bestMealScore).filter(Boolean).map(x=>x.rank);
         const overallAvg = visitAvgs.length ? visitAvgs.reduce((a, b) => a + b, 0) / visitAvgs.length : null;
         const perYear = new Map(); // two visits on the same day become one card
         matches.forEach(x => {
@@ -15277,7 +15285,7 @@
           let scoreSub = '';
           if (avg !== null){
             const eligible=e.visits.length===1?bestMealScore(e.visits[0]):null;
-            if (eligible && eligibleVisitAvgs.length >= 2 && eligible.avg >= Math.max(...eligibleVisitAvgs) && eligibleVisitAvgs.some(s=>s<eligible.avg)){
+            if (eligible && eligibleVisitRanks.length >= 2 && eligible.rank >= Math.max(...eligibleVisitRanks) && eligibleVisitRanks.some(s=>s<eligible.rank)){
               scoreSub = 'Your best visit here';
             } else if (visitAvgs.length >= 2 && overallAvg !== null && avg - overallAvg >= 0.3){
               scoreSub = 'Above your ' + overallAvg.toFixed(1) + ' average here';
@@ -17856,7 +17864,7 @@
         // Timeline cards may combine same-day visits, but awards must never do so.
         e.visits.forEach(v=>{
           const qualified=bestMealScore(v);
-          if(qualified)stats.scored.push({...item,visitId:v.id,avg:qualified.avg,ratedCount:qualified.count});
+          if(qualified)stats.scored.push({...item,visitId:v.id,avg:qualified.avg,ratedCount:qualified.count,mealRank:qualified.rank});
         });
       });
       if (firstYear === year) stats.newRestaurants++;
@@ -17896,7 +17904,7 @@
     const hl = [];
     const mem = stats.memorable;
     if (mem) hl.push({ label: 'Most memorable', big: mem.activity.name, sub: [yirShortDate(mem.dateStr), mem.activity.location].filter(Boolean).join(' · '), item: mem, star: true });
-    const bestMeal = stats.scored.slice().sort((a, b) => b.avg - a.avg || (a.dateStr < b.dateStr ? 1 : -1))[0];
+    const bestMeal = stats.scored.slice().sort((a,b)=>b.mealRank-a.mealRank||b.avg-a.avg||b.dateStr.localeCompare(a.dateStr))[0];
     if (bestMeal && !guestViewEnabled) hl.push({ label: 'Best meal', big: bestMeal.restaurant.name, sub: bestMeal.avg.toFixed(1) + ' · ' + bestMeal.ratedCount + ' rated · ' + yirShortDate(bestMeal.dateStr), item: bestMeal });
     let longest = null, withMiles = 0;
     list.forEach(dy => dy.hikes.forEach(h => { if (h.miles > 0){ withMiles++; if (!longest || h.miles > longest.miles) longest = h; } }));
