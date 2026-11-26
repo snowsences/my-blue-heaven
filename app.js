@@ -18223,7 +18223,9 @@
       const expanded=tripSelectedDay===d.key;
       const counts=[d.visits.length&&otdPlural(d.visits.length,'restaurant visit','restaurant visits'),d.hikes.length&&otdPlural(d.hikes.length,'hike','hikes'),d.activities.length&&otdPlural(d.activities.length,'activity','activities'),d.roads.length&&otdPlural(d.roads.length,'road','roads'),d.photos.length&&otdPlural(d.photos.length,'photo','photos')].filter(Boolean).join(' · ');
       const names=d.places.map(p=>p.name).filter(Boolean).join(' → ');
-      const thumb=d.photos[0]?.url;
+      // Reuse the trip's selected covers and normal rotation cadence, but
+      // restrict eligible photos to this day and give each date its own seed.
+      const thumb=rotatingCoverPhoto({id:t.id+'|day|'+d.key,coverPhotos:getSelectedCoverPhotos(t)},d.photos.map(p=>p.url));
       const edit=owner&&d.key?'<button type="button" class="trip-day-edit trip-owner" data-trip-day-edit="'+escapeAttr(d.key)+'" aria-label="'+escapeAttr('Edit title for '+date)+'">✎</button>':'';
       let body='';
       if(expanded){
