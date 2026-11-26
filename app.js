@@ -847,7 +847,6 @@
       roads: { roadRows, roadSavedAt: roadLastSavedAt },
       parks: { parkRows, parkSavedAt: parkLastSavedAt },
       photos: { photoRows, photoSavedAt: photoLastSavedAt, photoDuelItems, photoDuelHistory, photoDuelIsComplete, photoDuelFinalRanking, photoDuelSavedAt: photoDuelLastSavedAt },
-      photoCollections: { photoCollections, photoCollectionsSavedAt },
       trips: { tripRows, tripSavedAt: tripLastSavedAt },
       activities: { activityRows, activityMemorable, activitySavedAt: activityLastSavedAt },
       artists: { artistRows, artistSavedAt: artistLastSavedAt },
@@ -1176,12 +1175,6 @@
         renderPhotosPage();
       }
     }
-    if (Array.isArray(existing.photoCollections) && new Date(existing.photoCollectionsSavedAt || 0).getTime() > new Date(photoCollectionsSavedAt || 0).getTime()){
-      photoCollections = normalizePhotoCollections(existing.photoCollections);
-      photoCollectionsSavedAt = existing.photoCollectionsSavedAt;
-      persistPhotoCollections();
-      refreshPhotoExtras();
-    }
     // Duels changes independently of photoRows (a pick never touches it) —
     // its own savedAt inside the same "photos" part, same dual-timestamp
     // pattern as hikeFullListText living inside the hikes part below.
@@ -1485,7 +1478,6 @@
       songLastSavedAt = localSongParsed.savedAt || null;
     }
 
-    await loadPhotoCollections();
     // Same independent-local-key pattern as Songs.
     let localRestaurantParsed = null;
     try{
@@ -2677,7 +2669,7 @@
     photoSortHelperButton.hidden = true;
     photoSortHelperButton.classList.remove('show');
     photoSortHelperIds = null;
-    updatePhotoCollectionLightbox();
+    updatePhotoCalendarLightbox();
     lightboxPhotos = null;
     lightboxCoverContext = null;
     tripPhotoRemoveBtn.hidden = true;
@@ -2706,7 +2698,7 @@
     photoSortHelperButton.hidden = !photoSortHelperIds || photoRows.length < 2 || guestViewEnabled || isLockedGuestAccount;
     photoSortHelperButton.classList.toggle('show', !photoSortHelperButton.hidden);
     lightboxCoverContext = coverContext || null;
-    updatePhotoCollectionLightbox();
+    updatePhotoCalendarLightbox();
     artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(photos[lightboxIndex]), 1600);
     artLightboxOverlay.classList.add('multi');
     artLightboxOverlay.classList.add('show');
@@ -2858,7 +2850,7 @@
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
-    updatePhotoCollectionLightbox();
+    updatePhotoCalendarLightbox();
     artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(lightboxPhotos[lightboxIndex]), 1600);
     updateLightboxCounter();
     updateLightboxCoverToggle();
@@ -2873,7 +2865,7 @@
     photoSortHelperButton.hidden = true;
     photoSortHelperButton.classList.remove('show');
     photoSortHelperIds = null;
-    updatePhotoCollectionLightbox();
+    updatePhotoCalendarLightbox();
     lightboxZoomOut(); // a snapshot flies back to the thumbnail while the real viewer closes at once
     artLightboxOverlay.classList.remove('show');
     artLightboxOverlay.classList.remove('multi');
@@ -4474,7 +4466,6 @@
     if (page === 'photos'){
       renderPhotosPage();
     }
-    if (page === 'photo-collections') renderPhotoCollections();
     if (page === 'photo-calendar') renderPhotoCalendar();
     if (page === 'books'){
       renderMediaPage('book');
@@ -11064,7 +11055,7 @@
   }
 
   function renderPhotosPage(){
-    refreshPhotoExtras();
+    refreshPhotoCalendar();
     const empty = !photoRows.length;
     if (empty) photoEditMode = false;
     photoEmptyMessage.style.display = empty ? 'block' : 'none';
@@ -11108,210 +11099,37 @@
   }
 
 
-  // ---------- PHOTO COLLECTIONS AND CALENDAR ----------
-  // A collection is only metadata and stable Gallery IDs. Calendar is derived.
-  const PHOTO_COLLECTION_STORAGE_KEY = 'photo-collections-v1';
-  let photoCollections = [], photoCollectionsSavedAt = null;
-  let pcOpenId = '', pcSort = 'rank', pcListSort = 'name', pcBackY = 0;
+  // ---------- PHOTOGRAPHY CALENDAR ----------
+  // Derived entirely from the existing Gallery's stable IDs and rank order.
   let pcalYear = '', pcalDay = '', pcalBackY = 0;
   try { pcalYear = sessionStorage.getItem('mbh-photo-calendar-year') || ''; } catch(e){}
-  const pcHost = document.getElementById('photo-collections-content');
   const pcalHost = document.getElementById('photo-calendar-content');
-  const pcDialog = document.getElementById('photo-collection-dialog');
-  const pcLightbox = document.getElementById('photo-collection-lightbox');
-  const pcWritable = () => !guestViewEnabled && !isLockedGuestAccount;
-  function normalizePhotoCollections(value){
-    const ids = new Set();
-    return (Array.isArray(value) ? value : []).filter(c => c && typeof c.id === 'string' && !ids.has(c.id) && ids.add(c.id)).map(c => ({
-      id: c.id, name: String(c.name || 'Untitled'), description: String(c.description || ''),
-      coverPhotoId: typeof c.coverPhotoId === 'string' ? c.coverPhotoId : null,
-      photoIds: Array.from(new Set(Array.isArray(c.photoIds) ? c.photoIds.filter(x => typeof x === 'string') : [])),
-      updatedAt: c.updatedAt || ''
-    }));
-  }
-  function persistPhotoCollections(){
-    try { window.storage.set(PHOTO_COLLECTION_STORAGE_KEY, JSON.stringify({ photoCollections, savedAt: photoCollectionsSavedAt }), false); } catch(e){}
-  }
-  async function loadPhotoCollections(){
-    try {
-      const res = await window.storage.get(PHOTO_COLLECTION_STORAGE_KEY, false);
-      if (res && res.value){
-        const p = JSON.parse(res.value);
-        if (Array.isArray(p.photoCollections)){
-          photoCollections = normalizePhotoCollections(p.photoCollections);
-          photoCollectionsSavedAt = p.savedAt || null;
-        }
-      }
-    } catch(e){}
-  }
-  function savePhotoCollections(){
-    if (!pcWritable()) return;
-    photoCollectionsSavedAt = new Date().toISOString();
-    persistPhotoCollections();
-    scheduleSyncWrite();
-    refreshPhotoExtras();
-    updatePhotoCollectionLightbox();
-  }
-  function prunePhotoCollections(){
-    const ids = new Set(photoRows.map(p=>p.id));
-    let changed = false;
-    photoCollections.forEach(c=>{
-      const kept = c.photoIds.filter(id=>ids.has(id));
-      if (kept.length !== c.photoIds.length){ c.photoIds = kept; changed = true; }
-      if (c.coverPhotoId && !ids.has(c.coverPhotoId)){ c.coverPhotoId=null; changed=true; }
-    });
-    if (changed) savePhotoCollections();
-  }
+  const pcalLightbox = document.getElementById('photo-calendar-lightbox');
   function pcRanked(){
     const rows = photoSortHelperOrder();
     return rows.map((p,i)=>({p,rank:i+1,date:otdParse(p.date)}));
   }
-  function pcMembers(c, ranked){
-    const ids = new Set(c.photoIds);
-    return ranked.filter(x=>ids.has(x.p.id));
-  }
-  function pcCover(c, rows){ return rows.find(x=>x.p.id===c.coverPhotoId) || rows[0]; }
   function pcThumb(x, size=400){
     return '<img src="'+escapeAttr(cloudinaryThumbUrl(x.p.url,size))+'" alt="" loading="lazy" decoding="async">';
   }
   function pcCount(n){ return n+' photo'+(n===1?'':'s'); }
-  function pcButton(label, action, primary=false){
-    return '<button type="button" class="'+(primary?'btn-primary':'btn-ghost')+'" data-pc-action="'+escapeAttr(action)+'">'+escapeHtml(label)+'</button>';
-  }
   function pcPhotoGrid(rows, showYear=false){
     return '<div class="pc-photo-grid">'+rows.map((x,i)=>'<button class="pc-photo-tile" type="button" data-pc-photo="'+i+'" aria-label="View photo ranked '+x.rank+'">'+pcThumb(x)+'<span><b>#'+x.rank+'</b>'+(showYear&&x.date?'<small>'+x.date.y+'</small>':'')+'</span></button>').join('')+'</div>';
   }
-  function pcWireGrid(host, rows){
-    host.querySelectorAll('[data-pc-photo]').forEach(btn=>btn.addEventListener('click',()=>{
-      openPhotoLightbox(rows.map(x=>x.p.url),Number(btn.dataset.pcPhoto),null,rows.map(x=>x.p.id));
-    }));
-  }
-  function pcDialogOpen(title, html, onSave, saveLabel='Save'){
-    pcDialog.innerHTML = '<form method="dialog" class="pc-dialog-form"><header class="pc-toolbar"><h2>'+escapeHtml(title)+'</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></header><div class="pc-dialog-body">'+html+'</div><footer class="pc-toolbar"><button type="button" class="btn-ghost" data-close>Cancel</button><button type="submit" class="btn-primary">'+escapeHtml(saveLabel)+'</button></footer></form>';
-    pcDialog.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>pcDialog.close());
-    pcDialog.querySelector('form').onsubmit=e=>{e.preventDefault(); if(pcWritable() && onSave(pcDialog)!==false) pcDialog.close();};
-    if (!pcDialog.open) pcDialog.showModal();
-  }
-  function pcFind(id){ return photoCollections.find(c=>c.id===id); }
-  function pcNew(name, description='', photoIds=[]){
-    return { id:'pc-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2), name, description, photoIds, coverPhotoId:null, updatedAt:new Date().toISOString() };
-  }
-  function pcTouch(c){ c.updatedAt=new Date().toISOString(); }
-  function pcEditInfo(c){
-    pcDialogOpen(c?'Edit collection':'New collection',
-      '<label class="tf-label">Name<input class="tf-input" name="name" required maxlength="100" value="'+escapeAttr(c?c.name:'')+'"></label><label class="tf-label">Description (optional)<textarea class="tf-input" name="description" rows="3">'+escapeHtml(c?c.description:'')+'</textarea></label>', d=>{
-      const name=d.querySelector('[name=name]').value.trim(), description=d.querySelector('[name=description]').value.trim();
-      if(!name){showToast('Enter a collection name');return false;}
-      if(c){const live=pcFind(c.id);if(!live)return;live.name=name;live.description=description;pcTouch(live);}
-      else{const created=pcNew(name,description);photoCollections.push(created);pcBackY=window.scrollY;pcOpenId=created.id;pcSort='rank';window.scrollTo(0,0);}
-      savePhotoCollections();
-    },c?'Save':'Create');
-  }
-  function pcOpenCollection(id){
-    pcBackY=window.scrollY; pcOpenId=id;pcSort='rank';renderPhotoCollections();window.scrollTo(0,0);
-  }
-  function renderPhotoCollections(){
-    if(!pcHost)return;
-    const ranked=pcRanked(), c=pcFind(pcOpenId);
-    if(!c){
-      pcOpenId='';
-      let cards=photoCollections.map(c=>({c,rows:pcMembers(c,ranked)}));
-      cards.sort((a,b)=>pcListSort==='count'?b.rows.length-a.rows.length||a.c.name.localeCompare(b.c.name):pcListSort==='recent'?String(b.c.updatedAt).localeCompare(String(a.c.updatedAt)):a.c.name.localeCompare(b.c.name));
-      pcHost.innerHTML='<div class="pc-toolbar"><h2>Collections</h2><select class="pc-select" aria-label="Sort collections"><option value="name">Name</option><option value="count">Photo count</option><option value="recent">Recently updated</option></select>'+(pcWritable()?pcButton('+ New','new',true):'')+'</div><div class="pc-albums">'+cards.map(({c,rows})=>{
-        const cover=pcCover(c,rows);
-        return '<button type="button" class="pc-album" data-id="'+escapeAttr(c.id)+'">'+(cover?pcThumb(cover,650):'<div class="pc-empty-cover">📦</div>')+'<span><strong>'+escapeHtml(c.name)+'</strong><small>'+pcCount(rows.length)+'</small></span></button>';
-      }).join('')+(pcWritable()?'<button type="button" class="pc-album pc-new-album" data-pc-action="new">＋ New collection</button>':'')+'</div>';
-      const select=pcHost.querySelector('select');select.value=pcListSort;select.onchange=()=>{pcListSort=select.value;renderPhotoCollections();};
-      pcHost.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>pcOpenCollection(b.dataset.id));
-      pcHost.querySelectorAll('[data-pc-action=new]').forEach(b=>b.onclick=()=>pcEditInfo(null));
-      return;
-    }
-    const base=pcMembers(c,ranked),cover=pcCover(c,base),rows=base.slice();
-    if(pcSort==='reverse')rows.reverse();
-    if(pcSort==='newest'||pcSort==='oldest')rows.sort((a,b)=>{
-      if(!a.date||!b.date)return Number(!a.date)-Number(!b.date);
-      return (pcSort==='newest'?-1:1)*a.date.str.localeCompare(b.date.str)||a.rank-b.rank;
-    });
-    pcHost.innerHTML='<div class="pc-toolbar">'+pcButton('‹ Collections','back')+(pcWritable()?pcButton('Edit','edit')+pcButton('Delete','delete'):'')+'</div>'+
-      (cover?'<div class="pc-hero">'+pcThumb(cover,1000)+'</div>':'')+
-      '<div class="pc-toolbar"><h2>'+escapeHtml(c.name)+'</h2>'+(pcWritable()?pcButton('+ Add photos','add',true):'')+'</div><p class="pc-muted">'+pcCount(rows.length)+'</p>'+
-      (c.description?'<p class="pc-description">'+escapeHtml(c.description)+'</p>':'')+
-      '<div class="pc-toolbar"><select class="pc-select" aria-label="Sort photos"><option value="rank">Highest ranked</option><option value="reverse">Lowest ranked</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select>'+
-      (pcWritable()?pcButton('Choose cover','cover')+pcButton('Remove photos','remove'):'')+'</div>'+
-      (rows.length?pcPhotoGrid(rows):'<p class="pc-muted">No photos yet.</p>');
-    const select=pcHost.querySelector('select');select.value=pcSort;select.onchange=()=>{pcSort=select.value;renderPhotoCollections();};
-    pcWireGrid(pcHost,rows);
-    const act={back:()=>{pcOpenId='';renderPhotoCollections();window.scrollTo(0,pcBackY);},edit:()=>pcEditInfo(c),delete:()=>{
-      pcDialogOpen('Delete collection?','<p>Only '+escapeHtml(c.name)+' will be deleted. All Gallery photos stay in your library.</p>',()=>{photoCollections=photoCollections.filter(x=>x.id!==c.id);pcOpenId='';savePhotoCollections();},'Delete');
-    },add:()=>pcPickPhotos(c,'add'),remove:()=>pcPickPhotos(c,'remove'),cover:()=>pcPickPhotos(c,'cover')};
-    pcHost.querySelectorAll('[data-pc-action]').forEach(b=>b.onclick=act[b.dataset.pcAction]);
-  }
-  function pcPickPhotos(c, mode){
-    const all=pcRanked(), members=new Set(c.photoIds), rows=mode==='add'?all:all.filter(x=>members.has(x.p.id));
-    const selected=new Set(), years=[...new Set(rows.filter(x=>x.date).map(x=>x.date.y))].sort((a,b)=>b-a);
-    let chosenCover=c.coverPhotoId||'';
-    pcDialogOpen(mode==='cover'?'Choose cover':mode==='remove'?'Remove photos':'Add photos',
-      '<div class="pc-toolbar"><select class="pc-select" data-year aria-label="Filter year"><option value="">All years</option>'+years.map(y=>'<option>'+y+'</option>').join('')+'</select><select class="pc-select" data-season aria-label="Filter season"><option value="">All seasons</option><option value="winter">Winter</option><option value="spring">Spring</option><option value="summer">Summer</option><option value="autumn">Autumn</option></select></div><p class="pc-muted" data-status></p>'+(mode==='cover'?'<label class="pc-check"><input type="radio" name="cover" value=""> Automatic (highest ranked)</label>':'')+'<div class="pc-picker-grid"></div>',d=>{
-      const live=pcFind(c.id);if(!live)return;
-      if(mode==='cover')live.coverPhotoId=chosenCover||null;
-      else if(mode==='add')live.photoIds=Array.from(new Set([...live.photoIds,...selected]));
-      else {live.photoIds=live.photoIds.filter(id=>!selected.has(id));if(selected.has(live.coverPhotoId))live.coverPhotoId=null;}
-      pcTouch(live);savePhotoCollections();
-    });
-    const year=pcDialog.querySelector('[data-year]'),season=pcDialog.querySelector('[data-season]'),grid=pcDialog.querySelector('.pc-picker-grid'),status=pcDialog.querySelector('[data-status]');
-    const seasonOf=m=>m===12||m<=2?'winter':m<=5?'spring':m<=8?'summer':'autumn';
-    const updateStatus=()=>status.textContent=mode==='cover'?'Choose one photo, or use automatic cover.':selected.size+' selected'+(mode==='add'?' · existing members are checked':'');
-    function render(){
-      const filtered=rows.filter(x=>(!year.value||x.date&&String(x.date.y)===year.value)&&(!season.value||x.date&&seasonOf(x.date.m)===season.value));
-      grid.innerHTML=filtered.map((x,i)=>{
-        const id=x.p.id,existing=mode==='add'&&members.has(id),checked=mode==='cover'?chosenCover===id:existing||selected.has(id);
-        return '<label class="pc-picker-tile">'+pcThumb(x,240)+'<span>#'+x.rank+' <input type="'+(mode==='cover'?'radio':'checkbox')+'" '+(mode==='cover'?'name="cover"':'')+' data-index="'+i+'" '+(checked?'checked ':'')+(existing?'disabled ':'')+'aria-label="Photo ranked '+x.rank+'"></span></label>';
-      }).join('')||'<p class="pc-muted">No matching photos.</p>';
-      grid.querySelectorAll('input').forEach(input=>input.onchange=()=>{
-        const id=filtered[Number(input.dataset.index)].p.id;
-        if(mode==='cover')chosenCover=id;else if(input.checked)selected.add(id);else selected.delete(id);
-        updateStatus();
-      });
-      updateStatus();
-    }
-    if(mode==='cover'){const auto=pcDialog.querySelector('input[value=""]');auto.checked=!chosenCover;auto.onchange=()=>{chosenCover='';render();};}
-    year.onchange=season.onchange=render;render();
-  }
-  function pcMembership(photoId){
-    const item=pcRanked().find(x=>x.p.id===photoId);if(!item||!pcWritable())return;
-    const sorted=photoCollections.slice().sort((a,b)=>a.name.localeCompare(b.name));
-    pcDialogOpen('Add to collections','<div class="pc-toolbar pc-membership-preview">'+pcThumb(item,160)+'<span>Photo #'+item.rank+'</span></div>'+
-      sorted.map((c,i)=>'<label class="pc-check"><input type="checkbox" data-cindex="'+i+'" '+(c.photoIds.includes(photoId)?'checked':'')+'>'+escapeHtml(c.name)+'</label>').join('')+
-      '<label class="tf-label">Create a new collection (optional)<input class="tf-input" name="newname" maxlength="100" placeholder="Collection name"></label>',d=>{
-      d.querySelectorAll('[data-cindex]').forEach(input=>{
-        const c=pcFind(sorted[Number(input.dataset.cindex)].id);if(!c)return;
-        const had=c.photoIds.includes(photoId);
-        if(input.checked&&!had){c.photoIds.push(photoId);pcTouch(c);}
-        if(!input.checked&&had){c.photoIds=c.photoIds.filter(id=>id!==photoId);if(c.coverPhotoId===photoId)c.coverPhotoId=null;pcTouch(c);}
-      });
-      const name=d.querySelector('[name=newname]').value.trim();if(name)photoCollections.push(pcNew(name,'',[photoId]));
-      savePhotoCollections();
-    });
-  }
-  function updatePhotoCollectionLightbox(){
-    if(!pcLightbox)return;
+
+  function updatePhotoCalendarLightbox(){
+    if(!pcalLightbox)return;
     const id=photoSortHelperIds&&photoSortHelperIds[lightboxIndex];
     const p=id&&photoRows.find(x=>x.id===id);
-    pcLightbox.hidden=!p||!pcWritable();
-    if(!p||!pcWritable()){pcLightbox.innerHTML='';return;}
-    const memberships=photoCollections.filter(c=>c.photoIds.includes(id));
-    const date=otdParse(p.date);
-    pcLightbox.innerHTML=(date?'<button type="button" data-date>'+escapeHtml(date.str)+'</button>':'')+
-      memberships.map(c=>'<button type="button" data-id="'+escapeAttr(c.id)+'">'+escapeHtml(c.name)+'</button>').join('')+
-      '<button type="button" data-membership>📦 '+(memberships.length?'Edit collections':'Add to collections')+'</button>';
-    pcLightbox.querySelector('[data-membership]').onclick=e=>{e.stopPropagation();pcMembership(id);};
-    pcLightbox.querySelectorAll('[data-id]').forEach(b=>b.onclick=e=>{e.stopPropagation();closeArtLightbox();switchTopGroup('photos');switchPhotosSubPage('photo-collections');pcOpenCollection(b.dataset.id);});
-    const dateButton=pcLightbox.querySelector('[data-date]');
-    if(dateButton)dateButton.onclick=e=>{e.stopPropagation();closeArtLightbox();pcalYear=String(date.y);pcalDay='';pcalRememberYear();switchTopGroup('photos');switchPhotosSubPage('photo-calendar');pcalOpenDay(date.m+'-'+date.d);};
+    const date=p&&otdParse(p.date);
+    pcalLightbox.hidden=!date||guestViewEnabled||isLockedGuestAccount;
+    if(pcalLightbox.hidden){pcalLightbox.innerHTML='';return;}
+    pcalLightbox.innerHTML='<button type="button" aria-label="Open capture date in Calendar">🗓️ '+escapeHtml(date.str)+'</button>';
+    pcalLightbox.querySelector('button').onclick=e=>{
+      e.stopPropagation();closeArtLightbox();pcalYear=String(date.y);pcalDay='';pcalRememberYear();switchTopGroup('photos');switchPhotosSubPage('photo-calendar');pcalOpenDay(date.m+'-'+date.d);
+    };
   }
-  pcLightbox.addEventListener('click',e=>e.stopPropagation());
-  pcDialog.addEventListener('click',e=>{if(e.target===pcDialog)pcDialog.close();});
-  pcDialog.addEventListener('keydown',e=>e.stopPropagation());
+  pcalLightbox.addEventListener('click',e=>e.stopPropagation());
   function pcalRememberYear(){try{sessionStorage.setItem('mbh-photo-calendar-year',pcalYear);}catch(e){}}
   function pcalBuild(){
     const ranked=pcRanked(), years=[...new Set(ranked.filter(x=>x.date).map(x=>String(x.date.y)))].sort((a,b)=>Number(b)-Number(a));
@@ -11362,8 +11180,8 @@
     };
     pcalHost.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>pcalOpenDay(b.dataset.day));
   }
-  function refreshPhotoExtras(){
-    if(pagePhotoCollections.classList.contains('active'))renderPhotoCollections();
+
+  function refreshPhotoCalendar(){
     if(pagePhotoCalendar.classList.contains('active'))renderPhotoCalendar();
   }
 
@@ -11552,7 +11370,6 @@
     pairs.sort((a, b) => a.key - b.key); // stable: equal numbers keep their on-screen order
     const removed = photoRows.length - pairs.length;
     photoRows = pairs.map(x => x.row);
-    if (removed) prunePhotoCollections();
     photoRows.forEach(row => {
       if (!photoEditTrip.has(row.id)) return;
       const wanted = photoEditTrip.get(row.id);
@@ -14473,7 +14290,7 @@
       items, history, isComplete, finalRanking, loadingDock, art, tierBoundaries, tierBoundariesTotal,
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
-      hikeRows, parkRows, roadRows, photoRows, photoCollections, photoCollectionsSavedAt, tripRows, artistRows, activityRows, activityMemorable,
+      hikeRows, parkRows, roadRows, photoRows, tripRows, artistRows, activityRows, activityMemorable,
       photoDuelItems, photoDuelHistory, photoDuelIsComplete, photoDuelFinalRanking,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
@@ -14555,11 +14372,6 @@
         savePhotoProgress();
         renderPhotosPage();
         restoredParts.push(parsed.photoRows.length + ' photo' + (parsed.photoRows.length === 1 ? '' : 's'));
-      }
-      if (Array.isArray(parsed.photoCollections)){
-        photoCollections = normalizePhotoCollections(parsed.photoCollections);
-        savePhotoCollections();
-        restoredParts.push(photoCollections.length + ' photo collections');
       }
       if (Array.isArray(parsed.tripRows) && parsed.tripRows.length){
         tripRows = parsed.tripRows.map(tripNormalize);
