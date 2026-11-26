@@ -11358,11 +11358,24 @@
       (tag?.automaticOnly?'<p class="pt-muted pt-auto-only">Automatic only — this tag has children.</p>':'')+'</fieldset>';
   }
   function photoTagReadParents(form,childId){
+    if(form.elements.category.value!=='Location')return [];
     const current=photoTags.find(t=>t.id===childId);
     const existing=new Set(current?.parentIds||[]);
     const preserved=[...form.querySelectorAll('[name=existingParentId]')].map(x=>x.value).filter(id=>existing.has(id)&&photoTagCanParent(childId,id,photoTags));
     const chosen=[...form.querySelectorAll('[name=parentId]:checked')].map(x=>x.value).filter(id=>photoTagIsEligibleParent(childId,id,photoTags));
     return [...new Set([...preserved,...chosen])];
+  }
+  function wirePhotoTagCategory(form){
+    const hierarchy=form.querySelector('.pt-hierarchy');
+    if(!hierarchy)return;
+    const update=()=>{
+      const enabled=form.elements.category.value==='Location';
+      hierarchy.hidden=!enabled;
+      hierarchy.disabled=!enabled;
+      hierarchy.style.display=enabled?'':'none';
+    };
+    form.addEventListener('change',e=>{if(e.target.name==='category')update();});
+    update();
   }
   function wireExistingPhotoParents(form){
     form.querySelectorAll('[data-remove-parent]').forEach(b=>b.onclick=()=>b.closest('.pt-existing-parent').remove());
@@ -11550,6 +11563,7 @@
     add.onclick=()=>{
       photoTagCreateTray.innerHTML='<form class="pt-create-form" method="dialog"><div class="pt-grip" aria-hidden="true"></div><header><h2>Add Tags</h2><button type="button" class="btn-ghost" data-cancel>Cancel</button></header><div class="pt-create-body"><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySegments()+photoTagHierarchyFields(null)+'<p class="pt-error" role="alert" hidden></p></div><footer><button type="submit" class="btn-primary">Save</button></footer></form>';
       const form=photoTagCreateTray.querySelector('form'), error=form.querySelector('.pt-error'), input=form.elements.name;
+      wirePhotoTagCategory(form);
       form.querySelector('[data-cancel]').onclick=()=>photoTagCreateTray.close();
       form.onsubmit=e=>{
       e.preventDefault();
@@ -11627,7 +11641,7 @@
       savePhotoTags();photoTagModal.close();
       if(!rename)window.scrollTo(0,photoTagListY);
     };
-    if(rename)wireExistingPhotoParents(photoTagModal.querySelector('form'));
+    if(rename){wireExistingPhotoParents(photoTagModal.querySelector('form'));wirePhotoTagCategory(photoTagModal.querySelector('form'));}
     photoTagModal.showModal();
     if(rename){const input=photoTagModal.querySelector('input');input.focus();input.select();}
   }
