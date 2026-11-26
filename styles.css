@@ -5143,3 +5143,34 @@
   @media (prefers-reduced-motion: reduce){
     *, *::before, *::after{ animation-duration: 0.01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; transition-delay: 0ms !important; scroll-behavior: auto !important; }
   }
+
+  /* Restaurant detail header uses the same photo-derived wash as its tray.
+     The registered tint does not inherit automatically; pass it through
+     the inner wrapper so the sticky header stays opaque while scrolling. */
+  #restaurant-details-panel-inner,
+  #restaurant-details-panel-inner .rd-header{
+    --panel-tint: inherit;
+  }
+  #restaurant-details-panel #restaurant-details-panel-inner .rd-header{
+    background: linear-gradient(to bottom, var(--panel-tint) var(--tint-start, 0px), #0F1E20 calc(var(--tint-start, 0px) + 780px)) #0F1E20;
+  }
+  #restaurant-details-panel-inner .rd-header .rd-tabs{
+    background: transparent;
+  }
+
+  /* Overview only: match Visit history's numerical typography. */
+  #restaurant-details-panel-inner .rd-card .restaurant-score-label{
+    text-transform: lowercase;
+    letter-spacing: normal;
+  }
+  #restaurant-details-panel-inner .rd-card .restaurant-score-label::first-letter{
+    text-transform: uppercase;
+  }
+  #restaurant-details-panel-inner .rd-card :is(.restaurant-score-select, .restaurant-score-total-value, .restaurant-score-price-value){
+    font-size: 24px;
+  }
+  @media (max-width: 480px){
+    #restaurant-details-panel-inner .rd-card :is(.restaurant-score-select, .restaurant-score-total-value, .restaurant-score-price-value){
+      font-size: 21px;
+    }
+  }
