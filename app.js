@@ -11687,10 +11687,16 @@
     photoTagDraft={photoId:id,selected:new Set(explicitPhotoTagIds(id))};
     photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tags</button></div></div>';
     const list=photoTagTray.querySelector('.pt-tray-list'), add=photoTagTray.querySelector('[data-add]');
+    // The Rockies span Canada and the USA: Canada + Rockies is the sole
+    // exception to the one-explicit-location rule, in either selection order.
+    function compatibleDraftLocations(a,b){
+      const names=[a.name.trim().toLowerCase(),b.name.trim().toLowerCase()];
+      return names.includes('canada')&&names.includes('rockies');
+    }
     function selectDraftTag(tag){
       if(photoTagCategory(tag.category)==='Location'){
         photoTags.forEach(t=>{
-          if(t.id!==tag.id&&photoTagCategory(t.category)==='Location')photoTagDraft.selected.delete(t.id);
+          if(t.id!==tag.id&&photoTagCategory(t.category)==='Location'&&!compatibleDraftLocations(t,tag))photoTagDraft.selected.delete(t.id);
         });
       }
       photoTagDraft.selected.add(tag.id);
@@ -11701,7 +11707,7 @@
         tags=tags.filter(t=>!t.automaticOnly);
         if(category==='Location'){
           const selected=tags.filter(t=>photoTagDraft.selected.has(t.id));
-          if(selected.length)tags=selected;
+          if(selected.length)tags=tags.filter(t=>photoTagDraft.selected.has(t.id)||selected.every(other=>compatibleDraftLocations(t,other)));
         }
         const section=document.createElement('section');section.className='pt-category-group';
         const heading=document.createElement('h3');heading.textContent=category;section.appendChild(heading);
