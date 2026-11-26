@@ -4064,8 +4064,8 @@
   .modal-overlay.show{ display: flex; }
   .modal-box{
     background: var(--panel);
-    border: 1px solid var(--panel-line);
-    border-radius: var(--radius);
+    border: 0;
+    border-radius: 4px;
     padding: 24px;
     max-width: 360px;
     width: 100%;
@@ -5284,7 +5284,7 @@
   .pt-tray-add form[hidden],.pt-tray-add>button[hidden],.pt-error[hidden]{display:none;}
   .pt-tray-add input{flex:1;min-width:0;width:100%;margin:0;}
   .pt-error{color:#F28C77;font-size:13px;margin:8px 0 0;}
-  .pt-modal{width:min(420px,92vw);max-width:92vw;border-radius:var(--radius);margin:auto;}
+  .pt-modal{width:min(420px,92vw);max-width:92vw;border:0;border-radius:4px;margin:auto;}
   .pt-modal form{padding:18px;}
   .pt-modal-body{margin:16px 0;line-height:1.5;}
   .pt-modal-body label{display:block;font-size:14px;}
