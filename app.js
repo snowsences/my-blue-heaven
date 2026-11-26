@@ -1737,7 +1737,7 @@
   // regardless of which function created it or when.
   document.addEventListener('load', (e) => {
     const img = e.target;
-    if (img && img.tagName === 'IMG' && (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb'))){
+    if (img && img.tagName === 'IMG' && (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb, .pc-day-hero, .pc-photo-tile'))){
       img.classList.add('img-loaded');
     }
   }, true);
@@ -1757,7 +1757,7 @@
   document.addEventListener('error', (e) => {
     const img = e.target;
     if (!img || img.tagName !== 'IMG') return;
-    if (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb')){
+    if (img.classList.contains('art-img') || img.classList.contains('art-lightbox-img') || img.closest('.restaurant-photo-thumb, .pc-day-hero, .pc-photo-tile')){
       img.classList.add('img-loaded'); // stops the shimmer even on failure, rather than animating forever on a broken image
     }
     if (!img.dataset.brokenFallback){ // only once, so a failing placeholder can never loop
