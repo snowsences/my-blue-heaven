@@ -11637,10 +11637,10 @@
     if(!active){
       photoTagOpenId='';
       const tags=sortedPhotoTags();
-      photoTagsHost.innerHTML=tags.length?'<div class="pt-tag-grid">'+tags.map(t=>{
+      photoTagsHost.innerHTML=tags.length?groupedPhotoTags().map(({category,tags})=>'<section class="pt-tag-section"><h2 class="pt-tag-section-heading">'+escapeHtml(category)+'</h2>'+(tags.length?'<div class="pt-tag-grid">'+tags.map(t=>{
         const ids=members.get(t.id), rows=ranked.filter(x=>ids.has(x.p.id)), cover=rows[0];
         return '<button type="button" class="pt-tag-card" data-tag-id="'+escapeAttr(t.id)+'">'+(cover?pcThumb(cover,650):'<div class="pt-empty-cover" aria-hidden="true">🏷️</div>')+'<span><strong>'+escapeHtml(t.name)+'</strong><small>'+pcCount(rows.length)+'</small></span></button>';
-      }).join('')+'</div>':'<p class="pt-muted pt-empty">No tags yet. Open a photo in Gallery and tap Add Tags to create one.</p>';
+      }).join('')+'</div>':'<p class="pt-muted">No tags yet.</p>')+'</section>').join(''):'<p class="pt-muted pt-empty">No tags yet. Open a photo in Gallery and tap Add Tags to create one.</p>';
       photoTagsHost.querySelectorAll('[data-tag-id]').forEach(b=>b.onclick=()=>{
         photoTagListY=window.scrollY;photoTagOpenId=b.dataset.tagId;renderPhotoTags();window.scrollTo(0,0);
       });
