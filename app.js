@@ -10620,6 +10620,8 @@
     t.stopGeo = (t.stopGeo && typeof t.stopGeo === 'object') ? t.stopGeo : {};
     t.assign = (t.assign && typeof t.assign === 'object') ? t.assign : {};
     t.notes = Array.isArray(t.notes) ? t.notes : [];
+    // Optional titles belong to a calendar date, not to a photo or visit.
+    t.dayTitles = Object.fromEntries(Object.entries(t.dayTitles && typeof t.dayTitles === 'object' ? t.dayTitles : {}).filter(([k,v]) => otdParse(k) && typeof v === 'string' && v.trim()).map(([k,v]) => [k,v.trim().slice(0,120)]));
     t.photos = Array.isArray(t.photos) ? t.photos : [];
     // Manual card order within a place+day (drag-to-reorder on the timeline).
     // Key: "<placeId>|<date>" (either half may be blank); value: the item keys
@@ -17768,7 +17770,8 @@
   const tsheetCloseBtn = document.getElementById('tsheet-close');
 
   let tripOpenId = null;
-  let tripView = 'timeline';       // 'timeline' | 'gallery'
+  let tripView = 'timeline';       // overview | by day | photos | restaurants (legacy internal keys retained)
+  let tripSelectedDay = null;
   let tripCurrentGallery = [];     // the gallery as last drawn, for the photo viewer
   let tripReturnFocus = null;
 
@@ -18005,7 +18008,9 @@
     const forAnchor = (type, id) => notes.filter(n => n.anchor && n.anchor.type === type && n.anchor.id === id);
     const hasPlaces = t.places.length > 0;
     const placeNameOf = (pid) => { const p = t.places.find(x => x.id === pid); return p ? p.name : ''; };
-    const galleryUrls = tripCurrentGallery.map(g => g.url);
+    // Visit memories are rendered with their visits on Restaurants / By Day,
+    // not as orphan notes on Overview.
+    linked.visits.forEach(x => forAnchor('visit', x.v.id).forEach(n => shown.add(n.id)));
 
     // place id ('' = none) -> Map(date -> { visits, hikes, photos })
     const groups = new Map();
@@ -18033,7 +18038,6 @@
       return keys.map((key, ki) => {
         const d = g.get(key);
         let cardItems = [].concat(
-          d.visits.map(x => ({ k: 'v:' + x.v.id, html: tripVisitCardHtml(t, x, noteBlock(forAnchor('visit', x.v.id)), pname) })),
           d.hikes.map(x => ({ k: 'h:' + x.d.id, html: tripHikeCardHtml(t, x, noteBlock(forAnchor('hike', x.d.id)), pname) })),
           d.roads.map(x => ({ k: 'r:' + x.rd.id, html: tripRoadCardHtml(t, x, noteBlock(forAnchor('road', x.rd.id)), pname) })),
           d.activities.map(act => ({ k: 'a:' + act.id, html: tripActivityCardHtml(t, act, noteBlock(forAnchor('activity', act.id)), pname) }))
@@ -18048,17 +18052,11 @@
             .map(x => x.it);
         }
         const cards = cardItems.map(it => it.html).join('');
-        const photoUrls = d.photos.map(p => p.url);
-        const photosCard = photoUrls.length ? '<div class="yir-photos-card"><div class="yir-row"><span class="yir-chip">' + yirIcon('camera', 12) + 'PHOTOS</span><span class="yir-dim">' +
-          escapeHtml(otdPlural(photoUrls.length, 'photo', 'photos')) + '</span>' +
-          (hasPlaces ? '<button type="button" class="trip-mini trip-owner trip-photos-place" data-trip-act="place" data-keys="' + escapeAttr(d.photos.map(p => 'p:' + p.id).join(',')) + '">📍 ' + escapeHtml(pname || 'Place') + '</button>' : '') +
-          '</div><div class="yir-photo-grid">' +
-          photoUrls.slice(0, 6).map((u, i) => {
-            const gi = galleryUrls.indexOf(u);
-            const more = photoUrls.length > 6 && i === 5;
-            return '<button type="button" class="yir-tile yir-day-tile" data-trip-photo="' + Math.max(0, gi) + '" aria-label="Open photo">' + yirImg(u, 400) +
-              (more ? '<span class="yir-tile-more">+' + (photoUrls.length - 5) + '</span>' : '') + '</button>';
-          }).join('') + '</div></div>' : '';
+        // Overview keeps the route and existing memories/activities, with
+        // compact links instead of duplicating the dedicated tab content.
+        const summaryLinks = (d.visits.length ? '<button type="button" class="btn-ghost" data-trip-view="restaurants">' + escapeHtml(otdPlural(d.visits.length, 'restaurant visit', 'restaurant visits')) + ' ›</button>' : '') +
+          (d.photos.length ? '<button type="button" class="btn-ghost" data-trip-view="gallery">' + escapeHtml(otdPlural(d.photos.length, 'photo', 'photos')) + ' ›</button>' : '');
+        const photosCard = summaryLinks ? '<div class="trip-summary-links">' + summaryLinks + '</div>' : '';
         const dayNoteHtml = key ? noteBlock(notes.filter(n => n.anchor && n.anchor.type === 'day' && n.anchor.date === key && dayNotePlace(key) === pid)) : '';
         let badge, monthHead = '';
         if (key){
@@ -18133,6 +18131,139 @@
       ((owner && (g.src === 'trip' || g.src === 'photos' || g.src === 'activity')) ? '<button type="button" class="trip-gx trip-owner" data-trip-gremove="' + i + '" aria-label="Remove from trip">✕</button>' : '') + '</div>').join('') + '</section>';
   }
 
+
+  // The date index is derived only from existing linked records and trip dates.
+  // Month-only trips do not imply that every day of that month was traveled.
+  function tripRetrospectiveDays(t, linked, gallery){
+    const groups = new Map();
+    const dateKey = value => otdParse(value)?.str || '';
+    const day = key => {
+      if (!groups.has(key)) groups.set(key, { key, visits: [], hikes: [], roads: [], activities: [], photos: [], places: [], notes: [] });
+      return groups.get(key);
+    };
+    const range = tripRange(t);
+    if (!tripIsMonth(t) && otdParse(range.startKey) && otdParse(range.endKey)){
+      const start = Date.parse(range.startKey + 'T00:00:00Z'), end = Date.parse(range.endKey + 'T00:00:00Z');
+      // Guard against accidental multi-decade date ranges in imported data.
+      if (end >= start && end - start <= 3660 * 86400000){
+        for (let ms = start; ms <= end; ms += 86400000) day(new Date(ms).toISOString().slice(0,10));
+      }
+    }
+    t.places.forEach(p => (p.days || []).forEach(k => { if (dateKey(k)) day(k).places.push(p); }));
+    linked.visits.forEach(x => day(dateKey(x.date)).visits.push(x));
+    linked.hikes.forEach(x => day(dateKey(x.date)).hikes.push(x));
+    linked.roads.forEach(x => day(dateKey(x.date)).roads.push(x));
+    t.activities.forEach(a => day(dateKey(a.date)).activities.push(a));
+    gallery.forEach((g,i) => day(dateKey(g.date)).photos.push({ ...g, index: i }));
+    t.notes.forEach(n => { if (n.anchor?.type === 'day' && dateKey(n.anchor.date)) day(n.anchor.date).notes.push(n); });
+    Object.keys(t.dayTitles || {}).forEach(k => { if (dateKey(k)) day(k); });
+    return Array.from(groups.values()).sort((a,b) => a.key && b.key ? a.key.localeCompare(b.key) : a.key ? -1 : b.key ? 1 : 0);
+  }
+
+  function tripDayCards(t,d,owner){
+    const notes = (type,id) => t.notes.filter(n => n.anchor?.type === type && n.anchor.id === id).map(n => tripNoteHtml(n,owner)).join('');
+    const grouped = new Map();
+    const add = (key,city,make) => {
+      const pid = tripPlaceOf(t,key,d.key,city);
+      const name = t.places.find(p => p.id === pid)?.name || '';
+      if (!grouped.has(pid)) grouped.set(pid,[]);
+      grouped.get(pid).push({key,html:make(name)});
+    };
+    d.visits.forEach(x => add('v:'+x.v.id,restaurantCityOf(x.r),p=>tripVisitCardHtml(t,x,notes('visit',x.v.id),p)));
+    d.hikes.forEach(x => add('h:'+x.d.id,x.h.city,p=>tripHikeCardHtml(t,x,notes('hike',x.d.id),p)));
+    d.roads.forEach(x => add('r:'+x.rd.id,x.rd.state,p=>tripRoadCardHtml(t,x,notes('road',x.rd.id),p)));
+    d.activities.forEach(x => add('a:'+x.id,'',p=>tripActivityCardHtml(t,x,notes('activity',x.id),p)));
+    const order = t.places.map(p=>p.id).concat('');
+    return order.map(pid=>{
+      const rows=grouped.get(pid)||[];
+      const manual=t.order[pid+'|'+d.key]||[];
+      const rank=new Map(manual.map((k,i)=>[k,i]));
+      return rows.map((r,i)=>({r,rank:rank.has(r.key)?rank.get(r.key):manual.length+i})).sort((a,b)=>a.rank-b.rank).map(x=>x.r.html).join('');
+    }).join('');
+  }
+
+  function tripByDayHtml(t,linked,gallery,owner){
+    const days=tripRetrospectiveDays(t,linked,gallery);
+    if(!days.length) return '<p class="cal-hint">No dated memories yet. Add exact trip dates or link dated photos, visits and activities.</p>';
+    let numbered=0;
+    return '<section class="trip-day-list">'+days.map(d=>{
+      const index=d.key?++numbered:0;
+      const date=d.key?tripKeyToDate(d.key).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}):'No date';
+      const title=d.key?(t.dayTitles?.[d.key]||''):'';
+      const expanded=tripSelectedDay===d.key;
+      const counts=[d.visits.length&&otdPlural(d.visits.length,'restaurant visit','restaurant visits'),d.hikes.length&&otdPlural(d.hikes.length,'hike','hikes'),d.activities.length&&otdPlural(d.activities.length,'activity','activities'),d.roads.length&&otdPlural(d.roads.length,'road','roads'),d.photos.length&&otdPlural(d.photos.length,'photo','photos')].filter(Boolean).join(' · ');
+      const names=d.places.map(p=>p.name).filter(Boolean).join(' → ');
+      const thumb=d.photos[0]?.url;
+      const edit=owner&&d.key?'<button type="button" class="trip-day-edit trip-owner" data-trip-day-edit="'+escapeAttr(d.key)+'" aria-label="'+escapeAttr('Edit title for '+date)+'">✎</button>':'';
+      let body='';
+      if(expanded){
+        const cards=tripDayCards(t,d,owner);
+        const photos=d.photos.length?'<div class="trip-day-photos"><h3>Photos <span>'+d.photos.length+'</span></h3><div class="trip-gallery">'+d.photos.map(p=>'<button type="button" class="yir-tile trip-gimg" data-trip-day-photo="'+p.index+'" aria-label="Open photo">'+yirImg(p.url,500)+'</button>').join('')+'</div></div>':'';
+        body='<div class="trip-day-body">'+d.notes.map(n=>tripNoteHtml(n,owner)).join('')+cards+photos+(!cards&&!photos&&!d.notes.length?'<p class="cal-hint">No recorded activities or photos for this day.</p>':'')+'</div>';
+      }
+      return '<article class="trip-day-entry'+(expanded?' expanded':'')+'"><div class="trip-day-row"><button type="button" class="trip-day-open" data-trip-day="'+escapeAttr(d.key)+'" aria-expanded="'+expanded+'">'+
+        '<span class="trip-day-thumb">'+(thumb?yirImg(thumb,240):'<span aria-hidden="true">▦</span>')+'</span><span class="trip-day-copy"><span class="trip-day-date">'+(index?'Day '+index+' · ':'')+escapeHtml(date)+'</span><strong>'+escapeHtml(title||names||(index?'Day '+index:'Undated memories'))+'</strong>'+(counts?'<span class="trip-day-meta">'+escapeHtml(counts)+'</span>':'')+'</span><span aria-hidden="true" class="trip-day-chevron">'+(expanded?'⌄':'›')+'</span></button>'+edit+'</div>'+body+'</article>';
+    }).join('')+'</section>';
+  }
+
+  function tripRestaurantsHtml(t,linked,owner){
+    if(!linked.visits.length)return '<p class="cal-hint">No restaurant visits linked to this trip yet.</p>';
+    const groups=new Map();
+    linked.visits.forEach(x=>{if(!groups.has(x.date))groups.set(x.date,[]);groups.get(x.date).push(x);});
+    return '<section class="trip-restaurants-list">'+Array.from(groups.keys()).sort((a,b)=>a&&b?a.localeCompare(b):a?-1:b?1:0).map(date=>
+      '<h3 class="trip-day-date-heading">'+escapeHtml(date?tripKeyToDate(date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}):'No date')+'</h3><div class="trip-day-body">'+groups.get(date).map(x=>{
+        const place=t.places.find(p=>p.id===tripPlaceOf(t,'v:'+x.v.id,x.date,restaurantCityOf(x.r)))?.name||'';
+        const notes=t.notes.filter(n=>n.anchor?.type==='visit'&&n.anchor.id===x.v.id).map(n=>tripNoteHtml(n,owner)).join('');
+        return tripVisitCardHtml(t,x,notes,place);
+      }).join('')+'</div>').join('')+'</section>';
+  }
+
+  function tripEditDayTitle(t,key){
+    if(guestViewEnabled||!otdParse(key))return;
+    tsheetOpen({
+      title:'Day title',
+      bodyHtml:'<label class="tf-label" for="trip-day-title-input">'+escapeHtml(tripKeyToDate(key).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}))+'</label><input id="trip-day-title-input" class="tf-input" type="text" maxlength="120" placeholder="e.g. Bayon &amp; Ta Prohm" value="'+escapeAttr(t.dayTitles?.[key]||'')+'">',
+      actions:[{label:'Cancel',onClick:tsheetClose},{label:'Save',primary:true,onClick:()=>{
+        const current=tripFind(t.id);
+        if(!current||guestViewEnabled)return;
+        const value=document.getElementById('trip-day-title-input').value.trim();
+        current.dayTitles=current.dayTitles||{};
+        if(value)current.dayTitles[key]=value;else delete current.dayTitles[key];
+        saveTripProgress();tsheetClose();tripRender();
+      }}],
+      onOpen:body=>{const input=body.querySelector('#trip-day-title-input');input.focus();input.select();}
+    });
+  }
+
+  const tripTabsStyle=document.createElement('style');
+  tripTabsStyle.textContent=`
+    .trip-detail-tabs{display:flex;gap:0;margin:14px 0 12px;border-bottom:1px solid var(--panel-line)}
+    .trip-detail-tabs button{flex:1;min-width:0;padding:12px 3px;border:0;border-bottom:3px solid transparent;background:none;color:var(--chalk-dim);font:600 14px Figtree,sans-serif;cursor:pointer}
+    .trip-detail-tabs button.active{color:var(--amber);border-bottom-color:var(--amber)}
+    .trip-summary-links{display:flex;gap:6px;flex-wrap:wrap}
+    .trip-summary-links button{font-size:12px;padding:6px 10px}
+    .trip-day-list,.trip-restaurants-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+    .trip-day-entry{border:1px solid var(--panel-line);border-radius:12px;background:var(--panel);overflow:hidden}
+    .trip-day-entry.expanded{border-color:var(--amber)}
+    .trip-day-row{display:flex;align-items:center;min-width:0}
+    .trip-day-open{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:none;border:0;text-align:left;color:var(--chalk);padding:10px;cursor:pointer;font:inherit}
+    .trip-day-thumb{width:72px;height:72px;flex:none;border-radius:8px;background:var(--bg);overflow:hidden;display:grid;place-items:center;color:var(--chalk-dim);font-size:24px}
+    .trip-day-thumb img{width:100%;height:100%;object-fit:cover}
+    .trip-day-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
+    .trip-day-copy strong{font-size:16px;color:var(--chalk)}
+    .trip-day-date,.trip-day-meta{font-size:12px;color:var(--chalk-dim)}
+    .trip-day-chevron{font-size:20px;color:var(--chalk-dim)}
+    .trip-day-edit{flex:none;width:44px;height:44px;margin-right:5px;border:0;background:none;color:var(--amber);cursor:pointer;font-size:23px}
+    .trip-day-body{display:flex;flex-direction:column;gap:10px;min-width:0}
+    .trip-day-entry .trip-day-body{padding:12px 10px;border-top:1px solid var(--panel-line)}
+    .trip-day-photos h3,.trip-day-date-heading{font-size:14px;color:var(--chalk);margin:4px 0}
+    .trip-day-photos h3 span{color:var(--chalk-dim);font-weight:400}
+    .trip-day-photos .trip-gallery{margin-top:8px}
+    .trip-day-date-heading{margin:8px 0 0}
+    @media(max-width:400px){.trip-detail-tabs button{font-size:13px}.trip-day-thumb{width:60px;height:60px}}
+  `;
+  document.head.appendChild(tripTabsStyle);
+
   function tripRender(){
     const t = tripFind(tripOpenId);
     if (!t) return;
@@ -18143,19 +18274,17 @@
     tripCurrentGallery = gallery;
     const cover = tripCoverUrl(t, gallery);
     const stops = tripStops(t, linked);
-    const toggle = '<div class="view-toggle trip-view-toggle"><button type="button" class="view-toggle-btn' + (tripView === 'timeline' ? ' active' : '') + '" data-trip-view="timeline">Timeline</button>' +
-      '<button type="button" class="view-toggle-btn' + (tripView === 'gallery' ? ' active' : '') + '" data-trip-view="gallery">Gallery</button></div>';
-    const memoryBtn = owner ? '<button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="" aria-label="Add a memory">💬</button>' : '';
-    const toolbarRow = '<div class="trip-toolbar-row">' + toggle + memoryBtn + '</div>';
+    const tabs = '<nav class="trip-detail-tabs" aria-label="Trip details">'+[['timeline','Overview'],['day','By Day'],['gallery','Photos'],['restaurants','Restaurants']].map(([key,label])=>'<button type="button" data-trip-view="'+key+'" class="'+(tripView===key?'active':'')+'" aria-pressed="'+(tripView===key)+'">'+label+'</button>').join('')+'</nav>';
+    const memoryBtn = owner ? '<div class="trip-toolbar-row"><button type="button" class="btn-ghost trip-owner trip-memory-btn" data-trip-act="note" data-anchor-type="trip" data-anchor-id="" aria-label="Add a memory">💬</button></div>' : '';
+
 
     tripContent.innerHTML =
       '<section class="trip-hero"><div class="trip-hero-photo">' +
         (cover ? '<img class="trip-hero-img" src="' + escapeAttr(cloudinaryThumbUrl(cover, 1200)) + '" alt="">' : '<span class="trip-hero-ph" aria-hidden="true">🧳</span>') +
         '<div class="trip-hero-shade"></div><div class="trip-hero-text"><h2 class="trip-title" id="trip-title">' + escapeHtml(t.name || 'Untitled trip') + '</h2>' +
         '<p class="trip-dates">' + escapeHtml(tripDateLabel(t)) + '</p></div></div></section>' +
-      tripMapBlockHtml(t, stops, owner) +
-      toolbarRow +
-      (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripTimelineHtml(t, linked, owner));
+      tabs +
+      (tripView === 'gallery' ? tripGalleryHtml(gallery, owner) : tripView === 'day' ? tripByDayHtml(t,linked,gallery,owner) : tripView === 'restaurants' ? tripRestaurantsHtml(t,linked,owner) : tripMapBlockHtml(t,stops,owner)+memoryBtn+tripTimelineHtml(t,linked,owner));
     tripContent.querySelectorAll('.yir-img, .trip-hero-img').forEach(img => img.addEventListener('error', () => img.remove()));
     tripWireItemDrag(t);
     tripScroll.scrollTop = prevTop;
@@ -18208,6 +18337,7 @@
     if (!tripFind(id)) return;
     tripOpenId = id;
     tripView = 'timeline';
+    tripSelectedDay = null;
     tripReturnFocus = document.activeElement;
     tripScroll.scrollTop = 0;
     tripRender();
@@ -18310,7 +18440,14 @@
     const t = tripFind(tripOpenId);
     if (!t) return;
     let el;
-    if ((el = e.target.closest('[data-trip-view]'))){ tripView = el.dataset.tripView; tripRender(); return; }
+    if ((el = e.target.closest('[data-trip-view]'))){ const next=el.dataset.tripView; if(next!==tripView){tripView=next;tripScroll.scrollTop=0;tripRender();} return; }
+    if ((el = e.target.closest('[data-trip-day]'))){ tripSelectedDay=tripSelectedDay===el.dataset.tripDay?null:el.dataset.tripDay;tripRender();return; }
+    if ((el = e.target.closest('[data-trip-day-edit]'))){ tripEditDayTitle(t,el.dataset.tripDayEdit);return; }
+    if ((el = e.target.closest('[data-trip-day-photo]'))){
+      const selected=tripCurrentGallery[Number(el.dataset.tripDayPhoto)];if(!selected)return;
+      const group=tripCurrentGallery.filter(g=>g.date===selected.date);
+      openPhotoLightbox(group.map(g=>g.url),Math.max(0,group.indexOf(selected)),guestViewEnabled?null:{tripId:t.id});return;
+    }
     if ((el = e.target.closest('[data-trip-map-open]'))){ if (!el.classList.contains('empty')) openTripMap(t); return; }
     if ((el = e.target.closest('[data-trip-pins]'))){ tripOpenPinsSheet(t); return; }
     if ((el = e.target.closest('[data-trip-photo]'))){
