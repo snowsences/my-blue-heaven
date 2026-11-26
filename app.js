@@ -11222,6 +11222,7 @@
   const photoTagButton = document.getElementById('photo-tag-lightbox-btn');
   const photoTagTray = document.getElementById('photo-tag-tray');
   const photoTagModal = document.getElementById('photo-tag-modal');
+  const photoTagCreateTray = document.getElementById('photo-tag-create-tray');
   const photoTagsWritable = () => !guestViewEnabled && !isLockedGuestAccount;
   const PHOTO_TAG_CATEGORIES = ['Location','Scenery','Season'];
   // One-time assignment for existing tags. The version is stored per tag so
@@ -11265,6 +11266,9 @@
     const parents=new Set(tags.flatMap(t=>t.parentIds||[]));
     tags.forEach(t=>{t.automaticOnly=parents.has(t.id);});
     return tags;
+  }
+  function photoTagCategorySegments(){
+    return '<div class="pt-category-segments" role="radiogroup" aria-label="Category">'+PHOTO_TAG_CATEGORIES.map(c=>'<label><input type="radio" name="category" value="'+c+'" required><span>'+c+'</span></label>').join('')+'</div>';
   }
   function normalizePhotoTags(raw){
     const ids=new Set(), names=new Set();
@@ -11470,8 +11474,8 @@
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
     photoTagDraft={photoId:id,selected:new Set(explicitPhotoTagIds(id))};
-    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tags</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+photoTagHierarchyFields(null)+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
-    const list=photoTagTray.querySelector('.pt-tray-list'), form=photoTagTray.querySelector('form'), add=photoTagTray.querySelector('[data-add]'), error=photoTagTray.querySelector('.pt-error'), input=form.elements.name;
+    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tags</button></div></div>';
+    const list=photoTagTray.querySelector('.pt-tray-list'), add=photoTagTray.querySelector('[data-add]');
     function render(){
       list.replaceChildren();
       groupedPhotoTags().forEach(({category,tags})=>{
@@ -11511,8 +11515,11 @@
       const chip=Array.from(list.querySelectorAll('[data-tag-id]')).find(b=>b.dataset.tagId===match.id);
       if(chip)chip.scrollIntoView({block:'nearest'});
     });
-    add.onclick=()=>{add.hidden=true;form.hidden=false;input.focus();};
-    form.onsubmit=e=>{
+    add.onclick=()=>{
+      photoTagCreateTray.innerHTML='<form class="pt-create-form" method="dialog"><div class="pt-grip" aria-hidden="true"></div><header><h2>Add Tags</h2><button type="button" class="btn-ghost" data-cancel>Cancel</button></header><div class="pt-create-body"><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySegments()+photoTagHierarchyFields(null)+'<p class="pt-error" role="alert" hidden></p></div><footer><button type="submit" class="btn-primary">Save</button></footer></form>';
+      const form=photoTagCreateTray.querySelector('form'), error=form.querySelector('.pt-error'), input=form.elements.name;
+      form.querySelector('[data-cancel]').onclick=()=>photoTagCreateTray.close();
+      form.onsubmit=e=>{
       e.preventDefault();
       if(!photoTagsWritable())return;
       const name=input.value.trim();
@@ -11523,10 +11530,13 @@
       tag.parentIds=photoTagReadParents(form,tag.id);
       photoTags.push(tag);
       savePhotoTags();
-      form.reset();form.querySelector('.pt-hierarchy').outerHTML=photoTagHierarchyFields(null);form.hidden=true;add.hidden=false;error.hidden=true;render();
+      photoTagCreateTray.close();render();
       // Creation and selection are separate: the new tag starts off.
       const chip=Array.from(list.querySelectorAll('[data-tag-id]')).find(b=>b.dataset.tagId===tag.id);
       if(chip)chip.scrollIntoView({block:'nearest'});
+      };
+      photoTagCreateTray.showModal();
+      input.focus();
     };
     photoTagTray.querySelector('[data-done]').onclick=()=>{
       const draft=photoTagDraft;
@@ -11553,6 +11563,7 @@
   });
   photoTagTray.addEventListener('close',()=>{endPhotoTagPreview();photoTagDraft=null;updatePhotoTagLightbox();});
   photoTagTray.addEventListener('keydown',e=>e.stopPropagation());
+  photoTagCreateTray.addEventListener('keydown',e=>e.stopPropagation());
   photoTagModal.addEventListener('keydown',e=>e.stopPropagation());
   function photoTagShowModal(tag,mode){
     if(!photoTagsWritable())return;
