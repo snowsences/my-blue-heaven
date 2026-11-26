@@ -5676,7 +5676,7 @@
 
 /* Restaurant identity is part of the cover, not a separate vertical block. */
 #restaurant-details-panel-inner .rd-cover-caption{
-  padding:26px 20px 10px;
+  padding:26px 20px 20px;
   background:linear-gradient(to top,rgba(15,33,36,.86),rgba(15,33,36,.60) 45%,rgba(15,33,36,0));
   z-index:1;pointer-events:none;color:#fff;
 }
