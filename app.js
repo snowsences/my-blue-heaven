@@ -3411,7 +3411,14 @@
     Object.values(musicbeeAlbumIndex).forEach(list => list.sort((a, b) => (a.trackNum || 0) - (b.trackNum || 0)));
   }
 
+  // This album is unavailable on Last.fm. Preserve the owner's supplied
+  // MusicBee track numbers, ratings and loved flags without inventing track 10.
+  function isManualRedPaintingsAlbum(artist,album){
+    return albumMatchKey(artist,album)===albumMatchKey('The Red Paintings','The Revolution Is Never Coming');
+  }
+  const manualRedPaintingsTracks=[[1,"Vampires Are Chasing Me",5,true],[2,"Dead Children",5,true],[3,"Dead Adults",5,true],[4,"Wasps",5,true],[5,"Fall Of Rome",5,false],[6,"Walls",4,false],[7,"Streets Fell Into My Window",5,true],[8,"You're Not One Of Them",4,false],[9,"It Is As It Was",5,true],[11,"Deleted Romantic",5,true],[12,"Rain",5,false],[13,"The Revolution Is Never Coming",5,true]].map(([trackNum,title,stars,loved])=>({artist:'The Red Paintings',album:'The Revolution Is Never Coming',trackNum,title,rating:stars*20,loved}));
   function findMusicbeeTracksForAlbum(artist, album){
+    if(isManualRedPaintingsAlbum(artist,album))return manualRedPaintingsTracks;
     return musicbeeAlbumIndex[albumMatchKey(artist, album)] || null;
   }
 
@@ -3700,7 +3707,7 @@
 
   function renderMusicbeeTracklistHtml(tracks, artist, album){
     const songRankIndex = buildSongRankIndex();
-    return '<p class="details-lastfm-status" style="margin-bottom:10px;">🎵 From your MusicBee library</p>' +
+    return '<p class="details-lastfm-status" style="margin-bottom:10px;">'+(isManualRedPaintingsAlbum(artist,album)?'🎵 Manually recorded tracklist':'🎵 From your MusicBee library')+'</p>' +
       '<ol class="details-tracklist">' + tracks.map(t => {
         const trackNumHtml = t.trackNum ? '<span class="details-track-num">' + t.trackNum + '</span>' : '<span class="details-track-num"></span>';
         // Both this and the loved slot below always render, fixed-width,
@@ -5113,7 +5120,7 @@
     const yearChip = p.year ? '<span class="details-meta-chip">' + p.year + '</span>' : '';
 
     const musicbeeAlbumTracks = p.artist ? findMusicbeeTracksForAlbum(p.artist, p.album) : null;
-    const lastfmConnected = !!(lastfmApiKey && lastfmUsername);
+    const lastfmConnected = !!(lastfmApiKey && lastfmUsername) && !isManualRedPaintingsAlbum(p.artist,p.album);
 
     const musicbeeSectionHtml = musicbeeAlbumTracks
       ? '<div class="details-lastfm-section">' + renderMusicbeeTracklistHtml(musicbeeAlbumTracks, p.artist, p.album) + '</div>'
