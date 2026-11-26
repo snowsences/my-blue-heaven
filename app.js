@@ -4348,6 +4348,7 @@
   // It uses the full master ranking even when the album view is filtered.
   let albumSortHelperState = null;
   const albumSortHelperDialog = songSortHelperDialog.cloneNode(true);
+  albumSortHelperDialog.classList.add('album-sort-helper');
   albumSortHelperDialog.innerHTML = songSortHelperDialog.innerHTML
     .replace('Which song is better?', 'Which album is better?')
     .replace('Choose selected song', 'Choose selected album')
@@ -4361,11 +4362,50 @@
     return isComplete && !editMode && !guestViewEnabled && !isLockedGuestAccount
       && finalRanking.length >= 2 && index >= Math.ceil(finalRanking.length / 2) && index < finalRanking.length;
   }
-  function albumSortHelperCard(raw){
-    const p = parseEntry(raw), art = artCache[raw];
-    return '<span class="song-helper-art">' + (art ? '<img alt="" src="' + escapeAttr(cloudinaryThumbUrl(art, 600)) + '">' : '🎵') +
-      '</span><span class="song-helper-copy"><strong>' + escapeHtml(p.artist ? p.album : raw) + '</strong><span>' +
-      [p.artist, p.year].filter(Boolean).map(escapeHtml).join(' · ') + '</span></span>';
+  function albumDuelTracksHtml(tracks){
+    if (!tracks || !tracks.length) return '<span class="album-duel-track-status">No tracklist available.</span>';
+    return tracks.map(t => '<span class="album-duel-track">' +
+      '<span class="album-duel-track-num">' + escapeHtml(String(t.trackNum || '')) + '</span>' +
+      '<span class="album-duel-track-title">' + escapeHtml(t.title || '') + '</span>' +
+      '<span class="details-track-rating">' + (t.rating == null ? '' : starString(t.rating)) + '</span>' +
+      '<span class="details-track-loved"' + (t.loved ? ' title="Loved" aria-label="Loved">❤' : '>') + '</span></span>'
+    ).join('');
+  }
+  function albumDuelArtHtml(art){
+    return art ? '<img alt="" src="' + escapeAttr(cloudinaryThumbUrl(art, 600)) + '">' : '🎵';
+  }
+  const albumDuelLastfmPending = new Map();
+  function renderAlbumDuelCard(container, raw){
+    const p = parseEntry(raw);
+    const tracks = p.artist ? findMusicbeeTracksForAlbum(p.artist, p.album) : null;
+    const canFetch = !tracks && p.artist && lastfmApiKey && lastfmUsername && !isManualRedPaintingsAlbum(p.artist,p.album);
+    container.innerHTML = '<span class="album-duel-layout"><span class="album-duel-cover-column">' +
+      '<span class="album-duel-art">' + albumDuelArtHtml(artCache[raw]) + '</span>' +
+      '<span class="album-duel-copy"><strong>' + escapeHtml(p.artist ? p.album : raw) + '</strong><span>' +
+      [p.artist, p.year].filter(Boolean).map(escapeHtml).join(' · ') + '</span></span></span>' +
+      '<span class="album-duel-tracklist">' + (canFetch ? '<span class="album-duel-track-status">Loading tracklist…</span>' : albumDuelTracksHtml(tracks)) +
+      '</span></span>';
+    const artEl = container.querySelector('.album-duel-art');
+    if (artCache[raw] === undefined){
+      // Fetch the cover if it has not yet been cached. Never replace the
+      // active card with stale async data after a new duel has started.
+      loadArtForItems([raw]).then(() => {
+        if (artEl.isConnected) artEl.innerHTML = albumDuelArtHtml(artCache[raw]);
+      }).catch(() => {});
+    }
+    if (!canFetch) return;
+    const trackEl = container.querySelector('.album-duel-tracklist');
+    const key = albumMatchKey(p.artist, p.album);
+    if (!albumDuelLastfmPending.has(key)){
+      albumDuelLastfmPending.set(key, fetchLastfmAlbumInfo(p.artist,p.album).finally(() => albumDuelLastfmPending.delete(key)));
+    }
+    albumDuelLastfmPending.get(key).then(parsed => {
+      if (!trackEl.isConnected) return;
+      const imported = findMusicbeeTracksForAlbum(p.artist,p.album);
+      trackEl.innerHTML = albumDuelTracksHtml(imported || parsed?.tracks.map(t => ({trackNum:t.rank,title:t.name})));
+    }).catch(() => {
+      if (trackEl.isConnected) trackEl.textContent = 'Tracklist unavailable.';
+    });
   }
   function finishAlbumSortHelper(){
     const state = albumSortHelperState;
@@ -4394,8 +4434,8 @@
     state.mid = Math.floor((state.lo + state.hi) / 2);
     albumSortHelperDialog.querySelector('[data-progress]').textContent = 'Duel ' + (state.history.length + 1);
     albumSortHelperDialog.querySelector('[data-undo]').disabled = !state.history.length;
-    albumSortHelperDialog.querySelector('[data-choice="selected"]').innerHTML = albumSortHelperCard(state.selected);
-    albumSortHelperDialog.querySelector('[data-choice="other"]').innerHTML = albumSortHelperCard(state.others[state.mid]);
+    renderAlbumDuelCard(albumSortHelperDialog.querySelector('[data-choice="selected"]'), state.selected);
+    renderAlbumDuelCard(albumSortHelperDialog.querySelector('[data-choice="other"]'), state.others[state.mid]);
   }
   function chooseAlbumSortHelper(selectedWins){
     const state = albumSortHelperState;
@@ -5586,8 +5626,8 @@
       swapDisplay = Math.random() < 0.5;
       const leftItem = swapDisplay ? currentPair[1] : currentPair[0];
       const rightItem = swapDisplay ? currentPair[0] : currentPair[1];
-      renderCardContent(cardLeftContent, leftItem);
-      renderCardContent(cardRightContent, rightItem);
+      renderAlbumDuelCard(cardLeftContent, leftItem);
+      renderAlbumDuelCard(cardRightContent, rightItem);
       cardLeft.style.animation = 'none'; void cardLeft.offsetWidth; cardLeft.style.animation = '';
       cardRight.style.animation = 'none'; void cardRight.offsetWidth; cardRight.style.animation = '';
 

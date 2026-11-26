@@ -5777,3 +5777,94 @@
 #restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip:focus-visible,#restaurant-details-panel-inner .rd-cover-add:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 @media(hover:hover){#restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip[aria-pressed=false]:hover{background:var(--bg);background:color-mix(in srgb,var(--rd-photo-tint) 92%,black)}}
 @media(max-width:480px){#restaurant-details-panel-inner .rd-visit-rail{padding-inline:14px}#restaurant-details-panel-inner .rd-cover-caption{gap:8px}#restaurant-details-panel-inner .rd-cover-add{padding-inline:8px;font-size:12px}#restaurant-details-panel-inner .rd-import-footer{padding-inline:14px}#restaurant-details-panel-inner .rd-visit-header>p{padding-inline:14px}}
+
+/* Album duels: two stacked choices with a cover and a scrollable tracklist. */
+dialog.album-sort-helper [data-pair]{
+  grid-template-columns: minmax(0,1fr) !important;
+  grid-template-rows: repeat(2,minmax(0,1fr)) !important;
+}
+dialog.song-sort-helper.album-sort-helper [data-choice]{
+  display: block;
+  padding: 10px;
+  text-align: left;
+}
+.album-duel-layout{
+  display: grid;
+  grid-template-columns: minmax(0, 34%) minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(8px, 2vw, 22px);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.album-duel-cover-column{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  text-align: center;
+}
+.album-duel-art{
+  display: grid;
+  place-items: center;
+  width: min(100%, 240px);
+  aspect-ratio: 1;
+  min-height: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  font-size: 36px;
+}
+.album-duel-art img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.album-duel-copy{
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: none;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.album-duel-copy strong{ font-size: clamp(13px, 2vw, 19px); line-height: 1.2; }
+.album-duel-copy > span{ font-size: 12px; opacity: .75; }
+.album-duel-tracklist{
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  text-align: left;
+  touch-action: pan-y;
+}
+.album-duel-track{
+  display: grid;
+  grid-template-columns: 18px minmax(0,1fr) 58px 14px;
+  gap: 6px;
+  align-items: baseline;
+  padding: 3px 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.album-duel-track-title{ overflow-wrap: anywhere; }
+.album-duel-track-num{ font-size: 11px; text-align: right; opacity: .65; }
+.album-duel-track-status{ font-size: 13px; opacity: .7; }
+#duel-active-view .duel-stage{ flex-direction: column; }
+#duel-active-view .duel-card{ padding: 24px 12px 12px; }
+#duel-active-view .card-content{ width: 100%; }
+#duel-active-view .album-duel-layout{ height: 280px; }
+#duel-active-view .album-duel-track .details-track-rating{ color: #926014; }
+@media (max-width: 520px){
+  .album-duel-layout{ grid-template-columns: minmax(0,30%) minmax(0,1fr); gap: 8px; }
+  .album-duel-track{ grid-template-columns: 13px minmax(0,1fr) 45px 11px; gap: 4px; font-size: 11px; padding: 3px 0; }
+  .album-duel-track .details-track-rating{ width: 45px; font-size: 9px; letter-spacing: 0; }
+  .album-duel-track .details-track-loved{ width: 11px; font-size: 11px; }
+  .album-duel-copy > span{ font-size: 10px; }
+}
