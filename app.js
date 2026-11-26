@@ -4344,6 +4344,92 @@
     if(!e.repeat)chooseSongSortHelper(e.key==='ArrowLeft'||e.key==='ArrowUp');
   });
 
+  // Album Sort Helper follows the same bounded insertion as Songs/Photos.
+  // It uses the full master ranking even when the album view is filtered.
+  let albumSortHelperState = null;
+  const albumSortHelperDialog = songSortHelperDialog.cloneNode(true);
+  albumSortHelperDialog.innerHTML = songSortHelperDialog.innerHTML
+    .replace('Which song is better?', 'Which album is better?')
+    .replace('Choose selected song', 'Choose selected album')
+    .replace('Choose comparison song', 'Choose comparison album');
+  document.body.appendChild(albumSortHelperDialog);
+  function closeAlbumSortHelper(){
+    albumSortHelperState = null;
+    if (albumSortHelperDialog.open) albumSortHelperDialog.close();
+  }
+  function albumSortHelperEligible(index){
+    return isComplete && !editMode && !guestViewEnabled && !isLockedGuestAccount
+      && finalRanking.length >= 2 && index >= Math.ceil(finalRanking.length / 2) && index < finalRanking.length;
+  }
+  function albumSortHelperCard(raw){
+    const p = parseEntry(raw), art = artCache[raw];
+    return '<span class="song-helper-art">' + (art ? '<img alt="" src="' + escapeAttr(cloudinaryThumbUrl(art, 600)) + '">' : '🎵') +
+      '</span><span class="song-helper-copy"><strong>' + escapeHtml(p.artist ? p.album : raw) + '</strong><span>' +
+      [p.artist, p.year].filter(Boolean).map(escapeHtml).join(' · ') + '</span></span>';
+  }
+  function finishAlbumSortHelper(){
+    const state = albumSortHelperState;
+    if (!state) return;
+    if (!isComplete || editMode || guestViewEnabled || isLockedGuestAccount ||
+        finalRanking.length !== state.original.length || finalRanking.some((raw, i) => raw !== state.original[i])){
+      closeAlbumSortHelper();
+      showToast('Album ranking changed — reopen Sort Helper');
+      return;
+    }
+    const position = Math.floor((state.lo + state.hi) / 2), next = state.others.slice();
+    next.splice(position, 0, state.selected);
+    finalRanking = next;
+    items = next.slice();
+    history = [];
+    saveProgress();
+    closeAlbumSortHelper();
+    // Retain the current filters and open details panel, now with the new rank.
+    renderResultsTab();
+    showToast('Album moved to #' + (position + 1));
+  }
+  function renderAlbumSortHelper(){
+    const state = albumSortHelperState;
+    if (!state) return;
+    if (state.history.length && state.hi - state.lo + 1 <= 20){ finishAlbumSortHelper(); return; }
+    state.mid = Math.floor((state.lo + state.hi) / 2);
+    albumSortHelperDialog.querySelector('[data-progress]').textContent = 'Duel ' + (state.history.length + 1);
+    albumSortHelperDialog.querySelector('[data-undo]').disabled = !state.history.length;
+    albumSortHelperDialog.querySelector('[data-choice="selected"]').innerHTML = albumSortHelperCard(state.selected);
+    albumSortHelperDialog.querySelector('[data-choice="other"]').innerHTML = albumSortHelperCard(state.others[state.mid]);
+  }
+  function chooseAlbumSortHelper(selectedWins){
+    const state = albumSortHelperState;
+    if (!state) return;
+    state.history.push([state.lo, state.hi]);
+    if (selectedWins) state.hi = state.mid;
+    else state.lo = state.mid + 1;
+    renderAlbumSortHelper();
+  }
+  function openAlbumSortHelper(raw){
+    const index = finalRanking.indexOf(raw);
+    if (!albumSortHelperEligible(index) || albumSortHelperDialog.open) return;
+    const original = finalRanking.slice(), others = original.slice();
+    others.splice(index, 1);
+    albumSortHelperState = {selected:raw, others, original, lo:0, hi:others.length, history:[]};
+    albumSortHelperDialog.showModal();
+    renderAlbumSortHelper();
+  }
+  albumSortHelperDialog.querySelector('[data-close]').addEventListener('click', closeAlbumSortHelper);
+  albumSortHelperDialog.addEventListener('cancel', e => { e.preventDefault(); closeAlbumSortHelper(); });
+  albumSortHelperDialog.querySelector('[data-undo]').addEventListener('click', () => {
+    const state = albumSortHelperState;
+    if (!state || !state.history.length) return;
+    [state.lo, state.hi] = state.history.pop();
+    renderAlbumSortHelper();
+  });
+  albumSortHelperDialog.querySelector('[data-choice="selected"]').addEventListener('click', () => chooseAlbumSortHelper(true));
+  albumSortHelperDialog.querySelector('[data-choice="other"]').addEventListener('click', () => chooseAlbumSortHelper(false));
+  albumSortHelperDialog.addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (!e.repeat) chooseAlbumSortHelper(e.key === 'ArrowLeft' || e.key === 'ArrowUp');
+  });
+
   function renderSongResultsTab(){
     songDisplayedRanking = songIsComplete ? songFinalRanking : computeSongLiveEstimate();
     loadArtForItems(songDisplayedRanking.map(raw => findAlbumRawForSong(parseSongEntry(raw))).filter(Boolean));
@@ -5209,7 +5295,7 @@
     if (e.target.closest('.grid-card, .results-list li')) return;
     // Layers that open on top of the tray (the photo viewer, a confirm
     // box, a sheet) aren't "outside" it — closing them shouldn't close it.
-    if (artLightboxOverlay.contains(e.target) || modalOverlay.contains(e.target) || tsheetOverlay.contains(e.target)) return;
+    if (artLightboxOverlay.contains(e.target) || modalOverlay.contains(e.target) || tsheetOverlay.contains(e.target) || albumSortHelperDialog.contains(e.target)) return;
     closeDetailsPanel();
   }, true);
 
@@ -5264,8 +5350,12 @@
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
       '</div>' +
       '<div class="details-content">' +
-        '<h2 class="details-album">' + escapeHtml(p.artist ? p.album : item) + '</h2>' +
-        (p.artist ? '<p class="details-artist">' + escapeHtml(p.artist) + '</p>' : '') +
+        '<div class="details-album-heading"><div class="details-album-heading-copy">' +
+          '<h2 class="details-album">' + escapeHtml(p.artist ? p.album : item) + '</h2>' +
+          (p.artist ? '<p class="details-artist">' + escapeHtml(p.artist) + '</p>' : '') +
+        '</div>' +
+        (albumSortHelperEligible(rank - 1) ? '<button class="song-sort-helper-btn album-sort-helper-btn" type="button" title="Sort Helper" aria-label="Sort Helper">' + photoSortHelperButton.innerHTML + '</button>' : '') +
+        '</div>' +
         '<div class="details-meta-row">' + rankChip + yearChip + tierChipHtml + '</div>' +
         '<div class="details-actions">' +
           '<button class="details-action-btn" type="button" id="details-wiki-btn">🔍 Open Wikipedia</button>' +
@@ -5277,6 +5367,10 @@
       '</div>';
 
     detailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeDetailsPanel);
+    detailsPanelInner.querySelector('.album-sort-helper-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      openAlbumSortHelper(item);
+    });
     const detailsPrevBtn = detailsPanelInner.querySelector('.details-panel-prev-btn');
     const detailsNextBtn = detailsPanelInner.querySelector('.details-panel-next-btn');
     if (detailsPrevBtn) detailsPrevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigateDetailsPanel(-1); });

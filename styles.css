@@ -1004,6 +1004,20 @@
   .details-content{
     padding: 24px;
   }
+  .details-album-heading{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .details-album-heading-copy{
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
+  .details-album-heading .album-sort-helper-btn{
+    margin-bottom: 10px;
+  }
   .details-album{
     font-family: 'Figtree', sans-serif;
     font-size: 21px;
