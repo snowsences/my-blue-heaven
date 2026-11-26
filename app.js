@@ -19584,6 +19584,79 @@
   const tripViewBtns = document.querySelectorAll('[data-trips-view]');
   const WORLD_OCEAN = '#1D3A4F', WORLD_LAND = '#D6D1C7', WORLD_VISITED = '#EDA93F';
 
+  // Timeline controls are view-only: neither trip records nor pins are
+  // rewritten. Each polygon carries its earliest known visit year.
+  let worldYear = null, worldYearMin = null, worldYearMax = null, worldYearTimer = null, worldHistoryFeatures = [];
+  const worldTimeControls = document.createElement('div');
+  worldTimeControls.className = 'world-time-controls';
+  worldTimeControls.innerHTML = '<div class="world-time-inner"><div class="world-time-top"><button type="button" data-world-play aria-label="Play travel history" title="Play travel history">▶</button><div class="world-time-label"><strong data-world-year>All years</strong><span data-world-count></span></div><button type="button" data-world-all>All years</button></div><input type="range" data-world-range aria-label="Travel history through year" step="1"><div class="world-time-ends"><span data-world-min></span><span data-world-max></span></div></div>';
+  tripWorldEl.appendChild(worldTimeControls);
+  const worldTimeStyle = document.createElement('style');
+  worldTimeStyle.textContent = '.trip-world{display:flex;flex-direction:column;background:#03060D}.trip-world[hidden]{display:none}.trip-world .trip-world-map{height:auto;flex:1;min-height:0}.world-time-controls{flex:none;padding:8px 20px 12px;color:var(--chalk);background:linear-gradient(180deg,#03060D,#102328);font-family:Figtree,sans-serif}.world-time-inner{max-width:620px;margin:auto}.world-time-top{display:flex;align-items:center;gap:12px}.world-time-top button{background:var(--panel);color:var(--chalk);border:1px solid var(--panel-line);border-radius:8px;padding:8px 12px;cursor:pointer;font:600 13px Figtree,sans-serif;min-height:40px}.world-time-top button[data-world-play]{width:44px;font-size:17px;color:var(--amber)}.world-time-top button:disabled,.world-time-controls input:disabled{opacity:.4;cursor:default}.world-time-label{flex:1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.world-time-label strong{font-size:23px;color:var(--amber);font-variant-numeric:tabular-nums}.world-time-label span,.world-time-ends{font-size:12px;color:var(--chalk-dim)}.world-time-controls input{width:100%;margin:6px 0 0;accent-color:var(--amber);cursor:pointer;min-height:26px}.world-time-ends{display:flex;justify-content:space-between}';
+  document.head.appendChild(worldTimeStyle);
+  const worldRange=worldTimeControls.querySelector('[data-world-range]');
+  const worldPlay=worldTimeControls.querySelector('[data-world-play]');
+  function worldStopPlayback(){
+    if(worldYearTimer!==null){clearInterval(worldYearTimer);worldYearTimer=null;}
+    worldPlay.textContent='▶';worldPlay.setAttribute('aria-label','Play travel history');worldPlay.title='Play travel history';
+  }
+  function worldHistoryColor(){
+    return ['case', ['all',['==',['get','v'],1],...(worldYear===null?[]:[['<=',['get','year'],worldYear]])],WORLD_VISITED,WORLD_LAND];
+  }
+  function worldTimeUpdate(){
+    const available=worldYearMin!==null;
+    worldRange.disabled=worldPlay.disabled=!available;
+    if(available){
+      worldRange.min=worldYearMin;worldRange.max=worldYearMax;
+      if(worldYear!==null)worldYear=Math.max(worldYearMin,Math.min(worldYearMax,worldYear));
+      worldRange.value=worldYear===null?worldYearMax:worldYear;
+    }
+    worldRange.setAttribute('aria-valuetext',worldYear===null?'All years':String(worldYear));
+    worldTimeControls.querySelector('[data-world-year]').textContent=worldYear===null?'All years':worldYear===worldYearMin?'Before '+(worldYearMin+1):String(worldYear);
+    worldTimeControls.querySelector('[data-world-min]').textContent=available?'Before '+(worldYearMin+1):'No dated trips';
+    worldTimeControls.querySelector('[data-world-max]').textContent=available?String(worldYearMax):'';
+    const n=new Set(worldHistoryFeatures.filter(f=>f.properties.v&&(worldYear===null||f.properties.year<=worldYear)).map(f=>f.properties.country)).size;
+    worldTimeControls.querySelector('[data-world-count]').textContent=n+' '+(n===1?'country':'countries');
+    tripWorldMapEl.setAttribute('aria-label','A globe with '+n+' visited '+(n===1?'country':'countries')+' highlighted'+(worldYear===null?'':' through '+worldYear));
+    if(worldMap&&worldMap.getLayer('land'))worldMap.setPaintProperty('land','fill-color',worldHistoryColor());
+  }
+  worldRange.addEventListener('input',()=>{worldStopPlayback();worldYear=Number(worldRange.value);worldTimeUpdate();});
+  worldTimeControls.querySelector('[data-world-all]').addEventListener('click',()=>{worldStopPlayback();worldYear=null;worldTimeUpdate();});
+  worldPlay.addEventListener('click',()=>{
+    if(worldYearTimer!==null){worldStopPlayback();return;}
+    if(worldYearMin===null)return;
+    if(worldYear===null||worldYear>=worldYearMax)worldYear=worldYearMin;
+    worldTimeUpdate();
+    worldPlay.textContent='Ⅱ';worldPlay.setAttribute('aria-label','Pause travel history');worldPlay.title='Pause travel history';
+    worldYearTimer=setInterval(()=>{
+      if(!worldVisible()||document.hidden){worldStopPlayback();return;}
+      worldYear=Math.min(worldYearMax,worldYear+1);worldTimeUpdate();
+      if(worldYear>=worldYearMax)worldStopPlayback();
+    },1100);
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)worldStopPlayback();});
+  function worldTripYear(date){
+    const value=String(date||'');
+    const p=otdParse(value.length===7?value+'-01':value);
+    return p?p.y:null;
+  }
+  function worldTripHistory(){
+    const groups=new Map(),years=[];
+    tripRows.forEach(t=>{
+      const fallback=worldTripYear(t.startDate);
+      if(fallback!==null)years.push(fallback);
+      tripStops(t,tripLinked(t)).forEach(stop=>{
+        const dates=(stop.days||[]).map(worldTripYear).filter(y=>y!==null);
+        const year=dates.length?Math.min(...dates):fallback;
+        if(year!==null)years.push(year);
+        if(!tripStopPinned(stop))return;
+        const key=year===null?99999:year;
+        if(!groups.has(key))groups.set(key,[]);
+        groups.get(key).push(stop.geo);
+      });
+    });
+    return {groups,years};
+  }
   function setTripsView(mode){
     tripsViewMode = mode;
     try{ localStorage.setItem(TRIPS_VIEW_KEY, mode); }catch(e){ /* per-device preference only */ }
@@ -19601,6 +19674,7 @@
       renderTripWorld();
       tripWorldPinAll();
     } else {
+      worldStopPlayback();
       tripEmptyMsg.style.display = tripRows.length ? 'none' : 'block';
     }
     renderTripYearBar();
@@ -19652,28 +19726,29 @@
     delete tripWorldMapEl.dataset.offline;
     if (!worldVisible()) return;
     const trips = tripWorldPins();
-    const visited = tripWorldVisited(trips, countries);
-    tripWorldMapEl.setAttribute('aria-label', visited.size ? 'A globe with the ' + otdPlural(visited.size, 'country', 'countries') + ' you’ve visited highlighted' : 'A globe');
-    // France's atlas feature includes disconnected overseas territories and
-    // islands. Only the mainland polygon inherits the country-wide visit;
-    // another French component needs an actual pin inside its own outline.
-    const features = [];
-    const pins = trips.flat();
-    countries.forEach(f => {
-      const add = (geometry, v) => features.push({type:'Feature', id:features.length, geometry, properties:{v:v?1:0}});
-      if (String(f.properties.name).toLowerCase() === 'france' && f.geometry.type === 'MultiPolygon'){
-        f.geometry.coordinates.forEach(poly => {
-          const geometry = {type:'Polygon',coordinates:poly};
-          const component = {geometry};
-          // Paris is safely inside the contiguous mainland polygon.
-          const mainland = geoInFeature({lng:2.3522,lat:48.8566},component);
-          add(geometry, mainland ? visited.has(f) && pins.some(p=>geoInFeature(p,component) || (String(p.country || '').trim().toLowerCase() === 'france' && p.lng >= -5.5 && p.lng <= 8.5 && p.lat >= 42 && p.lat <= 51.5 && !f.geometry.coordinates.some(other=>other!==poly && geoInFeature(p,{geometry:{type:'Polygon',coordinates:other}})))) : pins.some(p=>geoInFeature(p,component)));
+    const history=worldTripHistory();
+    worldYearMin=history.years.length?Math.min(...history.years)-1:null;
+    worldYearMax=history.years.length?Math.max(new Date().getFullYear(),...history.years):null;
+    const ordered=Array.from(history.groups.entries()).sort((a,b)=>a[0]-b[0]);
+    const first=new Map();
+    ordered.forEach(([year,pins])=>tripWorldVisited([pins],countries).forEach(f=>{if(!first.has(f))first.set(f,year);}));
+    const features=[];
+    countries.forEach(f=>{
+      const country=String(f.properties.name);
+      const add=(geometry,year)=>features.push({type:'Feature',id:features.length,geometry,properties:{country,v:year===undefined?0:1,year:year===undefined?99999:year}});
+      if(country.toLowerCase()==='france'&&f.geometry.type==='MultiPolygon'){
+        // Preserve the mainland/overseas distinction for each historical year.
+        f.geometry.coordinates.forEach(poly=>{
+          const geometry={type:'Polygon',coordinates:poly},component={geometry};
+          const mainland=geoInFeature({lng:2.3522,lat:48.8566},component);
+          const match=ordered.find(([year,pins])=>pins.some(p=>geoInFeature(p,component)||(mainland&&String(p.country||'').trim().toLowerCase()==='france'&&p.lng>=-5.5&&p.lng<=8.5&&p.lat>=42&&p.lat<=51.5&&!f.geometry.coordinates.some(other=>other!==poly&&geoInFeature(p,{geometry:{type:'Polygon',coordinates:other}})))));
+          add(geometry,match?match[0]:undefined);
         });
-      } else {
-        add(f.geometry,visited.has(f));
-      }
+      }else add(f.geometry,first.get(f));
     });
-    const data = {type:'FeatureCollection',features};
+    worldHistoryFeatures=features;
+    worldTimeUpdate();
+    const data={type:'FeatureCollection',features};
     if (!worldMap){
       worldMap = new lib.Map({ container: tripWorldMapEl, style: worldGlobeStyle(), attributionControl: false, fadeDuration: 0, maxZoom: 4.5, center: [-40, 25], zoom: 1 }); // world copies on: shapes unwrapped past ±180° are drawn back in place
       worldMap.dragRotate.disable();            // north stays up — spinning the globe is dragging it
@@ -19693,10 +19768,11 @@
       setGeoSource(worldMap, 'borders', { type: 'Feature', properties: {}, geometry: worldBorders });
       if (!worldMap.getLayer('land')){
         worldMap.addLayer({ id: 'land', type: 'fill', source: 'countries',
-          paint: { 'fill-color': ['case', ['==', ['get', 'v'], 1], WORLD_VISITED, WORLD_LAND], 'fill-antialias': false } });
+          paint: { 'fill-color': worldHistoryColor(), 'fill-antialias': false, 'fill-color-transition': {duration:450,delay:0} } });
         worldMap.addLayer({ id: 'borders', type: 'line', source: 'borders', layout: { 'line-join': 'round' },
           paint: { 'line-color': 'rgba(255,255,255,0.55)', 'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.3, 4, 0.9] } });
       }
+      worldTimeUpdate();
       if (!worldFitted) tripWorldFit(trips);
       worldSpinStart();
     });
