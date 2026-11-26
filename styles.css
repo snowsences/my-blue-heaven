@@ -5310,3 +5310,14 @@
   .pt-modal-body .pt-category-select{display:block;margin-top:8px;}
 
   .pt-quick-tag{display:block;width:100%;box-sizing:border-box;flex:none;min-height:42px;}
+
+
+  /* Keep a real, undimmed photo preview visible while assigning tags. */
+  .pt-tray{max-height:62vh;max-height:62dvh;}
+  .pt-tray-inner{max-height:calc(62vh - 2px);max-height:calc(62dvh - 2px);}
+  .pt-tray::backdrop{background:transparent;}
+  .art-lightbox-overlay{transition:padding-bottom 220ms ease;}
+  .art-lightbox-overlay.pt-tray-open{padding-bottom:max(0px,calc(100vh - var(--pt-photo-space, 38vh)));padding-bottom:max(0px,calc(100dvh - var(--pt-photo-space, 38dvh)));background:rgba(10,20,22,0.98);}
+  .art-lightbox-overlay.pt-tray-open .art-lightbox-img{max-width:calc(100% - 16px);max-height:calc(100% - 16px);object-fit:contain;}
+  .art-lightbox-overlay.pt-tray-open > :not(.art-lightbox-img){visibility:hidden;}
+  @media(prefers-reduced-motion:reduce){.art-lightbox-overlay{transition:none;}}

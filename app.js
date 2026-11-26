@@ -11333,6 +11333,39 @@
     const matches=tags.filter(t=>singular(normalize(t.name))===singular(key));
     return matches.length===1?matches[0]:null;
   }
+  // Fit the original image into the visible area above the native modal
+  // rather than letting the sheet obscure it. Re-measure as the sheet
+  // expands, the viewport rotates, or the on-screen keyboard appears.
+  let photoTagTrayObserver = null;
+  function measurePhotoTagTray(){
+    if(!photoTagTray.open)return;
+    const top=Math.max(0,photoTagTray.getBoundingClientRect().top);
+    artLightboxOverlay.style.setProperty('--pt-photo-space',top+'px');
+  }
+  function beginPhotoTagPreview(){
+    measurePhotoTagTray();
+    artLightboxOverlay.classList.add('pt-tray-open');
+    if(typeof ResizeObserver==='function'){
+      if(photoTagTrayObserver)photoTagTrayObserver.disconnect();
+      photoTagTrayObserver=new ResizeObserver(measurePhotoTagTray);
+      photoTagTrayObserver.observe(photoTagTray);
+    }
+    window.addEventListener('resize',measurePhotoTagTray);
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize',measurePhotoTagTray);
+      window.visualViewport.addEventListener('scroll',measurePhotoTagTray);
+    }
+  }
+  function endPhotoTagPreview(){
+    if(photoTagTrayObserver){photoTagTrayObserver.disconnect();photoTagTrayObserver=null;}
+    window.removeEventListener('resize',measurePhotoTagTray);
+    if(window.visualViewport){
+      window.visualViewport.removeEventListener('resize',measurePhotoTagTray);
+      window.visualViewport.removeEventListener('scroll',measurePhotoTagTray);
+    }
+    artLightboxOverlay.classList.remove('pt-tray-open');
+    artLightboxOverlay.style.removeProperty('--pt-photo-space');
+  }
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
     photoTagDraft={photoId:id,selected:new Set(photoTagsFor(id).map(t=>t.id))};
@@ -11406,14 +11439,14 @@
       photoTagTray.close();
     };
     render();
-    if(!photoTagTray.open)photoTagTray.showModal();
+    if(!photoTagTray.open){photoTagTray.showModal();beginPhotoTagPreview();}
   }
   photoTagButton.addEventListener('click',e=>{
     e.stopPropagation();
     const id=photoSortHelperIds&&photoSortHelperIds[lightboxIndex];
     if(id)photoTagOpenTray(id);
   });
-  photoTagTray.addEventListener('close',()=>{photoTagDraft=null;updatePhotoTagLightbox();});
+  photoTagTray.addEventListener('close',()=>{endPhotoTagPreview();photoTagDraft=null;updatePhotoTagLightbox();});
   photoTagTray.addEventListener('keydown',e=>e.stopPropagation());
   photoTagModal.addEventListener('keydown',e=>e.stopPropagation());
   function photoTagShowModal(tag,mode){
