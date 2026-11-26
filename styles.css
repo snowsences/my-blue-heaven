@@ -5246,6 +5246,8 @@
 
 
   /* Photo Tags — ranked Gallery images referenced by ID. */
+  .pt-tag-section{margin:0 0 24px;}
+  .pt-tag-section-heading{font-size:21px;font-weight:700;margin:0 0 10px;}
   .pt-tag-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;width:calc(100% + 40px);margin-inline:-20px;}
   .pt-tag-card{position:relative;font:inherit;color:var(--chalk);background:var(--panel);border:0;border-radius:4px;overflow:hidden;text-align:left;padding:0;min-width:0;cursor:pointer;touch-action:manipulation;}
   .pt-tag-card img,.pt-empty-cover{width:100%;aspect-ratio:16/10;display:block;object-fit:cover;background:var(--bg-2);}
