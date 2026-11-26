@@ -12601,6 +12601,8 @@
   }
 
   function closeRestaurantDetailsPanel(){
+    stopCourseAudioRecording();
+    stopCourseAudioPlayback();
     openRestaurantIndex = null;
     newRestaurantDraft = null;
     restaurantEditMode = false;
@@ -12829,6 +12831,189 @@
     return '<div class="restaurant-course-thumb-grid">' + courseTilesHtml + otherTilesHtml + '</div>';
   }
 
+  // Local-only audio: never include blobs in restaurant JSON or cloud backups.
+  const COURSE_AUDIO_TTL = 7 * 24 * 60 * 60 * 1000;
+  let courseAudioDbPromise, courseAudioRecording = null, courseAudioPlayer = null;
+  let courseAudioPending = false;
+  const courseAudioTranscribing = new Set();
+  const courseAudioStyle = document.createElement('style');
+  courseAudioStyle.textContent = '.course-audio-row{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--chalk-dim);font-size:12px;min-height:34px} .course-audio-row button{border:0;background:none;color:inherit;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;padding:4px;cursor:pointer;flex:none} .course-audio-row button:disabled{opacity:.4;cursor:default} .course-audio-row button[hidden],.course-audio-row span[hidden]{display:none} .course-audio-row svg{width:21px;height:21px} .course-audio-row .is-recording svg{animation:courseAudioSpin 4s linear infinite;color:var(--amber)} @keyframes courseAudioSpin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.course-audio-row .is-recording svg{animation:none;color:var(--amber)}}';
+  document.head.appendChild(courseAudioStyle);
+  function courseAudioDb(){
+    if (!courseAudioDbPromise) courseAudioDbPromise = new Promise((resolve,reject)=>{
+      const req = indexedDB.open('mbh-course-audio',1);
+      req.onupgradeneeded=()=>req.result.createObjectStore('recordings',{keyPath:'id'});
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    }).catch(e=>{courseAudioDbPromise=null;throw e;});
+    return courseAudioDbPromise;
+  }
+  async function courseAudioRead(id){
+    const db=await courseAudioDb();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('recordings','readonly').objectStore('recordings').get(id);
+      req.onsuccess=()=>resolve(req.result && Date.now()-req.result.createdAt<COURSE_AUDIO_TTL ? req.result : null);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+  async function courseAudioWrite(record){
+    const db=await courseAudioDb();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction('recordings','readwrite');
+      tx.objectStore('recordings').put(record);
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+    });
+  }
+  async function courseAudioCleanup(){
+    try{
+      const db=await courseAudioDb();
+      await new Promise((resolve,reject)=>{
+        const tx=db.transaction('recordings','readwrite');
+        const req=tx.objectStore('recordings').openCursor();
+        req.onsuccess=()=>{const c=req.result;if(c){if(Date.now()-c.value.createdAt>=COURSE_AUDIO_TTL)c.delete();c.continue();}};
+        tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+      });
+      if(courseAudioPlayer && Date.now()-courseAudioPlayer.createdAt>=COURSE_AUDIO_TTL) stopCourseAudioPlayback();
+      refreshCourseAudioRows();
+    }catch(e){console.warn('Audio cleanup',e);}
+  }
+  function courseAudioIcon(name){
+    const paths={record:'<path d="M12 3a9 9 0 1 1-5.8 2.1"/>',play:'<path d="m9 5 11 7-11 7z"/>',pause:'<path d="M9 5v14M15 5v14"/>',text:'<path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/>'};
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[name]+'</svg>';
+  }
+  function courseAudioHtml(course){
+    const id=ensureCourseId(course);
+    return '<div class="course-audio-row" data-audio-id="'+escapeAttr(id)+'"><button type="button" data-audio-action="record" aria-label="Record audio" title="Record audio">'+courseAudioIcon('record')+'</button><span data-audio-info hidden></span><button type="button" data-audio-action="play" aria-label="Play recording" title="Play recording" hidden>'+courseAudioIcon('play')+'</button><button type="button" data-audio-action="text" aria-label="Transcribe recording" title="Transcribe recording" hidden>'+courseAudioIcon('text')+'</button></div>';
+  }
+  async function refreshCourseAudioRows(){
+    for(const row of restaurantDetailsPanelInner.querySelectorAll('[data-audio-id]')){
+      const id=row.dataset.audioId;
+      let saved=null;try{saved=await courseAudioRead(id);}catch(e){}
+      if(!row.isConnected)continue;
+      const active=courseAudioRecording && courseAudioRecording.id===id;
+      const rec=row.querySelector('[data-audio-action="record"]');
+      rec.classList.toggle('is-recording',!!active);
+      rec.setAttribute('aria-label',active?'Stop recording':'Record audio');
+      rec.setAttribute('aria-pressed',String(!!active));
+      rec.title=active?'Stop recording':'Record audio';
+      rec.disabled=courseAudioPending || (!!courseAudioRecording && !active);
+      const info=row.querySelector('[data-audio-info]');
+      info.hidden=!active&&!saved;
+      info.textContent=active?'Recording':saved?'Captured '+saved.seconds+' seconds':'';
+      const play=row.querySelector('[data-audio-action="play"]');
+      const trans=row.querySelector('[data-audio-action="text"]');
+      play.hidden=trans.hidden=!saved||!!active;
+      const playing=courseAudioPlayer && courseAudioPlayer.id===id && !courseAudioPlayer.audio.paused;
+      play.innerHTML=courseAudioIcon(playing?'pause':'play');
+      play.setAttribute('aria-label',playing?'Pause recording':'Play recording');
+      play.title=playing?'Pause recording':'Play recording';
+      trans.disabled=courseAudioTranscribing.has(id);
+      trans.title=trans.disabled?'Transcribing…':'Transcribe recording';
+      if(trans.disabled)info.textContent='Transcribing…';
+    }
+  }
+  function stopCourseAudioPlayback(){
+    if(!courseAudioPlayer)return;
+    const p=courseAudioPlayer;courseAudioPlayer=null;p.audio.pause();URL.revokeObjectURL(p.url);
+  }
+  function stopCourseAudioRecording(){
+    const r=courseAudioRecording;
+    if(r && r.recorder.state!=='inactive')r.recorder.stop();
+  }
+  async function toggleCourseAudioRecording(id){
+    if(courseAudioPending)return;
+    if(courseAudioRecording){if(courseAudioRecording.id===id)stopCourseAudioRecording();return;}
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){showToast('Audio recording is not supported here');return;}
+    if(await courseAudioRead(id).catch(()=>null)){
+      if(!window.confirm('Replace the existing recording for this course?'))return;
+    }
+    courseAudioPending=true;refreshCourseAudioRows();
+    let stream;
+    try{
+      await courseAudioDb();
+      stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      if(guestViewEnabled||isLockedGuestAccount||!restaurantDetailsPanel.classList.contains('open')||!findCourseByDishId(id)){stream.getTracks().forEach(t=>t.stop());return;}
+      stopCourseAudioPlayback();
+      // Persist any newly assigned course ID before tying audio to it.
+      await saveRestaurantProgress();
+      const recorder=new MediaRecorder(stream);
+      const chunks=[];
+      const recording={id,recorder,stream,started:Date.now()};
+      courseAudioRecording=recording;
+      recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+      recorder.onstop=async()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        if(courseAudioRecording===recording)courseAudioRecording=null;
+        courseAudioPending=true;refreshCourseAudioRows();
+        try{
+          const blob=new Blob(chunks,{type:recorder.mimeType||chunks[0]?.type||'audio/webm'});
+          if(blob.size && findCourseByDishId(id))await courseAudioWrite({id,blob,createdAt:Date.now(),seconds:Math.max(1,Math.round((Date.now()-recording.started)/1000))});
+        }catch(e){showToast('Could not save recording');}
+        finally{courseAudioPending=false;refreshCourseAudioRows();}
+      };
+      recorder.onerror=()=>{stopCourseAudioRecording();showToast('Recording interrupted');};
+      recorder.start();
+    }catch(e){if(stream)stream.getTracks().forEach(t=>t.stop());courseAudioRecording=null;showToast('Could not access microphone or audio storage');}
+    finally{courseAudioPending=false;refreshCourseAudioRows();}
+  }
+  async function playCourseAudio(id){
+    if(courseAudioPlayer && courseAudioPlayer.id===id){
+      const a=courseAudioPlayer.audio;if(a.paused)await a.play();else a.pause();refreshCourseAudioRows();return;
+    }
+    const record=await courseAudioRead(id);if(!record){refreshCourseAudioRows();return;}
+    stopCourseAudioPlayback();
+    const url=URL.createObjectURL(record.blob),audio=new Audio(url);
+    courseAudioPlayer={id,url,audio,createdAt:record.createdAt};
+    audio.onended=()=>{stopCourseAudioPlayback();refreshCourseAudioRows();};
+    audio.onpause=audio.onplay=()=>refreshCourseAudioRows();
+    await audio.play();
+  }
+  async function transcribeCourseAudio(id){
+    if(courseAudioTranscribing.has(id))return;
+    const record=await courseAudioRead(id);if(!record){refreshCourseAudioRows();return;}
+    if(!navigator.onLine){showToast('Connect to the internet to transcribe');return;}
+    // The endpoint must accept multipart audio and return {text}. Secrets
+    // belong on the server; never put an AI API key in this public app.
+    let endpoint=localStorage.getItem('mbh-transcription-endpoint')||'';
+    if(!endpoint){endpoint=(window.prompt('Secure transcription endpoint URL (HTTPS):')||'').trim();if(!endpoint)return;}
+    let url;try{url=new URL(endpoint);if(url.protocol!=='https:')throw Error();}catch(e){showToast('Use a secure HTTPS endpoint');return;}
+    localStorage.setItem('mbh-transcription-endpoint',url.href);
+    if(!window.confirm('Send this recording to the configured transcription service?'))return;
+    courseAudioTranscribing.add(id);refreshCourseAudioRows();
+    try{
+      const body=new FormData();const ext=record.blob.type.includes('mp4')?'m4a':record.blob.type.includes('ogg')?'ogg':'webm';
+      body.append('file',record.blob,'course.'+ext);
+      const response=await fetch(url.href,{method:'POST',body,credentials:'omit'});
+      if(!response.ok)throw Error('Transcription failed');
+      const result=await response.json();
+      const text=typeof result.text==='string'?result.text.trim():'';
+      if(!text)throw Error('Empty transcript');
+      if(guestViewEnabled||isLockedGuestAccount)return;
+      const course=findCourseByDishId(id);if(!course)return;
+      course.text=[(course.text||'').trim(),text].filter(Boolean).join('\\n');
+      await saveRestaurantProgress();
+      const row=Array.from(restaurantDetailsPanelInner.querySelectorAll('[data-audio-id]')).find(el=>el.dataset.audioId===id);
+      const input=row?.closest('.restaurant-course-card')?.querySelector('textarea[data-course-index]');
+      if(input){input.value=course.text;autoGrowTextarea(input);}
+      showToast('Transcription added');
+    }catch(e){showToast('Transcription failed — recording retained');}
+    finally{courseAudioTranscribing.delete(id);refreshCourseAudioRows();}
+  }
+  restaurantDetailsPanelInner.addEventListener('click',async e=>{
+    const btn=e.target.closest('[data-audio-action]');if(!btn||guestViewEnabled||isLockedGuestAccount)return;
+    const id=btn.closest('[data-audio-id]').dataset.audioId;
+    try{
+      if(btn.dataset.audioAction==='record')await toggleCourseAudioRecording(id);
+      else if(btn.dataset.audioAction==='play')await playCourseAudio(id);
+      else await transcribeCourseAudio(id);
+    }catch(e){showToast('Audio action failed');}
+  });
+  new MutationObserver(()=>refreshCourseAudioRows()).observe(restaurantDetailsPanelInner,{childList:true,subtree:false});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){stopCourseAudioRecording();stopCourseAudioPlayback();}else courseAudioCleanup();});
+  window.addEventListener('pagehide',()=>{stopCourseAudioRecording();stopCourseAudioPlayback();});
+  setInterval(courseAudioCleanup,60000);
+  courseAudioCleanup();
+
   function renderRestaurantCoursesContentHtml(visit){
     if (guestViewEnabled || restaurantVisitThumbnailMode){
       return renderRestaurantCoursesThumbnailGridHtml(visit);
@@ -12858,6 +13043,7 @@
                 pairingBtnHtml +
                 '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
               '</div>' +
+              courseAudioHtml(course) +
             '</div>' +
             renderDrinkPairingCardHtml(course, i)
           );
