@@ -11223,6 +11223,18 @@
   const photoTagModal = document.getElementById('photo-tag-modal');
   const photoTagsWritable = () => !guestViewEnabled && !isLockedGuestAccount;
   const PHOTO_TAG_CATEGORIES = ['Location','Scenery','Season'];
+  // One-time assignment for existing tags. The version is stored per tag so
+  // future manual category edits, renames and newly created tags are respected.
+  const PHOTO_TAG_CATEGORY_VERSION = 1;
+  const PHOTO_TAG_INITIAL_CATEGORIES = new Map([
+    ...['Alaska','Europe','Hawaii','Italy','PNW','Rockies','USA','Venice'].map(n=>[n.toLowerCase(),'Location']),
+    ...['Forests','Cities','Flowers','Lakes','Mountains','Night','Oceans','Wildlife'].map(n=>[n.toLowerCase(),'Scenery']),
+    ...['Winter','Autumn'].map(n=>[n.toLowerCase(),'Season'])
+  ]);
+  function initialPhotoTagCategory(t){
+    if(Number(t.categoryVersion)>=PHOTO_TAG_CATEGORY_VERSION)return photoTagCategory(t.category);
+    return PHOTO_TAG_INITIAL_CATEGORIES.get(t.name.trim().toLowerCase()) || photoTagCategory(t.category);
+  }
   function photoTagCategory(value){
     return PHOTO_TAG_CATEGORIES.find(c=>c.toLowerCase()===String(value||'').trim().toLowerCase()) || 'Scenery';
   }
@@ -11242,7 +11254,7 @@
         const existing=out.find(x=>x.name.toLocaleLowerCase()===key);
         existing.photoIds=[...new Set([...existing.photoIds,...photoIds])];ids.add(t.id);return out;
       }
-      ids.add(t.id);names.add(key);out.push({id:t.id,name,category:photoTagCategory(t.category),photoIds:[...new Set(photoIds)]});return out;
+      ids.add(t.id);names.add(key);out.push({id:t.id,name,category:initialPhotoTagCategory(t),categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[...new Set(photoIds)]});return out;
     },[]);
   }
   function sortedPhotoTags(){
@@ -11265,7 +11277,12 @@
       const res=await window.storage.get(PHOTO_TAG_STORAGE_KEY,false);
       if(res&&res.value){
         const p=JSON.parse(res.value);
-        if(Array.isArray(p.photoTags)){photoTags=normalizePhotoTags(p.photoTags);photoTagsSavedAt=p.savedAt||null;}
+        if(Array.isArray(p.photoTags)){
+          photoTags=normalizePhotoTags(p.photoTags);photoTagsSavedAt=p.savedAt||null;
+          // Preserve the timestamp: migrating local metadata must not outrank
+          // a newer cloud copy of the user's photo assignments.
+          if(JSON.stringify(photoTags)!==JSON.stringify(p.photoTags))persistPhotoTags();
+        }
       }
     }catch(e){}
     refreshPhotoTags();
@@ -11342,7 +11359,7 @@
       if(!name||!photoTagNameAvailable(name)){error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;}
       const category=form.elements.category.value;
       if(!PHOTO_TAG_CATEGORIES.includes(category)){error.textContent='Choose a category.';error.hidden=false;return;}
-      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,photoIds:[]};
+      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[]};
       photoTags.push(tag);
       savePhotoTags();
       form.reset();form.hidden=true;add.hidden=false;error.hidden=true;render();
@@ -11394,7 +11411,7 @@
         }
         const category=e.currentTarget.elements.category.value;
         if(!PHOTO_TAG_CATEGORIES.includes(category))return;
-        live.name=name;live.category=category;
+        live.name=name;live.category=category;live.categoryVersion=PHOTO_TAG_CATEGORY_VERSION;
       }else{
         photoTags=photoTags.filter(t=>t.id!==live.id);
         photoTagOpenId='';
