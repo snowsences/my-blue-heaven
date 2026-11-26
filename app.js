@@ -11415,14 +11415,14 @@
   const photoTagToolCount=document.getElementById('tag-photos-remaining');
   function untaggedPhotoRows(rows,tags){
     const tagged=new Set();
-    tags.forEach(t=>{if(!t.automaticOnly)t.photoIds.forEach(id=>tagged.add(id));});
+    tags.forEach(t=>{if(!t.automaticOnly&&photoTagCategory(t.category)==='Location')t.photoIds.forEach(id=>tagged.add(id));});
     return rows.filter(p=>p.url&&!tagged.has(p.id));
   }
   function refreshPhotoTagTool(){
     if(!photoTagToolCard)return;
     const count=untaggedPhotoRows(photoRows,photoTags).length;
     photoTagToolCard.hidden=!count||!photoTagsWritable();
-    photoTagToolCount.textContent=count.toLocaleString()+' untagged '+(count===1?'photo':'photos')+' remaining';
+    photoTagToolCount.textContent=count.toLocaleString()+' '+(count===1?'photo':'photos')+' without a Location tag';
   }
   document.getElementById('tag-photos-launch-btn').addEventListener('click',()=>{
     if(!photoTagsWritable())return;
