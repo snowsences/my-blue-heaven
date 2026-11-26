@@ -14461,8 +14461,62 @@
     const delta=points[points.length-1].avg-points[0].avg;
     return '<section class="rd-card"><h3>Visit scores over time</h3><p class="rd-muted">'+(delta>=0?'+':'')+rdFmt(delta)+' since first dated scored visit</p><svg class="rd-chart" viewBox="0 0 340 178" aria-label="Visit averages over time">'+axes+'<line class="rd-avg" x1="30" x2="322" y1="'+y(stats.mean)+'" y2="'+y(stats.mean)+'"/><polyline pathLength="1" points="'+line+'" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linejoin="round"/>'+nodes+'<text x="35" y="170">'+escapeHtml(rdDate(points[0].v))+'</text><text x="322" y="170" text-anchor="end">'+escapeHtml(rdDate(points[points.length-1].v))+'</text></svg><span class="rd-muted">Dashed line: all-time course average · Select a point to open its visit</span></section>';
   }
+
+  // Local culinary vocabulary; count distinct courses rather than repeated words.
+  let rdFoodLexicon=null;
+  function rdFoodTokens(s){return String(s||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().match(/\p{L}+/gu)||[];}
+  function rdFoodDictionary(){
+    if(rdFoodLexicon)return rdFoodLexicon;
+    const vocabulary='beef|steak|wagyu|veal|pork|bacon|ham|prosciutto|pancetta|lamb|venison|bison|rabbit|chicken|duck|goose|quail|pigeon|squab|turkey|foie gras|sweetbread|liver|short rib|brisket|tenderloin|ribeye|sausage|chorizo|salami|bone marrow|fish|salmon|trout|tuna|bluefin|bonito|mackerel|sardine|anchovy|herring|cod|black cod|halibut|sole|turbot|flounder|sea bass|snapper|grouper|branzino|monkfish|eel|sturgeon|sablefish|amberjack|hamachi|kampachi|bream|skate|crab|lobster|langoustine|crayfish|shrimp|prawn|scallop|oyster|mussel|clam|abalone|octopus|squid|cuttlefish|sea urchin|caviar|roe|salmon roe|shellfish|seaweed|nori|kombu|wakame|kelp|tomato|cherry tomato|potato|sweet potato|yam|carrot|parsnip|turnip|radish|daikon|beet|onion|spring onion|scallion|shallot|leek|garlic|black garlic|celery|celeriac|fennel|asparagus|broccoli|cauliflower|cabbage|brussels sprout|kale|spinach|chard|lettuce|endive|radicchio|arugula|watercress|chicory|artichoke|eggplant|zucchini|squash|pumpkin|cucumber|pepper|bell pepper|chili|jalapeno|poblano|serrano|corn|maize|pea|snow pea|snap pea|bean|green bean|black bean|fava bean|edamame|chickpea|lentil|soybean|tofu|tempeh|mushroom|morel|chanterelle|porcini|shiitake|maitake|enoki|oyster mushroom|truffle|black truffle|white truffle|sunchoke|bamboo shoot|lotus root|okra|bitter melon|avocado|olive|caper|apple|pear|peach|nectarine|plum|apricot|cherry|strawberry|raspberry|blackberry|blueberry|cranberry|currant|grape|raisin|fig|pomegranate|persimmon|quince|banana|plantain|mango|papaya|pineapple|passion fruit|guava|lychee|rambutan|dragon fruit|durian|jackfruit|coconut|melon|watermelon|orange|blood orange|mandarin|tangerine|lemon|meyer lemon|lime|kaffir lime|makrut lime|grapefruit|yuzu|sudachi|calamansi|kumquat|bergamot|citrus|tamarind|rhubarb|gooseberry|elderberry|rice|wild rice|sticky rice|wheat|barley|rye|oat|buckwheat|quinoa|farro|millet|bulgur|couscous|polenta|semolina|tapioca|noodle|pasta|spaghetti|linguine|fettuccine|tagliatelle|pappardelle|ravioli|tortellini|agnolotti|gnocchi|risotto|ramen|udon|soba|vermicelli|bread|sourdough|brioche|baguette|focaccia|naan|pita|tortilla|arepa|toast|crouton|cracker|wafer|pastry|croissant|phyllo|tart|cake|cookie|biscuit|meringue|macaron|choux|eclair|profiterole|dumpling|wonton|gyoza|bao|empanada|pierogi|egg|egg yolk|egg white|milk|cream|butter|brown butter|cultured butter|buttermilk|yogurt|cheese|parmesan|pecorino|mozzarella|burrata|ricotta|mascarpone|feta|goat cheese|blue cheese|cheddar|gruyere|comte|gouda|brie|camembert|gorgonzola|roquefort|halloumi|paneer|creme fraiche|sour cream|kefir|whey|ghee|almond|walnut|hazelnut|pistachio|pecan|cashew|peanut|macadamia|pine nut|chestnut|sesame|black sesame|sunflower seed|pumpkin seed|chia|flaxseed|poppy seed|basil|thai basil|mint|cilantro|coriander|parsley|dill|chive|tarragon|thyme|rosemary|sage|oregano|marjoram|shiso|perilla|lemongrass|ginger|galangal|turmeric|saffron|paprika|cumin|cardamom|cinnamon|clove|nutmeg|allspice|anise|star anise|fennel seed|mustard|fenugreek|sumac|zaatar|sichuan pepper|peppercorn|juniper|bay leaf|vanilla|lavender|hibiscus|jasmine|rose|elderflower|chamomile|matcha|tea|coffee|cocoa|cacao|chocolate|dark chocolate|white chocolate|honey|maple|molasses|caramel|miso|white miso|red miso|soy sauce|fish sauce|oyster sauce|tamari|ponzu|gochujang|doenjang|harissa|tahini|vinegar|balsamic|olive oil|sesame oil|truffle oil|salt|sauce|jus|gravy|broth|stock|consomme|dashi|bouillon|bisque|soup|puree|foam|emulsion|reduction|glaze|gel|gelee|aspic|vinaigrette|aioli|mayonnaise|hollandaise|beurre blanc|beurre noisette|bearnaise|romesco|pesto|chimichurri|salsa|chutney|relish|compote|jam|marmalade|curd|custard|mousse|ganache|praline|nougat|ice cream|gelato|sorbet|granita|parfait|panna cotta|creme brulee|souffle|tiramisu|sabayon|zabaglione|pudding|confit|terrine|pate|rillette|tartare|carpaccio|ceviche|crudo|sashimi|sushi|nigiri|tempura|karaage|yakitori|tataki|schnitzel|taco|tamale|mole|curry|satay|rendang|laksa|pho|banh mi|bibimbap|kimchi|borscht|paella|bouillabaisse|gazpacho|ratatouille|caponata|smoked|fermented|pickled|cured|aged|dry aged|charred|grilled|roasted|braised|poached|steamed|seared|fried|deep fried|pan fried|sous vide|caramelized|dehydrated|candied|toasted|marinated|blanched|simmered|sake|mirin|wine|champagne|sherry|vermouth|cognac|whiskey|rum|beer|mezcal|tequila|brandy';
+    const aliases={'prawns':'prawn','shrimps':'shrimp','tomatoes':'tomato','cherry tomatoes':'cherry tomato','potatoes':'potato','sweet potatoes':'sweet potato','anchovies':'anchovy','cherries':'cherry','strawberries':'strawberry','raspberries':'raspberry','blackberries':'blackberry','blueberries':'blueberry','cranberries':'cranberry','aubergine':'eggplant','aubergines':'eggplant','courgette':'zucchini','courgettes':'zucchini','beetroot':'beet','yoghurt':'yogurt','parmigiano':'parmesan','parmigiano reggiano':'parmesan','chile':'chili','chiles':'chili','chillies':'chili','chilies':'chili','uni':'sea urchin','unagi':'eel','ikura':'salmon roe','jerusalem artichoke':'sunchoke','whisky':'whiskey','za atar':'zaatar','szechuan pepper':'sichuan pepper','octopuses':'octopus','octopi':'octopus'};
+    const lex=new Map();
+    vocabulary.split('|').forEach(t=>{
+      lex.set(t,t);
+      const parts=t.split(' '),last=parts.pop(),prefix=parts.length?parts.join(' ')+' ':'';
+      if(!last.endsWith('s')&&!['rice','fish','squid','beef','pork','cream','butter','milk','tofu','bread','coffee','chocolate','miso','honey','salt','caviar','roe'].includes(last)){
+        lex.set(prefix+last+'s',t);
+        if(/(?:sh|ch|x|z)$/.test(last))lex.set(prefix+last+'es',t);
+        if(/[^aeiou]y$/.test(last))lex.set(prefix+last.slice(0,-1)+'ies',t);
+      }
+    });
+    Object.entries(aliases).forEach(([k,v])=>lex.set(k,v));rdFoodLexicon=lex;return lex;
+  }
+  function rdFoodTerms(c){
+    const lex=rdFoodDictionary(),found=new Set();
+    for(const raw of [c.text,c.transcript]){
+      const words=rdFoodTokens(raw);
+      for(let i=0;i<words.length;){
+        let term='',size=0;
+        for(let n=Math.min(3,words.length-i);n>=1;n--){const t=lex.get(words.slice(i,i+n).join(' '));if(t){term=t;size=n;break;}}
+        if(term){found.add(term);i+=size;}else i++;
+      }
+    }return found;
+  }
+  function rdFoodFrequency(courses){
+    const index=new Map();
+    courses.forEach(d=>rdFoodTerms(d.c).forEach(t=>index.set(t,(index.get(t)||0)+1)));
+    return [...index].map(([term,count])=>({term,count})).sort((a,b)=>b.count-a.count||a.term.localeCompare(b.term));
+  }
+  function rdWordCloud(stats){
+    const terms=rdFoodFrequency(stats.courses).slice(0,48);if(!terms.length)return '';
+    const max=terms[0].count,ordered=[];for(let i=0,j=terms.length-1;i<=j;){ordered.push(terms[i++]);if(i<=j)ordered.push(terms[j--]);}
+    return '<section class="rd-card rd-food-card"><h3>Food word cloud</h3><p class="rd-muted">Ingredients, dishes and cooking techniques. Larger words appear in more of your course descriptions.</p><div class="rd-food-cloud">'+ordered.map(t=>{
+      const weight=max===1?.25:Math.log(t.count)/Math.log(max);
+      return '<button type="button" class="rd-food-word" data-rd-food-term="'+escapeAttr(t.term)+'" aria-pressed="false" title="'+escapeAttr(t.term+' · '+t.count+' course'+(t.count===1?'':'s'))+'" aria-label="'+escapeAttr(t.term+', '+t.count+' courses')+'" style="--food-size:'+(15+weight*22).toFixed(1)+'px;--food-weight:'+(450+Math.round(weight*250))+';--food-alpha:'+(0.7+weight*.3).toFixed(2)+'"'+(weight>=.75&&max>1?' data-food-top':'')+'>'+escapeHtml(t.term)+'</button>';
+    }).join('')+'</div><p class="rd-muted">Select a word to see the dishes that mention it.</p><div data-rd-food-results aria-live="polite"></div></section>';
+  }
+  function rdSelectFoodWord(el){
+    const card=el.closest('.rd-food-card'),results=card?.querySelector('[data-rd-food-results]'),r=restaurantRows[openRestaurantIndex];if(!results||!r)return;
+    const was=el.getAttribute('aria-pressed')==='true';
+    card.querySelectorAll('[data-rd-food-term]').forEach(b=>b.setAttribute('aria-pressed',String(!was&&b===el)));
+    if(was){results.innerHTML='';return;}
+    const term=el.dataset.rdFoodTerm,matches=rdStats(r).courses.filter(d=>rdFoodTerms(d.c).has(term));
+    results.innerHTML='<h4>'+escapeHtml(term)+' · '+matches.length+' course'+(matches.length===1?'':'s')+'</h4><div class="rd-food-matches">'+matches.map(d=>'<button type="button" class="rd-food-match" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'"><span>'+escapeHtml(d.c.text||d.c.transcript||'Course '+(d.i+1))+'</span><small>'+escapeHtml(rdDate(d.v))+' · '+(d.score===null?'Unrated':d.score+'/10')+' ›</small></button>').join('')+'</div>';
+  }
+
   function rdGraphs(r,stats){
-    if(!stats.scored.length)return '<div class="rd-extra"><section class="rd-card"><h3>No scored courses yet</h3><p class="rd-muted">Rate courses in Visits to see your restaurant statistics here.</p></section></div>';
+    const cloud=rdWordCloud(stats);
+    if(!stats.scored.length)return '<div class="rd-extra">'+cloud+'<section class="rd-card"><h3>No scored courses yet</h3><p class="rd-muted">Rate courses in Visits to see your restaurant statistics here.</p></section></div>';
     const counts=Array.from({length:8},(_,i)=>({score:i+6,count:stats.scored.filter(c=>c.score===i+6).length}));
     const dist=counts.filter(d=>d.count>0).map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'')).join('');
     const ranked=stats.rated.slice().sort((a,b)=>restaurantGraphSort==='date'?b.date.localeCompare(a.date)||a.vi-b.vi:b.avg-a.avg||b.date.localeCompare(a.date));
@@ -14471,7 +14525,7 @@
       const w=Math.max(340,visit.courses.length*24+38),base=150,cy=n=>base-(n-5.5)/7.5*120,step=(w-38)/Math.max(1,visit.courses.length);
       return '<div class="rd-meal-entry"><div class="rd-meal-heading">'+rdVisitButton(visit.v,rdDate(visit.v),'btn-ghost rd-meal-date')+'<span class="rd-muted">'+visit.scored.length+' scored courses</span></div><div style="overflow-x:auto"><svg class="rd-chart" style="min-width:'+w+'px" viewBox="0 0 '+w+' 175" aria-label="'+escapeAttr('Course scores in meal order, '+rdDate(visit.v))+'">'+[6,8,10,12,13].map(n=>'<line class="rd-axis" x1="26" x2="'+w+'" y1="'+cy(n)+'" y2="'+cy(n)+'"/><text x="21" y="'+(cy(n)+3)+'" text-anchor="end">'+n+'</text>').join('')+visit.courses.map((d,i)=>{const x=30+i*step;return '<g role="button" tabindex="0" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'" aria-label="'+escapeAttr('Course '+(i+1)+', '+(d.score===null?'unscored':d.score))+'"><title>'+escapeHtml(d.c.text||'Course '+(i+1))+'</title><rect x="'+x+'" y="20" width="'+step+'" height="145" fill="transparent"/>'+(d.score===null?'':'<rect x="'+(x+2)+'" y="'+cy(d.score)+'" width="'+Math.max(4,step-4)+'" height="'+(base-cy(d.score))+'" rx="2" fill="'+(d.score>=12?'var(--amber)':'#709D9F')+'"/>')+'<text x="'+(x+step/2)+'" y="168" text-anchor="middle">'+(i+1)+'</text></g>';}).join('')+'<line class="rd-avg" x1="26" x2="'+w+'" y1="'+cy(visit.avg)+'" y2="'+cy(visit.avg)+'"/></svg></div><span class="rd-muted">Meal average '+rdFmt(visit.avg)+' · Select a course to open it</span></div>';
     }).join('')+'</div></section>';
-    return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg. (6+ rated)',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13</p></section>'+compare+progression+'</div>';
+    return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg. (6+ rated)',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13</p></section>'+compare+cloud+progression+'</div>';
   }
   function rdCourseResults(stats){
     const f=restaurantCourseFilters;
@@ -14548,9 +14602,10 @@
     if(focusSelector)body.querySelector(focusSelector)?.focus({preventScroll:true});
   }
   function rdAction(e){
-    const el=e.target.closest('[data-rd-tab],[data-rd-visit],[data-rd-course],[data-rd-photo],[data-rd-percent]');
+    const el=e.target.closest('[data-rd-tab],[data-rd-visit],[data-rd-course],[data-rd-photo],[data-rd-percent],[data-rd-food-term]');
     if(!el||guestViewEnabled||isLockedGuestAccount)return;
     if(e.type==='keydown'){if(!['Enter',' '].includes(e.key)||el.tagName.toLowerCase()==='button')return;e.preventDefault();}
+    if(el.hasAttribute('data-rd-food-term')){rdSelectFoodWord(el);return;}
     if(el.dataset.rdTab){rdSwitch(el.dataset.rdTab);return;}
     if(el.hasAttribute('data-rd-percent')){restaurantGraphPercent=!restaurantGraphPercent;mbhUpdateRestaurantGraphs('[data-rd-percent]');return;}
     if(el.dataset.rdPhoto!==undefined){
