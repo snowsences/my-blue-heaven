@@ -13304,6 +13304,12 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  // A best meal must have six individually rated courses in the same visit.
+  const BEST_MEAL_MIN_COURSES = 6;
+  function bestMealScore(visit){
+    const scores=(visit.courses||[]).map(rdScore).filter(n=>n!==null);
+    return scores.length>=BEST_MEAL_MIN_COURSES?{avg:scores.reduce((a,b)=>a+b,0)/scores.length,count:scores.length}:null;
+  }
   function computeVisitAverageScore(visit){
     const scored = (visit.courses || [])
       .map(c => c.score)
@@ -14203,7 +14209,7 @@
     const mean=nums.length?nums.reduce((a,b)=>a+b,0)/nums.length:null;
     const median=nums.length?(nums[Math.floor((nums.length-1)/2)]+nums[Math.floor(nums.length/2)])/2:null;
     const rated=visits.filter(v=>v.avg!==null),dated=rated.filter(v=>v.date).sort((a,b)=>a.date.localeCompare(b.date)||a.vi-b.vi);
-    const best=rated.slice().sort((a,b)=>b.avg-a.avg||b.date.localeCompare(a.date))[0];
+    const best=rated.filter(v=>v.scored.length>=BEST_MEAL_MIN_COURSES).sort((a,b)=>b.avg-a.avg||b.date.localeCompare(a.date))[0];
     return {visits,courses,scored,mean,median,rated,dated,best,exceptional:nums.filter(n=>n>=12).length};
   }
   const rdFmt=n=>n===null||n===undefined?'—':Number(n).toFixed(1);
@@ -14218,7 +14224,7 @@
     const dates=stats.visits.filter(v=>v.date).sort((a,b)=>a.date.localeCompare(b.date));
     const tier=restaurantTierBoundaries?getRestaurantTierForRank(openRestaurantIndex+1,restaurantTierBoundaries):null;
     return '<div class="rd-extra"><section class="rd-card"><h3>Restaurant scores</h3>'+renderRestaurantScoresRowHtml(r)+'</section><section class="rd-card"><h3>Visit history</h3>'+
-      rdMetrics([['Recorded visits',stats.visits.length],['Total courses',stats.courses.length],['Average course',rdFmt(stats.mean)],['Scored courses',stats.scored.length],['12+ courses',stats.exceptional],['Best visit',rdFmt(stats.best?.avg)]])+
+      rdMetrics([['Recorded visits',stats.visits.length],['Total courses',stats.courses.length],['Average course',rdFmt(stats.mean)],['Scored courses',stats.scored.length],['12+ courses',stats.exceptional],['Best visit (6+ rated)',rdFmt(stats.best?.avg)]])+
       [['Tier',tier?.name||'—'],['First visit',dates.length?rdDate(dates[0].v):'—'],['Most recent',dates.length?rdDate(dates[dates.length-1].v):'—']].map(([k,v])=>'<div class="rd-overview-row"><span class="rd-muted">'+escapeHtml(k)+'</span><span>'+escapeHtml(String(v))+'</span></div>').join('')+
       (stats.best?'<div class="rd-overview-row"><span class="rd-muted">Highest-scoring visit</span>'+rdVisitButton(stats.best.v,rdDate(stats.best.v)+' · '+rdFmt(stats.best.avg))+'</div>':'')+'</section></div>';
   }
@@ -14249,7 +14255,7 @@
     restaurantGraphVisit=selected.v.id;
     const w=Math.max(340,selected.courses.length*24+38),base=150,cy=n=>base-(n-5.5)/7.5*120,step=(w-38)/Math.max(1,selected.courses.length);
     const progression='<section class="rd-card"><div class="rd-tools"><h3>Meal progression</h3><select data-rd-meal aria-label="Select visit">'+stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>'<option value="'+escapeAttr(p.v.id)+'"'+(p===selected?' selected':'')+'>'+escapeHtml(rdDate(p.v))+'</option>').join('')+'</select></div><div style="overflow-x:auto"><svg class="rd-chart" style="min-width:'+w+'px" viewBox="0 0 '+w+' 175" aria-label="Course scores in meal order">'+[6,8,10,12,13].map(n=>'<line class="rd-axis" x1="26" x2="'+w+'" y1="'+cy(n)+'" y2="'+cy(n)+'"/><text x="21" y="'+(cy(n)+3)+'" text-anchor="end">'+n+'</text>').join('')+selected.courses.map((d,i)=>{const x=30+i*step;return '<g role="button" tabindex="0" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'" aria-label="'+escapeAttr('Course '+(i+1)+', '+(d.score===null?'unscored':d.score))+'"><title>'+escapeHtml(d.c.text||'Course '+(i+1))+'</title><rect x="'+x+'" y="20" width="'+step+'" height="145" fill="transparent"/>'+(d.score===null?'':'<rect x="'+(x+2)+'" y="'+cy(d.score)+'" width="'+Math.max(4,step-4)+'" height="'+(base-cy(d.score))+'" rx="2" fill="'+(d.score>=12?'var(--amber)':'#709D9F')+'"/>')+'<text x="'+(x+step/2)+'" y="168" text-anchor="middle">'+(i+1)+'</text></g>';}).join('')+'<line class="rd-avg" x1="26" x2="'+w+'" y1="'+cy(selected.avg)+'" y2="'+cy(selected.avg)+'"/></svg></div><span class="rd-muted">Meal average '+rdFmt(selected.avg)+' · Select a course to open it</span></section>';
-    return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg.',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13</p></section>'+compare+progression+'</div>';
+    return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg. (6+ rated)',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13</p></section>'+compare+progression+'</div>';
   }
   function rdCourseResults(stats){
     const f=restaurantCourseFilters;
@@ -15233,6 +15239,7 @@
         if (!matches.length) return;
         const distinct = Array.from(new Set(dated.map(x => x.p.str))).sort();
         const visitAvgs = visits.map(v => computeVisitAverageScore(v)).filter(s => s !== null);
+        const eligibleVisitAvgs=visits.map(bestMealScore).filter(Boolean).map(x=>x.avg);
         const overallAvg = visitAvgs.length ? visitAvgs.reduce((a, b) => a + b, 0) / visitAvgs.length : null;
         const perYear = new Map(); // two visits on the same day become one card
         matches.forEach(x => {
@@ -15265,7 +15272,8 @@
           const avg = nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null;
           let scoreSub = '';
           if (avg !== null){
-            if (visitAvgs.length >= 2 && avg >= Math.max.apply(null, visitAvgs) && visitAvgs.some(s => s < avg)){
+            const eligible=e.visits.length===1?bestMealScore(e.visits[0]):null;
+            if (eligible && eligibleVisitAvgs.length >= 2 && eligible.avg >= Math.max(...eligibleVisitAvgs) && eligibleVisitAvgs.some(s=>s<eligible.avg)){
               scoreSub = 'Your best visit here';
             } else if (visitAvgs.length >= 2 && overallAvg !== null && avg - overallAvg >= 0.3){
               scoreSub = 'Above your ' + overallAvg.toFixed(1) + ' average here';
@@ -17841,7 +17849,11 @@
           topDish: top ? { name: topName, score: scoreOf(top) } : null };
         day(e.p).restaurants.push(item);
         stats.restaurants++; stats.uniqueRestaurants.add(r);
-        if (avg !== null) stats.scored.push(item);
+        // Timeline cards may combine same-day visits, but awards must never do so.
+        e.visits.forEach(v=>{
+          const qualified=bestMealScore(v);
+          if(qualified)stats.scored.push({...item,visitId:v.id,avg:qualified.avg,ratedCount:qualified.count});
+        });
       });
       if (firstYear === year) stats.newRestaurants++;
     });
@@ -17881,7 +17893,7 @@
     const mem = stats.memorable;
     if (mem) hl.push({ label: 'Most memorable', big: mem.activity.name, sub: [yirShortDate(mem.dateStr), mem.activity.location].filter(Boolean).join(' · '), item: mem, star: true });
     const bestMeal = stats.scored.slice().sort((a, b) => b.avg - a.avg || (a.dateStr < b.dateStr ? 1 : -1))[0];
-    if (bestMeal && stats.scored.length >= 2 && !guestViewEnabled) hl.push({ label: 'Best meal', big: bestMeal.restaurant.name, sub: bestMeal.avg.toFixed(1) + ' · ' + yirShortDate(bestMeal.dateStr), item: bestMeal });
+    if (bestMeal && !guestViewEnabled) hl.push({ label: 'Best meal', big: bestMeal.restaurant.name, sub: bestMeal.avg.toFixed(1) + ' · ' + bestMeal.ratedCount + ' rated · ' + yirShortDate(bestMeal.dateStr), item: bestMeal });
     let longest = null, withMiles = 0;
     list.forEach(dy => dy.hikes.forEach(h => { if (h.miles > 0){ withMiles++; if (!longest || h.miles > longest.miles) longest = h; } }));
     if (longest && withMiles >= 2) hl.push({ label: 'Longest hike', big: longest.hike.name, sub: yirRound1(longest.miles) + ' mi · ' + yirShortDate(longest.dateStr), item: longest });
@@ -21448,7 +21460,7 @@
     };
     const rememberCover=(id,url)=>{if(id&&url&&!covers.has(id))covers.set(id,url);};
     restaurantRows.forEach((r,i)=>{
-      const visits=r.visits||[], cover=getEffectiveRestaurantCover(r);
+      const visits=r.visits||[], cover=rotatingCoverPhoto(r,[r.coverPhoto,...visits.flatMap(v=>[...(v.photos||[]),...(v.courses||[]).flatMap(c=>c.photos||[])]),...(r.photos||[])]);
       add('restaurant',r.name,usJoin(r.location,r.cuisine),r.notes,visits.map(v=>tripInfo(v.tripId)).join(' '),cover,visits.map(v=>v.date||'').sort().pop(),restaurantTotal(r),()=>{usPage('food','restaurants');openRestaurantDetailsPanel(i);});
       visits.forEach(v=>{
         rememberCover(v.tripId,cover);
@@ -21491,23 +21503,25 @@
       add('trip',t.name,usJoin(tripDateLabel(t),(t.places||[]).map(p=>p.name)),usJoin(t.description,notes,Object.values(t.dayTitles||{})), '',getSelectedCoverPhotos(t)[0]||usFirstPhoto(t)||covers.get(t.id),t.startDate,null,()=>{usPage('trips','trips');openTrip(t.id);});
     });
     const albums=finalRanking.length?finalRanking:items;
+    const albumByKey=new Map();
     albums.forEach((raw,i)=>{
       const p=parseEntry(raw);
+      if(p.artist&&p.album&&!albumByKey.has(albumMatchKey(p.artist,p.album)))albumByKey.set(albumMatchKey(p.artist,p.album),{raw,year:p.year});
       add('album',p.album,usJoin(p.artist,p.year),'',p.artist?findMusicbeeGroupingForAlbum(p.artist,p.album):'',artCache[raw],p.year,null,()=>{usPage('music','albums');openDetailsPanel(raw);});
     });
     (songFinalRanking.length?songFinalRanking:songItems).forEach(raw=>{
-      const p=parseSongEntry(raw), ar=findAlbumRawForSong(p);
-      add('song',p.title,usJoin(p.artist,p.album), '', '',artCache[ar],p.artist?findAlbumYearForSong(p.artist,p.album):'',null,()=>{
-        usClose();usPage('music','songs');if(p.artist)filterSongsByArtistAndScroll(p.artist);
-        usRevealRow(songResultsList,p.title);
+      const p=parseSongEntry(raw), album=p.artist&&p.album?albumByKey.get(albumMatchKey(p.artist,p.album)):null, ar=album?.raw;
+      add('song',p.title,usJoin(p.artist,p.album), '', '',artCache[ar],album?.year||'',null,()=>{
+        usClose();activeSongGroupingFilter='';activeSongArtistFilter=p.artist||'';usPage('music','songs');renderSongResultsTab();
+        usRevealRow(songResultsList,p.title,raw);
       });
     });
     artistRows.forEach(r=>add('artist',r.name,r.country,'','',r.coverPhoto,'',null,()=>{usPage('music','artists');openArtistDetailsPanel(r.key);}));
     Object.keys(mediaState).forEach(type=>mediaState[type].rows.forEach(r=>{
       const config=MEDIA_CONFIGS[type];
-      add(type,r.title,config.metaFn(r),usJoin(r.notes,r.description),'',r.coverPhoto,r.year,mediaTotal(r,config),()=>{
+      add(type,r.title,config.metaFn(r),usJoin(r.series,r.notes,r.description),'',r.coverPhoto,r.year,mediaTotal(r,config),()=>{
         if(r.coverPhoto){usPage('art',type+'s');openArtLightbox(r.coverPhoto);}
-        else{usClose();usPage('art',type+'s');const d=mediaState[type].dom;usRevealRow(d.grid,r.title);usRevealRow(d.list,r.title);}
+        else{usClose();const state=mediaState[type];state.searchFilter='';state.dom.searchInput.value='';state.dom.searchClear.style.display='none';usPage('art',type+'s');usRevealRow(state.dom.grid,r.title,r.id);usRevealRow(state.dom.list,r.title,r.id);}
       });
     }));
     return out;
@@ -21520,10 +21534,10 @@
     if(group==='art')switchArtSubPage(page);
     if(group==='photos')switchPhotosSubPage(page);
   }
-  function usRevealRow(root,title){
+  function usRevealRow(root,title,id){
     if(!root)return;requestAnimationFrame(()=>{
       const t=usNorm(title);
-      const row=[...root.children].find(el=>el.getClientRects().length&&[...el.querySelectorAll('.rank-album,.grid-title,.grid-card-title,.restaurant-name')].some(n=>usNorm(n.textContent)===t))||
+      const row=[...root.children].find(el=>el.getClientRects().length&&id&&(el.dataset.item===id||el.dataset.mediaId===id))||[...root.children].find(el=>el.getClientRects().length&&[...el.querySelectorAll('.rank-album,.grid-title,.grid-card-title,.restaurant-name,.restaurant-gold-card-name')].some(n=>usNorm(n.textContent)===t))||
         [...root.children].find(el=>el.getClientRects().length&&usNorm(el.textContent).includes(t));
       if(row){row.scrollIntoView({block:'center'});row.classList.add('us-target');setTimeout(()=>row.classList.remove('us-target'),1400);}
     });
@@ -21544,7 +21558,7 @@
     }
     return prev[b.length]<=limit;
   }
-  function usScore(r,q,terms){
+  function usScore(r,q,terms,near=usNear){
     let score=0;
     for(const w of terms){
       if(r.main.split(' ').includes(w))score+=45;
@@ -21552,7 +21566,7 @@
       else if(r.details.includes(w))score+=24;
       else if(r.notes.includes(w))score+=17;
       else if(r.links.includes(w))score+=10;
-      else if(r.words.some(v=>usNear(w,v)))score+=3;
+      else if(r.words.some(v=>near(w,v)))score+=3;
       else return -1;
     }
     if(r.main===q)score+=120;
@@ -21566,7 +21580,7 @@
   usButton.innerHTML='<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span class="top-nav-label">Search</span>';
   topNavToolsBtn.before(usButton);
   const usOverlay=document.createElement('section');
-  usOverlay.id='universal-search';usOverlay.setAttribute('role','dialog');usOverlay.setAttribute('aria-label','Universal search');usOverlay.setAttribute('aria-hidden','true');
+  usOverlay.id='universal-search';usOverlay.setAttribute('role','dialog');usOverlay.setAttribute('aria-label','Universal search');usOverlay.setAttribute('aria-modal','true');usOverlay.setAttribute('aria-hidden','true');
   usOverlay.innerHTML='<div class="us-shell"><header class="us-header"><div class="us-search-row"><button class="us-plain" type="button" data-us-close aria-label="Close search">‹</button><div class="us-input-wrap"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="us-query" type="search" autocomplete="off" placeholder="Search everything…" aria-label="Search everything"><button type="button" class="us-plain" data-us-clear aria-label="Clear search" hidden>×</button></div></div><div class="us-filters" aria-label="Result categories"></div><div class="us-toolbar" hidden><span class="us-count" role="status" aria-live="polite"></span><select aria-label="Sort results" class="us-sort"><option value="relevance">Relevance</option><option value="highest">Highest rated</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select></div></header><main class="us-results"></main></div>';
   document.body.appendChild(usOverlay);
   const usInput=usOverlay.querySelector('input'),usResults=usOverlay.querySelector('.us-results'),usFilters=usOverlay.querySelector('.us-filters'),usToolbar=usOverlay.querySelector('.us-toolbar'),usSort=usOverlay.querySelector('.us-sort'),usClear=usOverlay.querySelector('[data-us-clear]');
@@ -21579,10 +21593,12 @@
     usRecent=[q,...usRecent.filter(x=>usNorm(x)!==usNorm(q))].slice(0,8);usWriteRecent();
   }
   function usOpen(){
-    if(!usOwner()||usOverlay.classList.contains('open'))return;
+    if(!usOwner()||usOverlay.classList.contains('open')||countOpenOverlays()>0)return;
     usRecent=usReadRecent();usRows=usIndex();
     usOverlay.classList.add('open');usOverlay.setAttribute('aria-hidden','false');
     document.body.classList.add('details-open-lock');usRender();usInput.focus({preventScroll:true});
+    Promise.all([localDataReadyPromise,guestViewReadyPromise]).then(()=>{if(usOwner()&&usOverlay.classList.contains('open')){usRows=usIndex();usRender();}});
+    cloudSettledPromise.then(()=>{if(usOwner()&&usOverlay.classList.contains('open')){usRows=usIndex();usRender();}});
   }
   function usClose(){
     if(!usOverlay.classList.contains('open'))return;
@@ -21612,7 +21628,7 @@
   function usCard(r,i,q){
     const a=escapeAttr, h=escapeHtml;
     if(r.type==='photo')return '<button class="us-photo" type="button" data-us-result="'+i+'" aria-label="'+a(r.title+' '+r.meta)+'">'+usThumb(r)+'<span>'+h(r.title)+'</span></button>';
-    const score=r.score===null?'':'<span class="us-score">'+h(String(r.score))+'</span>';
+    const score=r.score===null?'':'<span class="us-score">'+h(String(r.score)+(r.type==='dish'?'/10':''))+'</span>';
     const excerpt=r.type==='dish'||r.type==='activity'?usExcerpt(r,q):'';
     return '<button class="us-result" type="button" data-us-result="'+i+'">'+usThumb(r)+'<span class="us-result-text"><strong>'+h(r.title)+'</strong>'+(r.meta?'<small>'+h(r.meta)+'</small>':'')+(excerpt&&excerpt!==r.title?'<small class="us-excerpt">'+h(excerpt)+'</small>':'')+'</span>'+score+'<span aria-hidden="true" class="us-chevron">›</span></button>';
   }
@@ -21620,14 +21636,15 @@
     if(!usOwner())return;
     const q=usNorm(usInput.value),terms=usWords(q),rail=usFilters.scrollLeft;
     usClear.hidden=!usInput.value;
-    const ranked=usRows.map(r=>({r,s:q?usScore(r,q,terms):0})).filter(x=>x.s>=0);
+    const memo=new Map();const near=(a,b)=>{if(a.length<4||Math.abs(a.length-b.length)>(a.length>=8?2:1))return false;const key=a+'\0'+b;if(!memo.has(key))memo.set(key,usNear(a,b));return memo.get(key);};
+    const ranked=usRows.map(r=>({r,s:q?usScore(r,q,terms,near):0})).filter(x=>x.s>=0);
     const counts=new Map();ranked.forEach(x=>counts.set(x.r.type,(counts.get(x.r.type)||0)+1));
     const available=Object.keys(usTypes).filter(t=>counts.has(t)||t===usType);
     usFilters.innerHTML=usChip('all','All'+(q?' '+ranked.length:''),usType==='all')+available.map(t=>usChip(t,usTypes[t][1]+' '+usTypes[t][0]+(q?' '+(counts.get(t)||0):''),usType===t)).join('');
     usFilters.scrollLeft=rail;
     if(!q&&usType==='all'){
       usToolbar.hidden=true;usVisible=[];
-      const suggestions=[...new Set(photoTags.map(t=>t.name).concat(tripRows.map(t=>t.name)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)).slice(0,12);
+      const suggestions=[...new Set(photoTags.slice().sort((a,b)=>(b.photoIds||[]).length-(a.photoIds||[]).length).map(t=>t.name).slice(0,8).concat(tripRows.slice().sort((a,b)=>String(b.startDate||'').localeCompare(String(a.startDate||''))).map(t=>t.name).slice(0,4)).filter(Boolean))];
       usResults.innerHTML=(usRecent.length?'<section class="us-section"><div class="us-section-head"><h2>Recent searches</h2><button type="button" class="us-plain us-link" data-us-reset-recent>Clear</button></div>'+usRecent.map(t=>'<div class="us-recent"><button type="button" data-us-term="'+escapeAttr(t)+'">↶ <span>'+escapeHtml(t)+'</span></button><button type="button" class="us-plain" data-us-remove-recent="'+escapeAttr(t)+'" aria-label="Remove recent search">×</button></div>').join('')+'</section>':'')+
         '<section class="us-section"><h2>Explore your collections</h2><div class="us-explore">'+available.map(t=>'<button type="button" data-us-type="'+t+'"><span>'+usTypes[t][1]+'</span><strong>'+usTypes[t][0]+'</strong><small>'+counts.get(t)+'</small></button>').join('')+'</div></section>'+
         (suggestions.length?'<section class="us-section"><h2>Explore your memories</h2><div class="us-suggestions">'+suggestions.map(t=>'<button type="button" data-us-term="'+escapeAttr(t)+'">'+escapeHtml(t)+'</button>').join('')+'</div></section>':'');
@@ -21637,7 +21654,7 @@
     const sort=usSort.value;
     let list=ranked.filter(x=>usType==='all'||x.r.type===usType);
     const cmp=(a,b)=>{
-      if(sort==='highest'&&a.r.type===b.r.type){const d=(b.r.score??-Infinity)-(a.r.score??-Infinity);if(d&&!Number.isNaN(d))return d;}
+      if(sort==='highest'&&usType!=='all'){const d=(b.r.score??-Infinity)-(a.r.score??-Infinity);if(d&&!Number.isNaN(d))return d;}
       if(sort==='newest'||sort==='oldest'){
         if(!a.r.date!==!b.r.date)return a.r.date?-1:1;
         const d=sort==='newest'?b.r.date.localeCompare(a.r.date):a.r.date.localeCompare(b.r.date);if(d)return d;
@@ -21649,6 +21666,7 @@
     if(!list.length){usResults.innerHTML='<div class="us-empty"><h2>No matches</h2><p>Try a different spelling, fewer words, or another category.</p>'+(usType!=='all'?'<button type="button" data-us-type="all" class="us-link">Search all categories</button>':'')+'</div>';return;}
     const groups=new Map();list.forEach((x,i)=>{if(!groups.has(x.r.type))groups.set(x.r.type,[]);groups.get(x.r.type).push({r:x.r,i});});
     usResults.innerHTML=[...groups].map(([type,rows])=>{
+      if(sort==='highest'&&usType==='all')rows.sort((a,b)=>(b.r.score??-Infinity)-(a.r.score??-Infinity)||0);
       const cap=usType==='all'?(type==='photo'?8:4):usLimit, shown=rows.slice(0,cap);
       return '<section class="us-section"><div class="us-section-head"><h2>'+usTypes[type][1]+' '+usTypes[type][0]+' <small>'+rows.length+'</small></h2>'+(usType==='all'&&rows.length>cap?'<button class="us-plain us-link" type="button" data-us-type="'+type+'">See all ›</button>':'')+'</div><div class="'+(type==='photo'?'us-photo-grid':'us-list')+'">'+shown.map(({r,i},j)=>'<div class="us-entry" style="--us-delay:'+Math.min(j,11)*20+'ms">'+usCard(r,i,q)+'</div>').join('')+'</div>'+(usType!=='all'&&rows.length>cap?'<button class="us-more" type="button" data-us-more>Show '+Math.min(60,rows.length-cap)+' more</button>':'')+'</section>';
     }).join('');

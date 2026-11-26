@@ -5523,3 +5523,6 @@
     .us-input-wrap input{font-size:17px;}
     .us-search-row{gap:4px;}
   }
+
+  @media(min-width:769px){#universal-search-btn{margin-right:-18px}.top-nav-inner:has(#universal-search-btn){gap:clamp(12px,2vw,28px)}}
+  @media(max-width:768px){#universal-search-btn svg{width:19px;height:19px}.top-nav-inner:has(#universal-search-btn) .top-nav-label{white-space:nowrap;font-size:clamp(9px,2.5vw,10.5px)}}
