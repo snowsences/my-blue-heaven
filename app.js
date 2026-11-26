@@ -13418,6 +13418,7 @@
     .rd-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
     .rd-tools h3{flex:1;margin:0}
     .rd-tools select,.rd-tools input{background:var(--bg);color:var(--chalk);border:1px solid var(--panel-line);border-radius:7px;padding:7px;font:inherit;min-width:0;max-width:100%}
+    #restaurant-details-panel-inner select:not(.restaurant-score-select){appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m2 4 4 4 4-4' fill='none' stroke='%23b9c6c5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;background-size:12px 12px;padding-right:22px}
     .rd-course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .rd-course-tile{min-width:0;display:flex;flex-direction:column;border:1px solid var(--panel-line);border-radius:10px;overflow:hidden;background:var(--bg-2)}
     .rd-course-photo{width:100%;aspect-ratio:4/3;background:var(--bg);border:0;padding:0;display:block;cursor:pointer;color:var(--chalk-dim)}
@@ -13506,7 +13507,7 @@
   function rdGraphs(r,stats){
     if(!stats.scored.length)return '<div class="rd-extra"><section class="rd-card"><h3>No scored courses yet</h3><p class="rd-muted">Rate courses in Visits to see your restaurant statistics here.</p></section></div>';
     const counts=Array.from({length:8},(_,i)=>({score:i+6,count:stats.scored.filter(c=>c.score===i+6).length}));
-    const dist=counts.map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'data-rd-score="'+d.score+'"')).join('');
+    const dist=counts.filter(d=>d.count>0).map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'data-rd-score="'+d.score+'"')).join('');
     const ranked=stats.rated.slice().sort((a,b)=>restaurantGraphSort==='date'?b.date.localeCompare(a.date)||a.vi-b.vi:b.avg-a.avg||b.date.localeCompare(a.date));
     const compare=stats.visits.length>1?'<section class="rd-card"><div class="rd-tools"><h3>Visit comparison</h3><select data-rd-graph-sort aria-label="Sort visits"><option value="score"'+(restaurantGraphSort==='score'?' selected':'')+'>Score</option><option value="date"'+(restaurantGraphSort==='date'?' selected':'')+'>Date</option></select></div><div class="rd-bars">'+ranked.map(p=>rdBar(rdDate(p.v),p.scored.length+' scored',rdFmt(p.avg),p.avg/13*100,p.avg===stats.best.avg,'data-rd-visit="'+escapeAttr(p.v.id)+'"')).join('')+stats.visits.filter(p=>p.avg===null).map(p=>rdVisitButton(p.v,rdDate(p.v)+' · Unscored')).join('')+'</div></section>':'';
     const selected=stats.rated.find(p=>p.v.id===restaurantGraphVisit)||stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
@@ -13649,7 +13650,7 @@
     const effectiveCover = getEffectiveRestaurantCover(r);
     const oldScroll=restaurantDetailsPanel.scrollTop;
     const stats=isVisits?null:rdStats(r);
-    const tabBar=guestViewEnabled||isLockedGuestAccount?'':'<nav class="rd-tabs" aria-label="Restaurant details">'+['overview','visits','graphs','courses'].map(t=>'<button type="button" data-rd-tab="'+t+'" class="'+(restaurantDetailTab===t?'active':'')+'" aria-pressed="'+(restaurantDetailTab===t)+'">'+t[0].toUpperCase()+t.slice(1)+'</button>').join('')+'</nav>';
+    const tabBar=guestViewEnabled||isLockedGuestAccount?'':'<nav class="rd-tabs" aria-label="Restaurant details">'+['overview','visits','courses','graphs'].map(t=>'<button type="button" data-rd-tab="'+t+'" class="'+(restaurantDetailTab===t?'active':'')+'" aria-pressed="'+(restaurantDetailTab===t)+'">'+(t==='courses'?'Dishes':t[0].toUpperCase()+t.slice(1))+'</button>').join('')+'</nav>';
     restaurantDetailsPanelInner.innerHTML =
       '<div class="rd-header"><div class="details-art-wrap">' +
         '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to open the photo gallery"' : ' title="Add photos via a course or More Photos below"') + '>' +
