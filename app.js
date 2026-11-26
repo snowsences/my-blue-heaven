@@ -18103,9 +18103,7 @@
     const forAnchor = (type, id) => notes.filter(n => n.anchor && n.anchor.type === type && n.anchor.id === id);
     const hasPlaces = t.places.length > 0;
     const placeNameOf = (pid) => { const p = t.places.find(x => x.id === pid); return p ? p.name : ''; };
-    // Visit memories are rendered with their visits on Restaurants / By Day,
-    // not as orphan notes on Overview.
-    linked.visits.forEach(x => forAnchor('visit', x.v.id).forEach(n => shown.add(n.id)));
+    const galleryIndexByUrl = new Map(tripCurrentGallery.map((g,i)=>[g.url,i]));
 
     // place id ('' = none) -> Map(date -> { visits, hikes, photos })
     const groups = new Map();
@@ -18133,7 +18131,7 @@
       return keys.map((key, ki) => {
         const d = g.get(key);
         let cardItems = [].concat(
-          d.visits.map(x => ({ k: 'v:' + x.v.id, html: '' })),
+          d.visits.map(x => ({ k: 'v:' + x.v.id, html: tripVisitCardHtml(t, x, noteBlock(forAnchor('visit', x.v.id)), pname) })),
           d.hikes.map(x => ({ k: 'h:' + x.d.id, html: tripHikeCardHtml(t, x, noteBlock(forAnchor('hike', x.d.id)), pname) })),
           d.roads.map(x => ({ k: 'r:' + x.rd.id, html: tripRoadCardHtml(t, x, noteBlock(forAnchor('road', x.rd.id)), pname) })),
           d.activities.map(act => ({ k: 'a:' + act.id, html: tripActivityCardHtml(t, act, noteBlock(forAnchor('activity', act.id)), pname) }))
@@ -18148,12 +18146,12 @@
             .map(x => x.it);
         }
         const cards = cardItems.map(it => it.html).join('');
-        // Overview keeps the route and existing memories/activities, with
-        // compact links instead of duplicating the dedicated tab content.
-        const summaryLinks = (d.visits.length ? '<button type="button" class="btn-ghost" data-trip-view="restaurants">' + escapeHtml(otdPlural(d.visits.length, 'restaurant visit', 'restaurant visits')) + ' ›</button>' : '') +
-          (d.photos.length ? '<button type="button" class="btn-ghost" data-trip-view="gallery">' + escapeHtml(otdPlural(d.photos.length, 'photo', 'photos')) + ' ›</button>' : '') +
-          (owner && hasPlaces && d.photos.length ? '<button type="button" class="btn-ghost trip-owner" data-trip-act="place" data-keys="' + escapeAttr(d.photos.map(p => 'p:' + p.id).join(',')) + '">📍 ' + escapeHtml(pname || 'Photo place') + '</button>' : '');
-        const photosCard = summaryLinks ? '<div class="trip-summary-links">' + summaryLinks + '</div>' : '';
+        // Show every standalone photo for this place/day, with a swipeable
+        // strip rather than a link out to the Photos tab.
+        const photoUrls = Array.from(new Set(d.photos.map(p=>p.url).filter(u=>galleryIndexByUrl.has(u))));
+        const photosCard = photoUrls.length ? '<div class="yir-photos-card trip-overview-photos"><div class="yir-row"><span class="yir-chip">' + yirIcon('camera',12) + 'PHOTOS</span><span class="yir-dim">' + escapeHtml(otdPlural(photoUrls.length,'photo','photos')) + '</span>' +
+          (owner && hasPlaces ? '<button type="button" class="trip-mini trip-owner trip-photos-place" data-trip-act="place" data-keys="' + escapeAttr(d.photos.map(p=>'p:'+p.id).join(',')) + '">📍 ' + escapeHtml(pname || 'Place') + '</button>' : '') +
+          '</div><div class="trip-overview-photo-strip" role="group" aria-label="Photos for this day">' + photoUrls.map((url,i)=>'<button type="button" class="yir-tile trip-overview-photo" data-trip-photo="' + galleryIndexByUrl.get(url) + '" aria-label="Open photo ' + (i+1) + ' of ' + photoUrls.length + '">' + yirImg(url,500) + '</button>').join('') + '</div></div>' : '';
         const dayNoteHtml = key ? noteBlock(notes.filter(n => n.anchor && n.anchor.type === 'day' && n.anchor.date === key && dayNotePlace(key) === pid)) : '';
         let badge, monthHead = '';
         if (key){
@@ -18338,8 +18336,12 @@
     .trip-detail-tabs{display:flex;gap:0;margin:14px 0 12px;border-bottom:1px solid var(--panel-line)}
     .trip-detail-tabs button{flex:1;min-width:0;padding:12px 3px;border:0;border-bottom:3px solid transparent;background:none;color:var(--chalk-dim);font:600 14px Figtree,sans-serif;cursor:pointer}
     .trip-detail-tabs button.active{color:var(--amber);border-bottom-color:var(--amber)}
-    .trip-summary-links{display:flex;gap:6px;flex-wrap:wrap}
-    .trip-summary-links button{font-size:12px;padding:6px 10px}
+    .trip-overview-photos{min-width:0;overflow:hidden}
+    .trip-overview-photos .yir-row{flex-wrap:wrap}
+    .trip-overview-photo-strip{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;max-width:100%;min-width:0;margin-top:10px;padding:2px 2px 8px;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:var(--panel-line) transparent;-webkit-overflow-scrolling:touch}
+    .trip-overview-photo{flex:0 0 min(176px,70%);aspect-ratio:1/1;border-radius:10px;scroll-snap-align:start}
+    .trip-overview-photo:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+    @media(max-width:480px){.trip-overview-photo{flex-basis:min(138px,70%)}}
     .trip-day-list,.trip-restaurants-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
     .trip-day-entry{border:1px solid var(--panel-line);border-radius:12px;background:var(--panel);overflow:hidden}
     .trip-day-entry.expanded{border-color:var(--amber)}
@@ -18415,11 +18417,7 @@
           if (!dragEl) return;
           dragEl = null;
           const keys = Array.from(container.children).filter(el => el.classList.contains('trip-item')).map(el => el.dataset.dragKey).filter(Boolean);
-          // Reorder visible cards in their original slots, keeping hidden restaurant
-          // cards in the complete order used by the By Day view.
-          const all=JSON.parse(container.dataset.allKeys || '[]');
-          const visible=new Set(keys);let i=0;
-          t.order[container.dataset.groupKey] = all.length?all.map(k=>visible.has(k)?keys[i++]:k):keys;
+          t.order[container.dataset.groupKey] = keys;
           saveTripProgress();
           tripRender();
         });
