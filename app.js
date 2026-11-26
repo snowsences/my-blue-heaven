@@ -14608,7 +14608,7 @@
           '<div class="restaurant-visits-header">' +
             renderRestaurantVisitTabsHtml(sortedVisits, activeVisit) +
             '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
-            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">📷 Bulk Import Photos</button>' +
+            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">Import</button>' +
             '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
           '</div>' +
           '<div class="restaurant-visit-content">' +
@@ -14620,7 +14620,7 @@
           '<div class="restaurant-visits-header">' +
             '<p class="restaurant-course-empty" style="margin:0;">No visits logged yet.</p>' +
             '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
-            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">📷 Bulk Import Photos</button>' +
+            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">Import</button>' +
             '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
           '</div>'
         );
