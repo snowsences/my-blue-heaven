@@ -2724,6 +2724,36 @@
   // toggle and the delete button — every current caller passing this is a
   // restaurant gallery; Dishes' own calls always pass null here, since
   // "set as cover" / "delete" don't apply to browsing dishes.
+  function galleryLightboxPhotoId(){
+    if(guestViewEnabled||isLockedGuestAccount||photoEditMode||lightboxCoverContext||!pagePhotos.classList.contains('active'))return null;
+    const id=photoSortHelperIds?.[lightboxIndex];
+    return id&&photoRows.some(p=>p.id===id)?id:null;
+  }
+  function removeGalleryLightboxPhoto(id){
+    if(guestViewEnabled||isLockedGuestAccount||photoEditMode||!photoRows.some(p=>p.id===id))return;
+    // Preserve the full master ranking, not just the currently visible grid.
+    const ranked=photoSortHelperOrder().map(p=>p.id).filter(x=>x!==id);
+    const entries=(photoSortHelperIds||[]).map((key,i)=>({key,entry:lightboxPhotos?.[i]}));
+    const viewing=artLightboxOverlay.classList.contains('show')&&galleryLightboxPhotoId()===id;
+    const next=entries.filter(x=>x.key!==id&&x.entry&&photoRows.some(p=>p.id===x.key));
+    const index=Math.min(lightboxIndex,next.length-1);
+    photoRows=photoRows.filter(p=>p.id!==id);
+    if(photoDuelEngaged()){
+      photoDuelItems=ranked.slice();photoDuelFinalRanking=ranked.slice();
+      photoDuelIsComplete=true;photoDuelHistory=[];savePhotoDuelProgress();
+    }
+    prunePhotoTagMemberships();
+    savePhotoProgress();
+    renderPhotosPage();
+    if(viewing){
+      if(!next.length)closeArtLightbox();
+      else{
+        lightboxPhotos=next.map(x=>x.entry);photoSortHelperIds=next.map(x=>x.key);
+        lightboxIndex=index;navigateLightbox(0);
+      }
+    }
+    showToast('Photo removed from Gallery');
+  }
   function openPhotoLightbox(photos, startIndex, coverContext, rankedPhotoIds){
     if (!photos || !photos.length) return;
     lightboxPhotos = photos;
@@ -2738,7 +2768,7 @@
     lightboxZoomIn();
     lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
     // Trips use a separate source-aware removal link, never the generic delete button.
-    lightboxDeleteBtn.classList.toggle('show', !!lightboxCoverContext && lightboxCoverContext.tripId === undefined);
+    lightboxDeleteBtn.classList.toggle('show', !!galleryLightboxPhotoId() || (!!lightboxCoverContext && lightboxCoverContext.tripId === undefined));
     updateLightboxCounter();
     updateLightboxCoverToggle();
     updateLightboxCaption();
@@ -2890,6 +2920,7 @@
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
+    lightboxDeleteBtn.classList.toggle('show', !!galleryLightboxPhotoId() || (!!lightboxCoverContext && lightboxCoverContext.tripId === undefined));
     updatePhotoSortHelperVisibility();
     updatePhotoCalendarLightbox();
     artLightboxImg.src = cloudinaryThumbUrl(lightboxEntryUrl(lightboxPhotos[lightboxIndex]), 1600);
@@ -3059,7 +3090,12 @@
   });
   lightboxDeleteBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!lightboxPhotos || !lightboxPhotos.length) return;
+    if (!lightboxPhotos || !lightboxPhotos.length || guestViewEnabled || isLockedGuestAccount) return;
+    const galleryId=galleryLightboxPhotoId();
+    if(galleryId){
+      showConfirmModal('Delete this photo?', 'This removes the photo from your Gallery, its tags, and its linked trip. Your original image file is not deleted.',()=>removeGalleryLightboxPhoto(galleryId));
+      return;
+    }
     const handler = resolveLightboxCoverHandler(lightboxCoverContext);
     if (!handler || typeof handler.deletePhoto !== 'function') return;
     const url = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
