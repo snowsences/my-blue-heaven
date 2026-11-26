@@ -11198,7 +11198,7 @@
         const m=i+1;
         return '<section class="pc-month"><div class="pc-toolbar"><h2>'+name+'</h2><small class="pc-muted">'+pcCount(counts[i])+'</small></div><div class="pc-days">'+Array.from({length:pcalDays(m)},(_,j)=>{
           const d=j+1,key=m+'-'+d,items=buckets.get(key);
-          return items?'<button class="pc-day" type="button" data-day="'+key+'" aria-label="'+name+' '+d+', '+pcCount(items.length)+'">'+pcThumb(items[0],300)+'<span>'+ordinal(d)+'<small>'+items.length+'</small></span></button>':'<div class="pc-day pc-day-empty"><div></div><span>'+ordinal(d)+'</span></div>';
+          return items?'<button class="pc-day" type="button" data-day="'+key+'" aria-label="'+name+' '+d+', '+pcCount(items.length)+'">'+pcThumb(items[0],300)+'</button>':'<div class="pc-day pc-day-empty"><div></div></div>';
         }).join('')+'</div></section>';
       }).join('')+
       (ranked.some(x=>!x.date)?'<p class="pc-muted">'+pcCount(ranked.filter(x=>!x.date).length)+' without a capture date are not shown.</p>':'');
