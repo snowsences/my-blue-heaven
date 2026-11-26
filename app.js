@@ -10806,7 +10806,17 @@
     return out;
   }
   function tripLinked(t){ return tripCollect(id => id === t.id); }
-  function tripCandidates(t){ return tripCollect((id, key) => !id && tripContainsDate(t, key)); }
+  // Portland is home: date overlap alone must never suggest its restaurants.
+  // Keep explicit manual linking and all existing trip links available.
+  function tripCanSuggestRestaurant(r){
+    const city = restaurantCityOf(r).toLowerCase().replace(/\s+/g,' ').trim();
+    return !/^portland(?:\s+(?:or|oregon))?$/.test(city);
+  }
+  function tripCandidates(t){
+    const candidates = tripCollect((id, key) => !id && tripContainsDate(t, key));
+    candidates.visits = candidates.visits.filter(x => tripCanSuggestRestaurant(x.r));
+    return candidates;
+  }
 
   function tripVisitPhotos(v){
     const scoreOf = (c) => (c.score === '' || c.score == null || isNaN(Number(c.score))) ? -1 : Number(c.score);
@@ -18723,11 +18733,11 @@
   function tripOpenPicker(t, kind, preselect){
     const all = tripCollect(() => true);
     const rows = [];
-    if (kind === 'visit') all.visits.forEach(x => rows.push({ id: x.v.id, label: x.r.name || '', sub: [x.date ? tripShortDate(x.date) + ', ' + x.date.slice(0, 4) : 'No date', restaurantCityOf(x.r)].filter(Boolean).join(' · '), date: x.date, taken: x.v.tripId || '' }));
+    if (kind === 'visit') all.visits.forEach(x => rows.push({ id: x.v.id, label: x.r.name || '', sub: [x.date ? tripShortDate(x.date) + ', ' + x.date.slice(0, 4) : 'No date', restaurantCityOf(x.r)].filter(Boolean).join(' · '), date: x.date, taken: x.v.tripId || '', suggest: tripCanSuggestRestaurant(x.r) }));
     if (kind === 'hike') all.hikes.forEach(x => rows.push({ id: x.d.id, label: x.h.name || '', sub: [x.date ? tripShortDate(x.date) + ', ' + x.date.slice(0, 4) : 'No date', x.h.city].filter(Boolean).join(' · '), date: x.date, taken: x.d.tripId || '' }));
     if (kind === 'road') all.roads.forEach(x => rows.push({ id: x.rd.id, label: x.rd.name || '', sub: [x.rd.state, x.rd.country].filter(Boolean).join(', '), date: '', taken: x.rd.tripId || '' }));
     if (kind === 'photo') all.photos.forEach(x => rows.push({ id: x.p.id, url: x.p.url, label: x.date ? tripShortDate(x.date) : '', date: x.date, taken: x.p.tripId || '' }));
-    const avail = rows.filter(r => r.taken !== t.id).map(r => Object.assign(r, { inRange: tripContainsDate(t, r.date), blocked: !!r.taken }));
+    const avail = rows.filter(r => r.taken !== t.id && (!preselect || r.suggest !== false)).map(r => Object.assign(r, { inRange: r.suggest !== false && tripContainsDate(t, r.date), blocked: !!r.taken }));
     avail.sort((a, b) => {
       if (a.inRange !== b.inRange) return a.inRange ? -1 : 1;
       if (!a.date !== !b.date) return a.date ? -1 : 1;
@@ -18752,7 +18762,7 @@
         const group = r.inRange ? 'in' : 'other';
         if (group !== lastGroup){
           lastGroup = group;
-          const head = '<div class="trip-pick-head">' + (group === 'in' ? 'From this trip\'s dates' : 'Other dates') + '</div>';
+          const head = '<div class="trip-pick-head">' + (group === 'in' ? 'From this trip\'s dates' : kind === 'visit' ? 'Other visits' : 'Other dates') + '</div>';
           html += kind === 'photo' ? '</div>' + head + '<div class="trip-pick-grid">' : head;
         }
         const takenName = r.taken ? (tripFind(r.taken) || {}).name || 'another trip' : '';
@@ -18816,7 +18826,7 @@
   // ---------- choosing a trip for one thing (a visit, a hike date, a photo) ----------
   function tripOpenChooser(cfg){
     const trips = tripSorted();
-    const match = (t) => cfg.dateKey && tripContainsDate(t, cfg.dateKey);
+    const match = (t) => cfg.suggest !== false && cfg.dateKey && tripContainsDate(t, cfg.dateKey);
     trips.sort((a, b) => (match(b) ? 1 : 0) - (match(a) ? 1 : 0));
     const row = (id, name, sub, on, tag) => '<button type="button" class="trip-choose-row' + (on ? ' on' : '') + '" data-choose="' + escapeAttr(id) + '"><span class="trip-choose-text"><span class="trip-choose-name">' + escapeHtml(name) + '</span>' +
       (sub ? '<span class="trip-choose-sub">' + escapeHtml(sub) + '</span>' : '') + '</span>' + (tag ? '<span class="trip-choose-tag">' + tag + '</span>' : '') + (on ? '<span class="trip-choose-tick">✓</span>' : '') + '</button>';
@@ -20433,7 +20443,7 @@
     if (!found) return;
     const p = otdParse(found.v.date);
     tripOpenChooser({
-      title: 'Add this visit to a trip', currentId: found.v.tripId || '', dateKey: p ? p.str : '',
+      title: 'Add this visit to a trip', currentId: found.v.tripId || '', dateKey: p ? p.str : '', suggest: tripCanSuggestRestaurant(found.r),
       onChoose: (id) => {
         if (id) found.v.tripId = id; else delete found.v.tripId;
         saveRestaurantProgress();
