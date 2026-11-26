@@ -14222,7 +14222,56 @@
   let otdOpenedAt = 0;
   const OTD_CLOSE_GUARD_MS = 1000; // ignores an accidental tap-to-dismiss in the first second, so it can't vanish before there's anything to read
 
+  // An empty day is a brief, non-modal acknowledgement, not an empty
+  // full-screen memory dialog. Reuse the actual tray's typography and shell.
+  let otdEmptyTray = null;
+  function dismissOtdEmptyTray(){
+    if (!otdEmptyTray) return;
+    const tray = otdEmptyTray;
+    otdEmptyTray = null;
+    tray.remove();
+  }
+  function showOtdEmptyTray(data){
+    dismissOtdEmptyTray();
+    const tray = document.createElement('div');
+    tray.className = 'otd-sheet otd-empty-tray';
+    tray.style.cssText = 'position:fixed;z-index:250;pointer-events:none;transform:translateY(100%);transition:none;max-height:none;';
+    tray.innerHTML = '<div class="otd-grabber" aria-hidden="true"><span class="otd-handle"></span></div>' +
+      '<div style="padding:0 20px calc(20px + env(safe-area-inset-bottom, 0px))">' +
+      '<div class="otd-header" style="padding:0"><div class="otd-eyebrow">ON THIS DAY</div>' +
+      '<h2 class="otd-title">' + escapeHtml(data.now.toLocaleDateString('en-US',{month:'long',day:'numeric'})) + '</h2></div>' +
+      '<div class="otd-year" style="margin-top:18px"><div class="otd-year-head" style="border:0;margin:0;padding:0"><span class="otd-year-ago">Nothing this day!</span></div></div></div>';
+    tray.setAttribute('role','status');
+    tray.setAttribute('aria-live','polite');
+    tray.setAttribute('aria-atomic','true');
+    document.body.appendChild(tray);
+    otdEmptyTray = tray;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || !tray.animate){
+      tray.style.transform = 'none';
+      setTimeout(()=>{ if (otdEmptyTray === tray) dismissOtdEmptyTray(); }, 2600);
+      return;
+    }
+    const enter = tray.animate([
+      {transform:'translateY(100%)',offset:0},
+      {transform:'translateY(-7px)',offset:0.65},
+      {transform:'translateY(2px)',offset:0.85},
+      {transform:'translateY(0)',offset:1}
+    ],{duration:780,easing:'cubic-bezier(0.22,0.65,0.35,1)',fill:'forwards'});
+    enter.onfinish = ()=>{
+      if (otdEmptyTray !== tray) return;
+      tray.style.transform = 'translateY(0)';
+      enter.cancel();
+      setTimeout(()=>{
+        if (otdEmptyTray !== tray) return;
+        const exit = tray.animate([{transform:'translateY(0)'},{transform:'translateY(100%)'}],{duration:420,easing:'cubic-bezier(0.4,0,0.65,1)',fill:'forwards'});
+        exit.onfinish = ()=>{ if (otdEmptyTray === tray) dismissOtdEmptyTray(); };
+      },2200);
+    };
+  }
+
   function openOnThisDay(data){
+    dismissOtdEmptyTray();
     otdRender(data);
     otdOpenedAt = Date.now();
     otdReturnFocus = document.activeElement;
@@ -14383,7 +14432,7 @@
 
   // ---------- when to show it ----------
   // Returns true if it opened, 'busy' if something else is open right now
-  // (worth retrying shortly), false if there's simply nothing to show.
+  // (worth retrying shortly), false if today's acknowledgement is not due.
   function otdTryShow(opts){
     opts = opts || {};
     if (!otdSettings.enabled && !opts.force) return false;
@@ -14392,11 +14441,11 @@
     const now = new Date();
     const key = otdDateKey(now);
     if (!opts.force && otdSettings.lastShown === key) return false;                    // once a day per device
-    if (otdOverlay.classList.contains('open')) return false;
+    if (otdOverlay.classList.contains('open') || otdEmptyTray) return false;
     if (countOpenOverlays() > 0) return 'busy';                                       // never on top of a panel, dialog or photo
     const data = otdCollect(now);
-    if (!data.counts.memories) return false;
-    openOnThisDay(data);
+    if (!data.counts.memories) showOtdEmptyTray(data);
+    else openOnThisDay(data);
     otdSettings.lastShown = key;
     saveOtdSettings();
     return true;
