@@ -944,6 +944,13 @@
           <button class="btn-primary" id="tag-photos-launch-btn" type="button">Tag Photos</button>
         </section>
 
+        <section class="fun-card fun-owner-only" id="fun-card-almanac" hidden>
+          <div class="fun-card-icon" aria-hidden="true">📚</div>
+          <h2 class="fun-card-title">Personal Almanac</h2>
+          <p class="fun-card-text">A lifetime of experiences, from the countries you've visited to your best meals, hikes and photography days.</p>
+          <button class="btn-primary" id="alm-launch" type="button">Open Personal Almanac</button>
+        </section>
+
         <section class="fun-card" id="fun-card-yir">
           <div class="fun-card-icon" aria-hidden="true">🗓️</div>
           <h2 class="fun-card-title">Year in Review</h2>
@@ -1254,6 +1261,16 @@
       </div>
     </div>
     <div class="share-footer"><button type="button" class="share-go" id="share-go-btn" disabled>Preparing…</button></div>
+  </div>
+</div>
+
+<div id="alm-overlay" aria-hidden="true">
+  <div id="alm-panel" role="dialog" aria-modal="true" aria-labelledby="alm-title">
+    <header class="alm-header">
+      <div class="alm-heading"><div><span class="alm-kicker">MY BLUE HEAVEN</span><h1 id="alm-title">Personal Almanac</h1><p id="alm-period">A lifetime of experiences</p></div><button type="button" class="alm-close" id="alm-close" aria-label="Close Personal Almanac">×</button></div>
+      <nav id="alm-tabs" aria-label="Almanac sections"></nav>
+    </header>
+    <div id="alm-scroll"><div id="alm-content"></div></div>
   </div>
 </div>
 
