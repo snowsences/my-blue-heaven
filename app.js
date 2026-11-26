@@ -11388,14 +11388,14 @@
   const photoTagModal = document.getElementById('photo-tag-modal');
   const photoTagCreateTray = document.getElementById('photo-tag-create-tray');
   const photoTagsWritable = () => !guestViewEnabled && !isLockedGuestAccount;
-  const PHOTO_TAG_CATEGORIES = ['Location','Scenery','Season'];
+  const PHOTO_TAG_CATEGORIES = ['Location','Scenery'];
   // One-time assignment for existing tags. The version is stored per tag so
   // future manual category edits, renames and newly created tags are respected.
   const PHOTO_TAG_CATEGORY_VERSION = 1;
   const PHOTO_TAG_INITIAL_CATEGORIES = new Map([
     ...['Alaska','Europe','Hawaii','Italy','PNW','Rockies','USA','Venice'].map(n=>[n.toLowerCase(),'Location']),
     ...['Forests','Cities','Flowers','Lakes','Mountains','Night','Oceans','Wildlife'].map(n=>[n.toLowerCase(),'Scenery']),
-    ...['Winter','Autumn'].map(n=>[n.toLowerCase(),'Season'])
+    ...['Winter','Autumn'].map(n=>[n.toLowerCase(),'Scenery'])
   ]);
   function initialPhotoTagCategory(t){
     if(Number(t.categoryVersion)>=PHOTO_TAG_CATEGORY_VERSION)return photoTagCategory(t.category);
@@ -11874,17 +11874,17 @@
     const oldRails=[...photoTagsHost.querySelectorAll('.pt-filter-rail')].map(el=>el.scrollLeft);
     const members=effectivePhotoTagMembers(photoTags), tags=sortedPhotoTags();
     const locations=tags.filter(t=>photoTagCategory(t.category)==='Location');
-    const others=['Scenery','Season'].flatMap(category=>tags.filter(t=>photoTagCategory(t.category)===category));
+    const others=tags.filter(t=>photoTagCategory(t.category)==='Scenery');
     if(!locations.some(t=>t.id===photoTagLocationFilter))photoTagLocationFilter='';
     photoTagOtherFilters=new Set([...photoTagOtherFilters].filter(id=>others.some(t=>t.id===id)));
     const filters=[...(photoTagLocationFilter?[photoTagLocationFilter]:[]),...photoTagOtherFilters];
     const rows=filters.length?base.filter(p=>filters.every(id=>members.get(id)?.has(p.id))):base;
     const chip=(id,label,on,kind)=>'<button type="button" class="pt-filter-chip" data-pt-filter="'+escapeAttr(id)+'" data-pt-kind="'+kind+'" aria-pressed="'+on+'">'+escapeHtml(label)+'</button>';
     const locationChips=chip('','All locations',!photoTagLocationFilter,'location')+locations.map(t=>chip(t.id,t.name,photoTagLocationFilter===t.id,'location')).join('');
-    const otherChips=chip('','All scenery & seasons',!photoTagOtherFilters.size,'other')+others.map(t=>chip(t.id,t.name,photoTagOtherFilters.has(t.id),'other')).join('');
+    const otherChips=chip('','All scenery',!photoTagOtherFilters.size,'other')+others.map(t=>chip(t.id,t.name,photoTagOtherFilters.has(t.id),'other')).join('');
     const manage=photoTagsWritable()&&tags.length?'<div class="pt-menu-wrap"><button type="button" class="pt-menu-btn btn-ghost" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout pt-manage-menu" hidden><label for="pt-manage-select">Manage tags</label><select id="pt-manage-select" class="tf-input">'+groupedPhotoTags().filter(g=>g.tags.length).map(g=>'<optgroup label="'+escapeAttr(g.category)+'">'+g.tags.map(t=>'<option value="'+escapeAttr(t.id)+'"'+(t.id===photoTagManageId?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')+'</optgroup>').join('')+'</select><button type="button" data-rename>Edit tag</button><button type="button" data-delete>Delete tag</button></div></div>':'';
     if(!photoTagsHost.querySelector('.pt-filter-dock')){
-      photoTagsHost.innerHTML='<div class="pt-gallery-heading"><span class="pt-muted" aria-live="polite"></span></div><div class="pt-filter-dock"><div class="pt-filter-rail" role="group" aria-label="Location filters"></div><div class="pt-filter-rail" role="group" aria-label="Scenery and season filters"></div></div>';
+      photoTagsHost.innerHTML='<div class="pt-gallery-heading"><span class="pt-muted" aria-live="polite"></span></div><div class="pt-filter-dock"><div class="pt-filter-rail" role="group" aria-label="Location filters"></div><div class="pt-filter-rail" role="group" aria-label="Scenery filters"></div></div>';
     }
     photoTagsHost.querySelector('.pt-gallery-heading .pt-muted').textContent=pcCount(rows.length);
     const mh=photoTagManageHost;if(mh.__html!==manage){mh.innerHTML=manage;mh.__html=manage;}
@@ -18639,7 +18639,7 @@
   const almTabs=document.getElementById('alm-tabs'), almCloseBtn=document.getElementById('alm-close');
   const almCard=document.getElementById('fun-card-almanac'), almLaunch=document.getElementById('alm-launch');
   let almManual=[], almSavedAt=null, almData=null, almSection='Overview', almFocus=null, almActions=[], almCountryDetail='';
-  let almPhotoYear='', almPhotoTags=['','',''], almCountrySort='first', almChartType='Food', almLimits={}, almAtlas=null, almAtlasLoading=false;
+  let almPhotoYear='', almPhotoTags=['',''], almCountrySort='first', almChartType='Food', almLimits={}, almAtlas=null, almAtlasLoading=false;
   const almOwner=()=>!guestViewEnabled&&!isLockedGuestAccount&&!document.body.classList.contains('guest-view-active');
   const almEsc=x=>escapeHtml(String(x??''));
   const almAttr=x=>escapeAttr(String(x??''));
@@ -18846,7 +18846,7 @@
   }
   function almPhotos(){
     const d=almData,ys=d.years, days=almPhotoDays();
-    const filters='<div class="alm-filters">'+almSelect('Year','photoYear',[['','All years'],...ys.filter(y=>y.photos).slice().reverse().map(y=>[y.y,y.y])],almPhotoYear)+['Location','Scenery','Season'].map((c,i)=>almSelect(c,'photoTag'+i,[['','All '+c.toLowerCase()+' tags'],...sortedPhotoTags().filter(t=>photoTagCategory(t.category)===c).map(t=>[t.id,t.name])],almPhotoTags[i])).join('')+'</div>';
+    const filters='<div class="alm-filters">'+almSelect('Year','photoYear',[['','All years'],...ys.filter(y=>y.photos).slice().reverse().map(y=>[y.y,y.y])],almPhotoYear)+PHOTO_TAG_CATEGORIES.map((c,i)=>almSelect(c,'photoTag'+i,[['','All '+c.toLowerCase()+' tags'],...sortedPhotoTags().filter(t=>photoTagCategory(t.category)===c).map(t=>[t.id,t.name])],almPhotoTags[i])).join('')+'</div>';
     const dayList=almList('photoDays',days,(x,i)=>'<button type="button" class="alm-day"'+almAction(()=>almGoDay(x.date))+'><span class="alm-day-head"><span class="alm-rank">#'+(i+1)+'</span><b>'+almEsc(almDateLabel(x.date))+'</b><span class="alm-day-count">'+x.rows.length+' photos ›</span></span><span class="alm-day-photos">'+x.rows.slice(0,4).map(p=>'<span class="alm-day-image">'+almImg(p.p.url,400)+'</span>').join('')+'</span></button>');
     const months='<div class="alm-months">'+PHOTO_MONTHS.map((m,i)=>{const p=d.months.get(i+1);return '<button type="button" class="alm-month"'+(p?almAction(()=>almGoPhoto(p)):' disabled')+'><span class="alm-month-image">'+(p?almImg(p.p.url,400):'')+'</span><strong>'+almEsc(m)+'</strong><small>'+(p?p.date.y+' · #'+p.rank:'No photo')+'</small></button>';}).join('')+'</div>';
     return almMetrics([[d.photos.length,'Gallery photos'],[d.days.size,'Photography days'],[d.photos.filter(p=>!p.date).length,'Undated photos']])+
@@ -18917,7 +18917,7 @@
   almTabs.addEventListener('click',e=>{const b=e.target.closest('[data-alm-section]');if(b&&almOwner())almSwitch(b.dataset.almSection);});
   almTabs.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const i=ALM_SECTIONS.indexOf(almSection);const next=e.key==='Home'?0:e.key==='End'?4:(i+(e.key==='ArrowRight'?1:4))%5;e.preventDefault();almSwitch(ALM_SECTIONS[next]);almTabs.querySelector('[aria-selected=true]')?.focus();});
   almContent.addEventListener('click',e=>{const b=e.target.closest('[data-alm-action]');if(b&&almOwner()){const fn=almActions[Number(b.dataset.almAction)];if(fn)fn();}});
-  almContent.addEventListener('change',e=>{if(!almOwner())return;const key=e.target.dataset.almFilter,v=e.target.value;if(!key)return;if(key==='chart'&&['Food','Hiking','Photography','Travel'].includes(v))almChartType=v;else if(key==='photoYear'){almPhotoYear=v;delete almLimits.photoDays;}else if(/^photoTag[0-2]$/.test(key)){almPhotoTags[Number(key.at(-1))]=v;delete almLimits.photoDays;}else if(key==='countrySort'&&['alpha','first','recent','trips','photos'].includes(v))almCountrySort=v;almRender(true);});
+  almContent.addEventListener('change',e=>{if(!almOwner())return;const key=e.target.dataset.almFilter,v=e.target.value;if(!key)return;if(key==='chart'&&['Food','Hiking','Photography','Travel'].includes(v))almChartType=v;else if(key==='photoYear'){almPhotoYear=v;delete almLimits.photoDays;}else if(/^photoTag[0-1]$/.test(key)){almPhotoTags[Number(key.at(-1))]=v;delete almLimits.photoDays;}else if(key==='countrySort'&&['alpha','first','recent','trips','photos'].includes(v))almCountrySort=v;almRender(true);});
   almContent.addEventListener('submit',e=>{if(e.target.id!=='alm-country-form')return;e.preventDefault();if(!almOwner())return;const f=new FormData(e.target),code=f.get('country'),raw=f.get('year'),year=raw?Number(raw):null;if(!almCountryNames.has(code)||raw&&(!Number.isInteger(year)||year<1900||year>new Date().getFullYear()))return;almManual=almManualNormalize([...almManual.filter(x=>x.code!==code),{code,year}]);almSaveManual();showToast('Historical country saved');});
   document.addEventListener('keydown',e=>{if(!almOverlay.classList.contains('open')||countOpenOverlays()>1)return;if(e.key==='Escape'){e.preventDefault();almClose();return;}if(e.key==='Tab'){const f=[...almPanel.querySelectorAll('button:not([disabled]),select,input')].filter(x=>x.offsetParent!==null);if(!f.length)return;if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===f.at(-1)){e.preventDefault();f[0].focus();}}});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')almRefresh();});
