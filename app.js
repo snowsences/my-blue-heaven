@@ -21451,8 +21451,7 @@
   const usTypes = {
     trip:['Trips','🧳'], photo:['Photos','📸'], restaurant:['Restaurants','🍽️'],
     dish:['Dishes','🍴'], hike:['Hikes','🥾'], park:['Parks','🌲'], road:['Scenic drives','🚗'],
-    activity:['Activities','🎟️'], album:['Albums','💿'], song:['Songs','🎵'], artist:['Artists','🎤'],
-    book:['Books','📚'], movie:['Movies','🎬'], game:['Games','🎮'], show:['Shows','📺']
+    activity:['Activities','🎟️']
   };
   const usNorm=v=>String(v??'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/ß/g,'ss').replace(/æ/g,'ae').replace(/œ/g,'oe').replace(/ø/g,'o').replace(/þ/g,'th').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   const usWords=v=>usNorm(v).split(' ').filter(Boolean);
@@ -21514,45 +21513,13 @@
       const notes=(t.notes||[]).map(n=>typeof n==='string'?n:usJoin(n.text,n.title,n.description));
       add('trip',t.name,usJoin(tripDateLabel(t),(t.places||[]).map(p=>p.name)),usJoin(t.description,notes,Object.values(t.dayTitles||{})), '',getSelectedCoverPhotos(t)[0]||usFirstPhoto(t)||covers.get(t.id),t.startDate,null,()=>{usPage('trips','trips');openTrip(t.id);});
     });
-    const albums=finalRanking.length?finalRanking:items;
-    const albumByKey=new Map();
-    albums.forEach((raw,i)=>{
-      const p=parseEntry(raw);
-      if(p.artist&&p.album&&!albumByKey.has(albumMatchKey(p.artist,p.album)))albumByKey.set(albumMatchKey(p.artist,p.album),{raw,year:p.year});
-      add('album',p.album,usJoin(p.artist,p.year),'',p.artist?findMusicbeeGroupingForAlbum(p.artist,p.album):'',artCache[raw],p.year,null,()=>{usPage('music','albums');openDetailsPanel(raw);});
-    });
-    (songFinalRanking.length?songFinalRanking:songItems).forEach(raw=>{
-      const p=parseSongEntry(raw), album=p.artist&&p.album?albumByKey.get(albumMatchKey(p.artist,p.album)):null, ar=album?.raw;
-      add('song',p.title,usJoin(p.artist,p.album), '', '',artCache[ar],album?.year||'',null,()=>{
-        usClose();activeSongGroupingFilter='';activeSongArtistFilter=p.artist||'';usPage('music','songs');renderSongResultsTab();
-        usRevealRow(songResultsList,p.title,raw);
-      });
-    });
-    artistRows.forEach(r=>add('artist',r.name,r.country,'','',r.coverPhoto,'',null,()=>{usPage('music','artists');openArtistDetailsPanel(r.key);}));
-    Object.keys(mediaState).forEach(type=>mediaState[type].rows.forEach(r=>{
-      const config=MEDIA_CONFIGS[type];
-      add(type,r.title,config.metaFn(r),usJoin(r.series,r.notes,r.description),'',r.coverPhoto,r.year,mediaTotal(r,config),()=>{
-        if(r.coverPhoto){usPage('art',type+'s');openArtLightbox(r.coverPhoto);}
-        else{usClose();const state=mediaState[type];state.searchFilter='';state.dom.searchInput.value='';state.dom.searchClear.style.display='none';usPage('art',type+'s');usRevealRow(state.dom.grid,r.title,r.id);usRevealRow(state.dom.list,r.title,r.id);}
-      });
-    }));
     return out;
   }
   function usPage(group,page){
     switchTopGroup(group);
-    if(group==='music')switchMusicSubPage(page);
     if(group==='food')switchFoodSubPage(page);
     if(group==='nature')switchNatureSubPage(page);
-    if(group==='art')switchArtSubPage(page);
     if(group==='photos')switchPhotosSubPage(page);
-  }
-  function usRevealRow(root,title,id){
-    if(!root)return;requestAnimationFrame(()=>{
-      const t=usNorm(title);
-      const row=[...root.children].find(el=>el.getClientRects().length&&id&&(el.dataset.item===id||el.dataset.mediaId===id))||[...root.children].find(el=>el.getClientRects().length&&[...el.querySelectorAll('.rank-album,.grid-title,.grid-card-title,.restaurant-name,.restaurant-gold-card-name')].some(n=>usNorm(n.textContent)===t))||
-        [...root.children].find(el=>el.getClientRects().length&&usNorm(el.textContent).includes(t));
-      if(row){row.scrollIntoView({block:'center'});row.classList.add('us-target');setTimeout(()=>row.classList.remove('us-target'),1400);}
-    });
   }
   // A bounded Damerau-Levenshtein distance allows ordinary misspellings without
   // turning short ingredient/location terms into unrelated matches.
