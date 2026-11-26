@@ -5201,12 +5201,12 @@
   .pc-photo-tile img{display:block;width:100%;aspect-ratio:1;object-fit:cover;background:var(--panel);border-radius:7px;}
   .pc-photo-tile>span{display:flex;align-items:center;justify-content:space-between;padding:5px 2px;font-size:13px;}
   .pc-photo-tile b,.pc-day-caption b{color:var(--amber);font-weight:600;}
-  .pc-year-sticky{position:sticky;top:var(--desktop-nav-height);z-index:12;background:var(--bg-2);padding:8px 0 12px;margin-bottom:12px;}
+  .pc-year-sticky{position:sticky;top:var(--desktop-nav-height);z-index:12;background:transparent;padding:0;margin-bottom:20px;}
   .pc-year-sticky select{width:100%;font-weight:600;}
   .pc-month{margin:0 auto 30px;max-width:800px;scroll-margin-top:110px;}
   .pc-month .pc-toolbar{padding:0 0 8px;border-bottom:1px solid var(--panel-line);margin-bottom:10px;}
   .pc-days{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;}
-  .pc-day{border-radius:6px;display:flex;flex-direction:column;}
+  .pc-day{border:0;border-radius:6px;display:flex;flex-direction:column;}
   .pc-day img,.pc-day-empty>div{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--panel);}
   .pc-day>span{font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:1px;padding:4px 5px;min-height:23px;}
   .pc-day small{font-size:10px;}
@@ -5224,7 +5224,7 @@
   .pc-lightbox[hidden]{display:none;}
   .pc-lightbox button{pointer-events:auto;font:inherit;font-size:13px;color:var(--chalk);border:1px solid var(--panel-line);background:rgba(15,33,36,.9);border-radius:20px;min-height:36px;padding:7px 12px;cursor:pointer;overflow-wrap:anywhere;max-width:100%;}
   :is(.pc-photo-tile,.pc-day,.pc-day-hero,.pc-lightbox button):focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
-  @media(hover:hover){:is(.pc-day:not(.pc-day-empty),.pc-lightbox button):hover{border-color:var(--amber);}}
+  @media(hover:hover){.pc-lightbox button:hover{border-color:var(--amber);}}
   @media(max-width:600px){
     .pc-photo-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;}
     .pc-days{gap:3px;}
