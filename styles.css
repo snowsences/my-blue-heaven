@@ -5402,3 +5402,22 @@
     outline: none !important;
     box-shadow: none !important;
   }
+
+  /* Quiet navigation and overflow controls: no outlined pill chrome. */
+  button:is(.pt-menu-btn,.trip-item-kebab,[data-back],[aria-label^="Back"],[title="Back"],[aria-label="More actions"],[aria-label="Tag actions"]){
+    border:0 !important;
+    border-radius:0;
+    background:transparent;
+    box-shadow:none;
+  }
+  button:is([data-back],[aria-label^="Back"],[title="Back"]){padding-inline:0;}
+  /* Floating menus use elevation, not a light perimeter stroke. */
+  :is(.pt-flyout,#photo-month-filter-menu,[role="menu"]){
+    border:0 !important;
+    border-radius:4px !important;
+    box-shadow:0px 4px 10px 0px rgba(0,0,0,0.2) !important;
+  }
+  .trip-menu-row,.trip-choose-row{
+    border:0;
+    border-radius:4px;
+  }
