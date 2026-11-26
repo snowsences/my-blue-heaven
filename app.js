@@ -13543,19 +13543,21 @@
   function bestMealRank(avg,count){
     return count>=BEST_MEAL_MIN_COURSES&&Number.isFinite(avg)?avg-BEST_MEAL_MIN_COURSES/count:null;
   }
+  // Unrated courses contribute an assumed 8 to meal averages only.
+  // Actual ratings, rated-course counts and award eligibility remain unchanged.
+  function mealAverage(courses){
+    if(!courses.length)return null;
+    return courses.reduce((sum,c)=>sum+(rdScore(c)??8),0)/courses.length;
+  }
   function bestMealScore(visit){
-    const scores=(visit.courses||[]).map(rdScore).filter(n=>n!==null),count=scores.length;
+    const courses=visit.courses||[],count=courses.filter(c=>rdScore(c)!==null).length;
     if(count<BEST_MEAL_MIN_COURSES)return null;
-    const avg=scores.reduce((a,b)=>a+b,0)/count;
+    const avg=mealAverage(courses);
     return {avg,count,rank:bestMealRank(avg,count)};
   }
   function computeVisitAverageScore(visit){
-    const scored = (visit.courses || [])
-      .map(c => c.score)
-      .filter(s => s !== null && s !== undefined && s !== '')
-      .map(Number);
-    if (!scored.length) return null;
-    return Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 10) / 10;
+    const avg=mealAverage(visit.courses||[]);
+    return avg===null?null:Math.round(avg*10)/10;
   }
 
   // Powers the unified gallery — every course photo and every general
@@ -14432,14 +14434,14 @@
     const visits=(r.visits||[]).map((v,vi)=>{
       const courses=(v.courses||[]).map((c,i)=>({c,i,v,vi,score:rdScore(c)}));
       const scored=courses.filter(c=>c.score!==null);
-      const avg=scored.length?scored.reduce((n,c)=>n+c.score,0)/scored.length:null;
+      const avg=mealAverage(v.courses||[]);
       return {v,vi,courses,scored,avg,date:otdParse(v.date)?v.date:''};
     });
     const courses=visits.flatMap(v=>v.courses),scored=courses.filter(c=>c.score!==null);
     const nums=scored.map(c=>c.score).sort((a,b)=>a-b);
     const mean=nums.length?nums.reduce((a,b)=>a+b,0)/nums.length:null;
     const median=nums.length?(nums[Math.floor((nums.length-1)/2)]+nums[Math.floor(nums.length/2)])/2:null;
-    const rated=visits.filter(v=>v.avg!==null),dated=rated.filter(v=>v.date).sort((a,b)=>a.date.localeCompare(b.date)||a.vi-b.vi);
+    const rated=visits.filter(v=>v.scored.length>0),dated=visits.filter(v=>v.avg!==null&&v.date).sort((a,b)=>a.date.localeCompare(b.date)||a.vi-b.vi);
     const best=rated.filter(v=>v.scored.length>=BEST_MEAL_MIN_COURSES).sort((a,b)=>bestMealRank(b.avg,b.scored.length)-bestMealRank(a.avg,a.scored.length)||b.avg-a.avg||b.date.localeCompare(a.date))[0];
     return {visits,courses,scored,mean,median,rated,dated,best,exceptional:nums.filter(n=>n>=12).length};
   }
@@ -14536,7 +14538,7 @@
     if(!stats.scored.length)return '<div class="rd-extra">'+cloud+'<section class="rd-card"><h3>No scored courses yet</h3><p class="rd-muted">Rate courses in Visits to see your restaurant statistics here.</p></section></div>';
     const counts=Array.from({length:8},(_,i)=>({score:i+6,count:stats.scored.filter(c=>c.score===i+6).length}));
     const dist=counts.filter(d=>d.count>0).map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'')).join('');
-    const ranked=stats.rated.slice().sort((a,b)=>restaurantGraphSort==='date'?b.date.localeCompare(a.date)||a.vi-b.vi:b.avg-a.avg||b.date.localeCompare(a.date));
+    const ranked=stats.visits.filter(v=>v.avg!==null).sort((a,b)=>restaurantGraphSort==='date'?b.date.localeCompare(a.date)||a.vi-b.vi:b.avg-a.avg||b.date.localeCompare(a.date));
     const compare=stats.visits.length>1?'<section class="rd-card"><div class="rd-tools"><h3>Visit comparison</h3><select data-rd-graph-sort aria-label="Sort visits"><option value="score"'+(restaurantGraphSort==='score'?' selected':'')+'>Score</option><option value="date"'+(restaurantGraphSort==='date'?' selected':'')+'>Date</option></select></div><div class="rd-bars">'+ranked.map(p=>rdBar(rdDate(p.v),p.scored.length+' scored',rdFmt(p.avg),p.avg/13*100,p.avg===stats.best?.avg,'data-rd-visit="'+escapeAttr(p.v.id)+'"')).join('')+stats.visits.filter(p=>p.avg===null).map(p=>rdVisitButton(p.v,rdDate(p.v)+' · Unscored')).join('')+'</div></section>':'';
     const progression='<section class="rd-card"><h3>Meal progression</h3><div class="rd-meal-list">'+stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date)||a.vi-b.vi).map(visit=>{
       const w=Math.max(340,visit.courses.length*24+38),base=150,cy=n=>base-(n-5.5)/7.5*120,step=(w-38)/Math.max(1,visit.courses.length);
@@ -15583,7 +15585,8 @@
 
           // Score for the day, and how it compares with the rest of this place's scored visits.
           const nums = scored.map(c => Number(c.score));
-          const avg = nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null;
+          const dayAvg=mealAverage(courses);
+          const avg=dayAvg===null?null:Math.round(dayAvg*10)/10;
           let scoreSub = '';
           if (avg !== null){
             const eligible=e.visits.length===1?bestMealScore(e.visits[0]):null;
@@ -18241,7 +18244,8 @@
         e.visits.forEach(v => (v.courses || []).forEach(c => courses.push(c)));
         const scoreOf = (c) => (c.score === '' || c.score == null || isNaN(Number(c.score))) ? -1 : Number(c.score);
         const scored = courses.filter(c => scoreOf(c) >= 0);
-        const avg = scored.length ? Math.round((scored.reduce((a, c) => a + scoreOf(c), 0) / scored.length) * 10) / 10 : null;
+        const dayAvg=mealAverage(courses);
+        const avg=dayAvg===null?null:Math.round(dayAvg*10)/10;
         const photos = [];
         courses.slice().sort((a, b) => scoreOf(b) - scoreOf(a)).forEach(c => otdCoursePhotos(c).forEach(u => { if (u && photos.indexOf(u) === -1) photos.push(u); }));
         e.visits.forEach(v => (v.photos || []).forEach(u => { if (u && photos.indexOf(u) === -1) photos.push(u); }));
@@ -18699,7 +18703,10 @@
     const tripById=new Map(completeTrips.map(t=>[t.id,t]));
     const tripDate=t=>almDate(tripRange(t).startKey,today);
     restaurantRows.forEach(r=>{
-      const completed=(r.visits||[]).map(v=>({v,p:almDate(v.date,today)})).filter(({v,p})=>p||(!String(v.date||'').trim()&&((v.courses||[]).some(c=>rdScore(c)!==null||otdCoursePhotos(c).length)||(v.photos||[]).length)));
+      const completed=(r.visits||[]).map(v=>({v,p:almDate(v.date,today)})).filter(({v,p})=>p||!String(v.date||'').trim());
+      // A restaurant with no visit records represents one undated historical visit.
+      // Never fabricate a saved visit or assign an invented calendar date.
+      if(!(r.visits||[]).length)completed.push({v:{courses:[],photos:[]},p:null});
       if(!completed.length)return;
       const dated=completed.filter(x=>x.p).map(x=>x.p.str).sort(),code=almCountryOf(r),entry={r,code,visits:completed,first:dated[0]||null,last:dated.at(-1)||null};
       restaurants.push(entry);if(entry.first)year(Number(entry.first.slice(0,4))).newRestaurants++;
@@ -18814,19 +18821,19 @@
     const fns={Food:y=>y.visits,Hiking:y=>y.hikes,Photography:y=>y.photos,Travel:y=>y.tripDays.size};
     return '<div class="alm-hero"><strong>'+almNum(d.countries.size)+'</strong><span class="alm-hero-label">Countries visited</span><button class="alm-plain alm-link" type="button"'+almAction(metric('Travel'))+'>Explore travel history ›</button></div>'+
       almMetrics([[d.restaurants.length,'Restaurants',metric('Food')],[t.visits,'Restaurant visits',metric('Food')],[t.dishes,'Rated dishes',metric('Food')],[d.hikes.length,'Unique hikes',metric('Nature')],[t.outings,'Hiking outings',metric('Nature')],[t.miles,'Miles hiked',metric('Nature')],[t.feet,'Feet climbed',metric('Nature')],[d.parks.length,'Parks',metric('Nature')],[d.roads.length,'Scenic roads',metric('Nature')],[d.photos.length,'Gallery photos',metric('Photos')],[d.days.size,'Photography days',metric('Photos')],[d.trips.length,'Completed trips',metric('Travel')]])+
-      almSectionHtml('A lifetime in numbers','Tap a year to open Year in Review.','<div class="alm-filters">'+almSelect('Annual activity','chart',Object.keys(fns).map(s=>[s,s]),almChartType)+'</div>'+almChart(ys,fns[almChartType]));
+      almSectionHtml('A lifetime in numbers','','<div class="alm-filters">'+almSelect('Annual activity','chart',[['Food','Restaurants'],['Hiking','Hikes'],['Photography','Photos'],['Travel','Travel Days']],almChartType)+'</div>'+almChart(ys,fns[almChartType]));
   }
   function almMealRow(m){const url=(m.v.courses||[]).slice().sort((a,b)=>(rdScore(b)||0)-(rdScore(a)||0)).flatMap(c=>otdCoursePhotos(c))[0]||(m.v.photos||[])[0]||m.r.coverPhoto;return almRow(m.r.name,almDateLabel(m.p.str)+' · '+m.count+' rated courses',m.avg.toFixed(1),()=>almGoRestaurant(m.r,m.v),url,String(m.p.y));}
   function almFood(){
     const d=almData,ys=d.years, best=ys.filter(y=>y.meals.length).slice().reverse().map(y=>y.meals[0]), visits=d.restaurants.slice().sort((a,b)=>b.visits.length-a.visits.length||a.r.name.localeCompare(b.r.name));
+    const chartYears=Array.from({length:Math.max(0,new Date().getFullYear()-2019+1)},(_,i)=>ys.find(y=>y.y===2019+i)||{y:2019+i,visits:0,newRestaurants:0,dishes:0});
     const quality=y=>y.meals.slice(0,5).reduce((s,m)=>s+m.rank,0)/5;
     const top=ys.filter(y=>y.meals.length>=5).slice().sort((a,b)=>quality(b)-quality(a)||b.y-a.y);
     return almMetrics([[d.restaurants.length,'Restaurants'],[d.totals.visits,'Visits'],[d.totals.dishes,'Rated dishes']])+
-      '<div class="alm-columns">'+almSectionHtml('Best meal of each year','Same award rules as Year in Review: 6+ rated courses, weighted for sample size.',almList('meal',best,almMealRow))+
-      almSectionHtml('Most visited restaurants','Completed visits, including multiple visits on the same day.',almList('visits',visits,(x,i)=>almRow(x.r.name,almDateLabel(x.first)+' – '+almDateLabel(x.last),x.visits.length,()=>almGoRestaurant(x.r),x.r.coverPhoto,'#'+(i+1),'visits')))+
+      '<div class="alm-columns">'+almSectionHtml('Best meal of each year','Same award rules as Year in Review: 6+ rated courses, unrated courses count as 8, weighted for sample size.',almList('meal',best,almMealRow))+
+      almSectionHtml('Most visited restaurants','Completed visits, including undated visits and one assumed visit for restaurants without visit records.',almList('visits',visits,(x,i)=>almRow(x.r.name,almDateLabel(x.first)+' – '+almDateLabel(x.last),x.visits.length,()=>almGoRestaurant(x.r),x.r.coverPhoto,'#'+(i+1),'visits')))+
       almSectionHtml('Best years for dining','Average weighted score of the five best qualifying meals; at least five are required.',almList('foodYears',top,y=>almRow(String(y.y),y.meals.length+' qualifying meals',quality(y).toFixed(2),()=>almOpenYear(y.y))))+
-      almSectionHtml('Restaurant visits by year','',almChart(ys,y=>y.visits))+almSectionHtml('New restaurants by year','',almChart(ys,y=>y.newRestaurants))+almSectionHtml('Rated dishes by year','',almChart(ys,y=>y.dishes))+
-      almSectionHtml('Average qualifying meal score','Actual average of eligible meal averages; no sample penalty in this chart.',almChart(ys.filter(y=>y.meals.length),y=>y.meals.reduce((s,m)=>s+m.avg,0)/y.meals.length,n=>n.toFixed(1)))+'</div>';
+      almSectionHtml('Restaurant visits by year','',almChart(chartYears,y=>y.visits))+almSectionHtml('New restaurants by year','',almChart(chartYears,y=>y.newRestaurants))+almSectionHtml('Rated dishes by year','',almChart(chartYears,y=>y.dishes))+'</div>';
   }
   function almNature(){
     const d=almData,ys=d.years, best=new Map(), bestP=new Map();
