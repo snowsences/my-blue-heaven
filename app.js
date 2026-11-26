@@ -11260,7 +11260,7 @@
   }
   function photoTagIsEligibleParent(childId,parentId,tags){
     const parent=tags.find(t=>t.id===parentId);
-    return !!parent&&!(parent.parentIds||[]).length&&photoTagCanParent(childId,parentId,tags);
+    return !!parent&&photoTagCategory(parent.category)==='Location'&&!(parent.parentIds||[]).length&&photoTagCanParent(childId,parentId,tags);
   }
   function derivePhotoTagAutomaticOnly(tags){
     const parents=new Set(tags.flatMap(t=>t.parentIds||[]));
