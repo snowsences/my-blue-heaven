@@ -284,7 +284,7 @@
   function readSessionPage(){
     try{
       const page = window.sessionStorage.getItem(NAV_SESSION_KEY);
-      return NAV_SESSION_PAGES.has(page) ? page : '';
+      return page==='photo-collections'?'photos':NAV_SESSION_PAGES.has(page) ? page : '';
     }catch(e){ return ''; }
   }
 
@@ -11362,7 +11362,7 @@
         const m=i+1;
         return '<section class="pc-month"><div class="pc-toolbar"><h2>'+name+'</h2><small class="pc-muted">'+pcCount(counts[i])+'</small></div><div class="pc-days">'+Array.from({length:pcalDays(m)},(_,j)=>{
           const d=j+1,key=m+'-'+d,items=buckets.get(key);
-          return items?'<button class="pc-day" type="button" data-day="'+key+'" aria-label="'+name+' '+d+', '+pcCount(items.length)+'">'+pcThumb(items[0],300)+'</button>':'<div class="pc-day pc-day-empty"><div></div></div>';
+          return items?'<button class="pc-day" type="button" data-day="'+key+'" aria-label="'+name+' '+d+', '+pcCount(items.length)+'">'+pcThumb(items[0],300)+'</button>':'<div class="pc-day pc-day-empty" role="img" aria-label="'+name+' '+d+', no photos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="5.5" width="17" height="15" rx="1.5"/><path d="M7.5 3.5v4M16.5 3.5v4M3.5 10h17"/></svg></div>';
         }).join('')+'</div></section>';
       }).join('')+
       (ranked.some(x=>!x.date)?'<p class="pc-muted">'+pcCount(ranked.filter(x=>!x.date).length)+' without a capture date are not shown.</p>':'');
