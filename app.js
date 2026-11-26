@@ -12579,6 +12579,13 @@
   }
 
   function openRestaurantDetailsPanel(index){
+    restaurantDetailTab = 'visits';
+    restaurantVisitEditMode = false;
+    restaurantCourseFilters = {sort:'highest',visit:'',score:'',search:''};
+    restaurantGraphVisit = '';
+    restaurantGraphSort = 'score';
+    restaurantGraphPercent = false;
+    restaurantDetailsPanel.scrollTop = 0;
     openRestaurantIndex = index;
     newRestaurantDraft = null;
     restaurantEditMode = false;
@@ -12593,6 +12600,8 @@
   // there's no off-by-one indexing to worry about if the panel is closed
   // mid-creation.
   function openNewRestaurantForm(){
+    restaurantDetailTab = 'visits';
+    restaurantDetailsPanel.scrollTop = 0;
     openRestaurantIndex = null;
     newRestaurantDraft = { name: '', cuisine: '', location: '', stars: '', website: '' };
     restaurantDetailsPanel.classList.add('open');
@@ -13325,6 +13334,221 @@
     );
   }
 
+  // Restaurant detail tabs are ephemeral UI state, never part of a backup.
+  let restaurantDetailTab = 'visits';
+  let restaurantCourseFilters = {sort:'highest',visit:'',score:'',search:''};
+  let restaurantGraphVisit = '', restaurantGraphSort = 'score', restaurantGraphPercent = false;
+  const restaurantDetailStyle = document.createElement('style');
+  restaurantDetailStyle.textContent = `
+    #restaurant-details-panel-inner .rd-header{position:sticky;top:calc(-1 * var(--rd-collapse,0px));z-index:12;background:var(--panel)}
+    .rd-header .details-art-wrap{overflow:hidden}
+    .rd-header .restaurant-cover-drop .art-img{transform:translateY(var(--rd-photo-shift,0px)) !important;object-fit:cover}
+    .rd-header .details-art-wrap>button{transform:translateY(var(--rd-button-shift,0px))}
+    .rd-header .details-content{padding:14px 24px 8px !important}
+    .rd-header .details-artist{margin-bottom:4px}
+    .rd-tabs{display:flex;align-items:stretch;border-bottom:1px solid var(--panel-line);padding:0 12px;background:var(--panel)}
+    .rd-tabs button{flex:1;min-width:0;background:none;color:var(--chalk-dim);border:0;border-bottom:3px solid transparent;padding:12px 3px;font:600 13px Figtree,sans-serif;cursor:pointer}
+    .rd-tabs button.active{color:var(--amber);border-bottom-color:var(--amber)}
+    .rd-body{min-height:var(--rd-body-min,0px);padding-bottom:18px}
+    .rd-extra{padding:18px 24px 24px;display:flex;flex-direction:column;gap:16px}
+    .rd-card{background:var(--bg-2);border:1px solid var(--panel-line);border-radius:12px;padding:16px;min-width:0}
+    .rd-card h3{font-size:16px;margin:0 0 12px;color:var(--chalk)}
+    .rd-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 8px}
+    .rd-metric{min-width:0;display:flex;flex-direction:column;gap:3px}
+    .rd-metric strong{color:var(--amber);font-size:24px;font-variant-numeric:tabular-nums}
+    .rd-muted{font-size:12px;color:var(--chalk-dim)}
+    .rd-chart{width:100%;height:auto;display:block;overflow:visible}
+    .rd-chart text{font-family:Figtree,sans-serif;fill:var(--chalk-dim);font-size:10px}
+    .rd-chart .rd-axis{stroke:var(--panel-line);stroke-width:1}
+    .rd-chart .rd-avg{stroke:var(--chalk-dim);stroke-dasharray:4 4;stroke-width:1}
+    .rd-chart [data-rd-visit],.rd-chart [data-rd-course]{cursor:pointer;outline-offset:3px}
+    .rd-bars{display:grid;gap:9px}
+    .rd-bar{display:grid;grid-template-columns:1fr auto;gap:5px 10px;text-align:left;color:var(--chalk);background:none;border:0;padding:4px 0;cursor:pointer;width:100%;font:inherit}
+    .rd-track{height:10px;border-radius:3px;background:var(--panel);grid-column:1/-1;overflow:hidden}
+    .rd-fill{height:100%;display:block;border-radius:3px;background:#709D9F}
+    .rd-fill.high{background:var(--amber)}
+    .rd-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+    .rd-tools h3{flex:1;margin:0}
+    .rd-tools select,.rd-tools input{background:var(--bg);color:var(--chalk);border:1px solid var(--panel-line);border-radius:7px;padding:7px;font:inherit;min-width:0;max-width:100%}
+    .rd-course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .rd-course-tile{min-width:0;display:flex;flex-direction:column;border:1px solid var(--panel-line);border-radius:10px;overflow:hidden;background:var(--bg-2)}
+    .rd-course-photo{width:100%;aspect-ratio:4/3;background:var(--bg);border:0;padding:0;display:block;cursor:pointer;color:var(--chalk-dim)}
+    .rd-course-photo img{width:100%;height:100%;object-fit:cover;display:block}
+    .rd-course-info{border:0;background:none;color:var(--chalk);padding:10px;text-align:left;cursor:pointer;font:inherit;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:5px}
+    .rd-course-score{color:var(--amber);font-weight:700}
+    .rd-overview-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--panel-line)}
+    .rd-extra .restaurant-scores-row{margin:0}
+    @media(max-width:480px){.rd-extra{padding:14px 14px 20px}.rd-header .details-content{padding:12px 16px 6px !important}.rd-card{padding:12px}.rd-metric strong{font-size:21px}}
+  `;
+  document.head.appendChild(restaurantDetailStyle);
+
+  // A sticky full-square header moves up naturally with the scroll. Shift the
+  // photo by half that distance so the remaining strip is its center, not
+  // its bottom edge. No changing layout heights during scrolling.
+  function restaurantDetailCoverSync(){
+    const head=restaurantDetailsPanelInner.querySelector('.rd-header');
+    if(!head)return;
+    const cover=head.querySelector('.details-art-wrap');
+    const height=cover.offsetHeight;
+    const strip=Math.min(height,Math.max(76,Math.min(108,restaurantDetailsPanel.clientHeight*.15)));
+    const collapse=Math.max(0,height-strip);
+    const shift=Math.min(collapse,Math.max(0,restaurantDetailsPanel.scrollTop));
+    head.style.setProperty('--rd-collapse',collapse+'px');
+    head.style.setProperty('--rd-photo-shift',shift/2+'px');
+    head.style.setProperty('--rd-button-shift',shift+'px');
+    const body=restaurantDetailsPanelInner.querySelector('.rd-body');
+    if(body)body.style.setProperty('--rd-body-min',Math.max(0,restaurantDetailsPanel.clientHeight-head.offsetHeight+collapse)+'px');
+  }
+  restaurantDetailsPanel.addEventListener('scroll',restaurantDetailCoverSync,{passive:true});
+  window.addEventListener('resize',restaurantDetailCoverSync);
+  if(window.ResizeObserver)new ResizeObserver(restaurantDetailCoverSync).observe(restaurantDetailsPanel);
+  function rdScore(c){
+    const v=c.score;
+    if(v===null||v===undefined||String(v).trim()==='')return null;
+    const n=Number(v);
+    return Number.isFinite(n)&&n>=6&&n<=13?n:null;
+  }
+  function rdStats(r){
+    const visits=(r.visits||[]).map((v,vi)=>{
+      const courses=(v.courses||[]).map((c,i)=>({c,i,v,vi,score:rdScore(c)}));
+      const scored=courses.filter(c=>c.score!==null);
+      const avg=scored.length?scored.reduce((n,c)=>n+c.score,0)/scored.length:null;
+      return {v,vi,courses,scored,avg,date:otdParse(v.date)?v.date:''};
+    });
+    const courses=visits.flatMap(v=>v.courses),scored=courses.filter(c=>c.score!==null);
+    const nums=scored.map(c=>c.score).sort((a,b)=>a-b);
+    const mean=nums.length?nums.reduce((a,b)=>a+b,0)/nums.length:null;
+    const median=nums.length?(nums[Math.floor((nums.length-1)/2)]+nums[Math.floor(nums.length/2)])/2:null;
+    const rated=visits.filter(v=>v.avg!==null),dated=rated.filter(v=>v.date).sort((a,b)=>a.date.localeCompare(b.date)||a.vi-b.vi);
+    const best=rated.slice().sort((a,b)=>b.avg-a.avg||b.date.localeCompare(a.date))[0];
+    return {visits,courses,scored,mean,median,rated,dated,best,exceptional:nums.filter(n=>n>=12).length};
+  }
+  const rdFmt=n=>n===null||n===undefined?'—':Number(n).toFixed(1);
+  const rdDate=v=>formatVisitDate(v.date);
+  function rdMetrics(items){
+    return '<div class="rd-metrics">'+items.map(([label,value])=>'<div class="rd-metric"><strong>'+escapeHtml(String(value))+'</strong><span class="rd-muted">'+escapeHtml(label)+'</span></div>').join('')+'</div>';
+  }
+  function rdVisitButton(v,label,cls){
+    return '<button type="button" class="'+(cls||'btn-ghost')+'" data-rd-visit="'+escapeAttr(v.id)+'">'+escapeHtml(label)+'</button>';
+  }
+  function rdOverview(r,stats){
+    const dates=stats.visits.filter(v=>v.date).sort((a,b)=>a.date.localeCompare(b.date));
+    const tier=restaurantTierBoundaries?getRestaurantTierForRank(openRestaurantIndex+1,restaurantTierBoundaries):null;
+    return '<div class="rd-extra"><section class="rd-card"><h3>Restaurant scores</h3>'+renderRestaurantScoresRowHtml(r)+'</section><section class="rd-card"><h3>Visit history</h3>'+
+      rdMetrics([['Recorded visits',stats.visits.length],['Total courses',stats.courses.length],['Average course',rdFmt(stats.mean)],['Scored courses',stats.scored.length],['12+ courses',stats.exceptional],['Best visit',rdFmt(stats.best?.avg)]])+
+      [['Price',formatRestaurantPrice(r.price)||'—'],['Tier',tier?.name||'—'],['First visit',dates.length?rdDate(dates[0].v):'—'],['Most recent',dates.length?rdDate(dates[dates.length-1].v):'—']].map(([k,v])=>'<div class="rd-overview-row"><span class="rd-muted">'+escapeHtml(k)+'</span><span>'+escapeHtml(String(v))+'</span></div>').join('')+
+      (stats.best?'<div class="rd-overview-row"><span class="rd-muted">Highest-scoring visit</span>'+rdVisitButton(stats.best.v,rdDate(stats.best.v)+' · '+rdFmt(stats.best.avg))+'</div>':'')+'</section></div>';
+  }
+  function rdBar(label,sub,value,width,high,attrs){
+    return '<button type="button" class="rd-bar" '+attrs+'><span>'+escapeHtml(label)+(sub?' <span class="rd-muted">'+escapeHtml(sub)+'</span>':'')+'</span><strong>'+escapeHtml(String(value))+'</strong><span class="rd-track"><span class="rd-fill'+(high?' high':'')+'" style="width:'+Math.max(0,Math.min(100,width))+'%"></span></span></button>';
+  }
+  function rdTrend(stats){
+    if(stats.dated.length<2)return '';
+    const points=stats.dated,dates=points.map(p=>Date.parse(p.date+'T00:00:00Z')),minT=dates[0],maxT=dates[dates.length-1];
+    const vals=points.map(p=>p.avg).concat(stats.mean);
+    const lo=Math.max(5.5,Math.floor((Math.min(...vals)-.3)*2)/2),hi=Math.min(13.5,Math.ceil((Math.max(...vals)+.3)*2)/2);
+    const y=v=>152-(v-lo)/(hi-lo)*124;
+    const xs=dates.map((d,i)=>35+(maxT===minT?i/(points.length-1):(d-minT)/(maxT-minT))*280);
+    const axes=Array.from({length:5},(_,i)=>lo+(hi-lo)*i/4).map(v=>'<line class="rd-axis" x1="30" x2="322" y1="'+y(v)+'" y2="'+y(v)+'"/><text x="26" y="'+(y(v)+3)+'" text-anchor="end">'+v.toFixed(1)+'</text>').join('');
+    const line=points.map((p,i)=>xs[i]+','+y(p.avg)).join(' ');
+    const nodes=points.map((p,i)=>'<g tabindex="0" role="button" data-rd-visit="'+escapeAttr(p.v.id)+'" aria-label="'+escapeAttr(rdDate(p.v)+', '+rdFmt(p.avg)+', '+p.scored.length+' scored courses')+'"><title>'+escapeHtml(rdDate(p.v)+' · '+rdFmt(p.avg)+' · '+p.scored.length+' scored courses')+'</title><circle cx="'+xs[i]+'" cy="'+y(p.avg)+'" r="10" fill="transparent"/><circle cx="'+xs[i]+'" cy="'+y(p.avg)+'" r="4" fill="var(--amber)"/></g>').join('');
+    const delta=points[points.length-1].avg-points[0].avg;
+    return '<section class="rd-card"><h3>Visit scores over time</h3><p class="rd-muted">'+(delta>=0?'+':'')+rdFmt(delta)+' since first dated scored visit</p><svg class="rd-chart" viewBox="0 0 340 178" aria-label="Visit averages over time">'+axes+'<line class="rd-avg" x1="30" x2="322" y1="'+y(stats.mean)+'" y2="'+y(stats.mean)+'"/><polyline points="'+line+'" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linejoin="round"/>'+nodes+'<text x="35" y="170">'+escapeHtml(rdDate(points[0].v))+'</text><text x="322" y="170" text-anchor="end">'+escapeHtml(rdDate(points[points.length-1].v))+'</text></svg><span class="rd-muted">Dashed line: all-time course average · Select a point to open its visit</span></section>';
+  }
+  function rdGraphs(r,stats){
+    if(!stats.scored.length)return '<div class="rd-extra"><section class="rd-card"><h3>No scored courses yet</h3><p class="rd-muted">Rate courses in Visits to see your restaurant statistics here.</p></section></div>';
+    const counts=Array.from({length:8},(_,i)=>({score:i+6,count:stats.scored.filter(c=>c.score===i+6).length}));
+    const dist=counts.map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'data-rd-score="'+d.score+'"')).join('');
+    const ranked=stats.rated.slice().sort((a,b)=>restaurantGraphSort==='date'?b.date.localeCompare(a.date)||a.vi-b.vi:b.avg-a.avg||b.date.localeCompare(a.date));
+    const compare=stats.visits.length>1?'<section class="rd-card"><div class="rd-tools"><h3>Visit comparison</h3><select data-rd-graph-sort aria-label="Sort visits"><option value="score"'+(restaurantGraphSort==='score'?' selected':'')+'>Score</option><option value="date"'+(restaurantGraphSort==='date'?' selected':'')+'>Date</option></select></div><div class="rd-bars">'+ranked.map(p=>rdBar(rdDate(p.v),p.scored.length+' scored',rdFmt(p.avg),p.avg/13*100,p.avg===stats.best.avg,'data-rd-visit="'+escapeAttr(p.v.id)+'"')).join('')+stats.visits.filter(p=>p.avg===null).map(p=>rdVisitButton(p.v,rdDate(p.v)+' · Unscored')).join('')+'</div></section>':'';
+    const selected=stats.rated.find(p=>p.v.id===restaurantGraphVisit)||stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
+    restaurantGraphVisit=selected.v.id;
+    const w=Math.max(340,selected.courses.length*24+38),base=150,cy=n=>base-(n-5.5)/7.5*120,step=(w-38)/Math.max(1,selected.courses.length);
+    const progression='<section class="rd-card"><div class="rd-tools"><h3>Meal progression</h3><select data-rd-meal aria-label="Select visit">'+stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>'<option value="'+escapeAttr(p.v.id)+'"'+(p===selected?' selected':'')+'>'+escapeHtml(rdDate(p.v))+'</option>').join('')+'</select></div><div style="overflow-x:auto"><svg class="rd-chart" style="min-width:'+w+'px" viewBox="0 0 '+w+' 175" aria-label="Course scores in meal order">'+[6,8,10,12,13].map(n=>'<line class="rd-axis" x1="26" x2="'+w+'" y1="'+cy(n)+'" y2="'+cy(n)+'"/><text x="21" y="'+(cy(n)+3)+'" text-anchor="end">'+n+'</text>').join('')+selected.courses.map((d,i)=>{const x=30+i*step;return '<g role="button" tabindex="0" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'" aria-label="'+escapeAttr('Course '+(i+1)+', '+(d.score===null?'unscored':d.score))+'"><title>'+escapeHtml(d.c.text||'Course '+(i+1))+'</title><rect x="'+x+'" y="20" width="'+step+'" height="145" fill="transparent"/>'+(d.score===null?'':'<rect x="'+(x+2)+'" y="'+cy(d.score)+'" width="'+Math.max(4,step-4)+'" height="'+(base-cy(d.score))+'" rx="2" fill="'+(d.score>=12?'var(--amber)':'#709D9F')+'"/>')+'<text x="'+(x+step/2)+'" y="168" text-anchor="middle">'+(i+1)+'</text></g>';}).join('')+'<line class="rd-avg" x1="26" x2="'+w+'" y1="'+cy(selected.avg)+'" y2="'+cy(selected.avg)+'"/></svg></div><span class="rd-muted">Meal average '+rdFmt(selected.avg)+' · Select a course to open it</span></section>';
+    return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg.',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13 · Select a score to see matching courses</p></section>'+compare+progression+'</div>';
+  }
+  function rdCourseResults(stats){
+    const f=restaurantCourseFilters;
+    const q=f.search.trim().toLowerCase();
+    const rows=stats.courses.filter(d=>(!f.visit||d.v.id===f.visit)&&(!f.score||(f.score==='unrated'?d.score===null:d.score===Number(f.score)))&&(!q||[d.c.text,d.c.transcript].some(t=>String(t||'').toLowerCase().includes(q))));
+    rows.sort((a,b)=>f.sort==='newest'||f.sort==='oldest'?(f.sort==='newest'?String(b.v.date||'').localeCompare(String(a.v.date||'')):String(a.v.date||'').localeCompare(String(b.v.date||'')))||a.vi-b.vi||a.i-b.i:(a.score===null?1:b.score===null?-1:0)||(f.sort==='lowest'?(a.score||0)-(b.score||0):(b.score||0)-(a.score||0))||String(b.v.date||'').localeCompare(String(a.v.date||''))||a.i-b.i);
+    return '<p class="rd-muted">'+rows.length+' of '+stats.courses.length+' courses</p><div class="rd-course-grid">'+rows.map(d=>{
+      const cover=getDishCoverPhoto(d.c)||d.c.photo;
+      const label=d.c.text||d.c.transcript||'Course '+(d.i+1);
+      return '<article class="rd-course-tile">'+(cover?'<button class="rd-course-photo" type="button" data-rd-photo="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'" aria-label="View course photo"><img src="'+escapeAttr(cloudinaryThumbUrl(cover,400))+'" loading="lazy" decoding="async" alt=""></button>':'')+'<button class="rd-course-info" type="button" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'"><span>'+escapeHtml(label)+'</span><span class="rd-course-score">'+(d.score===null?'Unrated':d.score+'/10')+'</span><span class="rd-muted">'+escapeHtml(rdDate(d.v))+' · #'+(d.i+1)+'</span></button></article>';
+    }).join('')+'</div>'+(rows.length?'':'<p class="rd-muted">No matching courses.</p>');
+  }
+  function rdCourses(stats){
+    const f=restaurantCourseFilters;
+    const opt=(v,t,cur)=>'<option value="'+escapeAttr(v)+'"'+(v===cur?' selected':'')+'>'+escapeHtml(t)+'</option>';
+    return '<div class="rd-extra"><div class="rd-tools"><input data-rd-search type="search" placeholder="Search descriptions…" aria-label="Search descriptions" value="'+escapeAttr(f.search)+'"><select data-rd-sort aria-label="Sort courses">'+[['highest','Highest rated'],['lowest','Lowest rated'],['newest','Newest'],['oldest','Oldest']].map(([v,t])=>opt(v,t,f.sort)).join('')+'</select><select data-rd-filter-visit aria-label="Filter by visit">'+opt('','All visits',f.visit)+stats.visits.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>opt(p.v.id,rdDate(p.v),f.visit)).join('')+'</select><select data-rd-filter-score aria-label="Filter by score">'+opt('','All scores',f.score)+RESTAURANT_COURSE_SCORES.map(n=>opt(String(n),String(n),f.score)).join('')+opt('unrated','Unrated',f.score)+'</select></div><div data-rd-results>'+rdCourseResults(stats)+'</div></div>';
+  }
+  function rdSwitch(tab){
+    if(guestViewEnabled||isLockedGuestAccount)return;
+    if(restaurantVisitEditMode){showToast('Save or cancel your visit edits first');return;}
+    document.activeElement?.blur();
+    if(tab!=='visits'){stopCourseAudioRecording();stopCourseAudioPlayback();}
+    const head=restaurantDetailsPanelInner.querySelector('.rd-header');
+    const cap=head?parseFloat(head.style.getPropertyValue('--rd-collapse'))||0:0;
+    const pos=Math.min(restaurantDetailsPanel.scrollTop,cap);
+    restaurantDetailTab=tab;
+    renderRestaurantDetailsContent();
+    restaurantDetailsPanel.scrollTop=pos;
+    restaurantDetailCoverSync();
+  }
+  function rdOpenVisit(id,index){
+    document.activeElement?.blur();
+    restaurantDetailTab='visits';
+    restaurantVisitEditMode=false;
+    restaurantActiveVisitId=id;
+    if(index!==undefined)restaurantVisitThumbnailMode=false;
+    renderRestaurantDetailsContent();
+    if(index!==undefined)requestAnimationFrame(()=>{
+      const el=restaurantDetailsPanelInner.querySelector('.restaurant-course-text[data-course-index="'+index+'"]')?.closest('.restaurant-course-card');
+      if(!el)return;
+      const head=restaurantDetailsPanelInner.querySelector('.rd-header');
+      const panel=restaurantDetailsPanel;
+      const cover=head?.querySelector('.details-art-wrap');
+      const collapse=head?parseFloat(head.style.getPropertyValue('--rd-collapse'))||0:0;
+      const compact=head?head.offsetHeight-collapse:0;
+      panel.scrollTop=Math.max(0,panel.scrollTop+el.getBoundingClientRect().top-panel.getBoundingClientRect().top-compact-8);
+    });
+  }
+  function rdAction(e){
+    const el=e.target.closest('[data-rd-tab],[data-rd-visit],[data-rd-score],[data-rd-course],[data-rd-photo],[data-rd-percent]');
+    if(!el||guestViewEnabled||isLockedGuestAccount)return;
+    if(e.type==='keydown'){if(!['Enter',' '].includes(e.key)||el.tagName.toLowerCase()==='button')return;e.preventDefault();}
+    if(el.dataset.rdTab){rdSwitch(el.dataset.rdTab);return;}
+    if(el.hasAttribute('data-rd-percent')){restaurantGraphPercent=!restaurantGraphPercent;renderRestaurantDetailsContent();return;}
+    if(el.dataset.rdScore){restaurantCourseFilters.score=el.dataset.rdScore;restaurantCourseFilters.visit='';restaurantCourseFilters.search='';rdSwitch('courses');return;}
+    if(el.dataset.rdPhoto!==undefined){
+      const r=restaurantRows[openRestaurantIndex],v=(r.visits||[]).find(v=>v.id===el.dataset.rdCourseVisit);
+      const c=v?.courses[Number(el.dataset.rdPhoto)];if(!c)return;
+      const cover=getDishCoverPhoto(c)||c.photo,urls=gatherAllRestaurantPhotos(r);
+      if(cover)openPhotoLightbox(urls,Math.max(0,urls.indexOf(cover)),{restaurantIndex:openRestaurantIndex});return;
+    }
+    if(el.dataset.rdCourse!==undefined){rdOpenVisit(el.dataset.rdCourseVisit,Number(el.dataset.rdCourse));return;}
+    if(el.dataset.rdVisit)rdOpenVisit(el.dataset.rdVisit);
+  }
+  restaurantDetailsPanelInner.addEventListener('click',rdAction);
+  restaurantDetailsPanelInner.addEventListener('keydown',rdAction);
+  restaurantDetailsPanelInner.addEventListener('change',e=>{
+    const el=e.target;
+    if(el.matches('[data-rd-meal]')){restaurantGraphVisit=el.value;renderRestaurantDetailsContent();}
+    else if(el.matches('[data-rd-graph-sort]')){restaurantGraphSort=el.value;renderRestaurantDetailsContent();}
+    else if(el.matches('[data-rd-sort],[data-rd-filter-visit],[data-rd-filter-score]')){
+      restaurantCourseFilters[el.hasAttribute('data-rd-sort')?'sort':el.hasAttribute('data-rd-filter-visit')?'visit':'score']=el.value;
+      const result=restaurantDetailsPanelInner.querySelector('[data-rd-results]');
+      if(result)result.innerHTML=rdCourseResults(rdStats(restaurantRows[openRestaurantIndex]));
+    }
+  });
+  restaurantDetailsPanelInner.addEventListener('input',e=>{
+    if(!e.target.matches('[data-rd-search]'))return;
+    restaurantCourseFilters.search=e.target.value;
+    const result=restaurantDetailsPanelInner.querySelector('[data-rd-results]');
+    if(result)result.innerHTML=rdCourseResults(rdStats(restaurantRows[openRestaurantIndex]));
+  });
+
   function renderRestaurantDetailsContent(){
     if (newRestaurantDraft || restaurantEditMode){
       renderRestaurantEditForm();
@@ -13346,7 +13570,8 @@
     const activeVisit = getActiveVisit(r);
     if (activeVisit) restaurantActiveVisitId = activeVisit.id; // locks in the resolved id (e.g. after a fallback to the newest visit)
 
-    const visitsSectionHtml = sortedVisits.length
+    const isVisits = guestViewEnabled || isLockedGuestAccount || restaurantDetailTab === 'visits';
+    const visitsSectionHtml = !isVisits ? '' : sortedVisits.length
       ? (
           '<div class="restaurant-visits-header">' +
             renderRestaurantVisitTabsHtml(sortedVisits, activeVisit) +
@@ -13369,8 +13594,11 @@
         );
 
     const effectiveCover = getEffectiveRestaurantCover(r);
+    const oldScroll=restaurantDetailsPanel.scrollTop;
+    const stats=isVisits?null:rdStats(r);
+    const tabBar=guestViewEnabled||isLockedGuestAccount?'':'<nav class="rd-tabs" aria-label="Restaurant details">'+['overview','visits','graphs','courses'].map(t=>'<button type="button" data-rd-tab="'+t+'" class="'+(restaurantDetailTab===t?'active':'')+'" aria-pressed="'+(restaurantDetailTab===t)+'">'+t[0].toUpperCase()+t.slice(1)+'</button>').join('')+'</nav>';
     restaurantDetailsPanelInner.innerHTML =
-      '<div class="details-art-wrap">' +
+      '<div class="rd-header"><div class="details-art-wrap">' +
         '<div class="art-drop restaurant-cover-drop"' + (effectiveCover ? ' title="Click to open the photo gallery"' : ' title="Add photos via a course or More Photos below"') + '>' +
           (effectiveCover ? '<img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(effectiveCover, 700)) + '" alt="">' : '<span class="art-drop-hint">📷</span>') +
         '</div>' +
@@ -13381,9 +13609,11 @@
       '<div class="details-content" style="padding-top:20px;">' +
         '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
         (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
-        renderRestaurantScoresRowHtml(r) +
-      '</div>' +
-      visitsSectionHtml;
+      '</div>' + tabBar + '</div><div class="rd-body">' +
+      (isVisits ? (guestViewEnabled?'':'<div style="padding:12px 24px 0">'+renderRestaurantScoresRowHtml(r)+'</div>')+visitsSectionHtml : restaurantDetailTab==='overview'?rdOverview(r,stats):restaurantDetailTab==='graphs'?rdGraphs(r,stats):rdCourses(stats))+'</div>';
+    restaurantDetailCoverSync();
+    restaurantDetailsPanel.scrollTop=oldScroll;
+    restaurantDetailCoverSync();
 
     restaurantDetailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeRestaurantDetailsPanel);
     restaurantDetailsPanelInner.querySelector('.details-edit-btn').addEventListener('click', enterRestaurantEditMode);
@@ -13414,6 +13644,8 @@
         updateRestaurantScoreTotalDisplay();
       });
     }
+
+    if(!isVisits)return;
 
     // Visit tabs / dropdown / add wiring
     const visitAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-add-btn');
