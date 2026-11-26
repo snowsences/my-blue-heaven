@@ -847,6 +847,7 @@
       roads: { roadRows, roadSavedAt: roadLastSavedAt },
       parks: { parkRows, parkSavedAt: parkLastSavedAt },
       photos: { photoRows, photoSavedAt: photoLastSavedAt, photoDuelItems, photoDuelHistory, photoDuelIsComplete, photoDuelFinalRanking, photoDuelSavedAt: photoDuelLastSavedAt },
+      photoTags: { photoTags, photoTagsSavedAt },
       trips: { tripRows, tripSavedAt: tripLastSavedAt },
       activities: { activityRows, activityMemorable, activitySavedAt: activityLastSavedAt },
       artists: { artistRows, artistSavedAt: artistLastSavedAt },
@@ -1175,6 +1176,12 @@
         renderPhotosPage();
       }
     }
+    if (Array.isArray(existing.photoTags) && new Date(existing.photoTagsSavedAt || 0).getTime() > new Date(photoTagsSavedAt || 0).getTime()){
+      photoTags = normalizePhotoTags(existing.photoTags);
+      photoTagsSavedAt = existing.photoTagsSavedAt;
+      persistPhotoTags();
+      refreshPhotoTags();
+    }
     // Duels changes independently of photoRows (a pick never touches it) —
     // its own savedAt inside the same "photos" part, same dual-timestamp
     // pattern as hikeFullListText living inside the hikes part below.
@@ -1361,6 +1368,7 @@
       || (Array.isArray(roadRows) && roadRows.length >= 1)
       || (Array.isArray(parkRows) && parkRows.length >= 1)
       || (Array.isArray(photoRows) && photoRows.length >= 1)
+      || photoTags.length > 0 || !!photoTagsSavedAt
       || (Array.isArray(tripRows) && tripRows.length >= 1)
       || (Array.isArray(activityRows) && activityRows.length >= 1)
       || (Array.isArray(mediaState.book.rows) && mediaState.book.rows.length >= 1)
@@ -1478,6 +1486,7 @@
       songLastSavedAt = localSongParsed.savedAt || null;
     }
 
+    await loadPhotoTags();
     // Same independent-local-key pattern as Songs.
     let localRestaurantParsed = null;
     try{
@@ -4467,6 +4476,7 @@
       renderPhotosPage();
     }
     if (page === 'photo-calendar') renderPhotoCalendar();
+    if (page === 'photo-collections') renderPhotoTags();
     if (page === 'books'){
       renderMediaPage('book');
     }
@@ -11056,6 +11066,7 @@
 
   function renderPhotosPage(){
     refreshPhotoCalendar();
+    refreshPhotoTags();
     const empty = !photoRows.length;
     if (empty) photoEditMode = false;
     photoEmptyMessage.style.display = empty ? 'block' : 'none';
@@ -11118,6 +11129,7 @@
   }
 
   function updatePhotoCalendarLightbox(){
+    updatePhotoTagLightbox();
     if(!pcalLightbox)return;
     const id=photoSortHelperIds&&photoSortHelperIds[lightboxIndex];
     const p=id&&photoRows.find(x=>x.id===id);
@@ -11184,6 +11196,206 @@
   function refreshPhotoCalendar(){
     if(pagePhotoCalendar.classList.contains('active'))renderPhotoCalendar();
   }
+
+
+  // ---------- PHOTO TAGS ----------
+  // Independent metadata; photoIds refer to stable Gallery rows, not files or ranks.
+  const PHOTO_TAG_STORAGE_KEY = 'photo-tags-v1';
+  let photoTags = [], photoTagsSavedAt = null;
+  let photoTagOpenId = '', photoTagListY = 0, photoTagDraft = null;
+  const photoTagsHost = document.getElementById('photo-tags-content');
+  const photoTagButton = document.getElementById('photo-tag-lightbox-btn');
+  const photoTagTray = document.getElementById('photo-tag-tray');
+  const photoTagModal = document.getElementById('photo-tag-modal');
+  const photoTagsWritable = () => !guestViewEnabled && !isLockedGuestAccount;
+  function normalizePhotoTags(raw){
+    const ids=new Set(), names=new Set();
+    return (Array.isArray(raw)?raw:[]).reduce((out,t)=>{
+      if(!t||typeof t.id!=='string'||!t.id||ids.has(t.id)||typeof t.name!=='string'||!t.name.trim())return out;
+      const name=t.name.trim(), key=name.toLocaleLowerCase();
+      // If older/imported data contains duplicate names, merge memberships rather than lose any.
+      const photoIds=Array.isArray(t.photoIds)?t.photoIds.filter(id=>typeof id==='string'):[];
+      if(names.has(key)){
+        const existing=out.find(x=>x.name.toLocaleLowerCase()===key);
+        existing.photoIds=[...new Set([...existing.photoIds,...photoIds])];ids.add(t.id);return out;
+      }
+      ids.add(t.id);names.add(key);out.push({id:t.id,name,photoIds:[...new Set(photoIds)]});return out;
+    },[]);
+  }
+  function sortedPhotoTags(){
+    return photoTags.slice().sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base',numeric:true}));
+  }
+  function photoTagsFor(id){ return sortedPhotoTags().filter(t=>t.photoIds.includes(id)); }
+  function photoTagFind(id){return photoTags.find(t=>t.id===id);}
+  function photoTagNameAvailable(name,exceptId){
+    return !photoTags.some(t=>t.id!==exceptId&&t.name.toLocaleLowerCase()===name.toLocaleLowerCase());
+  }
+  function persistPhotoTags(){
+    try {window.storage.set(PHOTO_TAG_STORAGE_KEY,JSON.stringify({photoTags,savedAt:photoTagsSavedAt}),false);}catch(e){}
+  }
+  async function loadPhotoTags(){
+    try{
+      const res=await window.storage.get(PHOTO_TAG_STORAGE_KEY,false);
+      if(res&&res.value){
+        const p=JSON.parse(res.value);
+        if(Array.isArray(p.photoTags)){photoTags=normalizePhotoTags(p.photoTags);photoTagsSavedAt=p.savedAt||null;}
+      }
+    }catch(e){}
+    refreshPhotoTags();
+  }
+  function savePhotoTags(){
+    if(!photoTagsWritable())return;
+    photoTagsSavedAt=new Date().toISOString();
+    persistPhotoTags();
+    scheduleSyncWrite();
+    refreshPhotoTags();
+  }
+  function prunePhotoTagMemberships(){
+    const ids=new Set(photoRows.map(p=>p.id));
+    let changed=false;
+    photoTags.forEach(t=>{
+      const next=t.photoIds.filter(id=>ids.has(id));
+      if(next.length!==t.photoIds.length){t.photoIds=next;changed=true;}
+    });
+    if(changed)savePhotoTags();
+  }
+  function refreshPhotoTags(){
+    if(pagePhotoCollections.classList.contains('active'))renderPhotoTags();
+    updatePhotoTagLightbox();
+  }
+  function updatePhotoTagLightbox(){
+    if(!photoTagButton)return;
+    const id=photoSortHelperIds&&photoSortHelperIds[lightboxIndex];
+    const valid=photoTagsWritable()&&id&&photoRows.some(p=>p.id===id);
+    photoTagButton.hidden=!valid;
+    if(!valid){photoTagButton.textContent='Add Tag';photoTagButton.removeAttribute('title');return;}
+    const label=photoTagsFor(id).map(t=>t.name).join(', ')||'Add Tag';
+    photoTagButton.textContent=label;
+    photoTagButton.title=label;
+    photoTagButton.setAttribute('aria-label',label==='Add Tag'?'Add Tag':'Edit tags: '+label);
+  }
+  function photoTagOpenTray(id){
+    if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
+    photoTagDraft={photoId:id,selected:new Set(photoTagsFor(id).map(t=>t.id))};
+    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required><button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
+    const list=photoTagTray.querySelector('.pt-tray-list'), form=photoTagTray.querySelector('form'), add=photoTagTray.querySelector('[data-add]'), error=photoTagTray.querySelector('.pt-error'), input=form.elements.name;
+    function render(){
+      list.replaceChildren();
+      sortedPhotoTags().forEach(t=>{
+        const b=document.createElement('button');
+        b.type='button';b.className='pt-toggle';
+        b.setAttribute('aria-pressed',String(photoTagDraft.selected.has(t.id)));
+        const name=document.createElement('span');name.textContent=t.name;
+        const mark=document.createElement('span');mark.className='pt-checkmark';mark.setAttribute('aria-hidden','true');mark.textContent=photoTagDraft.selected.has(t.id)?'✓':'＋';
+        b.append(name,mark);
+        b.onclick=()=>{
+          if(photoTagDraft.selected.has(t.id))photoTagDraft.selected.delete(t.id);else photoTagDraft.selected.add(t.id);
+          b.setAttribute('aria-pressed',String(photoTagDraft.selected.has(t.id)));
+          mark.textContent=photoTagDraft.selected.has(t.id)?'✓':'＋';
+        };
+        list.appendChild(b);
+      });
+      if(!list.children.length){const p=document.createElement('p');p.className='pt-muted';p.textContent='No tags yet. Add a tag to get started.';list.appendChild(p);}
+    }
+    add.onclick=()=>{add.hidden=true;form.hidden=false;input.focus();};
+    form.onsubmit=e=>{
+      e.preventDefault();
+      if(!photoTagsWritable())return;
+      const name=input.value.trim();
+      if(!name||!photoTagNameAvailable(name)){error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;}
+      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,photoIds:[]};
+      photoTags.push(tag);
+      savePhotoTags();
+      input.value='';form.hidden=true;add.hidden=false;error.hidden=true;render();
+      // Creation and selection are separate: the new tag starts off.
+      const index=sortedPhotoTags().findIndex(t=>t.id===tag.id);
+      if(list.children[index])list.children[index].scrollIntoView({block:'nearest'});
+    };
+    photoTagTray.querySelector('[data-done]').onclick=()=>{
+      const draft=photoTagDraft;
+      if(draft&&photoTagsWritable()&&photoRows.some(p=>p.id===draft.photoId)){
+        let changed=false;
+        photoTags.forEach(t=>{
+          const has=t.photoIds.includes(draft.photoId), wanted=draft.selected.has(t.id);
+          if(wanted&&!has){t.photoIds.push(draft.photoId);changed=true;}
+          if(!wanted&&has){t.photoIds=t.photoIds.filter(x=>x!==draft.photoId);changed=true;}
+        });
+        if(changed)savePhotoTags();
+      }
+      photoTagTray.close();
+    };
+    render();
+    if(!photoTagTray.open)photoTagTray.showModal();
+  }
+  photoTagButton.addEventListener('click',e=>{
+    e.stopPropagation();
+    const id=photoSortHelperIds&&photoSortHelperIds[lightboxIndex];
+    if(id)photoTagOpenTray(id);
+  });
+  photoTagTray.addEventListener('close',()=>{photoTagDraft=null;updatePhotoTagLightbox();});
+  photoTagTray.addEventListener('keydown',e=>e.stopPropagation());
+  photoTagModal.addEventListener('keydown',e=>e.stopPropagation());
+  function photoTagShowModal(tag,mode){
+    if(!photoTagsWritable())return;
+    const rename=mode==='rename';
+    photoTagModal.innerHTML='<form method="dialog"><header><h2>'+(rename?'Rename tag':'Delete tag?')+'</h2></header><div class="pt-modal-body">'+(rename?
+      '<label>Tag name<input type="text" name="name" class="tf-input" required maxlength="100" value="'+escapeAttr(tag.name)+'"></label><p class="pt-error" role="alert" hidden></p>':
+      '<p>Delete <strong>'+escapeHtml(tag.name)+'</strong>? This removes the tag from all its photos. The photos themselves will not be deleted.</p>')+
+      '</div><footer><button type="button" class="btn-ghost" data-cancel>Cancel</button><button type="submit" class="'+(rename?'btn-primary':'pt-delete-btn')+'">'+(rename?'Save':'Delete')+'</button></footer></form>';
+    photoTagModal.querySelector('[data-cancel]').onclick=()=>photoTagModal.close();
+    photoTagModal.querySelector('form').onsubmit=e=>{
+      e.preventDefault();if(!photoTagsWritable())return;
+      const live=photoTagFind(tag.id);if(!live){photoTagModal.close();return;}
+      if(rename){
+        const name=e.currentTarget.elements.name.value.trim();
+        if(!name||!photoTagNameAvailable(name,live.id)){
+          const error=photoTagModal.querySelector('.pt-error');
+          error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;
+        }
+        live.name=name;
+      }else{
+        photoTags=photoTags.filter(t=>t.id!==live.id);
+        photoTagOpenId='';
+      }
+      savePhotoTags();photoTagModal.close();
+      if(!rename)window.scrollTo(0,photoTagListY);
+    };
+    photoTagModal.showModal();
+    if(rename){const input=photoTagModal.querySelector('input');input.focus();input.select();}
+  }
+  function renderPhotoTags(){
+    if(!photoTagsHost)return;
+    const ranked=pcRanked(), active=photoTagFind(photoTagOpenId);
+    if(!active){
+      photoTagOpenId='';
+      const tags=sortedPhotoTags();
+      photoTagsHost.innerHTML=tags.length?'<div class="pt-tag-grid">'+tags.map(t=>{
+        const ids=new Set(t.photoIds), rows=ranked.filter(x=>ids.has(x.p.id)), cover=rows[0];
+        return '<button type="button" class="pt-tag-card" data-tag-id="'+escapeAttr(t.id)+'">'+(cover?pcThumb(cover,650):'<div class="pt-empty-cover" aria-hidden="true">🏷️</div>')+'<span><strong>'+escapeHtml(t.name)+'</strong><small>'+pcCount(rows.length)+'</small></span></button>';
+      }).join('')+'</div>':'<p class="pt-muted pt-empty">No tags yet. Open a photo in Gallery and tap Add Tag to create one.</p>';
+      photoTagsHost.querySelectorAll('[data-tag-id]').forEach(b=>b.onclick=()=>{
+        photoTagListY=window.scrollY;photoTagOpenId=b.dataset.tagId;renderPhotoTags();window.scrollTo(0,0);
+      });
+      return;
+    }
+    const ids=new Set(active.photoIds), rows=ranked.filter(x=>ids.has(x.p.id));
+    photoTagsHost.innerHTML='<div class="pt-detail-header"><button type="button" class="btn-ghost" data-back aria-label="Back to Tags">‹ Tags</button><div><h2>'+escapeHtml(active.name)+'</h2><p class="pt-muted">'+pcCount(rows.length)+'</p></div>'+
+      (photoTagsWritable()?'<div class="pt-menu-wrap"><button type="button" class="btn-ghost pt-menu-btn" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout" hidden><button type="button" data-rename>Rename</button><button type="button" data-delete>Delete</button></div></div>':'')+'</div>'+
+      (rows.length?'<div class="results-list grid-mode pt-detail-grid">'+rows.map((x,i)=>'<button type="button" class="grid-card pt-detail-photo" data-photo-index="'+i+'" aria-label="View photo ranked '+x.rank+'"><div class="art-drop">'+pcThumb(x,500)+'</div></button>').join('')+'</div>':'<p class="pt-muted pt-empty">No photos with this tag yet.</p>');
+    photoTagsHost.querySelector('[data-back]').onclick=()=>{photoTagOpenId='';renderPhotoTags();window.scrollTo(0,photoTagListY);};
+    photoTagsHost.querySelectorAll('[data-photo-index]').forEach(b=>b.onclick=()=>openPhotoLightbox(rows.map(x=>x.p.url),Number(b.dataset.photoIndex),null,rows.map(x=>x.p.id)));
+    const menu=photoTagsHost.querySelector('.pt-menu-btn'), flyout=photoTagsHost.querySelector('.pt-flyout');
+    if(menu){
+      const close=()=>{flyout.hidden=true;menu.setAttribute('aria-expanded','false');};
+      menu.onclick=e=>{e.stopPropagation();flyout.hidden=!flyout.hidden;menu.setAttribute('aria-expanded',String(!flyout.hidden));};
+      flyout.querySelector('[data-rename]').onclick=()=>{close();photoTagShowModal(active,'rename');};
+      flyout.querySelector('[data-delete]').onclick=()=>{close();photoTagShowModal(active,'delete');};
+    }
+  }
+  document.addEventListener('click',e=>{
+    const menu=photoTagsHost.querySelector('.pt-menu-wrap');
+    if(menu&&!menu.contains(e.target)){menu.querySelector('.pt-flyout').hidden=true;menu.querySelector('.pt-menu-btn').setAttribute('aria-expanded','false');}
+  });
 
   // ---------- EDIT MODE (same idea as Albums' Edit Items) ----------
   // Switches to a list of rows: thumbnail, a position number, the date the
@@ -11370,6 +11582,7 @@
     pairs.sort((a, b) => a.key - b.key); // stable: equal numbers keep their on-screen order
     const removed = photoRows.length - pairs.length;
     photoRows = pairs.map(x => x.row);
+    if (removed) prunePhotoTagMemberships();
     photoRows.forEach(row => {
       if (!photoEditTrip.has(row.id)) return;
       const wanted = photoEditTrip.get(row.id);
@@ -14290,7 +14503,7 @@
       items, history, isComplete, finalRanking, loadingDock, art, tierBoundaries, tierBoundariesTotal,
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
-      hikeRows, parkRows, roadRows, photoRows, tripRows, artistRows, activityRows, activityMemorable,
+      hikeRows, parkRows, roadRows, photoRows, photoTags, photoTagsSavedAt, tripRows, artistRows, activityRows, activityMemorable,
       photoDuelItems, photoDuelHistory, photoDuelIsComplete, photoDuelFinalRanking,
       bookRows: mediaState.book.rows, movieRows: mediaState.movie.rows, gameRows: mediaState.game.rows,
       showRows: mediaState.show.rows,
@@ -14372,6 +14585,11 @@
         savePhotoProgress();
         renderPhotosPage();
         restoredParts.push(parsed.photoRows.length + ' photo' + (parsed.photoRows.length === 1 ? '' : 's'));
+      }
+      if (Array.isArray(parsed.photoTags)){
+        photoTags = normalizePhotoTags(parsed.photoTags);
+        savePhotoTags();
+        restoredParts.push(photoTags.length + ' photo tags');
       }
       if (Array.isArray(parsed.tripRows) && parsed.tripRows.length){
         tripRows = parsed.tripRows.map(tripNormalize);
