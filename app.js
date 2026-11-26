@@ -21148,20 +21148,20 @@
   // it from the old tab to the new one instead of starting in place.
   const inkMemory = new Map();
   function placeIndicator(host, kind){
-    if (!host.offsetWidth) return; // hidden — placed when it appears
-    const active = host.querySelector(kind === 'ink' ? ':scope > .group-sub-tab-btn.active' : ':scope > .view-toggle-btn.active, :scope > .tab-btn.active');
+    if (!host.isConnected || !host.offsetWidth) return; // hidden — placed when it appears
+    const active = host.querySelector(kind === 'ink' ? ':scope > .group-sub-tab-btn.active, :scope > button.active' : ':scope > .view-toggle-btn.active, :scope > .tab-btn.active');
     const el = host.__indicator;
     if (!active){ el.style.opacity = '0'; return; }
     el.style.opacity = '';
     const target = kind === 'ink'
-      ? { x: active.offsetLeft, w: active.offsetWidth }
+      ? { x: active.offsetLeft, w: active.offsetWidth, y: active.offsetTop + active.offsetHeight }
       : { x: active.offsetLeft, y: active.offsetTop, w: active.offsetWidth, h: active.offsetHeight };
     const key = host.__memoryKey;
     const from = host.__placed ? null : inkMemory.get(key);
     const apply = (p) => Object.keys(p).forEach(k => el.style.setProperty('--' + (kind === 'ink' ? 'ink' : 'pill') + '-' + k, p[k] + 'px'));
     if (!host.__placed){
       el.style.transition = 'none';
-      apply(from && !motionReduced() ? Object.assign({}, target, { x: from.x, w: from.w }) : target);
+      apply(from && !motionReduced() ? Object.assign({}, target, { x: from.x, w: from.w, ...(kind === 'ink' && host.matches('.restaurant-visit-tabs') ? {y:from.y} : {}) }) : target);
       void el.offsetWidth; // commit the starting spot before sliding
       el.style.transition = '';
       host.__placed = true;
@@ -21178,14 +21178,14 @@
     host.__indicator = el;
     host.classList.add(kind === 'ink' ? 'has-ink' : 'has-pill');
     host.__memoryKey = kind === 'ink'
-      ? 'ink:' + (host.id || '').split('-sub-tabs')[0]
+      ? 'ink:' + (host.id ? host.id.split('-sub-tabs')[0] : host.matches('.rd-tabs') ? 'restaurant-detail' : host.matches('.trip-detail-tabs') ? 'trip-detail' : 'restaurant-visits')
       : 'pill:' + (host.id || Array.from(host.querySelectorAll(':scope > button')).map(b => b.textContent.trim()).join('|'));
     new MutationObserver(() => placeIndicator(host, kind)).observe(host, { subtree: true, attributes: true, attributeFilter: ['class'] });
     if (window.ResizeObserver) new ResizeObserver(() => { if (!host.offsetWidth) host.__placed = false; else placeIndicator(host, kind); }).observe(host);
     placeIndicator(host, kind);
   }
   function scanIndicators(root){
-    (root || document).querySelectorAll('.group-sub-tabs').forEach(h => setupIndicator(h, 'ink'));
+    (root || document).querySelectorAll('.group-sub-tabs, .rd-tabs, .trip-detail-tabs, .restaurant-visit-tabs').forEach(h => setupIndicator(h, 'ink'));
     (root || document).querySelectorAll('.view-toggle, .tab-switcher').forEach(h => { if (h.querySelector(':scope > .view-toggle-btn, :scope > .tab-btn')) setupIndicator(h, 'pill'); });
   }
 
