@@ -5652,3 +5652,15 @@
 @media(max-width:365px){#alm-tabs{gap:14px}.alm-tab{font-size:12px}.alm-day-head b{font-size:13px}.alm-month strong{font-size:11px}}
 @keyframes alm-grow{from{transform:scaleY(.12);opacity:.5}to{transform:scaleY(1);opacity:1}}
 @media(prefers-reduced-motion:reduce){#alm-overlay,.alm-image{transition:none}.alm-chart-fill,.alm-thumb,.alm-day-image,.alm-month-image{animation:none!important}}
+
+/* Gallery's optional tag filters share its single ranked grid. */
+#photo-tags-content{padding-bottom:0}
+#photo-tags-content[hidden],#photo-tag-manage-host[hidden],#photo-tag-filter-toggle[hidden],#photo-filter-empty[hidden]{display:none!important}
+#page-photos.photo-tag-filters-visible .page-content{padding-bottom:110px}
+#photo-tag-filter-toggle{flex:none;display:inline-flex;align-items:center;justify-content:center;width:40px;min-height:44px;padding:0;border:0;border-radius:4px;background:transparent;color:var(--chalk-dim)}
+#photo-tag-filter-toggle[aria-pressed=true]{color:var(--amber);background:var(--panel)}
+#photo-tag-manage-host{flex:none;display:inline-flex;align-items:center}
+#photo-tag-manage-host .pt-menu-btn{min-height:44px;padding:0 8px;border:0;background:transparent;font-size:24px}
+#photo-add-btn{margin-left:0}
+#photo-tags-content .pt-gallery-heading{min-height:24px;margin-bottom:6px}
+@media(max-width:768px){#page-photos.photo-tag-filters-visible .page-content{padding-bottom:calc(110px + var(--mobile-tabbar-height) + env(safe-area-inset-bottom,0px))}}
