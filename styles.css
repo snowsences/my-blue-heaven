@@ -5533,3 +5533,14 @@
   #page-photos .grid-card,.pt-filter-grid .grid-card{animation:none!important;}
   .pt-filter-chip{transition:background 120ms ease,color 120ms ease;}
   .pt-filter-grid .art-img{width:100%;height:100%;object-fit:cover;}
+
+  .pt-grip{touch-action:none;cursor:grab;position:relative;}
+  .pt-grip::after{content:'';position:absolute;inset:-8px -24px;}
+  .art-lightbox-overlay.show{touch-action:none;}
+  .rd-fill{transform-origin:left center;transition:width 250ms var(--ease-out);}
+  @media(prefers-reduced-motion:no-preference){
+    .mbh-chart-enter .rd-fill{animation:mbhBarGrow 420ms var(--ease-out) both;}
+    .mbh-chart-enter .rd-chart polyline[pathLength]{animation:mbhLineDraw 650ms var(--ease-out) both;stroke-dasharray:1;stroke-dashoffset:0;}
+    @keyframes mbhBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+    @keyframes mbhLineDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+  }

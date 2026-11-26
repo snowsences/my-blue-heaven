@@ -2734,6 +2734,7 @@
     updateLightboxGotoBtn();
     updateLightboxHideDishBtn();
     updateLightboxDishCoverBtn();
+    mbhPreloadLightbox();
   }
 
   function updateLightboxCounter(){
@@ -2869,6 +2870,12 @@
     lightboxDishCoverBtn.classList.add('show');
   }
 
+  function mbhPreloadLightbox(){
+    if(!lightboxPhotos||lightboxPhotos.length<2||navigator.connection?.saveData)return;
+    const keep=new Map();
+    for(const d of [-1,1]){const url=cloudinaryThumbUrl(lightboxEntryUrl(lightboxPhotos[(lightboxIndex+d+lightboxPhotos.length)%lightboxPhotos.length]),1600);if(!url)continue;const img=mbhPreloadLightbox.cache?.get(url)||new Image();if(!img.src){img.fetchPriority='low';img.decoding='async';img.src=url;}keep.set(url,img);}
+    mbhPreloadLightbox.cache=keep;
+  }
   function navigateLightbox(delta){
     if (!lightboxPhotos || !lightboxPhotos.length) return;
     lightboxIndex = (lightboxIndex + delta + lightboxPhotos.length) % lightboxPhotos.length;
@@ -2881,6 +2888,7 @@
     updateLightboxGotoBtn();
     updateLightboxHideDishBtn();
     updateLightboxDishCoverBtn();
+    mbhPreloadLightbox();
   }
 
   function closeArtLightbox(){
@@ -2889,6 +2897,7 @@
     photoSortHelperButton.classList.remove('show');
     photoSortHelperIds = null;
     updatePhotoCalendarLightbox();
+    mbhPreloadLightbox.cache=null;
     lightboxZoomOut(); // a snapshot flies back to the thumbnail while the real viewer closes at once
     artLightboxOverlay.classList.remove('show');
     artLightboxOverlay.classList.remove('multi');
@@ -2915,58 +2924,48 @@
   // one that does is an instant snap to the new photo, not a sliding
   // animation — matching how reordering elsewhere in the app also swaps
   // instantly rather than sliding.
+
   (function wireLightboxSwipe(){
-    const SWIPE_THRESHOLD = 50;
-    let startX = 0, startY = 0, dx = 0, dragging = false;
-
-    artLightboxOverlay.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1 || !lightboxPhotos || lightboxPhotos.length < 2 || e.target.closest('button')){
-        dragging = false;
-        return;
-      }
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      dx = 0;
-      dragging = true;
-    }, { passive: true });
-
-    artLightboxOverlay.addEventListener('touchmove', (e) => {
-      if (!dragging) return;
-      const touch = e.touches[0];
-      dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6){
-        e.preventDefault(); // a horizontal swipe, not a vertical scroll
-        artLightboxImg.style.transition = 'none';
-        artLightboxImg.style.transform = 'translateX(' + dx + 'px)';
-        artLightboxImg.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 500));
-      }
-    }, { passive: false });
-
-    const finish = () => {
-      if (!dragging) return;
-      dragging = false;
-      const moved = Math.abs(dx) > 6; // matches the touchmove threshold above that calls preventDefault, which is what suppresses the browser's own tap-to-close click
-      artLightboxImg.style.transition = '';
-      artLightboxImg.style.transform = '';
-      artLightboxImg.style.opacity = '';
-      if (Math.abs(dx) > SWIPE_THRESHOLD){
-        lightboxJustSwiped = true;
-        navigateLightbox(dx > 0 ? -1 : 1); // dragged right -> previous photo, dragged left -> next
-      } else if (moved){
-        // Dragged enough to suppress that native click, but not far enough
-        // to count as a swipe — close it ourselves instead of leaving the
-        // viewer stuck open with nothing having visibly happened.
-        closeArtLightbox();
-      }
-    };
-    artLightboxOverlay.addEventListener('touchend', finish, { passive: true });
-    artLightboxOverlay.addEventListener('touchcancel', () => {
-      dragging = false;
-      artLightboxImg.style.transition = '';
-      artLightboxImg.style.transform = '';
-      artLightboxImg.style.opacity = '';
-    }, { passive: true });
+    let start=null,dx=0,dy=0,mode='',scale=1,panX=0,panY=0,pinch=0,baseScale=1,animation=null;
+    const img=artLightboxImg,overlay=artLightboxOverlay;
+    const distance=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+    const draw=(x,y,z)=>{img.style.transition='none';img.style.transform='translate('+x+'px,'+y+'px) scale('+z+')';};
+    const clear=()=>{animation?.cancel();img.style.transition='';img.style.transform='';img.style.opacity='';overlay.style.backgroundColor='';};
+    const reset=()=>{clear();scale=1;panX=panY=0;start=null;mode='';};
+    const settle=(x,y,z)=>{clear();if(!motionReduced())animation=img.animate([{transform:'translate('+x+'px,'+y+'px) scale('+z+')'},{transform:'none'}],{duration:220,easing:EASE_OUT});};
+    const swallow=()=>{lightboxJustSwiped=true;setTimeout(()=>{lightboxJustSwiped=false;},350);};
+    new MutationObserver(()=>{if(!overlay.classList.contains('show'))reset();}).observe(overlay,{attributes:true,attributeFilter:['class']});
+    overlay.addEventListener('touchstart',e=>{
+      if(e.target.closest('button,dialog')||overlay.classList.contains('pt-tray-open'))return;
+      animation?.cancel();dx=dy=0;
+      if(e.touches.length===2){pinch=distance(e.touches);baseScale=scale;mode='pinch';start=null;return;}
+      if(e.touches.length!==1)return;
+      start={x:e.touches[0].clientX,y:e.touches[0].clientY,t:performance.now()};mode=scale>1?'pan':'';
+    },{passive:true});
+    overlay.addEventListener('touchmove',e=>{
+      if(mode==='pinch'&&e.touches.length===2){e.preventDefault();scale=Math.max(1,Math.min(4,baseScale*distance(e.touches)/Math.max(1,pinch)));draw(panX,panY,scale);return;}
+      if(!start||e.touches.length!==1)return;
+      dx=e.touches[0].clientX-start.x;dy=e.touches[0].clientY-start.y;
+      if(!mode&&Math.max(Math.abs(dx),Math.abs(dy))>7)mode=Math.abs(dx)>Math.abs(dy)?'x':'y';
+      if(!mode)return;e.preventDefault();
+      if(mode==='pan'){draw(panX+dx,panY+dy,scale);return;}
+      if(mode==='x'){draw(lightboxPhotos?.length>1?dx:dx*.2,0,1);}
+      else if(mode==='y'){const y=Math.max(0,dy);draw(0,y,Math.max(.85,1-y/innerHeight*.3));overlay.style.backgroundColor='rgba(10,20,22,'+Math.max(.2,.9-y/innerHeight)+')';}
+    },{passive:false});
+    overlay.addEventListener('touchend',e=>{
+      if(mode==='pinch'){if(e.touches.length)return;swallow();if(scale<=1.03)reset();else mode='';return;}
+      if(!start)return;const time=Math.max(1,performance.now()-start.t),m=mode;start=null;mode='';
+      if(!m)return;swallow();
+      if(m==='pan'){panX+=dx;panY+=dy;const maxX=img.clientWidth*(scale-1)/2,maxY=img.clientHeight*(scale-1)/2;panX=Math.max(-maxX,Math.min(maxX,panX));panY=Math.max(-maxY,Math.min(maxY,panY));draw(panX,panY,scale);return;}
+      if(m==='x'&&lightboxPhotos?.length>1&&(Math.abs(dx)>Math.min(110,innerWidth*.23)||Math.abs(dx)>35&&Math.abs(dx)/time>.55)){
+        const dir=dx>0?-1:1;clear();navigateLightbox(dir);
+        if(!motionReduced())animation=img.animate([{transform:'translateX('+dir*60+'px)',opacity:.55},{transform:'none',opacity:1}],{duration:230,easing:EASE_OUT});
+      }else if(m==='y'&&(dy>115||dy>35&&dy/time>.65)){clear();closeArtLightbox();}
+      else settle(m==='x'?dx:0,m==='y'?Math.max(0,dy):0,1);
+    },{passive:true});
+    overlay.addEventListener('touchcancel',reset,{passive:true});
+    overlay.addEventListener('click',e=>{if(scale>1&&!e.target.closest('button')){e.stopImmediatePropagation();reset();}},{capture:true});
+    lightboxPrevBtn.addEventListener('click',reset,{capture:true});lightboxNextBtn.addEventListener('click',reset,{capture:true});
   })();
   // Arrows (and the cover toggle / delete button) need to stop the click
   // from reaching the overlay's own close handler — otherwise using them
@@ -11561,6 +11560,20 @@
     artLightboxOverlay.classList.remove('pt-tray-open');
     artLightboxOverlay.style.removeProperty('--pt-photo-space');
   }
+
+  function mbhTagSheetDrag(sheet){
+    const grip=sheet.querySelector('.pt-grip');if(!grip||grip.__wired)return;grip.__wired=true;
+    let y=0,t=0,dy=0,active=false;
+    grip.addEventListener('pointerdown',e=>{if(e.button>0)return;active=true;y=e.clientY;t=performance.now();dy=0;grip.setPointerCapture(e.pointerId);sheet.style.transition='none';});
+    grip.addEventListener('pointermove',e=>{if(!active)return;dy=Math.max(0,e.clientY-y);sheet.style.transform='translateY('+dy+'px)';});
+    function end(e){if(!active)return;active=false;sheet.style.transition='';sheet.style.transform='';
+      if(e.type!=='pointercancel'&&(dy>110||dy>35&&dy/Math.max(1,performance.now()-t)>.6)){
+        // Same behavior as Cancel/Escape; never silently save draft changes.
+        sheet.close();
+      }else if(!motionReduced())sheet.animate([{transform:'translateY('+dy+'px)'},{transform:'none'}],{duration:240,easing:EASE_OUT});
+    }
+    grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
+  }
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
     photoTagDraft={photoId:id,selected:new Set(explicitPhotoTagIds(id))};
@@ -11658,6 +11671,7 @@
     };
     render();
     if(!photoTagTray.open){photoTagTray.showModal();beginPhotoTagPreview();}
+    mbhTagSheetDrag(photoTagTray);
   }
   photoTagButton.addEventListener('click',e=>{
     e.stopPropagation();
@@ -14321,7 +14335,7 @@
     const line=points.map((p,i)=>xs[i]+','+y(p.avg)).join(' ');
     const nodes=points.map((p,i)=>'<g tabindex="0" role="button" data-rd-visit="'+escapeAttr(p.v.id)+'" aria-label="'+escapeAttr(rdDate(p.v)+', '+rdFmt(p.avg)+', '+p.scored.length+' scored courses')+'"><title>'+escapeHtml(rdDate(p.v)+' · '+rdFmt(p.avg)+' · '+p.scored.length+' scored courses')+'</title><circle cx="'+xs[i]+'" cy="'+y(p.avg)+'" r="10" fill="transparent"/><circle cx="'+xs[i]+'" cy="'+y(p.avg)+'" r="4" fill="var(--amber)"/></g>').join('');
     const delta=points[points.length-1].avg-points[0].avg;
-    return '<section class="rd-card"><h3>Visit scores over time</h3><p class="rd-muted">'+(delta>=0?'+':'')+rdFmt(delta)+' since first dated scored visit</p><svg class="rd-chart" viewBox="0 0 340 178" aria-label="Visit averages over time">'+axes+'<line class="rd-avg" x1="30" x2="322" y1="'+y(stats.mean)+'" y2="'+y(stats.mean)+'"/><polyline points="'+line+'" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linejoin="round"/>'+nodes+'<text x="35" y="170">'+escapeHtml(rdDate(points[0].v))+'</text><text x="322" y="170" text-anchor="end">'+escapeHtml(rdDate(points[points.length-1].v))+'</text></svg><span class="rd-muted">Dashed line: all-time course average · Select a point to open its visit</span></section>';
+    return '<section class="rd-card"><h3>Visit scores over time</h3><p class="rd-muted">'+(delta>=0?'+':'')+rdFmt(delta)+' since first dated scored visit</p><svg class="rd-chart" viewBox="0 0 340 178" aria-label="Visit averages over time">'+axes+'<line class="rd-avg" x1="30" x2="322" y1="'+y(stats.mean)+'" y2="'+y(stats.mean)+'"/><polyline pathLength="1" points="'+line+'" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linejoin="round"/>'+nodes+'<text x="35" y="170">'+escapeHtml(rdDate(points[0].v))+'</text><text x="322" y="170" text-anchor="end">'+escapeHtml(rdDate(points[points.length-1].v))+'</text></svg><span class="rd-muted">Dashed line: all-time course average · Select a point to open its visit</span></section>';
   }
   function rdGraphs(r,stats){
     if(!stats.scored.length)return '<div class="rd-extra"><section class="rd-card"><h3>No scored courses yet</h3><p class="rd-muted">Rate courses in Visits to see your restaurant statistics here.</p></section></div>';
@@ -20310,6 +20324,7 @@
     const step = (now) => {
       const src = map.getSource(id);
       if (!src) return;
+      if(!el.isConnected)return;
       const t = Math.min(1, (now - t0) / dur);
       const d = (0.5 - Math.cos(Math.PI * t) / 2) * total; // easeInOutSine
       const line = [coords[0]];
@@ -21296,8 +21311,9 @@
     host.__memoryKey = kind === 'ink'
       ? 'ink:' + (host.id ? host.id.split('-sub-tabs')[0] : host.matches('.rd-tabs') ? 'restaurant-detail' : host.matches('.trip-detail-tabs') ? 'trip-detail' : 'restaurant-visits')
       : 'pill:' + (host.id || Array.from(host.querySelectorAll(':scope > button')).map(b => b.textContent.trim()).join('|'));
-    new MutationObserver(() => placeIndicator(host, kind)).observe(host, { subtree: true, attributes: true, attributeFilter: ['class'] });
-    if (window.ResizeObserver) new ResizeObserver(() => { if (!host.offsetWidth) host.__placed = false; else placeIndicator(host, kind); }).observe(host);
+    host.__kind=kind;
+    host.__indicatorObserver=new MutationObserver(() => placeIndicator(host, kind));host.__indicatorObserver.observe(host,{subtree:true,attributes:true,attributeFilter:['class']});
+    mbhIndicatorResize?.observe(host);
     placeIndicator(host, kind);
   }
   function scanIndicators(root){
@@ -21328,7 +21344,7 @@
   function pressRelease(){
     const el = pressedEl;
     pressedEl = null;
-    if (!el) return;
+    if (!el||!el.isConnected) return;
     if (el.__pressAnim) el.__pressAnim.cancel();
     el.__pressAnim = el.animate([{ scale: '0.97' }, { scale: '1' }], { duration: 360, easing: EASE_SPRING });
   }
@@ -21337,7 +21353,7 @@
     const el = e.target.closest(PRESSABLE);
     if (!el || el.disabled || el.closest('.maplibregl-map, .trip-world, .tmap-overlay')) return;
     // Mouse hit testing must not move the control under a stationary cursor.
-    if (e.pointerType === 'mouse' && el.closest('#trip-overlay')) return;
+    if (e.pointerType === 'mouse') return;
     pressRelease();
     pressedEl = el;
     if (el.__pressAnim) el.__pressAnim.cancel();
@@ -21366,36 +21382,58 @@
 
   // One watcher for things that appear anywhere: new tab rows and toggles,
   // stat numbers, and cached photos that finished before anyone listened.
-  let motionScanQueued = false;
-  // Redraws (switching a restaurant's visit, paging, editing) re-create the
-  // same photos; ones already in the browser's memory are marked loaded in
-  // the same moment they're added, before anything is painted, so they
-  // don't fade in or flash the dark placeholder again.
-  new MutationObserver((records) => {
-    records.forEach(r => r.addedNodes.forEach(n => {
-      if (n.nodeType !== 1) return;
-      const imgs = n.tagName === 'IMG' ? [n] : n.querySelectorAll('img.art-img, .restaurant-photo-thumb img');
-      imgs.forEach(img => {
-        if (!img.complete || !img.naturalWidth) return;
-        // Already in memory: show it at full strength right away, skipping the fade entirely
-        // (the tray may have been measured before this ran, which would otherwise start a fade from 0).
-        img.style.transition = 'none';
-        img.classList.add('img-loaded');
-        requestAnimationFrame(() => requestAnimationFrame(() => { img.style.transition = ''; }));
-      });
-    }));
-  }).observe(document.body, { childList: true, subtree: true });
-  new MutationObserver(() => {
-    if (motionScanQueued) return;
-    motionScanQueued = true;
-    requestAnimationFrame(() => {
-      motionScanQueued = false;
-      scanIndicators();
-      document.querySelectorAll('.yir-stat-n, .cal-stat-n').forEach(el => { if (!el.__counted && el.offsetParent) countUp(el); });
-      document.querySelectorAll('.art-img:not(.img-loaded)').forEach(img => { if (img.complete && img.naturalWidth) img.classList.add('img-loaded'); });
+
+  // Observe only changed subtrees; count-up and graphs run once when visible.
+  const mbhMotionSelector='.group-sub-tabs,.rd-tabs,.trip-detail-tabs,.restaurant-visit-tabs,.view-toggle,.tab-switcher,.yir-stat-n,.cal-stat-n,.rd-card,img.art-img,.restaurant-photo-thumb img';
+  const mbhMotionSeen=new WeakSet();
+  const mbhVisibility=window.IntersectionObserver?new IntersectionObserver(entries=>{
+    for(const entry of entries){
+      if(!entry.isIntersecting)continue;
+      const el=entry.target;mbhVisibility.unobserve(el);
+      if(!el.isConnected)continue;
+      if(el.matches('.rd-card'))el.classList.add('mbh-chart-enter');
+      else countUp(el);
+    }
+  }):null;
+  const mbhIndicatorResize=window.ResizeObserver?new ResizeObserver(entries=>{
+    entries.forEach(({target:host})=>{if(!host.isConnected){mbhIndicatorResize.unobserve(host);return;}
+      if(!host.offsetWidth)host.__placed=false;else placeIndicator(host,host.__kind);
     });
-  }).observe(document.body, { childList: true, subtree: true });
-  scanIndicators();
+  }):null;
+  function mbhScanMotion(root){
+    if(root.nodeType!==1)return;
+    const nodes=root.matches(mbhMotionSelector)?[root,...root.querySelectorAll(mbhMotionSelector)]:root.querySelectorAll(mbhMotionSelector);
+    for(const el of nodes){
+      if(el.matches('img')){
+        if(el.complete&&el.naturalWidth&&!el.classList.contains('img-loaded')){
+          el.style.transition='none';el.classList.add('img-loaded');
+          requestAnimationFrame(()=>{if(el.isConnected)el.style.transition='';});
+        }
+        continue;
+      }
+      if(mbhMotionSeen.has(el))continue;mbhMotionSeen.add(el);
+      if(el.matches('.group-sub-tabs,.rd-tabs,.trip-detail-tabs,.restaurant-visit-tabs'))setupIndicator(el,'ink');
+      else if(el.matches('.view-toggle,.tab-switcher')){
+        if(el.querySelector(':scope > .view-toggle-btn, :scope > .tab-btn'))setupIndicator(el,'pill');
+      }else if(mbhVisibility)mbhVisibility.observe(el);
+      else if(el.matches('.rd-card'))el.classList.add('mbh-chart-enter');
+      else if(el.offsetParent)countUp(el);
+    }
+  }
+  new MutationObserver(records=>{
+    for(const record of records){
+      for(const n of record.addedNodes)if(n.nodeType===1)mbhScanMotion(n);
+      for(const n of record.removedNodes)if(n.nodeType===1&&!n.isConnected){
+        const nodes=[n,...n.querySelectorAll('.group-sub-tabs,.rd-tabs,.trip-detail-tabs,.restaurant-visit-tabs,.view-toggle,.tab-switcher,.yir-stat-n,.cal-stat-n,.rd-card')];
+        for(const el of nodes){
+          if(el.isConnected)continue;
+          mbhVisibility?.unobserve(el);mbhIndicatorResize?.unobserve(el);
+          if(el.__indicatorObserver){el.__indicatorObserver.disconnect();el.__indicatorObserver=null;}
+        }
+      }
+    }
+  }).observe(document.body,{childList:true,subtree:true});
+  mbhScanMotion(document.body);
 
   // --- the photo viewer grows out of the tapped thumbnail, and shrinks back into it ---
   let lastPressedImg = null, lightboxSource = null, lightboxSourceIndex = null;
