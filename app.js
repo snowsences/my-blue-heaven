@@ -10930,7 +10930,35 @@
       });
     }
 
-    section.style.display = (yearKeys.length >= 2 || totalMonthPhotos >= 2) ? 'block' : 'none';
+    // By Trip counts only the entries in the Photos list, not trip-only,
+    // restaurant, activity or hike photos. Like the date insights this is
+    // computed from the entire library, regardless of current grid filters.
+    let tripBlock = document.getElementById('photo-trip-block');
+    if (!tripBlock){
+      tripBlock = document.createElement('div');
+      tripBlock.className = 'insights-block';
+      tripBlock.id = 'photo-trip-block';
+      tripBlock.innerHTML = '<p class="insights-block-title">By Trip</p><div class="artist-list" id="photo-trip-list"></div>';
+      section.appendChild(tripBlock);
+    }
+    const tripCounts = new Map();
+    photoRows.forEach(p => {
+      if (p && p.tripId) tripCounts.set(p.tripId, (tripCounts.get(p.tripId) || 0) + 1);
+    });
+    const trips = tripSorted().slice().reverse();
+    show('photo-trip-block', trips.length > 0);
+    const maxTrip = Math.max(1, ...trips.map(t => tripCounts.get(t.id) || 0));
+    document.getElementById('photo-trip-list').innerHTML = trips.map(t => {
+      const count = tripCounts.get(t.id) || 0;
+      const pct = count ? Math.max(6, Math.round(count / maxTrip * 100)) : 0;
+      const name = t.name || 'Untitled trip';
+      return '<div class="artist-row" style="cursor:default" aria-label="' + escapeAttr(name + ': ' + count + (count === 1 ? ' photo' : ' photos')) + '">' +
+        '<span class="artist-name" style="width:38%;white-space:normal;overflow-wrap:anywhere;color:var(--chalk)" title="' + escapeAttr(name) + '">' + escapeHtml(name) + '</span>' +
+        '<span class="artist-bar-track"><span class="artist-bar-fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="artist-count" style="min-width:65px;text-align:right">' + count + (count === 1 ? ' photo' : ' photos') + '</span></div>';
+    }).join('');
+
+    section.style.display = (yearKeys.length >= 2 || totalMonthPhotos >= 2 || trips.length > 0) ? 'block' : 'none';
   }
 
   function renderPhotosPage(){
@@ -18367,6 +18395,7 @@
   function tripRefresh(){
     if (tripOpenId && tripFind(tripOpenId)) tripRender();
     renderTripsPage();
+    renderPhotoInsights();
   }
   tripCloseBtn.addEventListener('click', closeTrip);
   tripAddBtn.addEventListener('click', () => { const t = tripFind(tripOpenId); if (t && !guestViewEnabled) tripOpenAddMenu(t); });
