@@ -14269,21 +14269,11 @@
   // the same reason course/flavor scores are: it's still a normal, fully
   // native, fully accessible control either way.
   function renderRestaurantVisitTabsHtml(sortedVisits, activeVisit){
-    if (sortedVisits.length > 5){
-      const options = sortedVisits.map(v => {
-        const avg = computeVisitAverageScore(v);
-        const label = formatVisitDate(v.date) + (avg !== null ? ' (' + avg + ')' : '');
-        return '<option value="' + v.id + '"' + (v.id === activeVisit.id ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
-      }).join('');
-      return '<select class="restaurant-visit-select" id="restaurant-visit-select">' + options + '</select>';
-    }
-    return '<div class="restaurant-visit-tabs">' + sortedVisits.map(v => {
-      const avg = computeVisitAverageScore(v);
-      const badge = avg !== null ? '<span class="restaurant-visit-badge">' + avg + '</span>' : '';
-      return '<button class="restaurant-visit-tab-btn' + (v.id === activeVisit.id ? ' active' : '') + '" data-visit-id="' + v.id + '" type="button">' +
-        escapeHtml(formatVisitDate(v.date)) + badge +
-      '</button>';
-    }).join('') + '</div>';
+    return '<div class="rd-visit-rail pt-filter-rail" role="group" aria-label="Restaurant visits">' + sortedVisits.map(v => {
+      const avg=computeVisitAverageScore(v),active=v.id===activeVisit?.id;
+      const badge=avg!==null?'<span class="rd-visit-score">'+escapeHtml(String(avg))+'</span>':'';
+      return '<button class="pt-filter-chip restaurant-visit-tab-btn" data-visit-id="'+escapeAttr(v.id)+'" aria-pressed="'+active+'" type="button">'+escapeHtml(formatVisitDate(v.date))+badge+'</button>';
+    }).join('')+'</div>';
   }
 
   function renderRestaurantVisitMetaHtml(visit){
@@ -14657,30 +14647,17 @@
     if (activeVisit) restaurantActiveVisitId = activeVisit.id; // locks in the resolved id (e.g. after a fallback to the newest visit)
 
     const isVisits = guestViewEnabled || isLockedGuestAccount || restaurantDetailTab === 'visits';
-    const visitsSectionHtml = !isVisits ? '' : sortedVisits.length
-      ? (
-          '<div class="restaurant-visits-header">' +
-            renderRestaurantVisitTabsHtml(sortedVisits, activeVisit) +
-            '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
-            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">Import</button>' +
-            '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
-          '</div>' +
-          '<div class="restaurant-visit-content">' +
-            renderRestaurantVisitMetaHtml(activeVisit) +
-            (restaurantVisitEditMode ? '' : renderRestaurantCoursesContentHtml(activeVisit)) +
-          '</div>'
-        )
-      : (
-          '<div class="restaurant-visits-header">' +
-            '<p class="restaurant-course-empty" style="margin:0;">No visits logged yet.</p>' +
-            '<button class="btn-ghost restaurant-visit-add-btn" id="restaurant-visit-add-btn" type="button">+ New Visit</button>' +
-            '<button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">Import</button>' +
-            '<input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple style="display:none;">' +
-          '</div>'
-        );
+    const canManageVisits=!guestViewEnabled&&!isLockedGuestAccount;
+    const importFooter=canManageVisits?'<div class="rd-import-footer"><button class="btn-ghost restaurant-bulk-import-btn" id="restaurant-bulk-import-btn" type="button" title="Filenames like 20250811_073318.jpg — one visit per date, one course per photo, ordered by time">Import</button><input type="file" id="restaurant-bulk-import-file" accept="image/*" multiple hidden></div>':'';
+    const visitsSectionHtml=!isVisits?'':(sortedVisits.length
+      ? '<div class="restaurant-visits-header rd-visit-header">'+renderRestaurantVisitTabsHtml(sortedVisits,activeVisit)+'</div><div class="restaurant-visit-content">'+renderRestaurantVisitMetaHtml(activeVisit)+(restaurantVisitEditMode?'':renderRestaurantCoursesContentHtml(activeVisit))+'</div>'
+      : '<div class="restaurant-visits-header rd-visit-header"><p class="restaurant-course-empty" style="margin:0;">No visits logged yet.</p></div>')+importFooter;
 
     const effectiveCover = getEffectiveRestaurantCover(r);
     const oldScroll=restaurantDetailsPanel.scrollTop;
+    const oldVisitRail=restaurantDetailsPanelInner.querySelector('.rd-visit-rail');
+    const oldVisitRailScroll=oldVisitRail?.scrollLeft||0;
+    const oldRailFocus=oldVisitRail?.contains(document.activeElement);
     const stats=isVisits?null:rdStats(r);
     const tabBar=guestViewEnabled||isLockedGuestAccount?'':'<nav class="rd-tabs" aria-label="Restaurant details">'+['overview','visits','courses','graphs'].map(t=>'<button type="button" data-rd-tab="'+t+'" class="'+(restaurantDetailTab===t?'active':'')+'" aria-pressed="'+(restaurantDetailTab===t)+'">'+(t==='courses'?'Dishes':t[0].toUpperCase()+t.slice(1))+'</button>').join('')+'</nav>';
     restaurantDetailsPanelInner.innerHTML =
@@ -14692,8 +14669,9 @@
         '<button class="details-edit-btn" type="button" title="Edit">✎</button>' +
         '<button class="details-close-btn" type="button" title="Close">✕</button>' +
         '<div class="rd-cover-caption restaurant-gold-card-overlay">' +
-          '<h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
-          (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') +
+          '<div class="rd-cover-identity"><h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
+          (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') + '</div>' +
+          (canManageVisits?'<button class="btn-ghost restaurant-visit-add-btn rd-cover-add" id="restaurant-visit-add-btn" type="button">+ New Visit</button>':'') +
         '</div>' +
       '</div>' + tabBar + '</div><div class="rd-body">' +
       (isVisits ? visitsSectionHtml : restaurantDetailTab==='overview'?rdOverview(r,stats):restaurantDetailTab==='graphs'?rdGraphs(r,stats):rdCourses(stats))+'</div>';
@@ -14731,11 +14709,19 @@
       });
     }
 
+    const visitAddBtn=restaurantDetailsPanelInner.querySelector('#restaurant-visit-add-btn');
+    if(visitAddBtn)visitAddBtn.addEventListener('click',()=>{
+      if(guestViewEnabled||isLockedGuestAccount)return;
+      if(restaurantVisitEditMode){showToast('Save or cancel your visit edits first');return;}
+      restaurantDetailTab='visits';
+      addRestaurantVisit();
+      const header=restaurantDetailsPanelInner.querySelector('.rd-header');
+      restaurantDetailsPanel.scrollTop=parseFloat(header?.style.getPropertyValue('--rd-collapse'))||0;
+      restaurantDetailCoverSync();
+    });
     if(!isVisits)return;
 
-    // Visit tabs / dropdown / add wiring
-    const visitAddBtn = restaurantDetailsPanelInner.querySelector('#restaurant-visit-add-btn');
-    if (visitAddBtn) visitAddBtn.addEventListener('click', addRestaurantVisit);
+    // Visit chips / import footer wiring
     const bulkImportBtn = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-btn');
     const bulkImportFile = restaurantDetailsPanelInner.querySelector('#restaurant-bulk-import-file');
     if (bulkImportBtn && bulkImportFile){
@@ -14745,12 +14731,20 @@
         bulkImportFile.value = '';
       });
     }
-    restaurantDetailsPanelInner.querySelectorAll('.restaurant-visit-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => switchActiveVisit(btn.dataset.visitId));
-    });
-    const visitSelect = restaurantDetailsPanelInner.querySelector('#restaurant-visit-select');
-    if (visitSelect){
-      visitSelect.addEventListener('change', () => switchActiveVisit(visitSelect.value));
+    const rail=restaurantDetailsPanelInner.querySelector('.rd-visit-rail');
+    if(rail){
+      rail.scrollLeft=oldVisitRailScroll;
+      const selected=rail.querySelector('[aria-pressed="true"]');
+      if(selected){const rr=rail.getBoundingClientRect(),br=selected.getBoundingClientRect();if(br.left<rr.left)rail.scrollLeft+=br.left-rr.left-8;else if(br.right>rr.right)rail.scrollLeft+=br.right-rr.right+8;if(oldRailFocus)selected.focus({preventScroll:true});}
+      rail.addEventListener('wheel',e=>{if(!e.shiftKey||Math.abs(e.deltaX)>Math.abs(e.deltaY)||rail.scrollWidth<=rail.clientWidth)return;e.preventDefault();rail.scrollLeft+=e.deltaY;},{passive:false});
+      rail.addEventListener('keydown',e=>{
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+        const buttons=[...rail.querySelectorAll('button')],i=buttons.indexOf(document.activeElement);
+        if(i<0)return;e.preventDefault();
+        const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:Math.max(0,Math.min(buttons.length-1,i+(e.key==='ArrowRight'?1:-1)));
+        buttons[next]?.focus();
+      });
+      rail.querySelectorAll('.restaurant-visit-tab-btn').forEach(btn=>btn.addEventListener('click',()=>{if(btn.getAttribute('aria-pressed')!=='true')switchActiveVisit(btn.dataset.visitId);}));
     }
 
     if (!activeVisit) return; // no visits at all yet — nothing else to wire
