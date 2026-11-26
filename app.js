@@ -770,14 +770,15 @@
   // Renamed from scheduleFirestoreWrite now that Firebase is the only sync
   // path — every save function throughout the app already calls this exact
   // name (it used to also trigger a folder-sync write alongside this).
-  function scheduleSyncWrite(){
+  function scheduleSyncWrite(part){
     if (!firebaseUser) return;
+    syncQueuedNonArt=syncQueuedNonArt&&(part==='non-art');
     clearTimeout(firestoreWriteTimer);
     // Until this sign-in's cloud read has succeeded, nothing may be written:
     // local data could be older than the cloud's, and writing it would
     // overwrite the newer copy. Retry the read instead — once it has merged
     // it pushes whatever local was ahead on, this change included.
-    firestoreWriteTimer = setTimeout(cloudReadOk ? writeFirestoreData : runCloudLoad, 600);
+    firestoreWriteTimer=setTimeout(()=>{const nonArt=syncQueuedNonArt;syncQueuedNonArt=true;if(cloudReadOk)writeFirestoreData(nonArt);else runCloudLoad();},600);
   }
 
   // The payload is split across part documents (below), each safely under
@@ -823,6 +824,7 @@
   // Each write of a part uses a fresh rev, and the manifest is only
   // switched over once all its chunks are written, so a reader never sees
   // a half-written part. Superseded revs are deleted afterwards.
+  let syncQueuedNonArt=true, syncArtBaseline=null;
   let cloudReadOk = false;     // true once this sign-in's cloud read has succeeded (or found nothing)
   let syncedParts = {};        // part name → { rev, count, chars } as the cloud manifest records it
   let syncedPartJson = {};     // part name → JSON last read from / written to the cloud, to spot changes
@@ -834,6 +836,7 @@
     cloudReadOk = false;
     syncedParts = {};
     syncedPartJson = {};
+    syncArtBaseline=null;syncQueuedNonArt=true;
   }
 
   // The albums part is compared without its savedAt — that's stamped only
@@ -869,14 +872,14 @@
 
   // One write at a time — a change landing mid-write queues exactly one
   // follow-up, which picks up everything that changed in the meantime.
-  async function writeFirestoreData(){
+  async function writeFirestoreData(nonArt=false){
     if (firestoreWriteInFlight){ firestoreWritePending = true; return; }
-    firestoreWriteInFlight = writeChangedSyncParts();
+    firestoreWriteInFlight = writeChangedSyncParts(nonArt);
     try{ await firestoreWriteInFlight; }finally{ firestoreWriteInFlight = null; }
     if (firestoreWritePending){ firestoreWritePending = false; writeFirestoreData(); }
   }
 
-  async function writeChangedSyncParts(){
+  async function writeChangedSyncParts(nonArt=false){
     const fb = window.__firebase;
     if (!fb || !firebaseUser || !cloudReadOk) return;
     // Hard guard, not just a UI-level restriction — this account must never
@@ -887,7 +890,9 @@
     try{
       const artKeys = Array.from(new Set([...items, ...loadingDock]));
       const art = {};
-      await Promise.all(artKeys.map(async (raw) => {
+      const artKeySignature=JSON.stringify(artKeys);
+      const skipArt=nonArt&&syncArtBaseline===artKeySignature&&typeof syncedPartJson.art==='string';
+      if(!skipArt)await Promise.all(artKeys.map(async (raw) => {
         if (artCache[raw]){ art[raw] = artCache[raw]; return; }
         try{
           const res = await window.storage.get(artKeyFor(raw), false);
@@ -897,11 +902,12 @@
       const parts = buildSyncParts(art);
       const changed = {};
       for (const name of Object.keys(parts)){
+        if(name==='art'&&skipArt)continue;
         const json = JSON.stringify(parts[name]);
         if (json !== syncedPartJson[name]) changed[name] = json;
       }
       const changedNames = Object.keys(changed);
-      if (!changedNames.length) return;
+      if (!changedNames.length){if(!skipArt)syncArtBaseline=artKeySignature;return;}
 
       const rev = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ownParts = {};
@@ -960,6 +966,7 @@
       const newParts = merged.manifest.parts;
       syncedParts = newParts;
       Object.assign(syncedPartJson, changed);
+      if(!skipArt)syncArtBaseline=artKeySignature;
 
       const staleDeletes = [];
       for (const r of merged.reclaim){
@@ -971,6 +978,7 @@
       for (const p of Object.values(newParts)){ totalChars += p.chars || 0; totalChunks += p.count || 0; }
       updateFirestoreSizeDisplay(totalChars / 1024 / 1024, totalChunks);
     }catch(e){
+      syncArtBaseline=null;
       console.error('Firestore write failed:', e);
       showToast("⚠️ Couldn't sync to Firebase (" + (e && e.code ? e.code : 'unknown error') + ") — see console, will retry on the next change");
     }
@@ -1089,6 +1097,7 @@
     }
     syncedParts = result.parts;
     syncedPartJson = result.partJson;
+    syncArtBaseline=null;
     const existing = result.data;
     if (!existing){
       cloudReadOk = true;
@@ -2292,7 +2301,7 @@
   }
 
   async function setArtForItem(raw, dataUrl){
-    artCache[raw] = dataUrl;
+    syncArtBaseline=null;artCache[raw] = dataUrl;
     try{
       await window.storage.set(artKeyFor(raw), dataUrl, false);
     }catch(e){
@@ -2333,13 +2342,13 @@
     const newRawSet = new Set(gathered.map(g => g.newRaw));
 
     await Promise.all(gathered.map(async ({ newRaw, dataUrl }) => {
-      artCache[newRaw] = dataUrl;
+      syncArtBaseline=null;artCache[newRaw] = dataUrl;
       try{ await window.storage.set(artKeyFor(newRaw), dataUrl, false); }catch(e){ /* best effort */ }
     }));
 
     await Promise.all(gathered.map(async ({ oldRaw }) => {
       if (newRawSet.has(oldRaw)) return; // this old key is someone else's new key this batch — leave it alone
-      delete artCache[oldRaw];
+      syncArtBaseline=null;delete artCache[oldRaw];
       try{ await window.storage.delete(artKeyFor(oldRaw), false); }catch(e){ /* best effort */ }
     }));
 
@@ -2526,7 +2535,7 @@
       await window.storage.set(COVER_ROTATION_INTERVAL_KEY, coverRotationInterval, false);
       await window.storage.set(COVER_ROTATION_INTERVAL_SAVED_AT_KEY, coverRotationIntervalSavedAt, false);
     }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
   const coverRotationSelect = document.getElementById('cover-rotation-select');
   if (coverRotationSelect){
@@ -3182,7 +3191,7 @@
     try{
       await window.storage.set(LASTFM_STORAGE_KEY, JSON.stringify({ apiKey: lastfmApiKey, username: lastfmUsername }), false);
     }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function updateLastfmUI(){
@@ -3712,7 +3721,7 @@
         songItems, songHistory, songIsComplete, songFinalRanking, savedAt: songLastSavedAt
       }), false);
     }catch(e){ /* best effort — export/import still works if this fails */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   async function clearSongProgress(){
@@ -4507,7 +4516,12 @@
     if (page === 'shows'){
       renderMediaPage('show');
     }
-    if(previous!==page)window.scrollTo(0,scrolls.get(page)||0);
+    if(previous!==page){
+      const y=scrolls.get(page)||0;
+      const grid=page==='photos'?photoGrid:page==='photo-collections'?photoTagsHost.querySelector('.pt-filter-grid'):null;
+      if(grid&&y>0&&grid.__rows&&grid.firstElementChild){const tile=grid.firstElementChild,cols=Math.max(1,Math.round(grid.clientWidth/Math.max(1,tile.offsetWidth)));const needed=Math.ceil((y+innerHeight)/Math.max(80,tile.offsetHeight))*cols;if(needed>(grid.__limit||96)){grid.__limit=needed;mbhPhotoGrid(grid,grid.__rows,page==='photos'?'gallery':'tags',false);}}
+      window.scrollTo(0,y);
+    }
   }
 
   // The dedicated guest nav is flat (just Restaurants/Hikes, no grouping),
@@ -5393,7 +5407,7 @@
       Object.keys(parsed.art).forEach(raw => {
         const dataUrl = parsed.art[raw];
         if (typeof dataUrl === 'string' && dataUrl){
-          artCache[raw] = dataUrl;
+          syncArtBaseline=null;artCache[raw] = dataUrl;
           window.storage.set(artKeyFor(raw), dataUrl, false).catch(() => {});
         }
       });
@@ -6294,7 +6308,7 @@
       await window.storage.set(POINTS_ALGO_STORAGE_KEY, pointsAlgorithm, false);
       await window.storage.set(POINTS_ALGO_SAVED_AT_KEY, pointsAlgorithmSavedAt, false);
     }catch(e){ /* best effort */ }
-    scheduleSyncWrite(); // part of the cloud copy now
+    scheduleSyncWrite('non-art'); // part of the cloud copy now
   }
   function setPointsAlgorithm(value){
     if (pointsAlgorithm === value) return;
@@ -6840,7 +6854,7 @@
         restaurantRows, savedAt: restaurantLastSavedAt
       }), false);
     }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function parseRestaurantNotes(notes){
@@ -7309,13 +7323,13 @@
   restaurantSearchFilterInput.addEventListener('input', () => {
     restaurantSearchFilter = restaurantSearchFilterInput.value.trim();
     restaurantSearchFilterClear.style.display = restaurantSearchFilter ? 'flex' : 'none';
-    renderRestaurantsPage();
+    mbhRestaurantFilter();
   });
   restaurantSearchFilterClear.addEventListener('click', () => {
     restaurantSearchFilterInput.value = '';
     restaurantSearchFilter = '';
     restaurantSearchFilterClear.style.display = 'none';
-    renderRestaurantsPage();
+    mbhRestaurantFilter();
   });
 
   // ---------- RESTAURANT INSIGHTS ----------
@@ -7880,7 +7894,7 @@
   function saveHikeProgress(){
     hikeLastSavedAt = new Date().toISOString();
     try{ window.storage.set(HIKE_STORAGE_KEY, JSON.stringify({ hikeRows, savedAt: hikeLastSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function isUSCountry(country){
@@ -8895,7 +8909,7 @@
     hikeFullListText = hikeFullListTextarea.value;
     hikeFullListTextSavedAt = new Date().toISOString();
     try{ window.storage.set(HIKE_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: hikeFullListText, savedAt: hikeFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function openHikeFullListPanel(){
@@ -8934,7 +8948,7 @@
     dishFullListText = dishFullListTextarea.value;
     dishFullListTextSavedAt = new Date().toISOString();
     try{ window.storage.set(DISH_FULL_LIST_STORAGE_KEY, JSON.stringify({ text: dishFullListText, savedAt: dishFullListTextSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function openDishFullListPanel(){
@@ -8993,7 +9007,7 @@
   function saveParkProgress(){
     parkLastSavedAt = new Date().toISOString();
     try{ window.storage.set(PARK_STORAGE_KEY, JSON.stringify({ parkRows, savedAt: parkLastSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function parkTotal(p){
@@ -9534,7 +9548,7 @@
   function saveRoadProgress(){
     roadLastSavedAt = new Date().toISOString();
     try{ window.storage.set(ROAD_STORAGE_KEY, JSON.stringify({ roadRows, savedAt: roadLastSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function roadTotal(r){
@@ -9587,7 +9601,7 @@
   function saveArtistProgress(){
     artistLastSavedAt = new Date().toISOString();
     try{ window.storage.set(ARTIST_STORAGE_KEY, JSON.stringify({ artistRows, savedAt: artistLastSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   // The ranked list only — the same list, in the same order, the Albums
@@ -10529,7 +10543,7 @@
   function savePhotoProgress(opts){
     photoLastSavedAt = new Date().toISOString();
     try{ window.storage.set(PHOTOS_STORAGE_KEY, JSON.stringify({ photoRows, savedAt: photoLastSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
     if (!(opts && opts.skipDuelReconcile)) photoDuelReconcile(); // keeps Duels' working set in step with whatever just changed in photoRows — a no-op unless Duels has ever been turned on
   }
 
@@ -10576,7 +10590,7 @@
   function savePhotoDuelProgress(){
     photoDuelLastSavedAt = new Date().toISOString();
     try{ window.storage.set(PHOTO_DUEL_STORAGE_KEY, photoDuelPayload(), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   // ---------- driver (mirrors runGenerator/handleGenResult/advance/pick/undo) ----------
@@ -10772,7 +10786,7 @@
   function saveTripProgress(){
     tripLastSavedAt = new Date().toISOString();
     try{ window.storage.set(TRIP_STORAGE_KEY, JSON.stringify({ tripRows, savedAt: tripLastSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   function tripFind(id){ return id ? (tripRows.find(t => t.id === id) || null) : null; }
@@ -11088,9 +11102,34 @@
 
 
   // Progressive keyed photo grid: lightbox and ranking retain the full order.
+
+  // FLIP for filtered cards whose renderers retain their original click
+  // wiring. Existing matching cards slide, new ones appear in a short stagger.
+  function mbhFilterMotion(root,selector,render){
+    if(motionReduced()||!root.classList.contains('active')){render();return;}
+    const before=new Map();
+    for(const el of root.querySelectorAll(selector)){
+      const r=el.getBoundingClientRect(),key=el.getAttribute('data-restaurant-index')||el.dataset.dishId||el.dataset.usKey;
+      if(key&&r.width&&r.bottom>0&&r.top<innerHeight)before.set(key,r);
+      el.__filterMotion?.cancel();
+    }
+    render();let i=0;
+    for(const el of root.querySelectorAll(selector)){
+      const r=el.getBoundingClientRect();if(!r.width||r.bottom<=0||r.top>=innerHeight)continue;
+      const key=el.getAttribute('data-restaurant-index')||el.dataset.dishId||el.dataset.usKey,from=before.get(key);
+      if(from){const x=from.left-r.left,y=from.top-r.top;if(Math.abs(x)+Math.abs(y)>2)el.__filterMotion=el.animate([{transform:'translate('+x+'px,'+y+'px)'},{transform:'none'}],{duration:240,easing:EASE_OUT});}
+      else el.__filterMotion=el.animate([{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'none'}],{duration:200,delay:Math.min(i++,7)*15,fill:'backwards',easing:EASE_OUT});
+    }
+  }
+  function mbhRestaurantFilter(){mbhFilterMotion(pageRestaurants,'[data-restaurant-index]',renderRestaurantsPage);}
+  function mbhDishFilter(){mbhFilterMotion(pageDishes,'[data-dish-id]',renderDishesPage);}
+  function mbhSearchFilter(){mbhFilterMotion(pageSearch,'[data-us-key]',usRender);}
   function mbhPhotoGrid(grid,rows,kind,animate=false){
     const ids=rows.map(p=>p.id),prior=grid.__ids||[];
-    if(ids.length!==prior.length||ids.some((id,i)=>id!==prior[i]))grid.__limit=96;
+    const changed=ids.length!==prior.length||ids.some((id,i)=>id!==prior[i]);
+    const sameMembers=ids.length===prior.length&&ids.every(id=>grid.__idSet?.has(id));
+    if(changed&&!sameMembers)grid.__limit=96;
+    grid.__idSet=new Set(ids);
     grid.__rows=rows;grid.__ids=ids;
     const motion=animate&&!motionReduced()&&grid.getClientRects().length;
     const before=new Map(),existing=new Map([...grid.children].map(el=>[el.dataset.photoId,el]));
@@ -11109,6 +11148,7 @@
         if(kind==='gallery')makePhotoDraggable(el);
       }
       if(kind==='tags')el.setAttribute('aria-label','View photo '+(i+1));
+      if(kind==='gallery')el.draggable=rows.length===photoRows.length;
       const img=el.querySelector('img');
       if(img.__url!==p.url){
         img.__url=p.url;img.classList.remove('img-loaded');
@@ -11159,6 +11199,7 @@
     updatePhotoSortHelperVisibility();
     refreshPhotoCalendar();
     refreshPhotoTags();
+    if(!pagePhotos.classList.contains('active'))return;
     const empty = !photoRows.length;
     if (empty) photoEditMode = false;
     photoEmptyMessage.style.display = empty ? 'block' : 'none';
@@ -11463,7 +11504,7 @@
     derivePhotoTagAutomaticOnly(photoTags);
     photoTagsSavedAt=new Date().toISOString();
     persistPhotoTags();
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
     refreshPhotoTags();
   }
   function prunePhotoTagMemberships(){
@@ -11652,6 +11693,7 @@
       if(chip)chip.scrollIntoView({block:'nearest'});
       };
       photoTagCreateTray.showModal();
+      mbhTagSheetDrag(photoTagCreateTray);
       input.focus();
     };
     photoTagTray.querySelector('[data-done]').onclick=()=>{
@@ -12234,7 +12276,7 @@
     const payload = { savedAt: mediaState[type].lastSavedAt };
     payload[config.storageField] = mediaState[type].rows;
     try{ window.storage.set(config.storageKey, JSON.stringify(payload), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   // Cover upload lives directly on each edit-mode row's thumbnail, since
@@ -12972,7 +13014,7 @@
   function saveDishOrder(){
     dishOrderSavedAt = new Date().toISOString();
     try{ window.storage.set(DISH_STORAGE_KEY, JSON.stringify({ order: dishOrder, savedAt: dishOrderSavedAt }), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite(); // dish order is part of the cloud copy now
+    scheduleSyncWrite('non-art'); // dish order is part of the cloud copy now
   }
 
   function dishPhotoHtml(course){
@@ -13237,7 +13279,7 @@
   dishRestaurantFilterInput.addEventListener('input', () => {
     const val = dishRestaurantFilterInput.value.trim();
     if (!val){
-      if (dishRestaurantFilter){ dishRestaurantFilter = ''; renderDishesPage(); }
+      if (dishRestaurantFilter){ dishRestaurantFilter = ''; mbhDishFilter(); }
       return;
     }
     // Same convention as Albums' filters — only actually applies once it's
@@ -13247,25 +13289,25 @@
     const known = Array.from(dishRestaurantFilterDatalist.options).map(o => o.value);
     if (known.includes(val) && val !== dishRestaurantFilter){
       dishRestaurantFilter = val;
-      renderDishesPage();
+      mbhDishFilter();
     }
   });
   dishRestaurantFilterClear.addEventListener('click', () => {
     dishRestaurantFilterInput.value = '';
     dishRestaurantFilter = '';
-    renderDishesPage();
+    mbhDishFilter();
   });
 
   dishDescriptionFilterInput.addEventListener('input', () => {
     dishDescriptionFilter = dishDescriptionFilterInput.value;
     dishDescriptionFilterClear.style.display = dishDescriptionFilter.trim() ? 'flex' : 'none';
-    renderDishesPage();
+    mbhDishFilter();
   });
   dishDescriptionFilterClear.addEventListener('click', () => {
     dishDescriptionFilterInput.value = '';
     dishDescriptionFilter = '';
     dishDescriptionFilterClear.style.display = 'none';
-    renderDishesPage();
+    mbhDishFilter();
   });
 
   // Parses filenames like "20250811_073318.jpg" (a common phone-camera
@@ -17419,7 +17461,7 @@
   function saveActivityProgress(){
     activityLastSavedAt = new Date().toISOString();
     try{ window.storage.set(ACTIVITY_STORAGE_KEY, activityStoragePayload(), false); }catch(e){ /* best effort */ }
-    scheduleSyncWrite();
+    scheduleSyncWrite('non-art');
   }
 
   // → { a, trip } — trip is null for a one-off — or null if it's gone.
@@ -21695,7 +21737,7 @@
   }
   // If the owner switches into Guest View, clear all private search state.
   new MutationObserver(()=>{
-    if(!usOwner()){usClose();usInput.value='';usRows=[];usEnter.__stamp=null;usRender.__ranked=null;usVisible=[];usType='all';usRecent=[];usResults.replaceChildren();usFilters.replaceChildren();usToolbar.hidden=true;}
+    if(!usOwner()){usClose();usInput.value='';usRows=[];usEnter.__stamp=null;usRender.__ranked=null;usVisible=[];usType='all';usRecent=[];usResults.replaceChildren();usFilters.replaceChildren();usFilters.__html=null;usToolbar.hidden=true;}
   }).observe(document.body,{attributes:true,attributeFilter:['class']});
   function usChip(type,label,selected){
     return '<button type="button" data-us-type="'+escapeAttr(type)+'" aria-pressed="'+selected+'">'+escapeHtml(label)+'</button>';
@@ -21718,7 +21760,7 @@
     return '<button class="us-result" type="button" data-us-result="'+i+'">'+usThumb(r)+'<span class="us-result-text"><strong>'+h(r.title)+'</strong>'+(r.meta?'<small>'+h(r.meta)+'</small>':'')+(excerpt&&excerpt!==r.title?'<small class="us-excerpt">'+h(excerpt)+'</small>':'')+'</span>'+score+'<span aria-hidden="true" class="us-chevron">›</span></button>';
   }
   function usRender(){
-    if(!usOwner())return;
+    if(!usOwner()||!pageSearch.classList.contains('active'))return;
     const q=usNorm(usInput.value),terms=usWords(q),rail=usFilters.scrollLeft;
     usClear.hidden=!usInput.value;
     const memo=new Map();const near=(a,b)=>{if(a.length<4||Math.abs(a.length-b.length)>(a.length>=8?2:1))return false;const key=a+'\0'+b;if(!memo.has(key))memo.set(key,usNear(a,b));return memo.get(key);};
@@ -21727,7 +21769,8 @@
     usRender.__ranked={rows:usRows,q,ranked};
     const counts=new Map();ranked.forEach(x=>counts.set(x.r.type,(counts.get(x.r.type)||0)+1));
     const available=Object.keys(usTypes).filter(t=>counts.has(t)||t===usType);
-    usFilters.innerHTML=usChip('all','All'+(q?' '+ranked.length:''),usType==='all')+available.map(t=>usChip(t,usTypes[t][1]+' '+usTypes[t][0]+(q?' '+(counts.get(t)||0):''),usType===t)).join('');
+    const filterHtml=usChip('all','All'+(q?' '+ranked.length:''),usType==='all')+available.map(t=>usChip(t,usTypes[t][1]+' '+usTypes[t][0]+(q?' '+(counts.get(t)||0):''),usType===t)).join('');
+    if(usFilters.__html!==filterHtml){usFilters.innerHTML=filterHtml;usFilters.__html=filterHtml;}
     usFilters.scrollLeft=rail;
     if(!q&&usType==='all'){
       usToolbar.hidden=true;usVisible=[];
@@ -21749,16 +21792,17 @@
       return b.s-a.s||a.r.order-b.r.order;
     };
     list.sort(cmp);usVisible=list.map(x=>x.r);
-    usToolbar.querySelector('.us-count').textContent=list.length+' result'+(list.length===1?'':'s');
+    const countLabel=usToolbar.querySelector('.us-count'),countText=list.length+' result'+(list.length===1?'':'s');
+    if(countLabel.textContent!==countText){countLabel.textContent=countText;if(!motionReduced()){countLabel.__motion?.cancel();countLabel.__motion=countLabel.animate([{opacity:.45,transform:'translateY(2px)'},{opacity:1,transform:'none'}],{duration:150,easing:EASE_OUT});}}
     if(!list.length){usResults.innerHTML='<div class="us-empty"><h2>No matches</h2><p>Try a different spelling, fewer words, or another category.</p>'+(usType!=='all'?'<button type="button" data-us-type="all" class="us-link">Search all categories</button>':'')+'</div>';return;}
     const groups=new Map();list.forEach((x,i)=>{if(!groups.has(x.r.type))groups.set(x.r.type,[]);groups.get(x.r.type).push({r:x.r,i});});
     usResults.innerHTML=[...groups].map(([type,rows])=>{
       if(sort==='highest'&&usType==='all')rows.sort((a,b)=>(b.r.score??-Infinity)-(a.r.score??-Infinity)||0);
       const cap=usType==='all'?(type==='photo'?8:4):usLimit, shown=rows.slice(0,cap);
-      return '<section class="us-section"><div class="us-section-head"><h2>'+usTypes[type][1]+' '+usTypes[type][0]+' <small>'+rows.length+'</small></h2>'+(usType==='all'&&rows.length>cap?'<button class="us-plain us-link" type="button" data-us-type="'+type+'">See all ›</button>':'')+'</div><div class="'+(type==='photo'?'us-photo-grid':'us-list')+'">'+shown.map(({r,i},j)=>'<div class="us-entry" style="--us-delay:'+Math.min(j,11)*20+'ms">'+usCard(r,i,q)+'</div>').join('')+'</div>'+(usType!=='all'&&rows.length>cap?'<button class="us-more" type="button" data-us-more>Show '+Math.min(60,rows.length-cap)+' more</button>':'')+'</section>';
+      return '<section class="us-section"><div class="us-section-head"><h2>'+usTypes[type][1]+' '+usTypes[type][0]+' <small>'+rows.length+'</small></h2>'+(usType==='all'&&rows.length>cap?'<button class="us-plain us-link" type="button" data-us-type="'+type+'">See all ›</button>':'')+'</div><div class="'+(type==='photo'?'us-photo-grid':'us-list')+'">'+shown.map(({r,i},j)=>'<div class="us-entry" data-us-key="'+escapeAttr(r.type+':'+r.order)+'" style="--us-delay:'+Math.min(j,11)*20+'ms">'+usCard(r,i,q)+'</div>').join('')+'</div>'+(usType!=='all'&&rows.length>cap?'<button class="us-more" type="button" data-us-more>Show '+Math.min(60,rows.length-cap)+' more</button>':'')+'</section>';
     }).join('');
   }
-  function usSetType(type){usType=type;usLimit=60;usRender();usScrollTop();}
+  function usSetType(type){usType=type;usLimit=60;mbhSearchFilter();usScrollTop();}
   function usActivate(i){
     const r=usVisible[i];if(!r||!usOwner())return;usRemember();usInput.blur();
     if(r.type==='photo'){
@@ -21767,12 +21811,12 @@
     }
     if(r.action)r.action();
   }
-  usInput.addEventListener('input',()=>{clearTimeout(usTimer);usLimit=60;usTimer=setTimeout(()=>{usRender();usScrollTop();},85);});
+  usInput.addEventListener('input',()=>{clearTimeout(usTimer);usLimit=60;usTimer=setTimeout(()=>{mbhSearchFilter();usScrollTop();},85);});
   usInput.addEventListener('keydown',e=>{
     if(e.key==='Enter'){e.preventDefault();clearTimeout(usTimer);usRender();usRemember();usInput.blur();}
     if(e.key==='ArrowDown'){const first=usResults.querySelector('[data-us-result], [data-us-term], [data-us-type]');if(first){e.preventDefault();first.focus();}}
   });
-  usSort.addEventListener('change',()=>{usLimit=60;usRender();});
+  usSort.addEventListener('change',()=>{usLimit=60;mbhSearchFilter();});
   usOverlay.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.hasAttribute('data-us-clear')){clearTimeout(usTimer);usInput.value='';usType='all';usLimit=60;usRender();usInput.focus();return;}

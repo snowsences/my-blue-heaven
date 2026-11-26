@@ -5544,3 +5544,11 @@
     @keyframes mbhBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
     @keyframes mbhLineDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
   }
+
+  .us-count{display:inline-block;}
+  .us-entry{animation:none!important;}
+  @media(prefers-reduced-motion:no-preference){
+    .rd-body .rd-extra{animation:revealIn 180ms var(--ease-out) backwards;}
+    .details-art-wrap .art-img.img-loaded{transition:opacity 220ms var(--ease-out),transform 320ms var(--ease-out);}
+    .pt-filter-chip,.us-filters button{transition:background 120ms var(--ease-out),color 120ms var(--ease-out);}
+  }
