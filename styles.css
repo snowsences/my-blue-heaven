@@ -2831,15 +2831,16 @@
     margin: 0 -20px 18px;
     padding: 10px 20px 8px;
     background: var(--bg);
-    border-bottom: 1px solid var(--panel-line);
+    border-bottom: 1px solid transparent;
     overflow-x: auto;
     scrollbar-width: none;
   }
+  .trip-year-bar.is-pinned{ border-bottom-color: var(--panel-line); }
   .trip-year-bar::-webkit-scrollbar{ display: none; }
   .trip-year-bar[hidden]{ display: none; }
   .trip-year-rail{ position: relative; display: inline-flex; min-width: 100%; gap: 6px; }
   /* the horizontal timeline's line, running through every dot */
-  .trip-year-rail::before{ content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--panel-line); border-radius: 1px; }
+  .trip-year-rail::before{ content: ''; position: absolute; left: 0; right: 0; top: 8.5px; height: 1px; background: var(--panel-line); border-radius: 1px; }
   .trip-year-btn{ position: relative; flex: none; display: grid; justify-items: center; gap: 4px; min-width: 56px; padding: 4px 6px 2px; background: none; border: none; color: var(--chalk-dim); font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
   .trip-year-btn:first-child{ padding-left: 0; }
   .trip-year-dot{ width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid rgba(241,236,222,0.35); transition: transform var(--dur-med) var(--ease-out), background var(--dur-med) var(--ease-out), border-color var(--dur-med) var(--ease-out); }
@@ -5130,7 +5131,7 @@
 
   /* Year bar: one amber dot glides along the line to the year you're on. */
   .trip-year-btn.active .trip-year-dot{ background: var(--bg); border-color: transparent; transform: none; box-shadow: none; }
-  .trip-year-glider{ position: absolute; top: 5px; left: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(232,163,61,0.22); pointer-events: none; z-index: 1;
+  .trip-year-glider{ position: absolute; top: 2.5px; left: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(232,163,61,0.22); pointer-events: none; z-index: 1;
     transform: translateX(var(--glide-x, 0px)); transition: transform 420ms var(--ease-spring); }
 
   /* A bottom sheet follows your finger when you drag it down by its top. */
