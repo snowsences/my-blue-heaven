@@ -5673,3 +5673,13 @@
 .rd-meal-heading .rd-meal-date{border:0;background:none;padding:6px 0;color:var(--chalk);font:600 15px Figtree,sans-serif;border-radius:4px;cursor:pointer}
 .rd-meal-heading .rd-meal-date:hover{color:var(--amber)}
 .rd-meal-entry+.rd-meal-entry{padding-top:14px}
+
+/* Restaurant identity is part of the cover, not a separate vertical block. */
+#restaurant-details-panel-inner .rd-cover-caption{
+  padding:26px 20px 10px;
+  background:linear-gradient(to top,rgba(15,33,36,.86),rgba(15,33,36,.60) 45%,rgba(15,33,36,0));
+  z-index:1;pointer-events:none;color:#fff;
+}
+#restaurant-details-panel-inner .rd-cover-caption .details-album{color:#fff;font-size:clamp(18px,4.5vw,23px);line-height:1.2;margin:0 0 3px;overflow-wrap:anywhere;text-shadow:0 1px 5px rgba(0,0,0,.45)}
+#restaurant-details-panel-inner .rd-cover-caption .details-artist{color:rgba(255,255,255,.85);font-size:13px;margin:0;line-height:1.25;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+@media(max-width:480px){#restaurant-details-panel-inner .rd-cover-caption{padding:24px 14px 9px}}
