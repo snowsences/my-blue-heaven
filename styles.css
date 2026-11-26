@@ -590,8 +590,9 @@
     display: flex;
     flex-direction: column;
     background: var(--bg-2);
-    border: 1px solid var(--panel-line);
-    border-radius: 10px;
+    border: 0;
+    border-radius: 4px;
+    box-shadow: 0px 1px 3px 0px rgba(0,0,0,0.1);
     overflow: hidden; /* keeps the photo's corners rounded with the card */
   }
   .restaurant-course-pairing-btn{
@@ -875,7 +876,8 @@
     font-family: 'Figtree', sans-serif;
     font-size: 13px;
   }
-  .restaurant-visit-content{ padding: 16px 24px 24px; }
+  .restaurant-visit-content{ padding: 16px 24px 24px; background: rgba(0,0,0,0.14); }
+  .restaurant-visit-content .restaurant-visit-notes-display{ padding-bottom: 8px; }
   .restaurant-visit-meta-row{
     display: flex;
     flex-wrap: wrap; /* the date, the Full/Thumbnails toggle, Share and Edit don't all fit one phone-width line — wrap instead of squashing the date or pushing Edit off the edge */
@@ -5392,6 +5394,7 @@
     outline: none !important;
     box-shadow: none !important;
   }
+  .restaurant-course-card:focus-within{ box-shadow: 0px 1px 3px 0px rgba(0,0,0,0.1) !important; }
   .tmap-stop:focus-visible .tmap-stop-num,
   .pt-category-segments input:focus-visible + span{
     outline: none !important;
