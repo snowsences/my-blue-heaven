@@ -11496,10 +11496,22 @@
     photoTagDraft={photoId:id,selected:new Set(explicitPhotoTagIds(id))};
     photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tags</button></div></div>';
     const list=photoTagTray.querySelector('.pt-tray-list'), add=photoTagTray.querySelector('[data-add]');
+    function selectDraftTag(tag){
+      if(photoTagCategory(tag.category)==='Location'){
+        photoTags.forEach(t=>{
+          if(t.id!==tag.id&&photoTagCategory(t.category)==='Location')photoTagDraft.selected.delete(t.id);
+        });
+      }
+      photoTagDraft.selected.add(tag.id);
+    }
     function render(){
       list.replaceChildren();
       groupedPhotoTags().forEach(({category,tags})=>{
         tags=tags.filter(t=>!t.automaticOnly);
+        if(category==='Location'){
+          const selected=tags.filter(t=>photoTagDraft.selected.has(t.id));
+          if(selected.length)tags=selected;
+        }
         const section=document.createElement('section');section.className='pt-category-group';
         const heading=document.createElement('h3');heading.textContent=category;section.appendChild(heading);
         const chips=document.createElement('div');chips.className='pt-category-chips';section.appendChild(chips);
@@ -11512,7 +11524,7 @@
         const mark=document.createElement('span');mark.className='pt-checkmark';mark.setAttribute('aria-hidden','true');mark.textContent=photoTagDraft.selected.has(t.id)?'✓':'＋';
         b.append(name,mark);
         b.onclick=()=>{
-          if(photoTagDraft.selected.has(t.id))photoTagDraft.selected.delete(t.id);else photoTagDraft.selected.add(t.id);
+          if(photoTagDraft.selected.has(t.id))photoTagDraft.selected.delete(t.id);else selectDraftTag(t);
           render();
           const replacement=[...list.querySelectorAll('[data-tag-id]')].find(x=>x.dataset.tagId===t.id);
           if(replacement)replacement.focus({preventScroll:true});
@@ -11529,7 +11541,7 @@
       const match=matchPhotoTagTerm(quick.value,photoTags.filter(t=>!t.automaticOnly));
       quick.value='';
       if(!match||!photoTagDraft||!photoTagsWritable())return;
-      photoTagDraft.selected.add(match.id);
+      selectDraftTag(match);
       // Keep the draft behavior consistent with tapping a chip: Done saves.
       render();
       const chip=Array.from(list.querySelectorAll('[data-tag-id]')).find(b=>b.dataset.tagId===match.id);
