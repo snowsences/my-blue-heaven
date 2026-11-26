@@ -18812,7 +18812,7 @@
   function almOverview(){
     const d=almData,t=d.totals, ys=d.years, metric=s=>()=>almSwitch(s);
     const fns={Food:y=>y.visits,Hiking:y=>y.hikes,Photography:y=>y.photos,Travel:y=>y.tripDays.size};
-    return '<div class="alm-hero"><strong>'+almNum(d.countries.size)+'</strong><span class="alm-hero-label">Countries visited</span><p class="alm-note">Known from your recorded experiences</p><button class="alm-plain alm-link" type="button"'+almAction(metric('Travel'))+'>Explore travel history ›</button></div>'+
+    return '<div class="alm-hero"><strong>'+almNum(d.countries.size)+'</strong><span class="alm-hero-label">Countries visited</span><button class="alm-plain alm-link" type="button"'+almAction(metric('Travel'))+'>Explore travel history ›</button></div>'+
       almMetrics([[d.restaurants.length,'Restaurants',metric('Food')],[t.visits,'Restaurant visits',metric('Food')],[t.dishes,'Rated dishes',metric('Food')],[d.hikes.length,'Unique hikes',metric('Nature')],[t.outings,'Hiking outings',metric('Nature')],[t.miles,'Miles hiked',metric('Nature')],[t.feet,'Feet climbed',metric('Nature')],[d.parks.length,'Parks',metric('Nature')],[d.roads.length,'Scenic roads',metric('Nature')],[d.photos.length,'Gallery photos',metric('Photos')],[d.days.size,'Photography days',metric('Photos')],[d.trips.length,'Completed trips',metric('Travel')]])+
       almSectionHtml('A lifetime in numbers','Tap a year to open Year in Review.','<div class="alm-filters">'+almSelect('Annual activity','chart',Object.keys(fns).map(s=>[s,s]),almChartType)+'</div>'+almChart(ys,fns[almChartType]));
   }

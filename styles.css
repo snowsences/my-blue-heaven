@@ -5587,9 +5587,9 @@
 #alm-period{margin:0 0 12px;color:var(--chalk-dim);font-size:13px}
 .alm-close,.alm-plain,.alm-tab,.alm-row,.alm-day,.alm-month,.alm-metric,.alm-chart-bar{border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:0;text-align:left}
 .alm-close{min-width:44px;min-height:44px;text-align:center;font-size:32px;font-weight:400;line-height:1}
-#alm-tabs{display:flex;gap:clamp(16px,5vw,36px);overflow-x:auto;scrollbar-width:none}
+#alm-tabs{display:flex;width:100%;gap:0;overflow-x:auto;scrollbar-width:none}
 #alm-tabs::-webkit-scrollbar{display:none}
-.alm-tab{position:relative;padding:12px 0 13px;white-space:nowrap;color:var(--chalk-dim);font-size:14px;font-weight:500}
+.alm-tab{position:relative;flex:1 1 0;min-width:max-content;text-align:center;padding:12px 0 13px;white-space:nowrap;color:var(--chalk-dim);font-size:14px;font-weight:500}
 .alm-tab[aria-selected=true]{color:var(--amber)}
 .alm-tab[aria-selected=true]:after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--amber)}
 #alm-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:24px max(20px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}
@@ -5656,7 +5656,7 @@
 #alm-panel :focus-visible{outline:2px solid var(--amber);outline-offset:3px}
 @media(hover:hover){.alm-row:hover,.alm-metric:hover,.alm-month:not(:disabled):hover,.alm-day:hover{background:rgba(140,180,176,.065)}.alm-link:hover{color:var(--chalk)}}
 @media(min-width:760px){.alm-columns{grid-template-columns:repeat(2,minmax(0,1fr))}.alm-metrics{grid-template-columns:repeat(6,minmax(0,1fr))}.alm-months{grid-template-columns:repeat(6,minmax(0,1fr))}.alm-day-photos{max-width:520px}}
-@media(max-width:365px){#alm-tabs{gap:14px}.alm-tab{font-size:12px}.alm-day-head b{font-size:13px}.alm-month strong{font-size:11px}}
+@media(max-width:365px){.alm-tab{font-size:12px}.alm-day-head b{font-size:13px}.alm-month strong{font-size:11px}}
 @keyframes alm-grow{from{transform:scaleY(.12);opacity:.5}to{transform:scaleY(1);opacity:1}}
 @media(prefers-reduced-motion:reduce){#alm-overlay,.alm-image{transition:none}.alm-chart-fill,.alm-thumb,.alm-day-image,.alm-month-image{animation:none!important}}
 
