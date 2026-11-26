@@ -18836,7 +18836,7 @@
       almSectionHtml('Restaurant visits by year','',almChart(chartYears,y=>y.visits))+almSectionHtml('New restaurants by year','',almChart(chartYears,y=>y.newRestaurants))+almSectionHtml('Rated dishes by year','',almChart(chartYears,y=>y.dishes))+'</div>';
   }
   function almNature(){
-    const d=almData,ys=d.years, best=new Map(), bestP=new Map();
+    const d=almData,ys=d.years.filter(y=>y.y>=2018), best=new Map(), bestP=new Map();
     d.hikes.forEach(x=>{if(x.code&&x.score!==null&&!best.has(x.code))best.set(x.code,x);});
     d.parks.slice().sort((a,b)=>(b.score??-1)-(a.score??-1)).forEach(x=>{if(x.code&&x.score!==null&&!bestP.has(x.code))bestP.set(x.code,x);});
     const repeat=d.hikes.filter(x=>x.dates.length>1).slice().sort((a,b)=>b.dates.length-a.dates.length||a.rank-b.rank);
@@ -18852,20 +18852,20 @@
     return result.sort((a,b)=>b.rows.length-a.rows.length||a.rows[0].rank-b.rows[0].rank||b.date.localeCompare(a.date));
   }
   function almPhotos(){
-    const d=almData,ys=d.years, days=almPhotoDays();
+    const d=almData,ys=d.years, chartYears=ys.filter(y=>y.y>=2018), days=almPhotoDays();
     const filters='<div class="alm-filters">'+almSelect('Year','photoYear',[['','All years'],...ys.filter(y=>y.photos).slice().reverse().map(y=>[y.y,y.y])],almPhotoYear)+PHOTO_TAG_CATEGORIES.map((c,i)=>almSelect(c,'photoTag'+i,[['','All '+c.toLowerCase()+' tags'],...sortedPhotoTags().filter(t=>photoTagCategory(t.category)===c).map(t=>[t.id,t.name])],almPhotoTags[i])).join('')+'</div>';
     const dayList=almList('photoDays',days,(x,i)=>'<button type="button" class="alm-day"'+almAction(()=>almGoDay(x.date))+'><span class="alm-day-head"><span class="alm-rank">#'+(i+1)+'</span><b>'+almEsc(almDateLabel(x.date))+'</b><span class="alm-day-count">'+x.rows.length+' photos ›</span></span><span class="alm-day-photos">'+x.rows.slice(0,4).map(p=>'<span class="alm-day-image">'+almImg(p.p.url,400)+'</span>').join('')+'</span></button>');
     const months='<div class="alm-months">'+PHOTO_MONTHS.map((m,i)=>{const p=d.months.get(i+1);return '<button type="button" class="alm-month"'+(p?almAction(()=>almGoPhoto(p)):' disabled')+'><span class="alm-month-image">'+(p?almImg(p.p.url,400):'')+'</span><strong>'+almEsc(m)+'</strong><small>'+(p?p.date.y+' · #'+p.rank:'No photo')+'</small></button>';}).join('')+'</div>';
     return almMetrics([[d.photos.length,'Gallery photos'],[d.days.size,'Photography days'],[d.photos.filter(p=>!p.date).length,'Undated photos']])+
-      almSectionHtml('Most productive photography days','Gallery-worthy photographs by exact capture date, ranked by count; ties use the best photo rank.',filters+dayList)+
+      almSectionHtml('Most productive photography days','',filters+dayList)+
       almSectionHtml('Best photograph of every month','Highest current Gallery rank for each calendar month, across all years.',months)+
       '<div class="alm-columns">'+almSectionHtml('Best years for photography','Three complementary measures of productivity and quality.',almYearLeaders([almLeader('Most photographs',y=>y.photos),almLeader('Most top-100 photos',y=>y.top[0]),almLeader('Most photography days',y=>y.photoDays)]))+
-      almSectionHtml('Gallery ranking by year','Current master ranking; undated photographs are excluded.',almChart(ys,y=>y.top,almNum,true))+almSectionHtml('Photography days by year','',almChart(ys,y=>y.photoDays))+'</div>';
+      almSectionHtml('Gallery ranking by year','Current master ranking; undated photographs are excluded.',almChart(chartYears,y=>y.top,almNum,true))+almSectionHtml('Photography days by year','',almChart(chartYears,y=>y.photoDays))+'</div>';
   }
   function almCountryPage(c){
     const d=almData;
     return '<button class="alm-plain alm-link alm-subnav" type="button"'+almAction(()=>{almCountryDetail='';almRender(false);})+'>‹ All countries</button>'+
-      '<div class="alm-country-head"><strong>'+almFlag(c.code)+'</strong><h2>'+almEsc(c.name)+'</h2></div><p class="alm-note">'+almEsc(c.first?'First known visit '+c.first+(c.last!==c.first?' · Most recent '+c.last:''):'Visit year unknown')+'</p>'+
+      '<div class="alm-country-head"><strong>'+almFlag(c.code)+'</strong><h2>'+almEsc(c.name)+'</h2></div><p class="alm-note">'+almEsc(c.first?'First visit '+c.first+(c.last!==c.first?' · Most recent '+c.last:''):'Visit year unknown')+'</p>'+
       almMetrics([[c.trips.size,'Trips'],[c.restaurants.size,'Restaurants'],[c.visits,'Restaurant visits'],[c.hikes.size,'Hikes'],[c.parks.size,'Parks'],[c.photos.size,'Gallery photos']])+
       '<div class="alm-columns">'+almSectionHtml('Trips','',almList('ctTrips',[...c.trips],t=>almRow(t.name||'Trip',tripDateLabel(t),'',()=>openTrip(t.id),t.coverPhoto)))+
       almSectionHtml('Restaurants','',almList('ctRestaurants',d.restaurants.filter(x=>c.restaurants.has(x.r)),x=>almRow(x.r.name,x.visits.length+' visits','',()=>almGoRestaurant(x.r),x.r.coverPhoto)))+
@@ -18875,25 +18875,23 @@
       almSectionHtml('Gallery photographs','Country-level Location tags, including inherited tags.',(()=>{const rows=d.photos.filter(x=>c.photos.has(x.p));if(!rows.length)return almEmpty('No Gallery photographs tagged with this country.');const cap=almLimits.ctPhotos||48;return '<div class="alm-months">'+rows.slice(0,cap).map(x=>'<button class="alm-month" type="button"'+almAction(()=>almGoPhoto(x,rows))+'><span class="alm-month-image">'+almImg(x.p.url,400)+'</span><small>#'+x.rank+'</small></button>').join('')+'</div>'+(rows.length>cap?'<button class="alm-plain alm-link" type="button"'+almAction(()=>{almLimits.ctPhotos=cap+48;almRender(true);})+'>Show more ›</button>':'');})());
   }
   function almTravel(){
-    const d=almData, cs=[...d.countries.values()], ys=d.years;if(almCountryDetail&&d.countries.has(almCountryDetail))return almCountryPage(d.countries.get(almCountryDetail));
+    const d=almData, cs=[...d.countries.values()], ys=d.years.filter(y=>y.y>=2017);if(almCountryDetail&&d.countries.has(almCountryDetail))return almCountryPage(d.countries.get(almCountryDetail));
     const sort={alpha:(a,b)=>a.name.localeCompare(b.name),first:(a,b)=>(a.first??Infinity)-(b.first??Infinity),recent:(a,b)=>(b.last??0)-(a.last??0),trips:(a,b)=>b.trips.size-a.trips.size,photos:(a,b)=>b.photos.size-a.photos.size};
     cs.sort((a,b)=>sort[almCountrySort](a,b)||a.name.localeCompare(b.name));
-    const unknown=cs.filter(c=>c.first===null).length;
     const firstCount=y=>cs.filter(c=>c.first===y.y).length;
-    const countryRows=almList('countries',cs,c=>almRow(c.name,c.first?'First known visit '+c.first:'Year unknown',c.trips.size,()=>{almCountryDetail=c.code;Object.keys(almLimits).filter(k=>k.startsWith('ct')).forEach(k=>delete almLimits[k]);almRender(false);},'',c.manual?'Historical entry':'','trips',almFlag(c.code)),30);
+    const countryRows=almList('countries',cs,c=>almRow(c.name,c.first?'First visit '+c.first:'Year unknown',c.trips.size,()=>{almCountryDetail=c.code;Object.keys(almLimits).filter(k=>k.startsWith('ct')).forEach(k=>delete almLimits[k]);almRender(false);},'',c.manual?'Historical entry':'','trips',almFlag(c.code)),30);
     const manual='<form class="alm-form" id="alm-country-form"><label>Country<select name="country" required><option value="">Select country</option>'+[...almCountryNames].sort((a,b)=>a[1].localeCompare(b[1])).map(([c,n])=>'<option value="'+c+'">'+almEsc(n)+'</option>').join('')+'</select></label><label>First visit year (optional)<input name="year" type="number" min="1900" max="'+new Date().getFullYear()+'" placeholder="Unknown"></label><button type="submit" class="btn-primary">Add / update</button></form>'+
       (almManual.length?'<div class="alm-manual-list">'+almManual.map(m=>'<button type="button"'+almAction(()=>{if(!almOwner())return;almManual=almManual.filter(x=>x.code!==m.code);almSaveManual();})+' aria-label="Remove historical entry for '+almAttr(almCountryNames.get(m.code))+'">'+almEsc(almCountryNames.get(m.code)+(m.year?' · '+m.year:''))+' ×</button>').join('')+'</div>':'');
-    return '<div class="alm-hero"><strong>'+cs.length+'</strong><span class="alm-hero-label">Countries visited</span><p class="alm-note">'+unknown+' without a known first-visit year</p><button type="button" class="alm-plain alm-link"'+almAction(almGoWorld)+'>Open Trips World View ›</button></div>'+
-      '<div class="alm-columns">'+almSectionHtml('Countries over time','Cumulative known first-visit years; undated countries are not placed in the chart.',almChart(ys,y=>cs.filter(c=>c.first!==null&&c.first<=y.y).length))+
+    return '<div class="alm-hero"><strong>'+cs.length+'</strong><span class="alm-hero-label">Countries visited</span><button type="button" class="alm-plain alm-link"'+almAction(almGoWorld)+'>Open Trips World View ›</button></div>'+
+      '<div class="alm-columns">'+almSectionHtml('Countries over time','Cumulative first-visit years; undated countries are not placed in the chart.',almChart(ys.filter(y=>y.y>=2020),y=>cs.filter(c=>c.first!==null&&c.first<=y.y).length))+
       almSectionHtml('Best years for travel','Separate measures, not a subjective trip-quality score.',almYearLeaders([almLeader('Most new countries',firstCount),almLeader('Most countries visited',y=>y.countries.size),almLeader('Most trip days',y=>y.tripDays.size)]))+
       almSectionHtml('Countries visited each year','Countries with dated evidence in that year.',almChart(ys,y=>y.countries.size))+almSectionHtml('Days on trips each year','Exact completed trip dates only; overlapping days count once.',almChart(ys,y=>y.tripDays.size))+'</div>'+
-      almSectionHtml('Country directory','Countries with known evidence; unrecognized locations are not guessed. Dependencies are grouped with their parent country where mapped.', '<div class="alm-filters">'+almSelect('Sort by','countrySort',[['first','First known visit'],['recent','Most recent visit'],['alpha','Alphabetical'],['trips','Trips'],['photos','Photographs']],almCountrySort)+'</div>'+countryRows)+
+      almSectionHtml('Country directory','Countries with known evidence; unrecognized locations are not guessed. Dependencies are grouped with their parent country where mapped.', '<div class="alm-filters">'+almSelect('Sort by','countrySort',[['first','First visit'],['recent','Most recent visit'],['alpha','Alphabetical'],['trips','Trips'],['photos','Photographs']],almCountrySort)+'</div>'+countryRows)+
       almSectionHtml('Add a historical country','For travel before you kept records here. Removing an entry only removes this manual evidence, never the original records.',manual);
   }
   function almRender(keep=false){
     if(!almOwner()||!almData)return;
     const y=almScroll.scrollTop,active=document.activeElement,activeFilter=almContent.contains(active)?active.dataset.almFilter:null;almActions=[];
-    document.getElementById('alm-period').textContent='A lifetime of experiences'+(almData.first?' · '+almData.first+(almData.last!==almData.first?'–'+almData.last:''):'');
     almTabs.innerHTML=ALM_SECTIONS.map(s=>'<button type="button" class="alm-tab" data-alm-section="'+s+'" aria-selected="'+(s===almSection)+'" tabindex="'+(s===almSection?0:-1)+'" aria-controls="alm-content" role="tab" id="alm-tab-'+s+'">'+s+'</button>').join('');
     almTabs.setAttribute('role','tablist');almContent.setAttribute('role','tabpanel');almContent.setAttribute('aria-labelledby','alm-tab-'+almSection);
     almContent.innerHTML=({Overview:almOverview,Food:almFood,Nature:almNature,Photos:almPhotos,Travel:almTravel})[almSection]();
