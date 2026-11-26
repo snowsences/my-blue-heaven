@@ -5308,3 +5308,5 @@
   .pt-category-select{width:100%;min-width:0;color-scheme:dark;font:inherit;}
   .pt-modal-body .pt-category-label{margin-top:14px;}
   .pt-modal-body .pt-category-select{display:block;margin-top:8px;}
+
+  .pt-quick-tag{display:block;width:100%;box-sizing:border-box;flex:none;min-height:42px;}

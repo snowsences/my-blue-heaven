@@ -11322,10 +11322,21 @@
     photoTagButton.title=assigned.length?assigned.map(t=>t.name).join(', '):'Add Tag';
     photoTagButton.setAttribute('aria-label',assigned.length?'Edit tags: '+label:'Add Tag');
   }
+  // Prefer an exact case-insensitive name, then allow a final plural s.
+  function matchPhotoTagTerm(term,tags){
+    const normalize=v=>String(v||'').trim().toLowerCase();
+    const key=normalize(term);
+    if(!key)return null;
+    const exact=tags.find(t=>normalize(t.name)===key);
+    if(exact)return exact;
+    const singular=v=>v.replace(/s$/,'');
+    const matches=tags.filter(t=>singular(normalize(t.name))===singular(key));
+    return matches.length===1?matches[0]:null;
+  }
   function photoTagOpenTray(id){
     if(!photoTagsWritable()||!photoRows.some(p=>p.id===id))return;
     photoTagDraft={photoId:id,selected:new Set(photoTagsFor(id).map(t=>t.id))};
-    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
+    photoTagTray.innerHTML='<div class="pt-tray-inner"><div class="pt-grip" aria-hidden="true"></div><header><h2 id="pt-tray-title">Tags</h2><button type="button" class="btn-primary" data-done>Done</button></header><input class="tf-input pt-quick-tag" type="text" placeholder="Type a tag and press Enter" aria-label="Quick add existing tag" enterkeyhint="done" autocomplete="off" autocapitalize="none"><div class="pt-tray-list" aria-label="Available tags"></div><div class="pt-tray-add"><button type="button" class="btn-ghost" data-add>＋ Add Tag</button><form data-new-form hidden><input class="tf-input" name="name" type="text" placeholder="Tag name" aria-label="Tag name" maxlength="100" required>'+photoTagCategorySelect()+'<button type="submit" class="btn-primary">Save</button></form><p class="pt-error" role="alert" hidden></p></div></div>';
     const list=photoTagTray.querySelector('.pt-tray-list'), form=photoTagTray.querySelector('form'), add=photoTagTray.querySelector('[data-add]'), error=photoTagTray.querySelector('.pt-error'), input=form.elements.name;
     function render(){
       list.replaceChildren();
@@ -11351,6 +11362,19 @@
         list.appendChild(section);
       });
     }
+    const quick=photoTagTray.querySelector('.pt-quick-tag');
+    quick.addEventListener('keydown',e=>{
+      if(e.key!=='Enter'||e.isComposing)return;
+      e.preventDefault();e.stopPropagation();
+      const match=matchPhotoTagTerm(quick.value,photoTags);
+      quick.value='';
+      if(!match||!photoTagDraft||!photoTagsWritable())return;
+      photoTagDraft.selected.add(match.id);
+      // Keep the draft behavior consistent with tapping a chip: Done saves.
+      render();
+      const chip=Array.from(list.querySelectorAll('[data-tag-id]')).find(b=>b.dataset.tagId===match.id);
+      if(chip)chip.scrollIntoView({block:'nearest'});
+    });
     add.onclick=()=>{add.hidden=true;form.hidden=false;input.focus();};
     form.onsubmit=e=>{
       e.preventDefault();
