@@ -7407,6 +7407,80 @@
     section.style.display = 'block';
   }
 
+  // Direct drag on the normal ranked view. Unlike Photos, this view has
+  // two different layouts, so keep the DOM intact during drag and commit
+  // a single insertion on drop, then redraw both sections.
+  let restaurantDirectDrag = null;
+  let restaurantDirectTarget = null;
+  let restaurantDirectSuppressClickUntil = 0;
+  function clearRestaurantDirectTarget(){
+    if (restaurantDirectTarget){
+      restaurantDirectTarget.classList.remove('restaurant-direct-before','restaurant-direct-after');
+      restaurantDirectTarget = null;
+    }
+  }
+  function endRestaurantDirectDrag(){
+    if (restaurantDirectDrag){
+      restaurantDirectDrag.el.classList.remove('dragging');
+      restaurantDirectDrag = null;
+      restaurantDirectSuppressClickUntil = Date.now() + 250;
+    }
+    clearRestaurantDirectTarget();
+  }
+  function restaurantDirectAllowed(){
+    return !restaurantRearrangeMode && !restaurantSearchFilter && !guestViewEnabled && !isLockedGuestAccount && countOpenOverlays() === 0;
+  }
+  function makeRestaurantDirectDraggable(el, idx){
+    if (restaurantSearchFilter || guestViewEnabled || isLockedGuestAccount || restaurantRows.length < 2) return;
+    const row = restaurantRows[idx];
+    el.draggable = true;
+    el.classList.add('restaurant-direct-draggable');
+    el.querySelectorAll('img').forEach(img=>{ img.draggable = false; });
+    el.addEventListener('dragstart',e=>{
+      if (!restaurantDirectAllowed() || restaurantRows[idx] !== row){ e.preventDefault(); return; }
+      restaurantDirectDrag = {el,row,order:restaurantRows.slice()};
+      el.classList.add('dragging');
+      if(e.dataTransfer){ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',row.name || 'Restaurant'); }
+    });
+    el.addEventListener('dragend',endRestaurantDirectDrag);
+    el.addEventListener('dragover',e=>{
+      if (!restaurantDirectDrag || !restaurantDirectAllowed() || restaurantDirectDrag.row === row) return;
+      e.preventDefault();
+      if(e.dataTransfer) e.dataTransfer.dropEffect='move';
+      clearRestaurantDirectTarget();
+      restaurantDirectTarget = el;
+      const from = restaurantRows.indexOf(restaurantDirectDrag.row);
+      const to = restaurantRows.indexOf(row);
+      el.classList.add(from < to ? 'restaurant-direct-after' : 'restaurant-direct-before');
+    });
+    el.addEventListener('dragleave',e=>{
+      if(restaurantDirectTarget===el && !el.contains(e.relatedTarget)) clearRestaurantDirectTarget();
+    });
+    el.addEventListener('drop',e=>{
+      const drag = restaurantDirectDrag;
+      if (!drag || !restaurantDirectAllowed()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const from = restaurantRows.indexOf(drag.row);
+      const to = restaurantRows.indexOf(row);
+      const unchanged = drag.order.length === restaurantRows.length && drag.order.every((r,i)=>r===restaurantRows[i]);
+      endRestaurantDirectDrag();
+      if (!unchanged){ showToast('Restaurant ranking changed — try again'); return; }
+      if (from < 0 || to < 0 || from === to) return;
+      const next = restaurantRows.slice();
+      next.splice(from,1);
+      next.splice(to,0,drag.row);
+      restaurantRows = next;
+      saveRestaurantProgress();
+      renderRestaurantsPage();
+      renderDishesPage();
+      showToast('Moved to #' + (to+1));
+    });
+  }
+  const restaurantDirectStyle = document.createElement('style');
+  restaurantDirectStyle.textContent = '.restaurant-direct-draggable.dragging{opacity:.45;cursor:grabbing} .restaurant-direct-before{outline:2px solid var(--amber);outline-offset:2px} .restaurant-direct-after{outline:2px solid var(--amber);outline-offset:2px} li.restaurant-direct-before{box-shadow:inset 0 3px var(--amber)} li.restaurant-direct-after{box-shadow:inset 0 -3px var(--amber)} .restaurant-gold-card.restaurant-direct-before{box-shadow:inset 3px 0 var(--amber)} .restaurant-gold-card.restaurant-direct-after{box-shadow:inset -3px 0 var(--amber)}';
+  document.head.appendChild(restaurantDirectStyle);
+
   function renderRestaurantsPage(){
     maybeInitRestaurantTiers(restaurantRows.length);
     renderRestaurantInsights();
@@ -7549,11 +7623,13 @@
     // view would open the wrong restaurant entirely.
     Array.from(restaurantGoldGridEl.children).forEach(card => {
       const idx = Number(card.dataset.restaurantIndex);
-      card.addEventListener('click', () => openRestaurantDetailsPanel(idx));
+      card.addEventListener('click', () => { if (Date.now() >= restaurantDirectSuppressClickUntil) openRestaurantDetailsPanel(idx); });
+      makeRestaurantDirectDraggable(card, idx);
     });
     Array.from(restaurantListEl.children).forEach(li => {
       const idx = Number(li.dataset.restaurantIndex);
-      li.addEventListener('click', () => openRestaurantDetailsPanel(idx));
+      li.addEventListener('click', () => { if (Date.now() >= restaurantDirectSuppressClickUntil) openRestaurantDetailsPanel(idx); });
+      makeRestaurantDirectDraggable(li, idx);
     });
   }
 
