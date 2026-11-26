@@ -13210,7 +13210,7 @@
     restaurantVisitEditMode = false;
     updateOpenRestaurant(rest => {
       const visits = ensureRestaurantVisits(rest);
-      const newVisit = { id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2), date: '', notes: '', courses: [], photos: [] };
+      const newVisit = { id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2), date: otdDateKey(new Date()), notes: '', courses: [], photos: [] };
       visits.push(newVisit);
       restaurantActiveVisitId = newVisit.id;
       restaurantVisitEditMode = true; // jump straight into editing so a date can be set right away
