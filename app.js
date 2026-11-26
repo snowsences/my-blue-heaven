@@ -11270,10 +11270,30 @@
   function photoTagCategorySegments(){
     return '<div class="pt-category-segments" role="radiogroup" aria-label="Category">'+PHOTO_TAG_CATEGORIES.map(c=>'<label><input type="radio" name="category" value="'+c+'" required><span>'+c+'</span></label>').join('')+'</div>';
   }
+  // One-time consolidation of existing Oceans/Lakes into Water. New tags
+  // created after this migration are not subject to the name-based merge.
+  const PHOTO_TAG_WATER_MERGE_VERSION=1;
+  function mergeLegacyWaterTags(raw){
+    const tags=(Array.isArray(raw)?raw:[]).filter(t=>t&&typeof t==='object').map(t=>({...t}));
+    const name=t=>String(t.name||'').trim().toLowerCase();
+    const legacy=tags.filter(t=>typeof t.id==='string'&&t.id&&Number(t.waterMergeVersion||0)<PHOTO_TAG_WATER_MERGE_VERSION&&['oceans','lakes'].includes(name(t)));
+    if(!legacy.length)return tags;
+    const existing=tags.find(t=>typeof t.id==='string'&&t.id&&name(t)==='water');
+    const keep=existing||legacy[0];
+    const merge=[...new Set([keep,...legacy])];
+    const removed=new Set(merge.filter(t=>t!==keep).map(t=>t.id));
+    keep.name='Water';
+    keep.category='Scenery';
+    keep.categoryVersion=PHOTO_TAG_CATEGORY_VERSION;
+    keep.waterMergeVersion=PHOTO_TAG_WATER_MERGE_VERSION;
+    keep.photoIds=[...new Set(merge.flatMap(t=>Array.isArray(t.photoIds)?t.photoIds:[]))];
+    keep.parentIds=[...new Set(merge.flatMap(t=>Array.isArray(t.parentIds)?t.parentIds:[]))];
+    return tags.filter(t=>t===keep||!removed.has(t.id)).map(t=>({...t,parentIds:[...new Set((Array.isArray(t.parentIds)?t.parentIds:[]).map(id=>removed.has(id)?keep.id:id))].filter(id=>id!==t.id)}));
+  }
   function normalizePhotoTags(raw){
     const ids=new Set(), names=new Set();
     const aliases=new Map();
-    const normalized=(Array.isArray(raw)?raw:[]).reduce((out,t)=>{
+    const normalized=mergeLegacyWaterTags(raw).reduce((out,t)=>{
       if(!t||typeof t.id!=='string'||!t.id||ids.has(t.id)||typeof t.name!=='string'||!t.name.trim())return out;
       const name=t.name.trim(), key=name.toLocaleLowerCase();
       // If older/imported data contains duplicate names, merge memberships rather than lose any.
@@ -11282,7 +11302,7 @@
         const existing=out.find(x=>x.name.toLocaleLowerCase()===key);
         existing.photoIds=[...new Set([...existing.photoIds,...photoIds])];aliases.set(t.id,existing.id);ids.add(t.id);return out;
       }
-      ids.add(t.id);names.add(key);out.push({id:t.id,name,category:initialPhotoTagCategory(t),categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[...new Set(photoIds)],parentIds:Array.isArray(t.parentIds)?[...new Set(t.parentIds.filter(id=>typeof id==='string'))]:[],automaticOnly:!!t.automaticOnly,hierarchyVersion:Number(t.hierarchyVersion)||0});return out;
+      ids.add(t.id);names.add(key);out.push({id:t.id,name,category:initialPhotoTagCategory(t),categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[...new Set(photoIds)],parentIds:Array.isArray(t.parentIds)?[...new Set(t.parentIds.filter(id=>typeof id==='string'))]:[],automaticOnly:!!t.automaticOnly,hierarchyVersion:Number(t.hierarchyVersion)||0,waterMergeVersion:PHOTO_TAG_WATER_MERGE_VERSION});return out;
     },[]);
     const byName=new Map(normalized.map(t=>[t.name.toLowerCase(),t]));
     const legacyParents={pnw:'usa',rockies:'usa',hawaii:'usa',alaska:'usa',italy:'europe',venice:'italy'};
@@ -11526,7 +11546,7 @@
       if(!name||!photoTagNameAvailable(name)){error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;}
       const category=form.elements.category.value;
       if(!PHOTO_TAG_CATEGORIES.includes(category)){error.textContent='Choose a category.';error.hidden=false;return;}
-      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[],parentIds:[],automaticOnly:false,hierarchyVersion:PHOTO_TAG_HIERARCHY_VERSION};
+      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[],parentIds:[],automaticOnly:false,hierarchyVersion:PHOTO_TAG_HIERARCHY_VERSION,waterMergeVersion:PHOTO_TAG_WATER_MERGE_VERSION};
       tag.parentIds=photoTagReadParents(form,tag.id);
       photoTags.push(tag);
       savePhotoTags();
