@@ -4429,6 +4429,9 @@
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
       trips: pageTrips, fun: pageFun, search: pageSearch, settings: pageSettings
     };
+    const previous=Object.keys(pages).find(key=>pages[key].classList.contains('active'));
+    const scrolls=switchTopPage.__scrolls||(switchTopPage.__scrolls=new Map());
+    if(previous&&previous!==page)scrolls.set(previous,window.scrollY);
     rememberSessionPage(page);
     Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
 
@@ -4505,6 +4508,7 @@
     if (page === 'shows'){
       renderMediaPage('show');
     }
+    if(previous!==page)window.scrollTo(0,scrolls.get(page)||0);
   }
 
   // The dedicated guest nav is flat (just Restaurants/Hikes, no grouping),
@@ -4708,7 +4712,7 @@
     if (guestViewEnabled) return;
     // Text fields have their own native touch behavior (cursor placement,
     // text selection, opening a picker) that a global swipe shouldn't step on.
-    if (e.target.closest('input, textarea, select')) return;
+    if (e.target.closest('input, textarea, select, .pt-filter-rail, .us-filters')) return;
     swipeStartX = e.touches[0].clientX;
     swipeStartY = e.touches[0].clientY;
   }, { passive: true });
@@ -11083,6 +11087,75 @@
     section.style.display = (yearKeys.length >= 2 || totalMonthPhotos >= 2 || trips.length > 0) ? 'block' : 'none';
   }
 
+
+  // Progressive keyed photo grid: lightbox and ranking retain the full order.
+  function mbhPhotoGrid(grid,rows,kind,animate=false){
+    const ids=rows.map(p=>p.id),prior=grid.__ids||[];
+    if(ids.length!==prior.length||ids.some((id,i)=>id!==prior[i]))grid.__limit=96;
+    grid.__rows=rows;grid.__ids=ids;
+    const motion=animate&&!motionReduced()&&grid.getClientRects().length;
+    const before=new Map(),existing=new Map([...grid.children].map(el=>[el.dataset.photoId,el]));
+    if(motion)for(const [id,el] of existing){
+      const r=el.getBoundingClientRect();if(r.width&&r.bottom>0&&r.top<innerHeight)before.set(id,{el,r});
+      el.__move?.cancel();
+    }
+    const limit=Math.min(rows.length,grid.__limit||96),desired=rows.slice(0,limit),wanted=new Set(desired.map(p=>p.id));
+    for(const [id,el] of existing)if(!wanted.has(id))el.remove();
+    desired.forEach((p,i)=>{
+      let el=existing.get(p.id);
+      if(!el){
+        el=document.createElement(kind==='tags'?'button':'div');el.className='grid-card'+(kind==='tags'?' pt-detail-photo':'');el.dataset.photoId=p.id;
+        if(kind==='tags')el.type='button';
+        el.innerHTML='<div class="art-drop"><img class="art-img" alt="" loading="lazy" decoding="async"></div>';
+        if(kind==='gallery')makePhotoDraggable(el);
+      }
+      if(kind==='tags')el.setAttribute('aria-label','View photo '+(i+1));
+      const img=el.querySelector('img');
+      if(img.__url!==p.url){
+        img.__url=p.url;img.classList.remove('img-loaded');
+        if(p.url.includes('res.cloudinary.com')&&p.url.includes('/upload/')){
+          img.srcset=[240,400,640,960].map(w=>cloudinaryThumbUrl(p.url,w)+' '+w+'w').join(', ');
+          img.sizes='(max-width:600px) 34vw, (max-width:1000px) 25vw, 220px';
+        }else{img.removeAttribute('srcset');img.removeAttribute('sizes');}
+        img.src=cloudinaryThumbUrl(p.url,500);
+        if(i<8)img.loading='eager';
+      }
+      if(grid.children[i]!==el)grid.insertBefore(el,grid.children[i]||null);
+    });
+    if(!grid.__click){
+      grid.__click=true;grid.addEventListener('click',e=>{
+        const el=e.target.closest('[data-photo-id]');if(!el||el.parentNode!==grid)return;
+        const all=grid.__rows||[],index=all.findIndex(p=>p.id===el.dataset.photoId);
+        if(index>=0)openPhotoLightbox(all.map(p=>p.url),index,null,all.map(p=>p.id));
+      });
+    }
+    if(motion){
+      let n=0;
+      for(const el of grid.children){
+        const to=el.getBoundingClientRect(),from=before.get(el.dataset.photoId)?.r;before.delete(el.dataset.photoId);
+        if(!to.width||to.bottom<=0||to.top>=innerHeight)continue;
+        if(from){
+          const x=from.left-to.left,y=from.top-to.top;
+          if(Math.abs(x)+Math.abs(y)>2)el.__move=el.animate([{transform:'translate('+x+'px,'+y+'px)'},{transform:'none'}],{duration:280,easing:EASE_OUT});
+        }else el.__move=el.animate([{opacity:0,transform:'translateY(7px) scale(.98)'},{opacity:1,transform:'none'}],{duration:250,delay:Math.min(n++,8)*20,easing:EASE_OUT,fill:'backwards'});
+      }
+      for(const {el,r} of before.values()){
+        if(el.isConnected)continue;
+        const ghost=el.cloneNode(true);ghost.inert=true;ghost.setAttribute('aria-hidden','true');ghost.style.cssText='position:fixed;pointer-events:none;z-index:80;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;height:'+r.height+'px;margin:0;overflow:hidden;';
+        ghost.querySelectorAll('img').forEach(img=>img.style.opacity='1');document.body.append(ghost);
+        const anim=ghost.animate([{opacity:1},{opacity:0,transform:'scale(.95)'}],{duration:130,easing:EASE_OUT});anim.onfinish=anim.oncancel=()=>ghost.remove();
+      }
+    }
+    let more=grid.__more;
+    if(!more){
+      more=document.createElement('button');more.type='button';more.className='mbh-photo-more';grid.after(more);grid.__more=more;
+      more.onclick=()=>{grid.__limit=(grid.__limit||96)+96;mbhPhotoGrid(grid,grid.__rows,kind,false);};
+      if(window.IntersectionObserver)grid.__observer=new IntersectionObserver(entries=>{if(entries.some(x=>x.isIntersecting)&&!more.hidden&&grid.getClientRects().length&&!photoDragSourceEl)more.click();},{rootMargin:'400px'});
+    }
+    more.hidden=limit>=rows.length;more.textContent='Show more photos ('+Math.min(96,rows.length-limit)+')';
+    if(grid.__observer){grid.__observer.disconnect();if(!more.hidden)grid.__observer.observe(more);}
+  }
+
   function renderPhotosPage(){
     updatePhotoSortHelperVisibility();
     refreshPhotoCalendar();
@@ -11103,30 +11176,9 @@
     renderPhotoMonthFilterOptions();
     renderPhotoInsights();
 
-    if (photoEditMode){
-      photoGrid.innerHTML = '';
-      renderPhotoEditRows();
-      return;
-    }
-    photoEditList.innerHTML = '';
-    photoGrid.innerHTML = '';
-    if (empty) return;
-    const order = photoDisplayRows();
-    order.forEach((p, idx) => {
-      const card = document.createElement('div');
-      card.className = 'grid-card';
-      card.dataset.photoId = p.id;
-      card.innerHTML =
-        '<div class="art-drop" style="cursor:pointer;"><img class="art-img" src="' + escapeAttr(cloudinaryThumbUrl(p.url, 500)) + '" alt="" loading="lazy" decoding="async"></div>';
-      photoGrid.appendChild(card);
-      // Always draggable, same as Albums — dragging a photo while Duels
-      // has ranked the grid settles that ranking to the dragged order
-      // rather than fighting it (see commitPhotoDragOrder).
-      makePhotoDraggable(card);
-      card.addEventListener('click', () => {
-        openPhotoLightbox(order.map(x => x.url), idx, null, order.map(x => x.id));
-      });
-    });
+    if(photoEditMode){if(photoGrid.__more)photoGrid.__more.hidden=true;renderPhotoEditRows();return;}
+    photoEditList.innerHTML='';
+    mbhPhotoGrid(photoGrid,empty?[]:photoDisplayRows(),'gallery',true);
   }
 
 
@@ -11437,7 +11489,7 @@
     return rows.filter(p=>p.url&&!tagged.has(p.id));
   }
   function refreshPhotoTagTool(){
-    if(!photoTagToolCard)return;
+    if(!photoTagToolCard||!pageFun.classList.contains('active'))return;
     const count=untaggedPhotoRows(photoRows,photoTags).length;
     photoTagToolCard.hidden=!count||!photoTagsWritable();
     photoTagToolCount.textContent=count.toLocaleString()+' '+(count===1?'photo':'photos')+' without a Location tag';
@@ -11667,19 +11719,28 @@
     const locationChips=chip('','All locations',!photoTagLocationFilter,'location')+locations.map(t=>chip(t.id,t.name,photoTagLocationFilter===t.id,'location')).join('');
     const otherChips=chip('','All scenery & seasons',!photoTagOtherFilters.size,'other')+others.map(t=>chip(t.id,t.name,photoTagOtherFilters.has(t.id),'other')).join('');
     const manage=photoTagsWritable()&&tags.length?'<div class="pt-menu-wrap"><button type="button" class="pt-menu-btn btn-ghost" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout pt-manage-menu" hidden><label for="pt-manage-select">Manage tags</label><select id="pt-manage-select" class="tf-input">'+groupedPhotoTags().filter(g=>g.tags.length).map(g=>'<optgroup label="'+escapeAttr(g.category)+'">'+g.tags.map(t=>'<option value="'+escapeAttr(t.id)+'"'+(t.id===photoTagManageId?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')+'</optgroup>').join('')+'</select><button type="button" data-rename>Edit tag</button><button type="button" data-delete>Delete tag</button></div></div>':'';
-    photoTagsHost.innerHTML='<div class="pt-gallery-heading"><span class="pt-muted" aria-live="polite">'+pcCount(rows.length)+'</span>'+manage+'</div>'+
-      (rows.length?'<div class="results-list grid-mode pt-detail-grid pt-filter-grid">'+rows.map((x,i)=>'<button type="button" class="grid-card pt-detail-photo" data-photo-index="'+i+'" aria-label="View photo ranked '+x.rank+'"><div class="art-drop">'+pcThumb(x,500)+'</div></button>').join('')+'</div>':'<p class="pt-muted pt-empty">No photos match these tags.</p>')+
-      '<div class="pt-filter-dock"><div class="pt-filter-rail" role="group" aria-label="Location filters">'+locationChips+'</div><div class="pt-filter-rail" role="group" aria-label="Scenery and season filters">'+otherChips+'</div></div>';
-    photoTagsHost.querySelectorAll('.pt-filter-rail').forEach((el,i)=>{el.scrollLeft=oldRails[i]||0;});
+    if(!photoTagsHost.querySelector('.pt-filter-grid')){
+      photoTagsHost.innerHTML='<div class="pt-gallery-heading"><span class="pt-muted" aria-live="polite"></span><span class="pt-manage-host"></span></div><div class="results-list grid-mode pt-detail-grid pt-filter-grid"></div><p class="pt-muted pt-empty" hidden>No photos match these tags.</p><div class="pt-filter-dock"><div class="pt-filter-rail" role="group" aria-label="Location filters"></div><div class="pt-filter-rail" role="group" aria-label="Scenery and season filters"></div></div>';
+    }
+    photoTagsHost.querySelector('.pt-gallery-heading .pt-muted').textContent=pcCount(rows.length);
+    const mh=photoTagsHost.querySelector('.pt-manage-host');if(mh.__html!==manage){mh.innerHTML=manage;mh.__html=manage;}
+    const rails=[...photoTagsHost.querySelectorAll('.pt-filter-rail')];
+    [locationChips,otherChips].forEach((html,i)=>{
+      const rail=rails[i],temp=document.createElement('template');temp.innerHTML=html;
+      const next=[...temp.content.children],current=[...rail.children];
+      if(next.length===current.length&&next.every((b,j)=>b.dataset.ptFilter===current[j].dataset.ptFilter&&b.textContent===current[j].textContent))next.forEach((b,j)=>current[j].setAttribute('aria-pressed',b.getAttribute('aria-pressed')));
+      else{rail.replaceChildren(...next);rail.scrollLeft=oldRails[i]||0;}
+    });
+    photoTagsHost.querySelector('.pt-empty').hidden=!!rows.length;
+    mbhPhotoGrid(photoTagsHost.querySelector('.pt-filter-grid'),rows.map(x=>x.p),'tags',true);
     photoTagsHost.querySelectorAll('[data-pt-filter]').forEach(b=>b.onclick=()=>{
       const id=b.dataset.ptFilter;
       if(b.dataset.ptKind==='location')photoTagLocationFilter=photoTagLocationFilter===id?'':id;
       else if(!id)photoTagOtherFilters.clear();
       else if(photoTagOtherFilters.has(id))photoTagOtherFilters.delete(id);
       else photoTagOtherFilters.add(id);
-      renderPhotoTags();window.scrollTo(0,0);
+      if(window.scrollY>100)window.scrollTo(0,0);renderPhotoTags();
     });
-    photoTagsHost.querySelectorAll('[data-photo-index]').forEach(b=>b.onclick=()=>openPhotoLightbox(rows.map(x=>x.p.url),Number(b.dataset.photoIndex),null,rows.map(x=>x.p.id)));
     const menu=photoTagsHost.querySelector('.pt-menu-btn'), flyout=photoTagsHost.querySelector('.pt-flyout');
     if(menu){
       const close=()=>{flyout.hidden=true;menu.setAttribute('aria-expanded','false');};
@@ -11973,8 +12034,10 @@
   function commitPhotoDragOrder(){
     if (photoDragSourceEl) photoDragSourceEl.classList.remove('dragging');
     photoDragSourceEl = null;
-    const newOrderIds = Array.from(photoGrid.children).map(c => c.dataset.photoId);
-    if (newOrderIds.length !== photoRows.length) return; // filtered/partial view — bail rather than risk dropping hidden photos
+    const visibleIds=Array.from(photoGrid.children).map(c=>c.dataset.photoId),full=photoGrid.__rows||[];
+    if(full.length!==photoRows.length){renderPhotosPage();return;}
+    const newOrderIds=visibleIds.concat(full.slice(visibleIds.length).map(p=>p.id)),liveIds=new Set(photoRows.map(p=>p.id));
+    if(newOrderIds.length!==liveIds.size||new Set(newOrderIds).size!==liveIds.size||!newOrderIds.every(id=>liveIds.has(id))){renderPhotosPage();return;}
     if (photoDuelEngaged()){
       // A manual drag IS the order the person wants — settle Duels to it
       // rather than let the next reconcile snap back to picks/estimates.
@@ -11982,7 +12045,7 @@
       photoDuelIsComplete = true;
       savePhotoDuelProgress();
     } else {
-      photoRows = newOrderIds.map(id => photoRows.find(p => p.id === id)).filter(Boolean);
+      const byId=new Map(photoRows.map(p=>[p.id,p]));photoRows=newOrderIds.map(id=>byId.get(id));
     }
     savePhotoProgress();
     renderPhotosPage(); // re-render so each card's click handler captures its new, correct index for the lightbox
@@ -14195,13 +14258,15 @@
     const strip=Math.min(height,Math.max(76,Math.min(108,restaurantDetailsPanel.clientHeight*.15)));
     const collapse=Math.max(0,height-strip);
     const shift=Math.min(collapse,Math.max(0,restaurantDetailsPanel.scrollTop));
+    const minBody=Math.max(0,restaurantDetailsPanel.clientHeight-head.offsetHeight+collapse);
     head.style.setProperty('--rd-collapse',collapse+'px');
     head.style.setProperty('--rd-photo-shift',shift/2+'px');
     head.style.setProperty('--rd-button-shift',shift+'px');
     const body=restaurantDetailsPanelInner.querySelector('.rd-body');
-    if(body)body.style.setProperty('--rd-body-min',Math.max(0,restaurantDetailsPanel.clientHeight-head.offsetHeight+collapse)+'px');
+    if(body)body.style.setProperty('--rd-body-min',minBody+'px');
   }
-  restaurantDetailsPanel.addEventListener('scroll',restaurantDetailCoverSync,{passive:true});
+  let rdScrollFrame=0;
+  restaurantDetailsPanel.addEventListener('scroll',()=>{if(!rdScrollFrame)rdScrollFrame=requestAnimationFrame(()=>{rdScrollFrame=0;if(restaurantDetailsPanel.classList.contains('open'))restaurantDetailCoverSync();});},{passive:true});
   window.addEventListener('resize',restaurantDetailCoverSync);
   if(window.ResizeObserver)new ResizeObserver(restaurantDetailCoverSync).observe(restaurantDetailsPanel);
   function rdScore(c){
@@ -21567,10 +21632,15 @@
   function usEnter(){
     if(!usOwner())return;
     clearTimeout(usTimer);
-    usRecent=usReadRecent();usRows=usIndex();usRender();
-    const refresh=()=>{if(usOwner()&&pageSearch.classList.contains('active')){usRows=usIndex();usRender();}};
-    Promise.all([localDataReadyPromise,guestViewReadyPromise]).then(refresh);
-    cloudSettledPromise.then(refresh);
+    usRecent=usReadRecent();
+    const refresh=()=>{
+      if(!usOwner()||!pageSearch.classList.contains('active'))return;
+      const stamp=[restaurantRows,hikeRows,parkRows,roadRows,photoRows,photoTags,tripRows,activityRows,restaurantLastSavedAt,hikeLastSavedAt,parkLastSavedAt,roadLastSavedAt,photoLastSavedAt,photoTagsSavedAt,tripLastSavedAt,activityLastSavedAt,photoDuelLastSavedAt];
+      if(!usEnter.__stamp||stamp.some((v,i)=>v!==usEnter.__stamp[i])){usRows=usIndex();usEnter.__stamp=stamp;}
+      usRender();
+    };
+    refresh();
+    if(!usEnter.__ready){usEnter.__ready=true;Promise.all([localDataReadyPromise,guestViewReadyPromise]).then(refresh);cloudSettledPromise.then(refresh);}
   }
   function usOpen(){
     if(!usOwner()||countOpenOverlays()>0)return;
@@ -21587,7 +21657,7 @@
   }
   // If the owner switches into Guest View, clear all private search state.
   new MutationObserver(()=>{
-    if(!usOwner()){usClose();usInput.value='';usRows=[];usVisible=[];usType='all';usRecent=[];usResults.replaceChildren();usFilters.replaceChildren();usToolbar.hidden=true;}
+    if(!usOwner()){usClose();usInput.value='';usRows=[];usEnter.__stamp=null;usRender.__ranked=null;usVisible=[];usType='all';usRecent=[];usResults.replaceChildren();usFilters.replaceChildren();usToolbar.hidden=true;}
   }).observe(document.body,{attributes:true,attributeFilter:['class']});
   function usChip(type,label,selected){
     return '<button type="button" data-us-type="'+escapeAttr(type)+'" aria-pressed="'+selected+'">'+escapeHtml(label)+'</button>';
@@ -21614,7 +21684,9 @@
     const q=usNorm(usInput.value),terms=usWords(q),rail=usFilters.scrollLeft;
     usClear.hidden=!usInput.value;
     const memo=new Map();const near=(a,b)=>{if(a.length<4||Math.abs(a.length-b.length)>(a.length>=8?2:1))return false;const key=a+'\0'+b;if(!memo.has(key))memo.set(key,usNear(a,b));return memo.get(key);};
-    const ranked=usRows.map(r=>({r,s:q?usScore(r,q,terms,near):0})).filter(x=>x.s>=0);
+    const cached=usRender.__ranked;
+    const ranked=cached&&cached.rows===usRows&&cached.q===q?cached.ranked:usRows.map(r=>({r,s:q?usScore(r,q,terms,near):0})).filter(x=>x.s>=0);
+    usRender.__ranked={rows:usRows,q,ranked};
     const counts=new Map();ranked.forEach(x=>counts.set(x.r.type,(counts.get(x.r.type)||0)+1));
     const available=Object.keys(usTypes).filter(t=>counts.has(t)||t===usType);
     usFilters.innerHTML=usChip('all','All'+(q?' '+ranked.length:''),usType==='all')+available.map(t=>usChip(t,usTypes[t][1]+' '+usTypes[t][0]+(q?' '+(counts.get(t)||0):''),usType===t)).join('');
