@@ -1355,6 +1355,34 @@
   <button class="lightbox-hide-dish-btn" id="lightbox-hide-dish-btn" type="button">Hide from Dishes</button>
 </div>
 
+
+<script>
+  // Escape uses the existing UI controls so navigation and cleanup stay intact.
+  window.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape' || event.defaultPrevented || event.repeat || event.isComposing) return;
+    // Native dialogs own Escape (including their cancel handlers).
+    if (document.querySelector('dialog[open]')) return;
+    const visible = el => el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && !el.disabled;
+    const click = el => { if (!visible(el)) return false; event.preventDefault(); event.stopImmediatePropagation(); el.click(); return true; };
+    if (document.querySelector('#modal-overlay.show') && click(document.getElementById('modal-cancel-btn'))) return;
+    const lightbox = document.querySelector('#art-lightbox-overlay.show');
+    if (lightbox && click(lightbox)) return;
+    const overlays = Array.from(document.querySelectorAll('.otd-overlay,.gg-overlay,.share-overlay,.yir-overlay,.tsheet-overlay')).filter(el => el.getAttribute('aria-hidden') === 'false' && visible(el));
+    overlays.sort((a,b) => (Number(getComputedStyle(b).zIndex)||0)-(Number(getComputedStyle(a).zIndex)||0));
+    if (overlays.length) {
+      const overlay = overlays[0];
+      const close = overlay.querySelector('button[aria-label="Close"],button[title="Close"],button[aria-label="Back"]');
+      if (click(close)) return;
+      if (click(overlay)) return;
+    }
+    const panels = Array.from(document.querySelectorAll('aside.open[id$="-panel"]')).filter(visible);
+    panels.sort((a,b) => (Number(getComputedStyle(b).zIndex)||0)-(Number(getComputedStyle(a).zIndex)||0));
+    const panel = panels[panels.length > 1 && getComputedStyle(panels[0]).zIndex === getComputedStyle(panels[panels.length-1]).zIndex ? panels.length-1 : 0];
+    if (panel && click(panel.querySelector('.details-close-btn,button[aria-label="Back"],button[title="Back"],button[aria-label="Close"]'))) return;
+    const tagHeader = document.querySelector('#page-photo-collections.active .pt-detail-header');
+    if (tagHeader) click(tagHeader.querySelector('button:not(.pt-menu-btn):not([data-delete])'));
+  }, true);
+</script>
 <script src="app.js"></script>
 
 </body>
