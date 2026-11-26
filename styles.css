@@ -5868,3 +5868,8 @@ dialog.song-sort-helper.album-sort-helper [data-choice]{
   .album-duel-track .details-track-loved{ width: 11px; font-size: 11px; }
   .album-duel-copy > span{ font-size: 10px; }
 }
+
+/* Editable music groupings use the existing chip positions. */
+button.music-grouping-edit{font-family:inherit;cursor:pointer;border:0;touch-action:manipulation;}
+button.music-grouping-edit:hover,button.music-grouping-edit:focus-visible{color:var(--amber);}
+button.music-grouping-add{background:transparent;color:var(--chalk-dim);font-size:17px;line-height:1;min-width:26px;min-height:28px;padding:3px 6px;}

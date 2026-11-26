@@ -535,7 +535,11 @@
   let resultsViewMode = 'grid'; // 'list' | 'grid' — grid is forced back to list whenever editMode is true
   let yearFilter = '';  // '' = show all years; otherwise a 4-digit year string
   let artistFilter = ''; // '' = show all artists; otherwise an exact artist name
-  let groupingFilter = ''; // '' = show all groupings; otherwise an exact MusicBee Grouping value
+  let groupingFilter = ''; // '' = show all groupings
+  const GROUPING_OVERRIDE_KEY = 'music-grouping-overrides';
+  let albumGroupingOverrides = Object.create(null);
+  let songGroupingOverrides = Object.create(null);
+  let groupingOverridesSavedAt = null;
   let selectedItem = null; // raw item string currently shown in the details panel (grid view only)
   let lastfmApiKey = '';
   let lastfmUsername = '';
@@ -845,6 +849,7 @@
     return {
       albums: { items, history, isComplete, finalRanking, loadingDock, tierBoundaries, tierBoundariesTotal },
       art: { art },
+      groupingOverrides: { albumGroupingOverrides, songGroupingOverrides, groupingOverridesSavedAt },
       songs: { songItems, songHistory, songIsComplete, songFinalRanking, songSavedAt: songLastSavedAt },
       restaurants: { restaurantRows, restaurantSavedAt: restaurantLastSavedAt, restaurantTierConfig: restaurantTierRecord },
       hikes: { hikeRows, hikeSavedAt: hikeLastSavedAt, hikeFullListText, hikeFullListTextSavedAt },
@@ -1125,6 +1130,13 @@
         try{ await window.storage.set(STORAGE_KEY, JSON.stringify({ items, history, isComplete, finalRanking, loadingDock, savedAt: lastSavedAt }), false); }catch(e){ /* best effort */ }
       }
     }
+    if (existing.groupingOverridesSavedAt && new Date(existing.groupingOverridesSavedAt).getTime() > new Date(groupingOverridesSavedAt || 0).getTime()){
+      albumGroupingOverrides = normalizeGroupingOverrides(existing.albumGroupingOverrides);
+      songGroupingOverrides = normalizeGroupingOverrides(existing.songGroupingOverrides);
+      groupingOverridesSavedAt = existing.groupingOverridesSavedAt;
+      await persistGroupingOverrides();
+      refreshGroupingViews();
+    }
     if (Array.isArray(existing.songItems) && existing.songItems.length >= 2){
       const remoteTime = new Date(existing.songSavedAt || 0).getTime();
       const localTime = new Date(songLastSavedAt || 0).getTime();
@@ -1389,7 +1401,7 @@
       || (Array.isArray(mediaState.game.rows) && mediaState.game.rows.length >= 1)
       || (Array.isArray(mediaState.show.rows) && mediaState.show.rows.length >= 1)
       || !!hikeFullListText
-      || !!dishFullListText;
+      || !!dishFullListText || !!groupingOverridesSavedAt;
     // Only now that everything newer from the cloud has been merged in is
     // this device allowed to write (see scheduleSyncWrite).
     cloudReadOk = true;
@@ -1500,6 +1512,7 @@
       songLastSavedAt = localSongParsed.savedAt || null;
     }
 
+    await loadGroupingOverrides();
     await loadPhotoTags();
     await almLoadManual();
     // Same independent-local-key pattern as Songs.
@@ -1642,6 +1655,10 @@
       }
     }catch(e){ /* nothing saved yet */ }
 
+    if (groupingOverridesSavedAt){
+      if (!editMode) renderResultsTab();
+      if (!songEditMode) renderSongResultsTab();
+    }
     restoreSessionPage();
     resolveLocalDataReady(); // every domain (albums, songs, restaurants, hikes, parks, roads, photos, books, movies, games, shows) has finished loading — safe for Firebase sync to compare/write now
   }
@@ -3430,11 +3447,114 @@
   // Grouping is usually set consistently across every track on an album in
   // MusicBee, so the first non-empty value found among the album's tracks
   // is used as "the album's" grouping, rather than requiring exact agreement.
-  function findMusicbeeGroupingForAlbum(artist, album){
+  function importedAlbumGrouping(artist, album){
     const tracks = findMusicbeeTracksForAlbum(artist, album);
     if (!tracks) return '';
     const withGrouping = tracks.find(t => t.grouping);
     return withGrouping ? withGrouping.grouping : '';
+  }
+  function findMusicbeeGroupingForAlbum(artist, album){
+    return albumGroupingOverrides[albumMatchKey(artist, album)] || importedAlbumGrouping(artist, album);
+  }
+  function groupingForSong(p){
+    const key = songTrackMatchKey(p.artist, p.album, p.title);
+    if (songGroupingOverrides[key] && !findAlbumRawForSong(p)) return songGroupingOverrides[key];
+    return p.artist && p.album ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
+  }
+  function normalizeGroupingOverrides(value){
+    const out = Object.create(null);
+    if (value && typeof value === 'object' && !Array.isArray(value)){
+      Object.entries(value).forEach(([k,v]) => { if (typeof v === 'string' && v.trim()) out[k] = v.trim(); });
+    }
+    return out;
+  }
+  async function persistGroupingOverrides(){
+    try{
+      await window.storage.set(GROUPING_OVERRIDE_KEY, JSON.stringify({albumGroupingOverrides, songGroupingOverrides, groupingOverridesSavedAt}), false);
+    }catch(e){ console.error('Grouping save failed', e); showToast("Couldn't save grouping locally"); }
+  }
+  async function loadGroupingOverrides(){
+    try{
+      const res = await window.storage.get(GROUPING_OVERRIDE_KEY, false);
+      if (!res || !res.value) return;
+      const parsed = JSON.parse(res.value);
+      albumGroupingOverrides = normalizeGroupingOverrides(parsed.albumGroupingOverrides);
+      songGroupingOverrides = normalizeGroupingOverrides(parsed.songGroupingOverrides);
+      groupingOverridesSavedAt = parsed.groupingOverridesSavedAt || null;
+    }catch(e){ console.error('Grouping load failed', e); }
+  }
+  function saveGroupingOverrides(){
+    groupingOverridesSavedAt = new Date().toISOString();
+    persistGroupingOverrides();
+    scheduleSyncWrite('non-art');
+  }
+  function refreshGroupingViews(){
+    // Don't discard draft ranking edits if a background sync arrives.
+    if (!editMode) renderResultsTab();
+    if (!songEditMode) renderSongResultsTab();
+    if (pageArtists.classList.contains('active')) renderArtistsPage();
+    if (openArtistKey !== null && !artistEditMode) renderArtistDetailsContent();
+    yirRefreshIfOpen();
+    almRefresh();
+  }
+  function knownMusicGroupings(){
+    const names = new Map();
+    [...musicbeeTracks.map(t => t.grouping), ...Object.values(albumGroupingOverrides), ...Object.values(songGroupingOverrides)].forEach(g => {
+      if (g && !names.has(g.toLowerCase())) names.set(g.toLowerCase(), g);
+    });
+    return [...names.values()].sort((a,b) => a.localeCompare(b));
+  }
+  function openMusicGroupingSheet(raw, isSong){
+    if (guestViewEnabled || isLockedGuestAccount) return;
+    const p = isSong ? parseSongEntry(raw) : parseEntry(raw);
+    if (isSong ? !!findAlbumRawForSong(p) : !p.artist) return;
+    const key = isSong ? songTrackMatchKey(p.artist, p.album, p.title) : albumMatchKey(p.artist, p.album);
+    const overrides = isSong ? songGroupingOverrides : albumGroupingOverrides;
+    const current = isSong ? groupingForSong(p) : findMusicbeeGroupingForAlbum(p.artist, p.album);
+    const groups = knownMusicGroupings();
+    if (current && !groups.includes(current)) groups.push(current);
+    let input;
+    function commit(reset){
+      if (guestViewEnabled || isLockedGuestAccount || (isSong && findAlbumRawForSong(p))) return;
+      const map = isSong ? songGroupingOverrides : albumGroupingOverrides;
+      if (reset) delete map[key];
+      else {
+        const value = input.value.trim();
+        if (!value) { input.focus(); return; }
+        map[key] = groups.find(g => g.toLowerCase() === value.toLowerCase()) || value;
+      }
+      saveGroupingOverrides();
+      tsheetClose();
+      refreshGroupingViews();
+      showToast(reset ? 'Grouping override removed' : 'Grouping saved');
+    }
+    tsheetOpen({
+      title: current ? 'Edit grouping' : 'Add grouping',
+      bodyHtml: '<p class="tf-hint">' + escapeHtml(isSong ? p.title : p.album) + '</p>' +
+        '<label class="tf-label" for="music-grouping-select">Grouping</label>' +
+        '<select class="tf-input" id="music-grouping-select"><option value="">Choose a grouping…</option>' +
+        groups.map(g => '<option value="' + escapeAttr(g) + '"' + (g === current ? ' selected' : '') + '>' + escapeHtml(g) + '</option>').join('') +
+        '</select><label class="tf-label" for="music-grouping-value" style="margin-top:12px">Or enter a grouping</label>' +
+        '<input class="tf-input" id="music-grouping-value" type="text" value="' + escapeAttr(current) + '" placeholder="e.g. Rock" autocomplete="off">',
+      actions: [
+        {label:'Cancel',onClick:tsheetClose},
+        ...(overrides[key] ? [{label:'Reset',onClick:()=>commit(true)}] : []),
+        {label:'Save',primary:true,onClick:()=>commit(false)}
+      ],
+      onOpen: body => {
+        input = body.querySelector('#music-grouping-value');
+        const select = body.querySelector('#music-grouping-select');
+        select.addEventListener('change', () => { if(select.value) input.value = select.value; });
+        input.addEventListener('input', () => { select.value = groups.includes(input.value) ? input.value : ''; });
+        input.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); commit(false); } });
+      }
+    });
+  }
+  function albumGroupingChipHtml(p){
+    if (!p.artist) return '';
+    const grouping = findMusicbeeGroupingForAlbum(p.artist, p.album);
+    if (guestViewEnabled || isLockedGuestAccount) return grouping ? '<span class="details-meta-chip">' + escapeHtml(grouping) + '</span>' : '';
+    return '<button class="details-meta-chip music-grouping-edit" type="button" title="Edit grouping">' + (grouping ? escapeHtml(grouping) : '+ Grouping') + '</button>';
   }
 
   async function loadMusicbeeLibrary(){
@@ -4001,7 +4121,7 @@
 
   songExportBtn.addEventListener('click', () => {
     const payload = JSON.stringify({
-      songItems, songHistory, songIsComplete, songFinalRanking, savedAt: new Date().toISOString()
+      songItems, songHistory, songIsComplete, songFinalRanking, songGroupingOverrides, savedAt: new Date().toISOString()
     }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -4084,7 +4204,7 @@
   function renderSongGroupingFilterOptions(list){
     const groupings = Array.from(new Set(list.map(raw => {
       const p = parseSongEntry(raw);
-      return p.artist ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
+      return groupingForSong(p);
     }).filter(Boolean))).sort();
     setGatedDatalistOptions(songGroupingFilterDatalist, songGroupingFilterInput, groupings.map(g => '<option value="' + escapeAttr(g) + '">').join(''));
     if (!groupings.includes(activeSongGroupingFilter)) activeSongGroupingFilter = '';
@@ -4166,11 +4286,10 @@
   }
 
   function computeSongGroupingStats(sorted){
-    const map = {};
+    const map = Object.create(null);
     sorted.forEach((raw, idx) => {
       const p = parseSongEntry(raw);
-      if (!p.artist) return;
-      const grouping = findMusicbeeGroupingForAlbum(p.artist, p.album);
+      const grouping = groupingForSong(p);
       if (!grouping) return;
       const rank = idx + 1;
       if (!map[grouping]) map[grouping] = { count: 0, sum: 0, best: Infinity, points: 0 };
@@ -4501,7 +4620,7 @@
     songResultsList.innerHTML = '';
     songDisplayedRanking.forEach((raw, idx) => {
       const p = songEditMode ? null : parseSongEntry(raw);
-      const itemGrouping = (!songEditMode && p.artist) ? findMusicbeeGroupingForAlbum(p.artist, p.album) : '';
+      const itemGrouping = songEditMode ? '' : groupingForSong(p);
       if (!songEditMode && ((activeSongArtistFilter && p.artist !== activeSongArtistFilter) || (activeSongGroupingFilter && itemGrouping !== activeSongGroupingFilter))) return;
 
       const li = document.createElement('li');
@@ -4523,7 +4642,10 @@
             '<span class="rank-meta">' + songMetaLine(p) + '</span>'
           : '<span class="rank-album">' + escapeHtml(raw) + '</span>';
 
-        const groupingChipHtml = itemGrouping ? '<span class="grouping-chip">' + escapeHtml(itemGrouping) + '</span>' : '';
+        const standalone = !findAlbumRawForSong(p);
+        const groupingChipHtml = standalone && !guestViewEnabled && !isLockedGuestAccount
+          ? '<button class="grouping-chip music-grouping-edit' + (itemGrouping ? '' : ' music-grouping-add') + '" type="button" title="' + (itemGrouping ? 'Edit grouping' : 'Add grouping') + '" aria-label="' + (itemGrouping ? 'Edit grouping: ' + escapeAttr(itemGrouping) : 'Add grouping') + '">' + (itemGrouping ? escapeHtml(itemGrouping) : '+') + '</button>'
+          : (itemGrouping ? '<span class="grouping-chip">' + escapeHtml(itemGrouping) + '</span>' : '');
         const showDragHandle = songIsComplete && !activeSongArtistFilter && !activeSongGroupingFilter;
         const dragHandleHtml = showDragHandle
           ? '<span class="row-drag-handle" title="Drag to reorder">' +
@@ -4543,6 +4665,7 @@
 
       makeSongRowDraggable(li, raw);
       li.querySelector('.song-sort-helper-btn')?.addEventListener('click',e=>{e.stopPropagation();openSongSortHelper(idx,raw);});
+      li.querySelector('.music-grouping-edit')?.addEventListener('click',e=>{e.stopPropagation();openMusicGroupingSheet(raw,true);});
       if (songEditMode){
         li.querySelector('.row-remove-btn').addEventListener('click', () => requestRemoveSongEditRow(li));
       }
@@ -5398,7 +5521,7 @@
         '</div>' +
         (albumSortHelperEligible(rank - 1) ? '<button class="song-sort-helper-btn album-sort-helper-btn" type="button" title="Sort Helper" aria-label="Sort Helper">' + photoSortHelperButton.innerHTML + '</button>' : '') +
         '</div>' +
-        '<div class="details-meta-row">' + rankChip + yearChip + tierChipHtml + '</div>' +
+        '<div class="details-meta-row">' + rankChip + yearChip + tierChipHtml + albumGroupingChipHtml(p) + '</div>' +
         '<div class="details-actions">' +
           '<button class="details-action-btn" type="button" id="details-wiki-btn">🔍 Open Wikipedia</button>' +
           (hasArt ? '<button class="details-action-btn" type="button" id="details-replace-art-btn">🖼️ Replace Art</button>' : '') +
@@ -5409,6 +5532,7 @@
       '</div>';
 
     detailsPanelInner.querySelector('.details-close-btn').addEventListener('click', closeDetailsPanel);
+    detailsPanelInner.querySelector('.music-grouping-edit')?.addEventListener('click',e=>{e.stopPropagation();openMusicGroupingSheet(item,false);});
     detailsPanelInner.querySelector('.album-sort-helper-btn')?.addEventListener('click', e => {
       e.stopPropagation();
       openAlbumSortHelper(item);
@@ -5771,6 +5895,7 @@
         }
         if (parsed && Array.isArray(parsed.items) && parsed.items.length >= 2){
           resumeFromData(parsed);
+          if (parsed.albumGroupingOverrides){ albumGroupingOverrides = normalizeGroupingOverrides(parsed.albumGroupingOverrides); saveGroupingOverrides(); refreshGroupingViews(); }
           saveProgress(); // persist the import itself — resumeFromData only updates in-memory state, and without this the import is lost on refresh and never reaches Firestore
         } else {
           showToast("That file doesn't look like a valid progress export");
@@ -5792,7 +5917,7 @@
       }catch(e){ /* no art saved for this item */ }
     }));
 
-    const payload = JSON.stringify({ items, history, isComplete, finalRanking, loadingDock, art, savedAt: new Date().toISOString() }, null, 2);
+    const payload = JSON.stringify({ items, history, isComplete, finalRanking, loadingDock, art, albumGroupingOverrides, savedAt: new Date().toISOString() }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6651,7 +6776,7 @@
   // grouping are skipped, the same way ungrouped/unparsed items are skipped
   // above.
   function computeGroupingStats(sorted){
-    const map = {};
+    const map = Object.create(null);
     sorted.forEach((raw, idx) => {
       const p = parseEntry(raw);
       if (!p.artist) return;
@@ -7045,6 +7170,7 @@
           return;
         }
         resumeSongDataFromSync(parsed);
+        if (parsed.songGroupingOverrides){ songGroupingOverrides = normalizeGroupingOverrides(parsed.songGroupingOverrides); saveGroupingOverrides(); refreshGroupingViews(); }
         saveSongProgress(); // persist the import itself — see the albums import handler's identical comment
         showToast('Song progress imported — ' + parsed.songItems.length + ' songs');
       };
@@ -15375,6 +15501,7 @@
     }));
     const payload = JSON.stringify({
       items, history, isComplete, finalRanking, loadingDock, art, tierBoundaries, tierBoundariesTotal,
+      albumGroupingOverrides, songGroupingOverrides, groupingOverridesSavedAt,
       songItems, songHistory, songIsComplete, songFinalRanking,
       restaurantRows,
       hikeRows, parkRows, roadRows, photoRows, photoTags, photoTagsSavedAt, tripRows, artistRows, activityRows, activityMemorable,
@@ -15409,6 +15536,11 @@
       let parsed;
       try{ parsed = JSON.parse(reader.result); }catch(err){ showToast('Could not read that file'); return; }
       const restoredParts = [];
+      if (parsed.albumGroupingOverrides || parsed.songGroupingOverrides){
+        if (parsed.albumGroupingOverrides) albumGroupingOverrides = normalizeGroupingOverrides(parsed.albumGroupingOverrides);
+        if (parsed.songGroupingOverrides) songGroupingOverrides = normalizeGroupingOverrides(parsed.songGroupingOverrides);
+        saveGroupingOverrides(); refreshGroupingViews(); restoredParts.push('music groupings');
+      }
       if (almOwner()&&Array.isArray(parsed.almManual)){almManual=almManualNormalize(parsed.almManual);almSaveManual();restoredParts.push('historical countries');}
       if (coverRotationIntervalValid(parsed.coverRotationInterval)){
         coverRotationInterval = parsed.coverRotationInterval;
