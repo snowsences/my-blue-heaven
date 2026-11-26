@@ -12743,7 +12743,7 @@
   function openRestaurantDetailsPanel(index){
     restaurantDetailTab = 'visits';
     restaurantVisitEditMode = false;
-    restaurantCourseFilters = {sort:'highest',visit:'',score:'',search:''};
+    restaurantCourseFilters = {sort:'highest',search:''};
     restaurantGraphVisit = '';
     restaurantGraphSort = 'score';
     restaurantGraphPercent = false;
@@ -13502,7 +13502,7 @@
 
   // Restaurant detail tabs are ephemeral UI state, never part of a backup.
   let restaurantDetailTab = 'visits';
-  let restaurantCourseFilters = {sort:'highest',visit:'',score:'',search:''};
+  let restaurantCourseFilters = {sort:'highest',search:''};
   let restaurantGraphVisit = '', restaurantGraphSort = 'score', restaurantGraphPercent = false;
   const restaurantDetailStyle = document.createElement('style');
   restaurantDetailStyle.textContent = `
@@ -13530,11 +13530,15 @@
     .rd-chart [data-rd-visit],.rd-chart [data-rd-course]{cursor:pointer;outline-offset:3px}
     .rd-bars{display:grid;gap:9px}
     .rd-bar{display:grid;grid-template-columns:1fr auto;gap:5px 10px;text-align:left;color:var(--chalk);background:none;border:0;padding:4px 0;cursor:pointer;width:100%;font:inherit}
+    .rd-bar-static{cursor:default}
     .rd-track{height:10px;border-radius:3px;background:var(--panel);grid-column:1/-1;overflow:hidden}
     .rd-fill{height:100%;display:block;border-radius:3px;background:#709D9F}
     .rd-fill.high{background:var(--amber)}
     .rd-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
     .rd-tools h3{flex:1;margin:0}
+    .rd-dish-tools{flex-wrap:nowrap;width:100%}
+    .rd-dish-tools input[data-rd-search]{flex:1 1 0;width:0;min-width:0}
+    .rd-dish-tools select[data-rd-sort]{flex:0 0 auto;width:auto}
     .rd-tools select,.rd-tools input{background:var(--bg);color:var(--chalk);border:1px solid var(--panel-line);border-radius:7px;padding:7px;font:inherit;min-width:0;max-width:100%}
     #restaurant-details-panel-inner select:not(.restaurant-score-select){appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m2 4 4 4 4-4' fill='none' stroke='%23b9c6c5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;background-size:12px 12px;padding-right:22px}
     .rd-course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -13607,7 +13611,8 @@
       (stats.best?'<div class="rd-overview-row"><span class="rd-muted">Highest-scoring visit</span>'+rdVisitButton(stats.best.v,rdDate(stats.best.v)+' · '+rdFmt(stats.best.avg))+'</div>':'')+'</section></div>';
   }
   function rdBar(label,sub,value,width,high,attrs){
-    return '<button type="button" class="rd-bar" '+attrs+'><span>'+escapeHtml(label)+(sub?' <span class="rd-muted">'+escapeHtml(sub)+'</span>':'')+'</span><strong>'+escapeHtml(String(value))+'</strong><span class="rd-track"><span class="rd-fill'+(high?' high':'')+'" style="width:'+Math.max(0,Math.min(100,width))+'%"></span></span></button>';
+    const tag=attrs?'button':'div';
+    return '<'+tag+(attrs?' type="button"':'')+' class="rd-bar'+(attrs?'':' rd-bar-static')+'" '+attrs+'><span>'+escapeHtml(label)+(sub?' <span class="rd-muted">'+escapeHtml(sub)+'</span>':'')+'</span><strong>'+escapeHtml(String(value))+'</strong><span class="rd-track"><span class="rd-fill'+(high?' high':'')+'" style="width:'+Math.max(0,Math.min(100,width))+'%"></span></span></'+tag+'>';
   }
   function rdTrend(stats){
     if(stats.dated.length<2)return '';
@@ -13625,19 +13630,19 @@
   function rdGraphs(r,stats){
     if(!stats.scored.length)return '<div class="rd-extra"><section class="rd-card"><h3>No scored courses yet</h3><p class="rd-muted">Rate courses in Visits to see your restaurant statistics here.</p></section></div>';
     const counts=Array.from({length:8},(_,i)=>({score:i+6,count:stats.scored.filter(c=>c.score===i+6).length}));
-    const dist=counts.filter(d=>d.count>0).map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'data-rd-score="'+d.score+'"')).join('');
+    const dist=counts.filter(d=>d.count>0).map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'')).join('');
     const ranked=stats.rated.slice().sort((a,b)=>restaurantGraphSort==='date'?b.date.localeCompare(a.date)||a.vi-b.vi:b.avg-a.avg||b.date.localeCompare(a.date));
     const compare=stats.visits.length>1?'<section class="rd-card"><div class="rd-tools"><h3>Visit comparison</h3><select data-rd-graph-sort aria-label="Sort visits"><option value="score"'+(restaurantGraphSort==='score'?' selected':'')+'>Score</option><option value="date"'+(restaurantGraphSort==='date'?' selected':'')+'>Date</option></select></div><div class="rd-bars">'+ranked.map(p=>rdBar(rdDate(p.v),p.scored.length+' scored',rdFmt(p.avg),p.avg/13*100,p.avg===stats.best.avg,'data-rd-visit="'+escapeAttr(p.v.id)+'"')).join('')+stats.visits.filter(p=>p.avg===null).map(p=>rdVisitButton(p.v,rdDate(p.v)+' · Unscored')).join('')+'</div></section>':'';
     const selected=stats.rated.find(p=>p.v.id===restaurantGraphVisit)||stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
     restaurantGraphVisit=selected.v.id;
     const w=Math.max(340,selected.courses.length*24+38),base=150,cy=n=>base-(n-5.5)/7.5*120,step=(w-38)/Math.max(1,selected.courses.length);
     const progression='<section class="rd-card"><div class="rd-tools"><h3>Meal progression</h3><select data-rd-meal aria-label="Select visit">'+stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>'<option value="'+escapeAttr(p.v.id)+'"'+(p===selected?' selected':'')+'>'+escapeHtml(rdDate(p.v))+'</option>').join('')+'</select></div><div style="overflow-x:auto"><svg class="rd-chart" style="min-width:'+w+'px" viewBox="0 0 '+w+' 175" aria-label="Course scores in meal order">'+[6,8,10,12,13].map(n=>'<line class="rd-axis" x1="26" x2="'+w+'" y1="'+cy(n)+'" y2="'+cy(n)+'"/><text x="21" y="'+(cy(n)+3)+'" text-anchor="end">'+n+'</text>').join('')+selected.courses.map((d,i)=>{const x=30+i*step;return '<g role="button" tabindex="0" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'" aria-label="'+escapeAttr('Course '+(i+1)+', '+(d.score===null?'unscored':d.score))+'"><title>'+escapeHtml(d.c.text||'Course '+(i+1))+'</title><rect x="'+x+'" y="20" width="'+step+'" height="145" fill="transparent"/>'+(d.score===null?'':'<rect x="'+(x+2)+'" y="'+cy(d.score)+'" width="'+Math.max(4,step-4)+'" height="'+(base-cy(d.score))+'" rx="2" fill="'+(d.score>=12?'var(--amber)':'#709D9F')+'"/>')+'<text x="'+(x+step/2)+'" y="168" text-anchor="middle">'+(i+1)+'</text></g>';}).join('')+'<line class="rd-avg" x1="26" x2="'+w+'" y1="'+cy(selected.avg)+'" y2="'+cy(selected.avg)+'"/></svg></div><span class="rd-muted">Meal average '+rdFmt(selected.avg)+' · Select a course to open it</span></section>';
-    return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg.',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13 · Select a score to see matching courses</p></section>'+compare+progression+'</div>';
+    return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg.',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13</p></section>'+compare+progression+'</div>';
   }
   function rdCourseResults(stats){
     const f=restaurantCourseFilters;
     const q=f.search.trim().toLowerCase();
-    const rows=stats.courses.filter(d=>(!f.visit||d.v.id===f.visit)&&(!f.score||(f.score==='unrated'?d.score===null:d.score===Number(f.score)))&&(!q||[d.c.text,d.c.transcript].some(t=>String(t||'').toLowerCase().includes(q))));
+    const rows=stats.courses.filter(d=>!q||[d.c.text,d.c.transcript].some(t=>String(t||'').toLowerCase().includes(q)));
     rows.sort((a,b)=>{
       const ad=otdParse(a.v.date)?a.v.date:'',bd=otdParse(b.v.date)?b.v.date:'';
       const dateOrder=(!ad&&!bd?0:!ad?1:!bd?-1:f.sort==='oldest'?ad.localeCompare(bd):bd.localeCompare(ad));
@@ -13653,7 +13658,7 @@
   function rdCourses(stats){
     const f=restaurantCourseFilters;
     const opt=(v,t,cur)=>'<option value="'+escapeAttr(v)+'"'+(v===cur?' selected':'')+'>'+escapeHtml(t)+'</option>';
-    return '<div class="rd-extra"><div class="rd-tools"><input data-rd-search type="search" placeholder="Search descriptions…" aria-label="Search descriptions" value="'+escapeAttr(f.search)+'"><select data-rd-sort aria-label="Sort courses">'+[['highest','Highest rated'],['lowest','Lowest rated'],['newest','Newest'],['oldest','Oldest']].map(([v,t])=>opt(v,t,f.sort)).join('')+'</select><select data-rd-filter-visit aria-label="Filter by visit">'+opt('','All visits',f.visit)+stats.visits.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>opt(p.v.id,rdDate(p.v),f.visit)).join('')+'</select><select data-rd-filter-score aria-label="Filter by score">'+opt('','All scores',f.score)+RESTAURANT_COURSE_SCORES.map(n=>opt(String(n),String(n),f.score)).join('')+opt('unrated','Unrated',f.score)+'</select></div><div data-rd-results>'+rdCourseResults(stats)+'</div></div>';
+    return '<div class="rd-extra"><div class="rd-tools rd-dish-tools"><input data-rd-search type="search" placeholder="Search descriptions…" aria-label="Search descriptions" value="'+escapeAttr(f.search)+'"><select data-rd-sort aria-label="Sort courses">'+[['highest','Highest rated'],['lowest','Lowest rated'],['newest','Newest'],['oldest','Oldest']].map(([v,t])=>opt(v,t,f.sort)).join('')+'</select></div><div data-rd-results>'+rdCourseResults(stats)+'</div></div>';
   }
   function rdSwitch(tab){
     if(guestViewEnabled||isLockedGuestAccount)return;
@@ -13687,12 +13692,11 @@
     });
   }
   function rdAction(e){
-    const el=e.target.closest('[data-rd-tab],[data-rd-visit],[data-rd-score],[data-rd-course],[data-rd-photo],[data-rd-percent]');
+    const el=e.target.closest('[data-rd-tab],[data-rd-visit],[data-rd-course],[data-rd-photo],[data-rd-percent]');
     if(!el||guestViewEnabled||isLockedGuestAccount)return;
     if(e.type==='keydown'){if(!['Enter',' '].includes(e.key)||el.tagName.toLowerCase()==='button')return;e.preventDefault();}
     if(el.dataset.rdTab){rdSwitch(el.dataset.rdTab);return;}
     if(el.hasAttribute('data-rd-percent')){restaurantGraphPercent=!restaurantGraphPercent;renderRestaurantDetailsContent();return;}
-    if(el.dataset.rdScore){restaurantCourseFilters.score=el.dataset.rdScore;restaurantCourseFilters.visit='';restaurantCourseFilters.search='';rdSwitch('courses');return;}
     if(el.dataset.rdPhoto!==undefined){
       const r=restaurantRows[openRestaurantIndex],v=(r.visits||[]).find(v=>v.id===el.dataset.rdCourseVisit);
       const c=v?.courses[Number(el.dataset.rdPhoto)];if(!c)return;
@@ -13708,8 +13712,8 @@
     const el=e.target;
     if(el.matches('[data-rd-meal]')){restaurantGraphVisit=el.value;renderRestaurantDetailsContent();}
     else if(el.matches('[data-rd-graph-sort]')){restaurantGraphSort=el.value;renderRestaurantDetailsContent();}
-    else if(el.matches('[data-rd-sort],[data-rd-filter-visit],[data-rd-filter-score]')){
-      restaurantCourseFilters[el.hasAttribute('data-rd-sort')?'sort':el.hasAttribute('data-rd-filter-visit')?'visit':'score']=el.value;
+    else if(el.matches('[data-rd-sort]')){
+      restaurantCourseFilters.sort=el.value;
       const result=restaurantDetailsPanelInner.querySelector('[data-rd-results]');
       if(result)result.innerHTML=rdCourseResults(rdStats(restaurantRows[openRestaurantIndex]));
     }
