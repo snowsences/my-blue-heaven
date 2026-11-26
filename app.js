@@ -218,6 +218,7 @@
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
   const pageFun = document.getElementById('page-fun');
+  const pageSearch = document.getElementById('page-search');
   const pageTrips = document.getElementById('page-trips');
   const topNavToolsBtn = document.getElementById('top-nav-tools-btn');
   const lastfmStatusText = document.getElementById('lastfm-status-text');
@@ -4420,13 +4421,13 @@
     // Defense in depth alongside the CSS-hidden Settings button itself —
     // this account never lands on Settings regardless of how 'settings'
     // got passed in.
-    if (isLockedGuestAccount && page === 'settings') page = 'restaurants';
+    if ((isLockedGuestAccount && page === 'settings') || ((guestViewEnabled || isLockedGuestAccount) && page === 'search')) page = 'restaurants';
     const pages = {
       albums: pageAlbums, songs: pageSongs, artists: pageArtists, restaurants: pageRestaurants, dishes: pageDishes,
       hikes: pageHikes, parks: pageParks, roads: pageRoads, photos: pagePhotos,
       'photo-collections': pagePhotoCollections, 'photo-calendar': pagePhotoCalendar,
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
-      trips: pageTrips, fun: pageFun, settings: pageSettings
+      trips: pageTrips, fun: pageFun, search: pageSearch, settings: pageSettings
     };
     rememberSessionPage(page);
     Object.keys(pages).forEach(key => pages[key].classList.toggle('active', key === page));
@@ -4476,6 +4477,7 @@
     if (page === 'parks'){
       renderParksPage();
     }
+    if (page === 'search') usEnter();
     if (page === 'fun'){
       refreshPhotoTagTool();
       refreshOtdSettingsUI(); // the undated-items count can change whenever data does
@@ -4562,9 +4564,11 @@
     switchTopPage(page);
   }
   function switchToolsSubPage(page){
+    if(page==='search'&&(guestViewEnabled||isLockedGuestAccount))return;
     activeToolsSubPage = page;
     [toolsSubtabFunBtn, toolsSubtabFunBtn2].forEach(b => b.classList.toggle('active', page === 'fun'));
     [toolsSubtabSettingsBtn, toolsSubtabSettingsBtn2].forEach(b => b.classList.toggle('active', page === 'settings'));
+    document.querySelectorAll('[data-tools-subpage]').forEach(b=>b.classList.toggle('active',b.dataset.toolsSubpage===page));
     switchTopPage(page);
   }
   function switchPhotosSubPage(page){
@@ -4638,6 +4642,7 @@
   topNavToolsBtn.addEventListener('click', () => switchTopGroup('tools'));
   [toolsSubtabFunBtn, toolsSubtabFunBtn2].forEach(b => b.addEventListener('click', () => switchToolsSubPage('fun')));
   [toolsSubtabSettingsBtn, toolsSubtabSettingsBtn2].forEach(b => b.addEventListener('click', () => switchToolsSubPage('settings')));
+  document.querySelectorAll('[data-tools-subpage]').forEach(b=>b.addEventListener('click',()=>switchToolsSubPage(b.dataset.toolsSubpage)));
 
   [musicSubtabAlbumsBtn, musicSubtabAlbumsBtn2, musicSubtabAlbumsBtn3].forEach(b => b.addEventListener('click', () => switchMusicSubPage('albums')));
   [musicSubtabSongsBtn, musicSubtabSongsBtn2, musicSubtabSongsBtn3].forEach(b => b.addEventListener('click', () => switchMusicSubPage('songs')));
@@ -4663,7 +4668,7 @@
     photos: ['photos', 'photo-collections', 'photo-calendar'],
     nature: ['hikes', 'parks', 'roads'],
     art: ['books', 'movies', 'games', 'shows'],
-    tools: ['fun', 'settings'],
+    tools: ['fun', 'search', 'settings'],
   };
   const GROUP_SWITCHERS = {
     music: switchMusicSubPage,
@@ -15043,7 +15048,6 @@
     if (calOverlay.classList.contains('open')){ closeActivityCalendar(); return; }
     if (tmapOverlay && tmapOverlay.classList.contains('open')){ closeTripMap(); return; }
     if (tripOverlay.classList.contains('open')){ closeTrip(); return; }
-    if (usOverlay.classList.contains('open')){ usClose(); return; }
   }
 
   window.addEventListener('popstate', () => {
@@ -21574,15 +21578,8 @@
     else if(r.main.includes(q))score+=20;
     return score;
   }
-  const usButton=document.createElement('button');
-  usButton.type='button';usButton.id='universal-search-btn';usButton.className='top-nav-settings-btn';
-  usButton.setAttribute('aria-label','Search everything');usButton.title='Search (Ctrl/⌘ K)';
-  usButton.innerHTML='<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span class="top-nav-label">Search</span>';
-  topNavToolsBtn.before(usButton);
-  const usOverlay=document.createElement('section');
-  usOverlay.id='universal-search';usOverlay.setAttribute('role','dialog');usOverlay.setAttribute('aria-label','Universal search');usOverlay.setAttribute('aria-modal','true');usOverlay.setAttribute('aria-hidden','true');
-  usOverlay.innerHTML='<div class="us-shell"><header class="us-header"><div class="us-search-row"><button class="us-plain" type="button" data-us-close aria-label="Close search">‹</button><div class="us-input-wrap"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="us-query" type="search" autocomplete="off" placeholder="Search everything…" aria-label="Search everything"><button type="button" class="us-plain" data-us-clear aria-label="Clear search" hidden>×</button></div></div><div class="us-filters" aria-label="Result categories"></div><div class="us-toolbar" hidden><span class="us-count" role="status" aria-live="polite"></span><select aria-label="Sort results" class="us-sort"><option value="relevance">Relevance</option><option value="highest">Highest rated</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select></div></header><main class="us-results"></main></div>';
-  document.body.appendChild(usOverlay);
+  const usOverlay=document.getElementById('universal-search');
+  usOverlay.innerHTML='<div class="us-shell"><header class="us-header"><div class="us-search-row"><div class="us-input-wrap"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="us-query" type="search" autocomplete="off" placeholder="Search everything…" aria-label="Search everything"><button type="button" class="us-plain" data-us-clear aria-label="Clear search" hidden>×</button></div></div><div class="us-filters" aria-label="Result categories"></div><div class="us-toolbar" hidden><span class="us-count" role="status" aria-live="polite"></span><select aria-label="Sort results" class="us-sort"><option value="relevance">Relevance</option><option value="highest">Highest rated</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select></div></header><main class="us-results"></main></div>';
   const usInput=usOverlay.querySelector('input'),usResults=usOverlay.querySelector('.us-results'),usFilters=usOverlay.querySelector('.us-filters'),usToolbar=usOverlay.querySelector('.us-toolbar'),usSort=usOverlay.querySelector('.us-sort'),usClear=usOverlay.querySelector('[data-us-clear]');
   let usRows=[],usVisible=[],usType='all',usTimer=0,usLimit=60,usRecent=[];
   const usRecentKey='mbh-universal-search-recent-v1';
@@ -21592,25 +21589,30 @@
     const q=usInput.value.trim();if(q.length<2)return;
     usRecent=[q,...usRecent.filter(x=>usNorm(x)!==usNorm(q))].slice(0,8);usWriteRecent();
   }
+  function usEnter(){
+    if(!usOwner())return;
+    clearTimeout(usTimer);
+    usRecent=usReadRecent();usRows=usIndex();usRender();
+    const refresh=()=>{if(usOwner()&&pageSearch.classList.contains('active')){usRows=usIndex();usRender();}};
+    Promise.all([localDataReadyPromise,guestViewReadyPromise]).then(refresh);
+    cloudSettledPromise.then(refresh);
+  }
   function usOpen(){
-    if(!usOwner()||usOverlay.classList.contains('open')||countOpenOverlays()>0)return;
-    usRecent=usReadRecent();usRows=usIndex();
-    usOverlay.classList.add('open');usOverlay.setAttribute('aria-hidden','false');
-    document.body.classList.add('details-open-lock');usRender();usInput.focus({preventScroll:true});
-    Promise.all([localDataReadyPromise,guestViewReadyPromise]).then(()=>{if(usOwner()&&usOverlay.classList.contains('open')){usRows=usIndex();usRender();}});
-    cloudSettledPromise.then(()=>{if(usOwner()&&usOverlay.classList.contains('open')){usRows=usIndex();usRender();}});
+    if(!usOwner()||countOpenOverlays()>0)return;
+    if(!pageSearch.classList.contains('active')){
+      switchToolsSubPage('search');switchTopGroup('tools');window.scrollTo(0,0);
+    }
+    usInput.focus({preventScroll:true});
   }
   function usClose(){
-    if(!usOverlay.classList.contains('open'))return;
-    clearTimeout(usTimer);usOverlay.classList.remove('open');usOverlay.setAttribute('aria-hidden','true');
-    if(countOpenOverlays()===0)document.body.classList.remove('details-open-lock');
-    usButton.focus({preventScroll:true});
+    clearTimeout(usTimer);usInput.blur();
   }
-  BACK_BUTTON_OVERLAYS.push({el:usOverlay,openClass:'open'});
-  new MutationObserver(handleOverlayClassChange).observe(usOverlay,{attributes:true,attributeFilter:['class']});
+  function usScrollTop(){
+    if(pageSearch.classList.contains('active'))window.scrollTo(0,0);
+  }
   // If the owner switches into Guest View, clear all private search state.
   new MutationObserver(()=>{
-    if(!usOwner()){usClose();usInput.value='';usRows=[];usVisible=[];usType='all';usRecent=[];usResults.replaceChildren();}
+    if(!usOwner()){usClose();usInput.value='';usRows=[];usVisible=[];usType='all';usRecent=[];usResults.replaceChildren();usFilters.replaceChildren();usToolbar.hidden=true;}
   }).observe(document.body,{attributes:true,attributeFilter:['class']});
   function usChip(type,label,selected){
     return '<button type="button" data-us-type="'+escapeAttr(type)+'" aria-pressed="'+selected+'">'+escapeHtml(label)+'</button>';
@@ -21671,7 +21673,7 @@
       return '<section class="us-section"><div class="us-section-head"><h2>'+usTypes[type][1]+' '+usTypes[type][0]+' <small>'+rows.length+'</small></h2>'+(usType==='all'&&rows.length>cap?'<button class="us-plain us-link" type="button" data-us-type="'+type+'">See all ›</button>':'')+'</div><div class="'+(type==='photo'?'us-photo-grid':'us-list')+'">'+shown.map(({r,i},j)=>'<div class="us-entry" style="--us-delay:'+Math.min(j,11)*20+'ms">'+usCard(r,i,q)+'</div>').join('')+'</div>'+(usType!=='all'&&rows.length>cap?'<button class="us-more" type="button" data-us-more>Show '+Math.min(60,rows.length-cap)+' more</button>':'')+'</section>';
     }).join('');
   }
-  function usSetType(type){usType=type;usLimit=60;usRender();usOverlay.scrollTop=0;}
+  function usSetType(type){usType=type;usLimit=60;usRender();usScrollTop();}
   function usActivate(i){
     const r=usVisible[i];if(!r||!usOwner())return;usRemember();usInput.blur();
     if(r.type==='photo'){
@@ -21680,8 +21682,7 @@
     }
     if(r.action)r.action();
   }
-  usButton.addEventListener('click',usOpen);
-  usInput.addEventListener('input',()=>{clearTimeout(usTimer);usLimit=60;usTimer=setTimeout(()=>{usRender();usOverlay.scrollTop=0;},85);});
+  usInput.addEventListener('input',()=>{clearTimeout(usTimer);usLimit=60;usTimer=setTimeout(()=>{usRender();usScrollTop();},85);});
   usInput.addEventListener('keydown',e=>{
     if(e.key==='Enter'){e.preventDefault();clearTimeout(usTimer);usRender();usRemember();usInput.blur();}
     if(e.key==='ArrowDown'){const first=usResults.querySelector('[data-us-result], [data-us-term], [data-us-type]');if(first){e.preventDefault();first.focus();}}
@@ -21689,30 +21690,20 @@
   usSort.addEventListener('change',()=>{usLimit=60;usRender();});
   usOverlay.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
-    if(b.hasAttribute('data-us-close')){usClose();return;}
     if(b.hasAttribute('data-us-clear')){clearTimeout(usTimer);usInput.value='';usType='all';usLimit=60;usRender();usInput.focus();return;}
     if(b.hasAttribute('data-us-type')){clearTimeout(usTimer);usSetType(b.dataset.usType);return;}
     if(b.hasAttribute('data-us-term')){usInput.value=b.dataset.usTerm;usSetType('all');return;}
     if(b.hasAttribute('data-us-remove-recent')){usRecent=usRecent.filter(t=>t!==b.dataset.usRemoveRecent);usWriteRecent();usRender();return;}
     if(b.hasAttribute('data-us-reset-recent')){usRecent=[];usWriteRecent();usRender();return;}
-    if(b.hasAttribute('data-us-more')){usLimit+=60;const scroll=usOverlay.scrollTop;usRender();usOverlay.scrollTop=scroll;return;}
+    if(b.hasAttribute('data-us-more')){usLimit+=60;const scroll=window.scrollY;usRender();window.scrollTo(0,scroll);return;}
     if(b.hasAttribute('data-us-result'))usActivate(Number(b.dataset.usResult));
   });
   document.addEventListener('keydown',e=>{
-    if(!usOwner())return;
-    const open=usOverlay.classList.contains('open');
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&(!open?countOpenOverlays()===0:countOpenOverlays()===1)){
-      e.preventDefault();if(open)usInput.focus();else usOpen();return;
+    if(!usOwner()||countOpenOverlays()>0)return;
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){
+      e.preventDefault();usOpen();
     }
-    if(!open||countOpenOverlays()!==1)return;
-    if(e.key==='Escape'){e.preventDefault();usClose();}
-    if(e.key==='Tab'){
-      const els=[...usOverlay.querySelectorAll('button:not([disabled]),input,select')].filter(el=>el.getClientRects().length);
-      if(!els.length)return;
-      const first=els[0],last=els[els.length-1];
-      if(e.shiftKey&&(document.activeElement===first||!usOverlay.contains(document.activeElement))){e.preventDefault();last.focus();}
-      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
-    }
+    if(e.key==='Escape'&&pageSearch.classList.contains('active')&&document.activeElement===usInput)usInput.blur();
   });
 
 })();
