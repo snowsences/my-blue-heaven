@@ -202,6 +202,19 @@
   const lightboxCoverToggleBtn = document.getElementById('lightbox-cover-toggle-btn');
   const lightboxDishCoverBtn = document.getElementById('lightbox-dish-cover-btn');
   const lightboxDeleteBtn = document.getElementById('lightbox-delete-btn');
+  const tripPhotoRemoveBtn = document.createElement('button');
+  tripPhotoRemoveBtn.type = 'button';
+  tripPhotoRemoveBtn.className = 'trip-photo-remove-link';
+  tripPhotoRemoveBtn.hidden = true;
+  artLightboxOverlay.appendChild(tripPhotoRemoveBtn);
+  const tripPhotoRemoveStyle = document.createElement('style');
+  tripPhotoRemoveStyle.textContent = `
+    .trip-photo-remove-link{position:fixed;top:12px;top:max(12px,env(safe-area-inset-top));right:12px;right:max(12px,env(safe-area-inset-right));z-index:301;min-height:44px;padding:6px 9px;background:rgba(15,33,36,.72);border:0;border-radius:6px;color:#fff;font:500 12px Figtree,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+    .trip-photo-remove-link[hidden],body.guest-view-active .trip-photo-remove-link{display:none!important}
+    .trip-photo-remove-link:hover{color:var(--amber)}
+    @media(max-width:480px){.art-lightbox-overlay:has(.trip-photo-remove-link:not([hidden])) #lightbox-cover-toggle-btn{top:60px;top:calc(max(12px,env(safe-area-inset-top)) + 48px)}}
+  `;
+  document.head.appendChild(tripPhotoRemoveStyle);
   const pageAlbums = document.getElementById('page-albums');
   const pageSettings = document.getElementById('page-settings');
   const pageFun = document.getElementById('page-fun');
@@ -2661,6 +2674,7 @@
     photoSortHelperIds = null;
     lightboxPhotos = null;
     lightboxCoverContext = null;
+    tripPhotoRemoveBtn.hidden = true;
     artLightboxImg.src = cloudinaryThumbUrl(src, 1600);
     artLightboxOverlay.classList.remove('multi');
     lightboxCoverToggleBtn.classList.remove('show');
@@ -2691,9 +2705,7 @@
     artLightboxOverlay.classList.add('show');
     lightboxZoomIn();
     lightboxCoverToggleBtn.classList.toggle('show', !!lightboxCoverContext);
-    // A trip's gallery mixes photos from several different sources (visits,
-    // hikes, roads, activities, trip-only uploads, the Photos tab) — there's
-    // no single safe "delete" for that mix, so only the cover picker applies here.
+    // Trips use a separate source-aware removal link, never the generic delete button.
     lightboxDeleteBtn.classList.toggle('show', !!lightboxCoverContext && lightboxCoverContext.tripId === undefined);
     updateLightboxCounter();
     updateLightboxCoverToggle();
@@ -2704,6 +2716,7 @@
   }
 
   function updateLightboxCounter(){
+    updateTripPhotoRemoveLink();
     if (!lightboxPhotos) return;
     lightboxCounter.textContent = (lightboxIndex + 1) + ' / ' + lightboxPhotos.length;
   }
@@ -2864,6 +2877,7 @@
     artLightboxImg.src = '';
     lightboxPhotos = null;
     lightboxCoverContext = null;
+    tripPhotoRemoveBtn.hidden = true;
   }
   artLightboxOverlay.addEventListener('click', (e) => {
     if (lightboxJustSwiped){ lightboxJustSwiped = false; return; } // a swipe just fired, not a tap to close
@@ -2955,6 +2969,59 @@
       handler.setCover(handler.index, newCover);
     }
     updateLightboxCoverToggle();
+  });
+  // Look up the current photo by URL against the trip's current gallery;
+  // never use a stale photo index after another item has been removed.
+  function currentTripPhotoRemoval(){
+    if (guestViewEnabled || isLockedGuestAccount || !lightboxPhotos || !lightboxCoverContext || lightboxCoverContext.tripId === undefined) return null;
+    const t = tripFind(lightboxCoverContext.tripId);
+    if (!t) return null;
+    const url = lightboxEntryUrl(lightboxPhotos[lightboxIndex]);
+    const g = tripGallery(t, tripLinked(t)).find(x => x.url === url);
+    if (!g || !['photos','trip','activity'].includes(g.src)) return null;
+    return {t,g};
+  }
+  function updateTripPhotoRemoveLink(){
+    const entry = currentTripPhotoRemoval();
+    tripPhotoRemoveBtn.hidden = !entry;
+    if (entry) tripPhotoRemoveBtn.textContent = ({photos:'Remove from trip',trip:'Delete photo',activity:'Remove from activity'})[entry.g.src];
+  }
+  tripPhotoRemoveBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const entry = currentTripPhotoRemoval();
+    if (!entry || modalOverlay.classList.contains('show')) return;
+    const {t,g} = entry;
+    const msg = {
+      photos:['Remove from this trip?', 'The photo stays in your Photos tab.'],
+      trip:['Delete this photo?', 'It only exists in this trip, so it will be gone for good.'],
+      activity:['Remove from this activity?', 'The photo will be removed from the activity and its trip gallery.']
+    }[g.src];
+    showConfirmModal(msg[0], msg[1], () => {
+      if (guestViewEnabled || isLockedGuestAccount) return;
+      const current = tripFind(t.id);
+      if (!current) return;
+      // Revalidate identity before mutating; activity array indices may shift.
+      if (g.src === 'photos'){
+        const p = photoRows.find(p => p.id === g.id && p.tripId === current.id && p.url === g.url);
+        if (!p) return;
+        closeArtLightbox();
+        tripUnlinkItem(current, 'photo', g.id);
+      } else if (g.src === 'trip'){
+        if (!current.photos.some(p => p.id === g.id && p.url === g.url)) return;
+        closeArtLightbox();
+        current.photos = current.photos.filter(p => p.id !== g.id);
+        delete current.assign['p:' + g.id];
+        saveTripProgress(); tripRefresh();
+      } else {
+        const [actId, idx] = g.id.split(':');
+        const act = current.activities.find(a => a.id === actId);
+        const i = Number(idx);
+        if (!act || act.photos[i]?.url !== g.url) return;
+        closeArtLightbox();
+        act.photos.splice(i, 1);
+        saveTripProgress(); tripRefresh();
+      }
+    });
   });
   lightboxDeleteBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -18157,8 +18224,7 @@
   function tripGalleryHtml(gallery, owner){
     if (!gallery.length) return '<p class="cal-hint">No photos yet.</p>';
     return '<section class="trip-gallery">' + gallery.map((g, i) =>
-      '<div class="trip-gtile"><button type="button" class="yir-tile trip-gimg" data-trip-photo="' + i + '" aria-label="Open photo ' + (i + 1) + ' of ' + gallery.length + '">' + yirImg(g.url, 500) + '</button>' +
-      ((owner && (g.src === 'trip' || g.src === 'photos' || g.src === 'activity')) ? '<button type="button" class="trip-gx trip-owner" data-trip-gremove="' + i + '" aria-label="Remove from trip">✕</button>' : '') + '</div>').join('') + '</section>';
+      '<div class="trip-gtile"><button type="button" class="yir-tile trip-gimg" data-trip-photo="' + i + '" aria-label="Open photo ' + (i + 1) + ' of ' + gallery.length + '">' + yirImg(g.url, 500) + '</button></div>').join('') + '</section>';
   }
 
 
@@ -18523,22 +18589,7 @@
       if (n) showConfirmModal('Delete this memory?', (n.text || '').slice(0, 120), () => { t.notes = t.notes.filter(x => x.id !== n.id); saveTripProgress(); tripRender(); });
       return;
     }
-    if ((el = e.target.closest('[data-trip-gremove]'))){
-      const g = tripCurrentGallery[Number(el.dataset.tripGremove)];
-      if (!g) return;
-      if (g.src === 'trip'){
-        showConfirmModal('Delete this photo?', 'It only exists in this trip, so it will be gone for good.', () => { t.photos = t.photos.filter(p => p.id !== g.id); delete t.assign['p:' + g.id]; saveTripProgress(); tripRefresh(); });
-      } else if (g.src === 'photos'){
-        showConfirmModal('Remove from this trip?', 'The photo stays in your Photos tab.', () => tripUnlinkItem(t, 'photo', g.id));
-      } else if (g.src === 'activity'){
-        showConfirmModal('Delete this photo?', 'It only exists in this trip, so it will be gone for good.', () => {
-          const [actId, idx] = g.id.split(':');
-          const act = t.activities.find(a => a.id === actId);
-          if (act){ act.photos.splice(Number(idx), 1); saveTripProgress(); tripRefresh(); }
-        });
-      }
-      return;
-    }
+
   });
 
   // ---------- a small bottom sheet the trip's forms and pickers share ----------
