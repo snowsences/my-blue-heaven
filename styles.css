@@ -5098,6 +5098,12 @@
 
   /* Sub-tabs: one amber line that slides and stretches to the selected tab. */
   .group-sub-tabs.has-ink .group-sub-tab-btn.active::after{ display: none; }
+  :is(.rd-tabs,.trip-detail-tabs,.restaurant-visit-tabs).has-ink{ position:relative; }
+  :is(.rd-tabs,.trip-detail-tabs,.restaurant-visit-tabs).has-ink > button.active{ border-bottom-color:transparent; }
+  :is(.rd-tabs,.trip-detail-tabs).has-ink > .sub-tab-ink{ height:3px; }
+  .restaurant-visit-tabs.has-ink > .sub-tab-ink{ top:calc(var(--ink-y, 0px) - 2px); bottom:auto; transition:transform var(--dur-slow) var(--ease-spring),width var(--dur-slow) var(--ease-spring),top var(--dur-slow) var(--ease-spring); }
+  @media(prefers-reduced-motion:reduce){ .restaurant-visit-tabs.has-ink > .sub-tab-ink{ transition:none; } }
+
   .sub-tab-ink{ position: absolute; left: 0; bottom: 0; height: 2px; width: var(--ink-w, 0px); transform: translateX(var(--ink-x, 0px)); background: var(--amber); z-index: 1; pointer-events: none;
     transition: transform var(--dur-slow) var(--ease-spring), width var(--dur-slow) var(--ease-spring); }
 
