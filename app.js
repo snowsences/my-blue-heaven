@@ -13564,7 +13564,6 @@
     restaurantDetailTab = 'visits';
     restaurantVisitEditMode = false;
     restaurantCourseFilters = {sort:'highest',search:''};
-    restaurantGraphVisit = '';
     restaurantGraphSort = 'score';
     restaurantGraphPercent = false;
     restaurantDetailsPanel.scrollTop = 0;
@@ -14335,7 +14334,7 @@
   // Restaurant detail tabs are ephemeral UI state, never part of a backup.
   let restaurantDetailTab = 'visits';
   let restaurantCourseFilters = {sort:'highest',search:''};
-  let restaurantGraphVisit = '', restaurantGraphSort = 'score', restaurantGraphPercent = false;
+  let restaurantGraphSort = 'score', restaurantGraphPercent = false;
   const restaurantDetailStyle = document.createElement('style');
   restaurantDetailStyle.textContent = `
     #restaurant-details-panel-inner .rd-header{position:sticky;top:calc(-1 * var(--rd-collapse,0px));z-index:12;background:var(--panel)}
@@ -14466,11 +14465,11 @@
     const counts=Array.from({length:8},(_,i)=>({score:i+6,count:stats.scored.filter(c=>c.score===i+6).length}));
     const dist=counts.filter(d=>d.count>0).map(d=>rdBar(String(d.score),'',restaurantGraphPercent?(100*d.count/stats.scored.length).toFixed(1)+'%':d.count,100*d.count/Math.max(1,...counts.map(c=>c.count)),d.score>=12,'')).join('');
     const ranked=stats.rated.slice().sort((a,b)=>restaurantGraphSort==='date'?b.date.localeCompare(a.date)||a.vi-b.vi:b.avg-a.avg||b.date.localeCompare(a.date));
-    const compare=stats.visits.length>1?'<section class="rd-card"><div class="rd-tools"><h3>Visit comparison</h3><select data-rd-graph-sort aria-label="Sort visits"><option value="score"'+(restaurantGraphSort==='score'?' selected':'')+'>Score</option><option value="date"'+(restaurantGraphSort==='date'?' selected':'')+'>Date</option></select></div><div class="rd-bars">'+ranked.map(p=>rdBar(rdDate(p.v),p.scored.length+' scored',rdFmt(p.avg),p.avg/13*100,p.avg===stats.best.avg,'data-rd-visit="'+escapeAttr(p.v.id)+'"')).join('')+stats.visits.filter(p=>p.avg===null).map(p=>rdVisitButton(p.v,rdDate(p.v)+' · Unscored')).join('')+'</div></section>':'';
-    const selected=stats.rated.find(p=>p.v.id===restaurantGraphVisit)||stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
-    restaurantGraphVisit=selected.v.id;
-    const w=Math.max(340,selected.courses.length*24+38),base=150,cy=n=>base-(n-5.5)/7.5*120,step=(w-38)/Math.max(1,selected.courses.length);
-    const progression='<section class="rd-card"><div class="rd-tools"><h3>Meal progression</h3><select data-rd-meal aria-label="Select visit">'+stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>'<option value="'+escapeAttr(p.v.id)+'"'+(p===selected?' selected':'')+'>'+escapeHtml(rdDate(p.v))+'</option>').join('')+'</select></div><div style="overflow-x:auto"><svg class="rd-chart" style="min-width:'+w+'px" viewBox="0 0 '+w+' 175" aria-label="Course scores in meal order">'+[6,8,10,12,13].map(n=>'<line class="rd-axis" x1="26" x2="'+w+'" y1="'+cy(n)+'" y2="'+cy(n)+'"/><text x="21" y="'+(cy(n)+3)+'" text-anchor="end">'+n+'</text>').join('')+selected.courses.map((d,i)=>{const x=30+i*step;return '<g role="button" tabindex="0" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'" aria-label="'+escapeAttr('Course '+(i+1)+', '+(d.score===null?'unscored':d.score))+'"><title>'+escapeHtml(d.c.text||'Course '+(i+1))+'</title><rect x="'+x+'" y="20" width="'+step+'" height="145" fill="transparent"/>'+(d.score===null?'':'<rect x="'+(x+2)+'" y="'+cy(d.score)+'" width="'+Math.max(4,step-4)+'" height="'+(base-cy(d.score))+'" rx="2" fill="'+(d.score>=12?'var(--amber)':'#709D9F')+'"/>')+'<text x="'+(x+step/2)+'" y="168" text-anchor="middle">'+(i+1)+'</text></g>';}).join('')+'<line class="rd-avg" x1="26" x2="'+w+'" y1="'+cy(selected.avg)+'" y2="'+cy(selected.avg)+'"/></svg></div><span class="rd-muted">Meal average '+rdFmt(selected.avg)+' · Select a course to open it</span></section>';
+    const compare=stats.visits.length>1?'<section class="rd-card"><div class="rd-tools"><h3>Visit comparison</h3><select data-rd-graph-sort aria-label="Sort visits"><option value="score"'+(restaurantGraphSort==='score'?' selected':'')+'>Score</option><option value="date"'+(restaurantGraphSort==='date'?' selected':'')+'>Date</option></select></div><div class="rd-bars">'+ranked.map(p=>rdBar(rdDate(p.v),p.scored.length+' scored',rdFmt(p.avg),p.avg/13*100,p.avg===stats.best?.avg,'data-rd-visit="'+escapeAttr(p.v.id)+'"')).join('')+stats.visits.filter(p=>p.avg===null).map(p=>rdVisitButton(p.v,rdDate(p.v)+' · Unscored')).join('')+'</div></section>':'';
+    const progression='<section class="rd-card"><h3>Meal progression</h3><div class="rd-meal-list">'+stats.rated.slice().sort((a,b)=>b.date.localeCompare(a.date)||a.vi-b.vi).map(visit=>{
+      const w=Math.max(340,visit.courses.length*24+38),base=150,cy=n=>base-(n-5.5)/7.5*120,step=(w-38)/Math.max(1,visit.courses.length);
+      return '<div class="rd-meal-entry"><div class="rd-meal-heading">'+rdVisitButton(visit.v,rdDate(visit.v),'btn-ghost rd-meal-date')+'<span class="rd-muted">'+visit.scored.length+' scored courses</span></div><div style="overflow-x:auto"><svg class="rd-chart" style="min-width:'+w+'px" viewBox="0 0 '+w+' 175" aria-label="'+escapeAttr('Course scores in meal order, '+rdDate(visit.v))+'">'+[6,8,10,12,13].map(n=>'<line class="rd-axis" x1="26" x2="'+w+'" y1="'+cy(n)+'" y2="'+cy(n)+'"/><text x="21" y="'+(cy(n)+3)+'" text-anchor="end">'+n+'</text>').join('')+visit.courses.map((d,i)=>{const x=30+i*step;return '<g role="button" tabindex="0" data-rd-course="'+d.i+'" data-rd-course-visit="'+escapeAttr(d.v.id)+'" aria-label="'+escapeAttr('Course '+(i+1)+', '+(d.score===null?'unscored':d.score))+'"><title>'+escapeHtml(d.c.text||'Course '+(i+1))+'</title><rect x="'+x+'" y="20" width="'+step+'" height="145" fill="transparent"/>'+(d.score===null?'':'<rect x="'+(x+2)+'" y="'+cy(d.score)+'" width="'+Math.max(4,step-4)+'" height="'+(base-cy(d.score))+'" rx="2" fill="'+(d.score>=12?'var(--amber)':'#709D9F')+'"/>')+'<text x="'+(x+step/2)+'" y="168" text-anchor="middle">'+(i+1)+'</text></g>';}).join('')+'<line class="rd-avg" x1="26" x2="'+w+'" y1="'+cy(visit.avg)+'" y2="'+cy(visit.avg)+'"/></svg></div><span class="rd-muted">Meal average '+rdFmt(visit.avg)+' · Select a course to open it</span></div>';
+    }).join('')+'</div></section>';
     return '<div class="rd-extra"><section class="rd-card">'+rdMetrics([['Average course',rdFmt(stats.mean)],['Median course',rdFmt(stats.median)],['Scored courses',stats.scored.length],['Scored visits',stats.rated.length],['Best visit avg. (6+ rated)',rdFmt(stats.best?.avg)],['12+ courses',stats.exceptional]])+'</section>'+rdTrend(stats)+'<section class="rd-card"><div class="rd-tools"><h3>Course score distribution</h3><button type="button" class="btn-ghost" data-rd-percent>'+ (restaurantGraphPercent?'Show #':'Show %')+'</button></div><div class="rd-bars">'+dist+'</div><p class="rd-muted">'+(100*stats.exceptional/stats.scored.length).toFixed(1)+'% rated 12 or 13</p></section>'+compare+progression+'</div>';
   }
   function rdCourseResults(stats){
@@ -14566,8 +14565,7 @@
   restaurantDetailsPanelInner.addEventListener('keydown',rdAction);
   restaurantDetailsPanelInner.addEventListener('change',e=>{
     const el=e.target;
-    if(el.matches('[data-rd-meal]')){restaurantGraphVisit=el.value;mbhUpdateRestaurantGraphs('[data-rd-meal]');}
-    else if(el.matches('[data-rd-graph-sort]')){restaurantGraphSort=el.value;mbhUpdateRestaurantGraphs('[data-rd-graph-sort]');}
+    if(el.matches('[data-rd-graph-sort]')){restaurantGraphSort=el.value;mbhUpdateRestaurantGraphs('[data-rd-graph-sort]');}
     else if(el.matches('[data-rd-sort]')){
       restaurantCourseFilters.sort=el.value;
       const result=restaurantDetailsPanelInner.querySelector('[data-rd-results]');
