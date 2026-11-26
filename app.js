@@ -209,7 +209,7 @@
   artLightboxOverlay.appendChild(tripPhotoRemoveBtn);
   const tripPhotoRemoveStyle = document.createElement('style');
   tripPhotoRemoveStyle.textContent = `
-    .trip-photo-remove-link{position:fixed;top:12px;top:max(12px,env(safe-area-inset-top));right:12px;right:max(12px,env(safe-area-inset-right));z-index:301;min-height:44px;padding:6px 9px;background:rgba(15,33,36,.72);border:0;border-radius:6px;color:#fff;font:500 12px Figtree,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+    .trip-photo-remove-link{position:fixed;top:12px;top:max(12px,env(safe-area-inset-top));right:12px;right:max(12px,env(safe-area-inset-right));z-index:301;min-height:44px;padding:6px 9px;background:rgba(15,33,36,.72);border:0;border-radius:6px;color:#fff;font:400 12px Figtree,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
     .trip-photo-remove-link[hidden],body.guest-view-active .trip-photo-remove-link{display:none!important}
     .trip-photo-remove-link:hover{color:var(--amber)}
     @media(max-width:480px){.art-lightbox-overlay:has(.trip-photo-remove-link:not([hidden])) #lightbox-cover-toggle-btn{top:60px;top:calc(max(12px,env(safe-area-inset-top)) + 48px)}}
@@ -14298,7 +14298,7 @@
     return (
       '<div class="restaurant-visit-meta-row">' +
         '<span class="restaurant-visit-date-display">' + escapeHtml(formatVisitDate(visit.date)) + '</span>' +
-        (guestViewEnabled || isLockedGuestAccount || !formatRestaurantPrice(visit.price) ? '' : '<span class="restaurant-visit-price" title="Price for this visit" style="color:var(--amber);font-size:13px;font-weight:600;white-space:nowrap">' + escapeHtml(formatRestaurantPrice(visit.price)) + '</span>') +
+        (guestViewEnabled || isLockedGuestAccount || !formatRestaurantPrice(visit.price) ? '' : '<span class="restaurant-visit-price" title="Price for this visit" style="color:var(--amber);font-size:13px;font-weight:500;white-space:nowrap">' + escapeHtml(formatRestaurantPrice(visit.price)) + '</span>') +
         (guestViewEnabled ? '' :
           '<div class="view-toggle restaurant-visit-view-toggle">' +
             '<button class="view-toggle-btn' + (restaurantVisitThumbnailMode ? '' : ' active') + '" id="restaurant-visit-view-full-btn" type="button">Full</button>' +
@@ -14334,7 +14334,7 @@
     .rd-header .details-content{padding:14px 24px 8px !important}
     .rd-header .details-artist{margin-bottom:4px}
     .rd-tabs{display:flex;align-items:stretch;border-bottom:1px solid var(--panel-line);padding:0 12px;background:var(--panel)}
-    .rd-tabs button{flex:1;min-width:0;background:none;color:var(--chalk-dim);border:0;border-bottom:3px solid transparent;padding:12px 3px;font:600 13px Figtree,sans-serif;cursor:pointer}
+    .rd-tabs button{flex:1;min-width:0;background:none;color:var(--chalk-dim);border:0;border-bottom:3px solid transparent;padding:12px 3px;font:500 13px Figtree,sans-serif;cursor:pointer}
     .rd-tabs button.active{color:var(--amber);border-bottom-color:var(--amber)}
     .rd-body{min-height:var(--rd-body-min,0px);padding-bottom:18px}
     .rd-extra{padding:18px 24px 24px;display:flex;flex-direction:column;gap:16px}
@@ -14492,7 +14492,9 @@
     const max=terms[0].count,ordered=[];for(let i=0,j=terms.length-1;i<=j;){ordered.push(terms[i++]);if(i<=j)ordered.push(terms[j--]);}
     return '<section class="rd-card rd-food-card"><h3>Food word cloud</h3><p class="rd-muted">Ingredients, dishes and cooking techniques. Larger words appear in more of your course descriptions.</p><div class="rd-food-cloud">'+ordered.map(t=>{
       const weight=max===1?.25:Math.log(t.count)/Math.log(max);
-      return '<button type="button" class="rd-food-word" data-rd-food-term="'+escapeAttr(t.term)+'" aria-pressed="false" title="'+escapeAttr(t.term+' · '+t.count+' course'+(t.count===1?'':'s'))+'" aria-label="'+escapeAttr(t.term+', '+t.count+' courses')+'" style="--food-size:'+(15+weight*22).toFixed(1)+'px;--food-weight:'+(450+Math.round(weight*250))+';--food-alpha:'+(0.7+weight*.3).toFixed(2)+'"'+(weight>=.75&&max>1?' data-food-top':'')+'>'+escapeHtml(t.term)+'</button>';
+      const originalFontWeight=450+Math.round(weight*250);
+      const fontWeight=originalFontWeight<=500?400:originalFontWeight<=600?500:700;
+      return '<button type="button" class="rd-food-word" data-rd-food-term="'+escapeAttr(t.term)+'" aria-pressed="false" title="'+escapeAttr(t.term+' · '+t.count+' course'+(t.count===1?'':'s'))+'" aria-label="'+escapeAttr(t.term+', '+t.count+' courses')+'" style="--food-size:'+(15+weight*22).toFixed(1)+'px;--food-weight:'+fontWeight+';--food-alpha:'+(0.7+weight*.3).toFixed(2)+'"'+(weight>=.75&&max>1?' data-food-top':'')+'>'+escapeHtml(t.term)+'</button>';
     }).join('')+'</div><p class="rd-muted">Select a word to see the dishes that mention it.</p><div data-rd-food-results aria-live="polite"></div></section>';
   }
   function rdSelectFoodWord(el){
@@ -17134,7 +17136,7 @@
   }
 
   async function shareDrawCard(title, location, imgs, twoColumns){
-    try{ await Promise.all([document.fonts.load('700 84px Figtree'), document.fonts.load('500 40px Figtree')]); }catch(e){ /* falls back to the system font */ }
+    try{ await Promise.all([document.fonts.load('700 84px Figtree'), document.fonts.load('400 40px Figtree')]); }catch(e){ /* falls back to the system font */ }
     const PAD = 64, cw = SHARE_CARD_W - PAD * 2;
     const measure = document.createElement('canvas').getContext('2d');
 
@@ -17146,7 +17148,7 @@
       titleLines = shareWrapText(measure, title, cw, size === 60 ? 3 : 2);
       if (titleLines.length <= 2) break;
     }
-    measure.font = '500 40px ' + SHARE_FONT;
+    measure.font = '400 40px ' + SHARE_FONT;
     const locLines = location ? shareWrapText(measure, location, cw, 2) : [];
     const titleLH = Math.round(titleSize * 1.14), locLH = 52;
     const grid = shareGridCells(imgs, cw, twoColumns);
@@ -17180,7 +17182,7 @@
     if (locLines.length){
       y += 14;
       ctx.fillStyle = 'rgba(241, 236, 222, 0.72)';
-      ctx.font = '500 40px ' + SHARE_FONT;
+      ctx.font = '400 40px ' + SHARE_FONT;
       locLines.forEach((line, i) => { ctx.fillText(line, PAD, y + 40 * 0.9 + i * locLH); });
       y += locLines.length * locLH;
     }
@@ -17262,7 +17264,7 @@
   }
 
   async function shareDrawOtdDay(data){
-    try{ await Promise.all([document.fonts.load('700 72px Figtree'), document.fonts.load('700 30px Figtree'), document.fonts.load('500 24px Figtree')]); }catch(e){ /* falls back to the system font */ }
+    try{ await Promise.all([document.fonts.load('700 72px Figtree'), document.fonts.load('700 30px Figtree'), document.fonts.load('400 24px Figtree')]); }catch(e){ /* falls back to the system font */ }
     const groups = shareOtdRowsFor(data);
     const urls = [];
     groups.forEach(g => g.items.forEach(it => it.shownPhotos.forEach(u => { if (u && urls.indexOf(u) === -1) urls.push(u); })));
@@ -17280,7 +17282,7 @@
 
     measure.font = '700 72px ' + SHARE_FONT;
     const titleLines = shareWrapText(measure, monthDay, cw, 2);
-    measure.font = '500 32px ' + SHARE_FONT;
+    measure.font = '400 32px ' + SHARE_FONT;
     const subLines = shareWrapText(measure, sub, cw, 2);
 
     // Every row is measured up front (text wraps to a known width) so the
@@ -17296,7 +17298,7 @@
       g.items.forEach(it => {
         measure.font = '700 30px ' + SHARE_FONT;
         it.nameLines = shareWrapText(measure, it.name, textW, 2);
-        measure.font = '500 24px ' + SHARE_FONT;
+        measure.font = '400 24px ' + SHARE_FONT;
         it.metaLines = it.meta ? shareWrapText(measure, it.meta, textW, 1) : [];
         it.statLines = it.stat ? shareWrapText(measure, it.stat, textW, 1) : [];
         const textH = LINE_H + it.nameLines.length * LINE_H + (it.metaLines.length ? LINE_H : 0) + (it.statLines.length ? LINE_H : 0);
@@ -17333,7 +17335,7 @@
     titleLines.forEach((line, i) => ctx.fillText(line, PAD, y + 62 + i * 82));
     y += titleLines.length * 82 + 6;
     ctx.fillStyle = 'rgba(241, 236, 222, 0.68)';
-    ctx.font = '500 32px ' + SHARE_FONT;
+    ctx.font = '400 32px ' + SHARE_FONT;
     subLines.forEach((line, i) => ctx.fillText(line, PAD, y + 28 + i * 40));
     y += subLines.length * 40 + 40;
 
@@ -17342,7 +17344,7 @@
       ctx.font = '700 26px ' + SHARE_FONT;
       ctx.fillText(g.label, PAD, y + 24);
       ctx.fillStyle = 'rgba(241, 236, 222, 0.56)';
-      ctx.font = '500 22px ' + SHARE_FONT;
+      ctx.font = '400 22px ' + SHARE_FONT;
       ctx.fillText(g.dateLabel, PAD + cw - ctx.measureText(g.dateLabel).width, y + 24);
       y += HEADER_H;
 
@@ -17363,13 +17365,13 @@
         ty += it.nameLines.length * LINE_H;
         if (it.metaLines.length){
           ctx.fillStyle = 'rgba(241, 236, 222, 0.7)';
-          ctx.font = '500 24px ' + SHARE_FONT;
+          ctx.font = '400 24px ' + SHARE_FONT;
           ctx.fillText(it.metaLines[0], tx, ty + 20);
           ty += LINE_H;
         }
         if (it.statLines.length){
           ctx.fillStyle = 'rgba(241, 236, 222, 0.56)';
-          ctx.font = '500 24px ' + SHARE_FONT;
+          ctx.font = '400 24px ' + SHARE_FONT;
           ctx.fillText(it.statLines[0], tx, ty + 20);
           ty += LINE_H;
         }
@@ -19667,7 +19669,7 @@
   const tripTabsStyle=document.createElement('style');
   tripTabsStyle.textContent=`
     .trip-detail-tabs{display:flex;gap:0;margin:14px 0 12px;border-bottom:1px solid var(--panel-line)}
-    .trip-detail-tabs button{flex:1;min-width:0;padding:12px 3px;border:0;border-bottom:3px solid transparent;background:none;color:var(--chalk-dim);font:600 14px Figtree,sans-serif;cursor:pointer}
+    .trip-detail-tabs button{flex:1;min-width:0;padding:12px 3px;border:0;border-bottom:3px solid transparent;background:none;color:var(--chalk-dim);font:500 14px Figtree,sans-serif;cursor:pointer}
     .trip-detail-tabs button.active{color:var(--amber);border-bottom-color:var(--amber)}
     .trip-overview-photos{min-width:0;overflow:hidden}
     /* This is a static preview inside a real button, not an interactive map. */
@@ -21230,7 +21232,7 @@
   worldTimeControls.innerHTML = '<div class="world-time-inner"><div class="world-time-top"><button type="button" data-world-play aria-label="Play travel history" title="Play travel history">▶</button><div class="world-time-label"><strong data-world-year>All years</strong><span data-world-count></span></div><button type="button" data-world-all>All years</button></div><input type="range" data-world-range aria-label="Travel history through year" step="1"><div class="world-time-ends"><span data-world-min></span><span data-world-max></span></div></div>';
   tripWorldEl.appendChild(worldTimeControls);
   const worldTimeStyle = document.createElement('style');
-  worldTimeStyle.textContent = '.trip-world{display:flex;flex-direction:column;background:#03060D}.trip-world[hidden]{display:none}.trip-world .trip-world-map{height:auto;flex:1;min-height:0}.world-time-controls{flex:none;padding:8px 20px 12px;color:var(--chalk);background:linear-gradient(180deg,#03060D,#102328);font-family:Figtree,sans-serif}.world-time-inner{max-width:620px;margin:auto}.world-time-top{display:flex;align-items:center;gap:12px}.world-time-top button{background:var(--panel);color:var(--chalk);border:1px solid var(--panel-line);border-radius:8px;padding:8px 12px;cursor:pointer;font:600 13px Figtree,sans-serif;min-height:40px}.world-time-top button[data-world-play]{width:44px;font-size:17px;color:var(--amber)}.world-time-top button:disabled,.world-time-controls input:disabled{opacity:.4;cursor:default}.world-time-label{flex:1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.world-time-label strong{font-size:23px;color:var(--amber);font-variant-numeric:tabular-nums}.world-time-label span,.world-time-ends{font-size:12px;color:var(--chalk-dim)}.world-time-controls input{width:100%;margin:6px 0 0;accent-color:var(--amber);cursor:pointer;min-height:26px}.world-time-ends{display:flex;justify-content:space-between}';
+  worldTimeStyle.textContent = '.trip-world{display:flex;flex-direction:column;background:#03060D}.trip-world[hidden]{display:none}.trip-world .trip-world-map{height:auto;flex:1;min-height:0}.world-time-controls{flex:none;padding:8px 20px 12px;color:var(--chalk);background:linear-gradient(180deg,#03060D,#102328);font-family:Figtree,sans-serif}.world-time-inner{max-width:620px;margin:auto}.world-time-top{display:flex;align-items:center;gap:12px}.world-time-top button{background:var(--panel);color:var(--chalk);border:1px solid var(--panel-line);border-radius:8px;padding:8px 12px;cursor:pointer;font:500 13px Figtree,sans-serif;min-height:40px}.world-time-top button[data-world-play]{width:44px;font-size:17px;color:var(--amber)}.world-time-top button:disabled,.world-time-controls input:disabled{opacity:.4;cursor:default}.world-time-label{flex:1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.world-time-label strong{font-size:23px;color:var(--amber);font-variant-numeric:tabular-nums}.world-time-label span,.world-time-ends{font-size:12px;color:var(--chalk-dim)}.world-time-controls input{width:100%;margin:6px 0 0;accent-color:var(--amber);cursor:pointer;min-height:26px}.world-time-ends{display:flex;justify-content:space-between}';
   document.head.appendChild(worldTimeStyle);
   const worldRange=worldTimeControls.querySelector('[data-world-range]');
   const worldPlay=worldTimeControls.querySelector('[data-world-play]');
