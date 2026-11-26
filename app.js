@@ -241,7 +241,6 @@
   const pageParks = document.getElementById('page-parks');
   const pageRoads = document.getElementById('page-roads');
   const pagePhotos = document.getElementById('page-photos');
-  const pagePhotoCollections = document.getElementById('page-photo-collections');
   const pagePhotoCalendar = document.getElementById('page-photo-calendar');
   const pageBooks = document.getElementById('page-books');
   const pageMovies = document.getElementById('page-movies');
@@ -274,7 +273,7 @@
   const NAV_SESSION_KEY = 'mbh-active-page';
   const NAV_SESSION_PAGES = new Set([
     'albums', 'songs', 'artists', 'restaurants', 'dishes',
-    'hikes', 'parks', 'roads', 'photos', 'photo-collections', 'photo-calendar',
+    'hikes', 'parks', 'roads', 'photos', 'photo-calendar',
     'books', 'movies', 'games', 'shows',
     'trips', 'fun', 'settings'
   ]);
@@ -2641,6 +2640,7 @@
     // Existing grid drag requires the complete unfiltered ranking.
     photoYearFilter = '';
     photoMonthFilter.clear();
+    photoTagLocationFilter='';photoTagOtherFilters.clear();
     photoYearFilterInput.value = '';
     closePhotoMonthMenu();
     if(!pagePhotos.classList.contains('active')){switchTopGroup('photos');switchPhotosSubPage('photos');}
@@ -4477,7 +4477,7 @@
     const pages = {
       albums: pageAlbums, songs: pageSongs, artists: pageArtists, restaurants: pageRestaurants, dishes: pageDishes,
       hikes: pageHikes, parks: pageParks, roads: pageRoads, photos: pagePhotos,
-      'photo-collections': pagePhotoCollections, 'photo-calendar': pagePhotoCalendar,
+      'photo-calendar': pagePhotoCalendar,
       books: pageBooks, movies: pageMovies, games: pageGames, shows: pageShows,
       trips: pageTrips, fun: pageFun, search: pageSearch, settings: pageSettings
     };
@@ -4547,7 +4547,6 @@
       renderPhotosPage();
     }
     if (page === 'photo-calendar') renderPhotoCalendar();
-    if (page === 'photo-collections') renderPhotoTags();
     if (page === 'books'){
       renderMediaPage('book');
     }
@@ -4562,8 +4561,8 @@
     }
     if(previous!==page){
       const y=scrolls.get(page)||0;
-      const grid=page==='photos'?photoGrid:page==='photo-collections'?photoTagsHost.querySelector('.pt-filter-grid'):null;
-      if(grid&&y>0&&grid.__rows&&grid.firstElementChild){const tile=grid.firstElementChild,cols=Math.max(1,Math.round(grid.clientWidth/Math.max(1,tile.offsetWidth)));const needed=Math.ceil((y+innerHeight)/Math.max(80,tile.offsetHeight))*cols;if(needed>(grid.__limit||96)){grid.__limit=needed;mbhPhotoGrid(grid,grid.__rows,page==='photos'?'gallery':'tags',false);}}
+      const grid=page==='photos'?photoGrid:null;
+      if(grid&&y>0&&grid.__rows&&grid.firstElementChild){const tile=grid.firstElementChild,cols=Math.max(1,Math.round(grid.clientWidth/Math.max(1,tile.offsetWidth)));const needed=Math.ceil((y+innerHeight)/Math.max(80,tile.offsetHeight))*cols;if(needed>(grid.__limit||96)){grid.__limit=needed;mbhPhotoGrid(grid,grid.__rows,'gallery',false);}}
       window.scrollTo(0,y);
     }
   }
@@ -4633,6 +4632,7 @@
     switchTopPage(page);
   }
   function switchPhotosSubPage(page){
+    if(page==='photo-collections')page='photos'; // migrate saved pre-merge navigation
     activePhotosSubPage = page;
     document.querySelectorAll('[data-photo-subpage]').forEach(b => b.classList.toggle('active', b.dataset.photoSubpage === page));
     switchTopPage(page);
@@ -4726,7 +4726,7 @@
   const GROUP_SUBPAGES = {
     music: ['albums', 'songs', 'artists'],
     food: ['restaurants', 'dishes'],
-    photos: ['photos', 'photo-collections', 'photo-calendar'],
+    photos: ['photos', 'photo-calendar'],
     nature: ['hikes', 'parks', 'roads'],
     art: ['books', 'movies', 'games', 'shows'],
     tools: ['fun', 'search', 'settings'],
@@ -11265,7 +11265,7 @@
   function renderPhotosPage(){
     updatePhotoSortHelperVisibility();
     refreshPhotoCalendar();
-    refreshPhotoTags();
+    refreshPhotoTags(false);
     if(!pagePhotos.classList.contains('active'))return;
     const empty = !photoRows.length;
     if (empty) photoEditMode = false;
@@ -11283,9 +11283,9 @@
     renderPhotoMonthFilterOptions();
     renderPhotoInsights();
 
-    if(photoEditMode){if(photoGrid.__more)photoGrid.__more.hidden=true;renderPhotoEditRows();return;}
+    if(photoEditMode){renderPhotoTags();document.getElementById('photo-filter-empty').hidden=true;if(photoGrid.__more)photoGrid.__more.hidden=true;renderPhotoEditRows();return;}
     photoEditList.innerHTML='';
-    mbhPhotoGrid(photoGrid,empty?[]:photoDisplayRows(),'gallery',true);
+    renderPhotoGalleryGrid();
   }
 
 
@@ -11583,9 +11583,9 @@
     });
     if(changed)savePhotoTags();
   }
-  function refreshPhotoTags(){
+  function refreshPhotoTags(updateGallery=true){
     refreshPhotoTagTool();
-    if(pagePhotoCollections.classList.contains('active'))renderPhotoTags();
+    if(updateGallery&&pagePhotos.classList.contains('active')&&!photoEditMode)renderPhotoGalleryGrid();
     updatePhotoTagLightbox();
   }
   const photoTagToolCard=document.getElementById('fun-card-tag-photos');
@@ -11826,27 +11826,43 @@
     if(rename){const input=photoTagModal.querySelector('input');input.focus();input.select();}
   }
   // Filters are view-only; selecting a chip never changes a photo's tags.
-  let photoTagLocationFilter='', photoTagOtherFilters=new Set();
+  let photoTagFiltersVisible=false, photoTagLocationFilter='', photoTagOtherFilters=new Set();
+  const photoTagFilterToggle=document.getElementById('photo-tag-filter-toggle');
+  const photoTagManageHost=document.getElementById('photo-tag-manage-host');
+  photoTagFilterToggle.addEventListener('click',()=>{if(photoEditMode)return;photoTagFiltersVisible=!photoTagFiltersVisible;renderPhotoGalleryGrid();});
+  function renderPhotoGalleryGrid(){
+    const rows=renderPhotoTags();
+    document.getElementById('photo-filter-empty').hidden=!photoRows.length||!!rows.length;
+    mbhPhotoGrid(photoGrid,rows,'gallery',true);
+  }
   let photoTagManageId='';
   function renderPhotoTags(){
-    if(!photoTagsHost)return;
+    const visible=photoTagFiltersVisible&&!photoEditMode;
+    photoTagsHost.hidden=!visible;
+    photoTagManageHost.hidden=!visible||!photoTagsWritable()||!photoTags.length;
+    pagePhotos.classList.toggle('photo-tag-filters-visible',visible);
+    photoTagFilterToggle.hidden=photoEditMode;
+    photoTagFilterToggle.setAttribute('aria-pressed',String(visible));
+    const label=visible?'Hide tag filters':'Show tag filters';photoTagFilterToggle.setAttribute('aria-label',label);photoTagFilterToggle.title=label;
+    const base=photoDisplayRows();
+    if(!visible){const flyout=photoTagManageHost.querySelector('.pt-flyout');if(flyout)flyout.hidden=true;const menu=photoTagManageHost.querySelector('.pt-menu-btn');if(menu)menu.setAttribute('aria-expanded','false');return base;}
     const oldRails=[...photoTagsHost.querySelectorAll('.pt-filter-rail')].map(el=>el.scrollLeft);
-    const ranked=pcRanked(), members=effectivePhotoTagMembers(photoTags), tags=sortedPhotoTags();
+    const members=effectivePhotoTagMembers(photoTags), tags=sortedPhotoTags();
     const locations=tags.filter(t=>photoTagCategory(t.category)==='Location');
     const others=['Scenery','Season'].flatMap(category=>tags.filter(t=>photoTagCategory(t.category)===category));
     if(!locations.some(t=>t.id===photoTagLocationFilter))photoTagLocationFilter='';
     photoTagOtherFilters=new Set([...photoTagOtherFilters].filter(id=>others.some(t=>t.id===id)));
     const filters=[...(photoTagLocationFilter?[photoTagLocationFilter]:[]),...photoTagOtherFilters];
-    const rows=ranked.filter(x=>filters.every(id=>members.get(id)?.has(x.p.id)));
+    const rows=filters.length?base.filter(p=>filters.every(id=>members.get(id)?.has(p.id))):base;
     const chip=(id,label,on,kind)=>'<button type="button" class="pt-filter-chip" data-pt-filter="'+escapeAttr(id)+'" data-pt-kind="'+kind+'" aria-pressed="'+on+'">'+escapeHtml(label)+'</button>';
     const locationChips=chip('','All locations',!photoTagLocationFilter,'location')+locations.map(t=>chip(t.id,t.name,photoTagLocationFilter===t.id,'location')).join('');
     const otherChips=chip('','All scenery & seasons',!photoTagOtherFilters.size,'other')+others.map(t=>chip(t.id,t.name,photoTagOtherFilters.has(t.id),'other')).join('');
     const manage=photoTagsWritable()&&tags.length?'<div class="pt-menu-wrap"><button type="button" class="pt-menu-btn btn-ghost" aria-label="Tag actions" aria-expanded="false">⋯</button><div class="pt-flyout pt-manage-menu" hidden><label for="pt-manage-select">Manage tags</label><select id="pt-manage-select" class="tf-input">'+groupedPhotoTags().filter(g=>g.tags.length).map(g=>'<optgroup label="'+escapeAttr(g.category)+'">'+g.tags.map(t=>'<option value="'+escapeAttr(t.id)+'"'+(t.id===photoTagManageId?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')+'</optgroup>').join('')+'</select><button type="button" data-rename>Edit tag</button><button type="button" data-delete>Delete tag</button></div></div>':'';
-    if(!photoTagsHost.querySelector('.pt-filter-grid')){
-      photoTagsHost.innerHTML='<div class="pt-gallery-heading"><span class="pt-muted" aria-live="polite"></span><span class="pt-manage-host"></span></div><div class="results-list grid-mode pt-detail-grid pt-filter-grid"></div><p class="pt-muted pt-empty" hidden>No photos match these tags.</p><div class="pt-filter-dock"><div class="pt-filter-rail" role="group" aria-label="Location filters"></div><div class="pt-filter-rail" role="group" aria-label="Scenery and season filters"></div></div>';
+    if(!photoTagsHost.querySelector('.pt-filter-dock')){
+      photoTagsHost.innerHTML='<div class="pt-gallery-heading"><span class="pt-muted" aria-live="polite"></span></div><div class="pt-filter-dock"><div class="pt-filter-rail" role="group" aria-label="Location filters"></div><div class="pt-filter-rail" role="group" aria-label="Scenery and season filters"></div></div>';
     }
     photoTagsHost.querySelector('.pt-gallery-heading .pt-muted').textContent=pcCount(rows.length);
-    const mh=photoTagsHost.querySelector('.pt-manage-host');if(mh.__html!==manage){mh.innerHTML=manage;mh.__html=manage;}
+    const mh=photoTagManageHost;if(mh.__html!==manage){mh.innerHTML=manage;mh.__html=manage;}
     const rails=[...photoTagsHost.querySelectorAll('.pt-filter-rail')];
     [locationChips,otherChips].forEach((html,i)=>{
       const rail=rails[i],temp=document.createElement('template');temp.innerHTML=html;
@@ -11854,17 +11870,15 @@
       if(next.length===current.length&&next.every((b,j)=>b.dataset.ptFilter===current[j].dataset.ptFilter&&b.textContent===current[j].textContent))next.forEach((b,j)=>current[j].setAttribute('aria-pressed',b.getAttribute('aria-pressed')));
       else{rail.replaceChildren(...next);rail.scrollLeft=oldRails[i]||0;}
     });
-    photoTagsHost.querySelector('.pt-empty').hidden=!!rows.length;
-    mbhPhotoGrid(photoTagsHost.querySelector('.pt-filter-grid'),rows.map(x=>x.p),'tags',true);
     photoTagsHost.querySelectorAll('[data-pt-filter]').forEach(b=>b.onclick=()=>{
       const id=b.dataset.ptFilter;
       if(b.dataset.ptKind==='location')photoTagLocationFilter=photoTagLocationFilter===id?'':id;
       else if(!id)photoTagOtherFilters.clear();
       else if(photoTagOtherFilters.has(id))photoTagOtherFilters.delete(id);
       else photoTagOtherFilters.add(id);
-      if(window.scrollY>100)window.scrollTo(0,0);renderPhotoTags();
+      if(window.scrollY>100)window.scrollTo(0,0);renderPhotoGalleryGrid();
     });
-    const menu=photoTagsHost.querySelector('.pt-menu-btn'), flyout=photoTagsHost.querySelector('.pt-flyout');
+    const menu=photoTagManageHost.querySelector('.pt-menu-btn'), flyout=photoTagManageHost.querySelector('.pt-flyout');
     if(menu){
       const close=()=>{flyout.hidden=true;menu.setAttribute('aria-expanded','false');};
       const select=flyout.querySelector('select');
@@ -11874,9 +11888,10 @@
       flyout.querySelector('[data-rename]').onclick=()=>action('rename');
       flyout.querySelector('[data-delete]').onclick=()=>action('delete');
     }
+    return rows;
   }
   document.addEventListener('click',e=>{
-    const menu=photoTagsHost.querySelector('.pt-menu-wrap');
+    const menu=photoTagManageHost.querySelector('.pt-menu-wrap');
     if(menu&&!menu.contains(e.target)){menu.querySelector('.pt-flyout').hidden=true;menu.querySelector('.pt-menu-btn').setAttribute('aria-expanded','false');}
   });
 
