@@ -18588,7 +18588,9 @@
     }
   }
   function tripYearSync(){
-    if (tripYearBar.hidden || !document.getElementById('page-trips').classList.contains('active')) return;
+    if (tripYearBar.hidden || !document.getElementById('page-trips').classList.contains('active')) { tripYearBar.classList.remove('is-pinned'); return; }
+    const stickyTop=parseFloat(getComputedStyle(tripYearBar).top);
+    tripYearBar.classList.toggle('is-pinned',Number.isFinite(stickyTop)&&tripYearBar.getBoundingClientRect().top<=stickyTop+0.5);
     const markers = Array.from(tripGridEl.querySelectorAll('.trip-tl-year[data-year]'));
     if (!markers.length) return;
     const line = tripYearLine();
@@ -20495,9 +20497,8 @@
   // Just the globe: every country you've visited in amber, nothing else — no
   // labels, routes or controls. It fills the screen between the toolbar and
   // the tab bar, turns slowly on its own, and pauses while you spin or zoom it.
-  const TRIPS_VIEW_KEY = 'mbh-trips-view';
   let tripsViewMode = 'timeline';
-  try{ if (localStorage.getItem(TRIPS_VIEW_KEY) === 'world') tripsViewMode = 'world'; }catch(e){ /* per-device preference only */ }
+  // Always start Trips in Timeline; World remains available during the session.
   let worldMap = null, worldCountries = null, worldBorders = null, worldRefreshTimer = null, worldFitted = false;
   const tripWorldEl = document.getElementById('trip-world');
   const tripWorldMapEl = document.getElementById('trip-world-map');
@@ -20580,7 +20581,7 @@
   }
   function setTripsView(mode){
     tripsViewMode = mode;
-    try{ localStorage.setItem(TRIPS_VIEW_KEY, mode); }catch(e){ /* per-device preference only */ }
+
     applyTripsView();
   }
   function applyTripsView(){
