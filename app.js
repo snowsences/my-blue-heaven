@@ -7594,9 +7594,13 @@
         tierChipHtml = '<span class="restaurant-tier-dot" style="background:' + hexToRgba(tier.color, 0.18) + ';" title="' + escapeAttr(tier.name) + '"></span>';
       }
 
+      const listCover = getEffectiveRestaurantCover(r);
       listRows.push(
         '<li' + borderAttr + ' data-restaurant-index="' + idx + '">' +
           '<span class="rank-num">' + rank + '</span>' +
+          '<span style="display:block;flex:0 0 40px;width:40px;height:40px;aspect-ratio:1;border-radius:3px;overflow:hidden;background:var(--panel);">' +
+            (listCover ? '<img src="' + escapeAttr(cloudinaryThumbUrl(listCover, 120)) + '" alt="" loading="lazy" decoding="async" draggable="false" style="display:block;width:100%;height:100%;object-fit:cover;border-radius:3px;">' : '') +
+          '</span>' +
           '<span class="rank-item">' +
             '<span class="restaurant-name-row">' +
               '<span class="rank-album">' + escapeHtml(r.name) + '</span>' +
