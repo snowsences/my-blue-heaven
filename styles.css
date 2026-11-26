@@ -5677,7 +5677,7 @@
 /* Restaurant identity is part of the cover, not a separate vertical block. */
 #restaurant-details-panel-inner .rd-cover-caption{
   padding:26px 20px 20px;
-  background:linear-gradient(to top,rgba(15,33,36,.86),rgba(15,33,36,.60) 45%,rgba(15,33,36,0));
+  background:linear-gradient(to top,var(--rd-photo-tint),color-mix(in srgb,var(--rd-photo-tint) 60%,transparent) 45%,transparent);
   z-index:1;pointer-events:none;color:#fff;
 }
 #restaurant-details-panel-inner .rd-cover-caption .details-album{color:#fff;font-size:clamp(18px,4.5vw,23px);line-height:1.2;margin:0 0 3px;overflow-wrap:anywhere;text-shadow:0 1px 5px rgba(0,0,0,.45)}
@@ -5706,9 +5706,9 @@
 #restaurant-details-panel-inner .rd-cover-add:hover{color:var(--ink);background:var(--amber)}
 #restaurant-details-panel-inner .rd-visit-header{display:block;margin:0;padding:8px 0;border:0;min-width:0}
 #restaurant-details-panel-inner .rd-visit-rail{width:100%;min-width:0;flex-wrap:nowrap;padding:2px 24px;gap:6px}
-/* The photo tint is registered as non-inheriting; alias it on the inner wrapper for the visit chips. */
-#restaurant-details-panel-inner{--rd-visit-tint:var(--panel-tint)}
-#restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:4px;padding:7px 12px;min-height:36px;background:var(--panel);background:color-mix(in srgb,var(--rd-visit-tint) 80%,black);color:var(--chalk);white-space:nowrap}
+/* The photo tint is registered as non-inheriting; alias it on the inner wrapper for the caption and visit chips. */
+#restaurant-details-panel-inner{--rd-photo-tint:var(--panel-tint)}
+#restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:4px;padding:7px 12px;min-height:36px;background:var(--panel);background:color-mix(in srgb,var(--rd-photo-tint) 80%,black);color:var(--chalk);white-space:nowrap}
 #restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip[aria-pressed=true]{background:var(--amber);color:var(--ink)}
 #restaurant-details-panel-inner .rd-visit-score{font-size:11px;font-weight:700;opacity:.8;color:var(--amber)}
 #restaurant-details-panel-inner .rd-visit-rail [aria-pressed=true] .rd-visit-score{color:inherit}
@@ -5716,5 +5716,5 @@
 #restaurant-details-panel-inner .rd-import-footer input[hidden]{display:none}
 #restaurant-details-panel-inner .rd-visit-header>p{padding:8px 24px}
 #restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip:focus-visible,#restaurant-details-panel-inner .rd-cover-add:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
-@media(hover:hover){#restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip[aria-pressed=false]:hover{background:var(--bg);background:color-mix(in srgb,var(--rd-visit-tint) 92%,black)}}
+@media(hover:hover){#restaurant-details-panel-inner .rd-visit-rail .pt-filter-chip[aria-pressed=false]:hover{background:var(--bg);background:color-mix(in srgb,var(--rd-photo-tint) 92%,black)}}
 @media(max-width:480px){#restaurant-details-panel-inner .rd-visit-rail{padding-inline:14px}#restaurant-details-panel-inner .rd-cover-caption{gap:8px}#restaurant-details-panel-inner .rd-cover-add{padding-inline:8px;font-size:12px}#restaurant-details-panel-inner .rd-import-footer{padding-inline:14px}#restaurant-details-panel-inner .rd-visit-header>p{padding-inline:14px}}
