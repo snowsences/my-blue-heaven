@@ -16232,12 +16232,13 @@
   const ggCloseBtn = document.getElementById('gg-close-btn');
   const ggLaunchBtn = document.getElementById('gg-launch-btn');
   const ggLaunchYearBtn = document.getElementById('gg-year-launch-btn');
+  const ggLaunchRestaurantBtn = document.getElementById('gg-restaurant-launch-btn');
   const ggEyebrow = document.getElementById('gg-eyebrow');
 
   function ggEmptyStats(){
     const cats = {};
     GG_KINDS.forEach(k => { cats[k] = { right: 0, total: 0 }; });
-    return { cats, bestStreak: 0, rounds: 0, year: { right: 0, total: 0 }, bestStreakYear: 0, roundsYear: 0 };
+    return { cats, bestStreak: 0, rounds: 0, year: { right: 0, total: 0 }, bestStreakYear: 0, roundsYear: 0, restaurantGame: { right: 0, total: 0, points: 0, rounds: 0, bestStreak: 0 } };
   }
   let ggStats = ggEmptyStats();
   let ggPools = null;          // rebuilt from the current data every time the game opens
@@ -16263,6 +16264,7 @@
         if (p.year) base.year = { right: Number(p.year.right) || 0, total: Number(p.year.total) || 0 };
         base.bestStreakYear = Number(p.bestStreakYear) || 0;
         base.roundsYear = Number(p.roundsYear) || 0;
+        if (p.restaurantGame) Object.keys(base.restaurantGame).forEach(k => { base.restaurantGame[k] = Number(p.restaurantGame[k]) || 0; });
         ggStats = base;
       }
     }catch(e){ /* nothing saved yet */ }
@@ -16410,7 +16412,44 @@
       pool.eligible = !pool.reason;
       if (pool.eligible) uniquePhotos += urls.size;
     });
-    return { kinds, uniquePhotos, year };
+    // Guess the Restaurant uses three distinct courses from a single visit.
+    const restaurantMeals = [];
+    kinds.restaurant.all.forEach(place => {
+      (place.row.visits || []).forEach(v => {
+        const when = ggPlainDate(v.date), seen = new Set(), dishes = [];
+        (v.courses || []).forEach(c => {
+          const urls = otdCoursePhotos(c).filter(url => typeof url === 'string' && url && !seen.has(url));
+          if (!urls.length) return;
+          urls.forEach(url => seen.add(url));
+          const dish = (c.text || '').trim();
+          dishes.push({ urls, caption: (ggIsDishName(dish) ? 'Dish: ' + dish : 'A dish') + (when ? ' · ' + when : ''), visitId: v.id });
+        });
+        if (dishes.length >= 3) restaurantMeals.push({place, dishes});
+      });
+    });
+    return { kinds, uniquePhotos, year, restaurantMeals };
+  }
+
+  function ggRestaurantCandidates(){
+    if (new Set(ggPools.kinds.restaurant.all.map(p => ggNorm(p.name))).size < 4) return [];
+    return ggPools.restaurantMeals.map(m => ({
+      place: m.place,
+      dishes: m.dishes.map(d => ({...d, urls: d.urls.filter(url => !ggBadUrls.has(url))})).filter(d => d.urls.length)
+    })).filter(m => m.dishes.length >= 3 && (!ggRound || !ggRound.usedPlaces.has(ggNorm(m.place.name))));
+  }
+  function ggRestaurantCount(){
+    return new Set(ggRestaurantCandidates().map(m => ggNorm(m.place.name))).size;
+  }
+  function ggPickRestaurantQuestion(){
+    const meals = ggRestaurantCandidates();
+    const names = [...new Set(meals.map(m => ggNorm(m.place.name)))];
+    if (!names.length) return null;
+    const name = ggPick(names);
+    const meal = ggPick(meals.filter(m => ggNorm(m.place.name) === name));
+    const options = ggBuildOptions(ggPools.kinds.restaurant, meal.place);
+    if (!options) return null;
+    const clues = ggShuffle(meal.dishes).slice(0,3).map(d => ({url:ggPick(d.urls), caption:d.caption, visitId:d.visitId}));
+    return {kind:'restaurant', place:meal.place, photo:clues[0], clues, revealed:1, clueIndex:0, options, answered:false, picked:-1, correct:false};
   }
 
   function ggAvailablePhotoCount(cat){
@@ -16474,6 +16513,7 @@
 
   function ggPickQuestion(){
     if (ggMode === 'year') return ggPickYearQuestion();
+    if (ggMode === 'restaurant') return ggPickRestaurantQuestion();
     const r = ggRound;
     const kinds = (r.category === 'all' ? ggKinds() : [r.category]).filter(k => ggPools.kinds[k].eligible);
     if (!kinds.length) return null;
@@ -16526,7 +16566,40 @@
         : '');
   }
 
+  function ggRestaurantStatsHtml(){
+    const c = ggStats.restaurantGame;
+    return '<div class="gg-stats"><div class="gg-stats-head">YOUR RECORD</div>' +
+      '<div class="gg-stat-row"><span>Accuracy</span><span class="gg-stat-val">'+c.right+' / '+c.total+' · '+Math.round(100*c.right/Math.max(1,c.total))+'%</span></div>' +
+      '<div class="gg-stat-row"><span>Lifetime points</span><span class="gg-stat-val">'+c.points+'</span></div>' +
+      '<div class="gg-stat-row"><span>Best streak</span><span class="gg-stat-val">'+c.bestStreak+'</span></div>' +
+      '<div class="gg-stat-row"><span>Rounds played</span><span class="gg-stat-val">'+c.rounds+'</span></div></div>';
+  }
+  function ggRenderRestaurantStart(){
+    const n = ggRestaurantCount();
+    ggProgress.textContent = '';
+    ggContent.innerHTML = '<h2 class="gg-title" id="gg-title">Guess the Restaurant</h2>' +
+      '<p class="gg-lede">Recognize the restaurant from dishes you actually ate. Each question uses up to three dishes from the same visit. Choose from four restaurants.</p>' +
+      '<div class="gg-stats"><div class="gg-stats-head">SCORING</div><div class="gg-stat-row"><span>First photo</span><span class="gg-stat-val">3 points</span></div><div class="gg-stat-row"><span>Second photo</span><span class="gg-stat-val">2 points</span></div><div class="gg-stat-row"><span>Third photo</span><span class="gg-stat-val">1 point</span></div><div class="gg-stat-row"><span>Incorrect answer</span><span class="gg-stat-val">0 points</span></div></div>' +
+      (n ? '<p class="gg-note">'+n+' eligible restaurants · '+Math.min(n,GG_ROUND_LENGTH)+' questions per round</p><button type="button" class="gg-primary" id="gg-start-btn">Start round</button>' : '<p class="gg-note">You need four saved restaurants and at least one visit with photos of three distinct dishes.</p>') +
+      (ggStats.restaurantGame.total ? ggRestaurantStatsHtml() : '');
+  }
+  function ggRenderRestaurantResults(){
+    const r = ggRound;
+    ggProgress.textContent = 'Round complete';
+    ggContent.innerHTML = '<h2 class="gg-title" id="gg-title">'+r.points+' / '+(r.length*3)+' points</h2>' +
+      '<p class="gg-lede">'+r.score+' of '+r.length+' restaurants identified</p>' +
+      '<div class="gg-stats"><div class="gg-stats-head">THIS ROUND</div><div class="gg-stat-row"><span>Best streak</span><span class="gg-stat-val">'+r.bestStreak+'</span></div></div>' +
+      ggRestaurantStatsHtml() + '<button type="button" class="gg-primary" id="gg-again-btn">Play again</button><div class="gg-actions gg-actions-split"><button type="button" class="gg-ghost" id="gg-done-btn">Done</button></div>';
+  }
+  function ggRestaurantClueHtml(q){
+    return '<div class="gg-actions" aria-label="Dish photo clues">' +
+      Array.from({length:q.revealed},(_,i)=>'<button type="button" class="gg-ghost" data-gg-clue="'+i+'" aria-pressed="'+(i===q.clueIndex)+'"'+(i===q.clueIndex?' disabled':'')+'>Photo '+(i+1)+'</button>').join('') +
+      '</div>' + (!q.answered && q.revealed<3 ? '<button type="button" class="gg-ghost" id="gg-more-clue" style="margin-top:10px;width:100%">Reveal another dish · −1 point</button>' : '') +
+      '<p class="gg-note" aria-live="polite">'+(q.answered?(q.correct?(4-q.revealed)+' points earned':'0 points earned'):(4-q.revealed)+' points available')+'</p>';
+  }
+
   function ggRenderStart(){
+    if (ggMode === 'restaurant'){ ggRenderRestaurantStart(); return; }
     if (ggMode === 'year'){ ggRenderYearStart(); return; }
     const anyEligible = ggKinds().some(k => ggPools.kinds[k].eligible);
     if (ggSelectedCat !== 'all' && !ggPools.kinds[ggSelectedCat].eligible) ggSelectedCat = 'all';
@@ -16621,15 +16694,17 @@
       '<button type="button" class="gg-photo" id="gg-photo-btn" aria-label="View this photo full size">' +
         '<img id="gg-photo-img" src="' + escapeAttr(cloudinaryThumbUrl(q.photo.url, 1100)) + '" alt="A photo to identify">' +
       '</button>' +
+      (ggMode === 'restaurant' ? ggRestaurantClueHtml(q) : '') +
       '<h2 class="gg-question" id="gg-title">' + (isYear ? 'Which year was this photo taken?' : 'Which ' + GG_INFO[q.kind].noun + ' is this from?') + '</h2>' +
       '<div class="gg-options' + (isYear ? ' gg-options-year' : '') + '">' + optionsHtml + '</div>' +
       '<div id="gg-feedback" aria-live="polite">' + (q.answered ? ggRevealHtml(q) : '') + '</div>';
 
     const img = document.getElementById('gg-photo-img');
+    const displayedUrl = q.photo.url;
     img.addEventListener('error', () => {
       // A photo that won't load is skipped without counting for or against you.
-      if (ggScreen !== 'question' || ggRound !== r || r.question !== q || q.answered) return;
-      ggBadUrls.add(q.photo.url);
+      if (ggScreen !== 'question' || ggRound !== r || r.question !== q || q.answered || q.photo.url !== displayedUrl || !img.isConnected) return;
+      ggBadUrls.add(displayedUrl);
       ggAdvanceOrFinish(false);
     });
     if (q.answered){
@@ -16639,6 +16714,7 @@
   }
 
   function ggRenderResults(){
+    if (ggMode === 'restaurant'){ ggRenderRestaurantResults(); return; }
     if (ggMode === 'year'){ ggRenderYearResults(); return; }
     const r = ggRound;
     ggProgress.textContent = 'Round complete';
@@ -16680,10 +16756,11 @@
 
   // ---------- running a round ----------
   function ggStartRound(){
-    const length = Math.min(GG_ROUND_LENGTH, ggAvailablePhotoCount(ggMode === 'year' ? 'year' : ggSelectedCat));
+    if (ggMode === 'restaurant') ggRound = null;
+    const length = Math.min(GG_ROUND_LENGTH, ggMode === 'restaurant' ? ggRestaurantCount() : ggAvailablePhotoCount(ggMode === 'year' ? 'year' : ggSelectedCat));
     if (!length) return;
     ggRound = {
-      category: ggMode === 'year' ? 'year' : ggSelectedCat, length, index: 0, score: 0, streak: 0, bestStreak: 0,
+      category: ggMode === 'year' ? 'year' : ggSelectedCat, length, index: 0, score: 0, points: 0, streak: 0, bestStreak: 0,
       byKind: { park: { right: 0, total: 0 }, road: { right: 0, total: 0 }, hike: { right: 0, total: 0 }, restaurant: { right: 0, total: 0 }, year: { right: 0, total: 0 } },
       usedUrls: new Set(), usedPlaces: new Set(), question: null
     };
@@ -16700,13 +16777,13 @@
     if (!q){ r.length = r.index; ggFinishRound(); return; } // ran out of fresh photos — end early rather than repeat
     r.question = q;
     r.usedUrls.add(q.photo.url);
-    r.usedPlaces.add(q.place);
+    r.usedPlaces.add(ggMode === 'restaurant' ? ggNorm(q.place.name) : q.place);
     ggScreen = 'question';
     ggRender();
   }
 
   function ggFinishRound(){
-    if (ggRound.length > 0){ if (ggMode === 'year') ggStats.roundsYear++; else ggStats.rounds++; saveGgStats(); }
+    if (ggRound.length > 0){ if (ggMode === 'restaurant') ggStats.restaurantGame.rounds++; else if (ggMode === 'year') ggStats.roundsYear++; else ggStats.rounds++; saveGgStats(); }
     ggScreen = ggRound.length > 0 ? 'results' : 'start';
     ggRender();
   }
@@ -16718,7 +16795,7 @@
     q.picked = i;
     const isYear = q.kind === 'year';
     q.correct = isYear ? q.options[i] === q.correctYear : q.options[i] === q.place;
-    const bucket = isYear ? ggStats.year : ggStats.cats[q.kind];
+    const bucket = ggMode === 'restaurant' ? ggStats.restaurantGame : isYear ? ggStats.year : ggStats.cats[q.kind];
     r.byKind[q.kind].total++;
     bucket.total++;
     if (q.correct){
@@ -16726,7 +16803,8 @@
       r.byKind[q.kind].right++;
       bucket.right++;
       if (r.streak > r.bestStreak) r.bestStreak = r.streak;
-      if (isYear){ if (r.streak > ggStats.bestStreakYear) ggStats.bestStreakYear = r.streak; }
+      if (ggMode === 'restaurant'){ const points = 4-q.revealed; r.points += points; bucket.points += points; bucket.bestStreak = Math.max(bucket.bestStreak,r.streak); }
+      else if (isYear){ if (r.streak > ggStats.bestStreakYear) ggStats.bestStreakYear = r.streak; }
       else if (r.streak > ggStats.bestStreak) ggStats.bestStreak = r.streak;
     } else {
       r.streak = 0;
@@ -16776,8 +16854,8 @@
   // ---------- opening / closing ----------
   function openGuessGame(mode){
     if (ggOverlay.classList.contains('open')) return;
-    ggMode = mode === 'year' ? 'year' : 'place';
-    ggEyebrow.textContent = ggMode === 'year' ? 'WHICH YEAR' : 'GUESS THE PLACE';
+    ggMode = mode === 'restaurant' ? 'restaurant' : mode === 'year' ? 'year' : 'place';
+    ggEyebrow.textContent = ggMode === 'restaurant' ? 'GUESS THE RESTAURANT' : ggMode === 'year' ? 'WHICH YEAR' : 'GUESS THE PLACE';
     ggPools = ggBuildPools();
     ggRound = null;
     ggScreen = 'start';
@@ -16803,11 +16881,26 @@
 
   ggLaunchBtn.addEventListener('click', () => openGuessGame('place'));
   ggLaunchYearBtn.addEventListener('click', () => openGuessGame('year'));
+  if (ggLaunchRestaurantBtn) ggLaunchRestaurantBtn.addEventListener('click', () => openGuessGame('restaurant'));
   ggCloseBtn.addEventListener('click', closeGuessGame);
   ggContent.addEventListener('click', (e) => {
     const cat = e.target.closest('[data-gg-cat]');
     if (cat && !cat.disabled){ ggSelectedCat = cat.dataset.ggCat; ggRenderStart(); return; }
     if (e.target.closest('#gg-start-btn') || e.target.closest('#gg-again-btn')){ ggStartRound(); return; }
+    if (ggMode === 'restaurant' && ggRound && ggRound.question){
+      const q = ggRound.question;
+      const clue = e.target.closest('[data-gg-clue]');
+      if (clue || e.target.closest('#gg-more-clue')){
+        if (clue) q.clueIndex = Number(clue.dataset.ggClue);
+        else if (!q.answered && q.revealed < 3) q.clueIndex = q.revealed++;
+        else return;
+        q.photo = q.clues[q.clueIndex];
+        const y = ggScroll.scrollTop;
+        ggRenderQuestion();
+        ggScroll.scrollTop = y;
+        return;
+      }
+    }
     const opt = e.target.closest('[data-gg-option]');
     if (opt){ ggAnswer(Number(opt.dataset.ggOption)); return; }
     if (e.target.closest('#gg-next-btn')){ ggAdvanceOrFinish(true); return; }
