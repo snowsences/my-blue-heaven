@@ -11257,6 +11257,15 @@
   function photoTagCanParent(childId,parentId,tags){
     return childId!==parentId&&tags.some(t=>t.id===parentId)&&!photoTagClosure([parentId],tags).has(childId);
   }
+  function photoTagIsEligibleParent(childId,parentId,tags){
+    const parent=tags.find(t=>t.id===parentId);
+    return !!parent&&!(parent.parentIds||[]).length&&photoTagCanParent(childId,parentId,tags);
+  }
+  function derivePhotoTagAutomaticOnly(tags){
+    const parents=new Set(tags.flatMap(t=>t.parentIds||[]));
+    tags.forEach(t=>{t.automaticOnly=parents.has(t.id);});
+    return tags;
+  }
   function normalizePhotoTags(raw){
     const ids=new Set(), names=new Set();
     const aliases=new Map();
@@ -11277,7 +11286,6 @@
       if(t.hierarchyVersion<PHOTO_TAG_HIERARCHY_VERSION){
         const name=t.name.toLowerCase(),parent=byName.get(legacyParents[name]);
         if(parent)t.parentIds.push(parent.id);
-        if(name==='usa'||name==='europe')t.automaticOnly=true;
         t.hierarchyVersion=PHOTO_TAG_HIERARCHY_VERSION;
       }
       t.parentIds=[...new Set(t.parentIds.map(id=>aliases.get(id)||id))];
@@ -11288,10 +11296,9 @@
     proposed.forEach(([t,parents])=>parents.forEach(id=>{
       if(photoTagCanParent(t.id,id,normalized))t.parentIds.push(id);
     }));
-    // Preserve legacy parent-only memberships in storage, but automatic-only
-    // tags never act as explicit selections. They become visible again if
-    // the user disables automatic-only. No photo assignments are destroyed.
-    return normalized;
+    // Existing hierarchy edges (including legacy multilevel links) survive.
+    // Parent-only status is derived from actual children, not user settings.
+    return derivePhotoTagAutomaticOnly(normalized);
   }
   function sortedPhotoTags(){
     return photoTags.slice().sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base',numeric:true}));
@@ -11319,13 +11326,22 @@
   }
   function photoTagHierarchyFields(tag){
     const selected=new Set(tag?.parentIds||[]);
-    const options=sortedPhotoTags().filter(t=>!tag||photoTagCanParent(tag.id,t.id,photoTags));
+    const options=sortedPhotoTags().filter(t=>photoTagIsEligibleParent(tag?.id||'',t.id,photoTags));
+    const locked=sortedPhotoTags().filter(t=>selected.has(t.id)&&!options.some(o=>o.id===t.id));
     return '<fieldset class="pt-hierarchy"><legend>Parent tags</legend><p class="pt-muted">Selecting this tag also applies its parents.</p><div class="pt-parent-options">'+
       (options.length?options.map(t=>'<label class="pt-parent-option"><input type="checkbox" name="parentId" value="'+escapeAttr(t.id)+'" '+(selected.has(t.id)?'checked':'')+'><span>'+escapeHtml(t.name)+'</span></label>').join(''):'<span class="pt-muted">No eligible parent tags.</span>')+
-      '</div><label class="pt-parent-option pt-auto-only"><input type="checkbox" name="automaticOnly" '+(tag?.automaticOnly?'checked':'')+'><span>Automatic only</span></label><p class="pt-muted">Only applied through child tags, never selected directly.</p></fieldset>';
+      '</div>'+(locked.length?'<div class="pt-existing-parents"><p class="pt-muted">Existing parent relationships</p>'+locked.map(t=>'<div class="pt-existing-parent"><span>'+escapeHtml(t.name)+'</span><input type="hidden" name="existingParentId" value="'+escapeAttr(t.id)+'"><button type="button" class="btn-ghost" data-remove-parent>Remove</button></div>').join('')+'</div>':'')+
+      (tag?.automaticOnly?'<p class="pt-muted pt-auto-only">Automatic only — this tag has children.</p>':'')+'</fieldset>';
   }
   function photoTagReadParents(form,childId){
-    return [...form.querySelectorAll('[name=parentId]:checked')].map(x=>x.value).filter(id=>photoTagCanParent(childId,id,photoTags));
+    const current=photoTags.find(t=>t.id===childId);
+    const existing=new Set(current?.parentIds||[]);
+    const preserved=[...form.querySelectorAll('[name=existingParentId]')].map(x=>x.value).filter(id=>existing.has(id)&&photoTagCanParent(childId,id,photoTags));
+    const chosen=[...form.querySelectorAll('[name=parentId]:checked')].map(x=>x.value).filter(id=>photoTagIsEligibleParent(childId,id,photoTags));
+    return [...new Set([...preserved,...chosen])];
+  }
+  function wireExistingPhotoParents(form){
+    form.querySelectorAll('[data-remove-parent]').forEach(b=>b.onclick=()=>b.closest('.pt-existing-parent').remove());
   }
   function photoTagFind(id){return photoTags.find(t=>t.id===id);}
   function photoTagNameAvailable(name,exceptId){
@@ -11351,6 +11367,7 @@
   }
   function savePhotoTags(){
     if(!photoTagsWritable())return;
+    derivePhotoTagAutomaticOnly(photoTags);
     photoTagsSavedAt=new Date().toISOString();
     persistPhotoTags();
     scheduleSyncWrite();
@@ -11457,7 +11474,6 @@
     const list=photoTagTray.querySelector('.pt-tray-list'), form=photoTagTray.querySelector('form'), add=photoTagTray.querySelector('[data-add]'), error=photoTagTray.querySelector('.pt-error'), input=form.elements.name;
     function render(){
       list.replaceChildren();
-      const effective=photoTagClosure(photoTagDraft.selected,photoTags);
       groupedPhotoTags().forEach(({category,tags})=>{
         tags=tags.filter(t=>!t.automaticOnly);
         const section=document.createElement('section');section.className='pt-category-group';
@@ -11479,14 +11495,6 @@
         };
         chips.appendChild(b);
         });
-        const inherited=sortedPhotoTags().filter(t=>photoTagCategory(t.category)===category&&effective.has(t.id)&&!photoTagDraft.selected.has(t.id));
-        if(inherited.length){
-          const row=document.createElement('div');row.className='pt-inherited';
-          const label=document.createElement('small');label.textContent='Automatically applied';row.appendChild(label);
-          const group=document.createElement('div');group.className='pt-category-chips';row.appendChild(group);
-          inherited.forEach(t=>{const chip=document.createElement('span');chip.className='pt-inherited-chip';chip.textContent='↳ '+t.name;group.appendChild(chip);});
-          section.appendChild(row);
-        }
         list.appendChild(section);
       });
     }
@@ -11511,7 +11519,7 @@
       if(!name||!photoTagNameAvailable(name)){error.textContent=!name?'Enter a tag name.':'A tag with that name already exists.';error.hidden=false;return;}
       const category=form.elements.category.value;
       if(!PHOTO_TAG_CATEGORIES.includes(category)){error.textContent='Choose a category.';error.hidden=false;return;}
-      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[],parentIds:[],automaticOnly:form.elements.automaticOnly.checked,hierarchyVersion:PHOTO_TAG_HIERARCHY_VERSION};
+      const tag={id:'pt-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),name,category,categoryVersion:PHOTO_TAG_CATEGORY_VERSION,photoIds:[],parentIds:[],automaticOnly:false,hierarchyVersion:PHOTO_TAG_HIERARCHY_VERSION};
       tag.parentIds=photoTagReadParents(form,tag.id);
       photoTags.push(tag);
       savePhotoTags();
@@ -11567,7 +11575,6 @@
         if(!PHOTO_TAG_CATEGORIES.includes(category))return;
         live.name=name;live.category=category;live.categoryVersion=PHOTO_TAG_CATEGORY_VERSION;
         live.parentIds=photoTagReadParents(e.currentTarget,live.id);
-        live.automaticOnly=e.currentTarget.elements.automaticOnly.checked;
         live.hierarchyVersion=PHOTO_TAG_HIERARCHY_VERSION;
       }else{
         photoTags=photoTags.filter(t=>t.id!==live.id);
@@ -11577,6 +11584,7 @@
       savePhotoTags();photoTagModal.close();
       if(!rename)window.scrollTo(0,photoTagListY);
     };
+    if(rename)wireExistingPhotoParents(photoTagModal.querySelector('form'));
     photoTagModal.showModal();
     if(rename){const input=photoTagModal.querySelector('input');input.focus();input.select();}
   }

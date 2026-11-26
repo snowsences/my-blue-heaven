@@ -5334,8 +5334,9 @@
   .pt-tray-add form:has(.pt-hierarchy){max-height:37dvh;overflow:auto;}
   .pt-tray-add form .pt-category-select{grid-column:1/-1;}
   .pt-modal form{max-height:88dvh;overflow:auto;}
-  .pt-inherited{margin-top:10px;}
-  .pt-inherited small{display:block;color:var(--chalk-dim);font-size:12px;margin-bottom:6px;}
-  .pt-inherited-chip{display:inline-flex;align-items:center;min-height:30px;border:1px dashed var(--panel-line);border-radius:999px;padding:5px 10px;color:var(--chalk-dim);font-size:13px;}
 
   #fun-card-tag-photos[hidden], .guest-view-active #fun-card-tag-photos{display:none!important;}
+
+  .pt-existing-parents{margin-top:12px;border-top:1px solid var(--panel-line);padding-top:8px;}
+  .pt-existing-parent{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0;}
+  .pt-existing-parent button{font-size:12px;padding:5px 9px;min-height:32px;}
