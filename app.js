@@ -12837,8 +12837,8 @@
   let courseAudioPending = false;
   const courseAudioTranscribing = new Set();
   const courseAudioStyle = document.createElement('style');
-  courseAudioStyle.textContent = '.course-audio-row{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--chalk-dim);font-size:12px;min-height:34px} .course-audio-row button{border:0;background:none;color:inherit;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;padding:4px;cursor:pointer;flex:none} .course-audio-row button:disabled{opacity:.4;cursor:default} .course-audio-row button[hidden],.course-audio-row span[hidden]{display:none} .course-audio-row svg{width:21px;height:21px} .course-audio-row .is-recording svg{animation:courseAudioSpin 4s linear infinite;color:var(--amber)} @keyframes courseAudioSpin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.course-audio-row .is-recording svg{animation:none;color:var(--amber)}}';
-  courseAudioStyle.textContent += '.course-transcript{margin:0 10px 8px 40px;padding:8px 10px;border-left:2px solid var(--panel-line);font-size:13px;line-height:1.5;color:var(--chalk-dim);white-space:pre-wrap;overflow-wrap:anywhere}.course-transcript[hidden]{display:none}';
+  courseAudioStyle.textContent = '.course-audio-row{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--chalk-dim);font-size:12px;min-height:34px} .course-audio-row button{border:0;background:none;color:inherit;width:45px;height:45px;display:inline-flex;align-items:center;justify-content:center;padding:6px;cursor:pointer;flex:none} .course-audio-row button:disabled{opacity:.4;cursor:default} .course-audio-row button[hidden],.course-audio-row span[hidden]{display:none} .course-audio-row svg{width:31.5px;height:31.5px} .course-audio-row .is-recording svg{animation:courseAudioSpin 4s linear infinite;color:var(--amber)} @keyframes courseAudioSpin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.course-audio-row .is-recording svg{animation:none;color:var(--amber)}}';
+  courseAudioStyle.textContent += '.course-transcript{display:flex;align-items:flex-start;gap:8px;margin:0 10px 8px 40px;padding:4px 0 4px 10px;border-left:2px solid var(--panel-line)}.course-transcript[hidden]{display:none}.course-transcript .restaurant-course-text{color:var(--chalk-dim);min-height:24px;box-sizing:border-box}.course-transcript-clear{flex:none;width:32px;height:32px;border:0;background:transparent;color:var(--chalk-dim);cursor:pointer;font-size:16px}';
   document.head.appendChild(courseAudioStyle);
   function courseAudioDb(){
     if (!courseAudioDbPromise) courseAudioDbPromise = new Promise((resolve,reject)=>{
@@ -13003,7 +13003,7 @@
       await saveRestaurantProgress();
       const row=Array.from(restaurantDetailsPanelInner.querySelectorAll('[data-audio-id]')).find(el=>el.dataset.audioId===id);
       const transcript=row?.closest('.restaurant-course-card')?.querySelector('[data-course-transcript]');
-      if(transcript){transcript.textContent=text;transcript.hidden=false;}
+      if(transcript){const input=transcript.querySelector('[data-transcript-text]');input.value=text;transcript.hidden=false;autoGrowTextarea(input);}
       showToast('Transcription added');
     }catch(e){showToast('Transcription failed — recording retained');}
     finally{courseAudioTranscribing.delete(id);refreshCourseAudioRows();}
@@ -13017,7 +13017,32 @@
       else await transcribeCourseAudio(id);
     }catch(e){showToast('Audio action failed');}
   });
-  new MutationObserver(()=>refreshCourseAudioRows()).observe(restaurantDetailsPanelInner,{childList:true,subtree:false});
+  function saveCourseTranscript(block, value){
+    if(guestViewEnabled||isLockedGuestAccount)return;
+    const course=findCourseByDishId(block.dataset.transcriptId);
+    if(!course)return;
+    const text=value.trim();
+    if(text)course.transcript=text;else delete course.transcript;
+    const input=block.querySelector('[data-transcript-text]');
+    input.value=text;
+    block.hidden=!text;
+    if(text)autoGrowTextarea(input);
+    saveRestaurantProgress();
+  }
+  restaurantDetailsPanelInner.addEventListener('input',e=>{
+    if(e.target.matches('[data-transcript-text]'))autoGrowTextarea(e.target);
+  });
+  restaurantDetailsPanelInner.addEventListener('focusout',e=>{
+    if(e.target.matches('[data-transcript-text]'))saveCourseTranscript(e.target.closest('[data-course-transcript]'),e.target.value);
+  });
+  restaurantDetailsPanelInner.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-transcript-clear]');
+    if(btn)saveCourseTranscript(btn.closest('[data-course-transcript]'),'');
+  });
+  new MutationObserver(()=>{
+    refreshCourseAudioRows();
+    restaurantDetailsPanelInner.querySelectorAll('[data-course-transcript]:not([hidden]) [data-transcript-text]').forEach(autoGrowTextarea);
+  }).observe(restaurantDetailsPanelInner,{childList:true,subtree:false});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){stopCourseAudioRecording();stopCourseAudioPlayback();}else courseAudioCleanup();});
   window.addEventListener('pagehide',()=>{stopCourseAudioRecording();stopCourseAudioPlayback();});
   setInterval(courseAudioCleanup,60000);
@@ -13052,7 +13077,7 @@
                 pairingBtnHtml +
                 '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
               '</div>' +
-              '<div data-course-transcript class="course-transcript"' + (course.transcript ? '' : ' hidden') + '>' + escapeHtml(course.transcript || '') + '</div>' +
+              '<div data-course-transcript data-transcript-id="' + escapeAttr(ensureCourseId(course)) + '" class="course-transcript"' + (course.transcript && course.transcript.trim() ? '' : ' hidden') + '><textarea class="restaurant-course-text" data-transcript-text aria-label="Transcribed description" placeholder="Transcribed description">' + escapeHtml(course.transcript || '') + '</textarea><button type="button" class="course-transcript-clear" data-transcript-clear aria-label="Clear transcription" title="Clear transcription">✕</button></div>' +
               courseAudioHtml(course) +
             '</div>' +
             renderDrinkPairingCardHtml(course, i)
