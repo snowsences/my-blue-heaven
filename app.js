@@ -13053,14 +13053,15 @@
     const paths={record:'<path d="M12 3a9 9 0 1 1-5.8 2.1"/>',play:'<path d="m9 5 11 7-11 7z"/>',pause:'<path d="M9 5v14M15 5v14"/>',text:'<path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/>'};
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[name]+'</svg>';
   }
-  // Compare local calendar dates, not elapsed hours, to avoid timezone and
-  // daylight-saving offsets at the boundaries of the three-day window.
+  // Allow yesterday, today and all future visits for testing. Compare local
+  // calendar dates rather than elapsed hours (DST-safe).
   function courseAudioDateAllowed(date, today = new Date()){
+    if(typeof date==='string' && date.trim().toLowerCase()==='future')return true;
     const visit=otdParse(date);
     if(!visit)return false;
     const visitDay=Date.UTC(visit.y,visit.m-1,visit.d);
     const todayDay=Date.UTC(today.getFullYear(),today.getMonth(),today.getDate());
-    return Math.abs(visitDay-todayDay)<=86400000;
+    return visitDay>=todayDay-86400000;
   }
   function courseAudioHtml(course, visitDate){
     const id=ensureCourseId(course);
