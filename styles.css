@@ -5385,3 +5385,15 @@
       background-image:none;
     }
   }
+
+  /* Suppress visual focus decorations throughout the app, including native
+     browser rings on inputs and selects. Keyboard focus itself is unchanged. */
+  :focus, :focus-visible, :focus-within{
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  .tmap-stop:focus-visible .tmap-stop-num,
+  .pt-category-segments input:focus-visible + span{
+    outline: none !important;
+    box-shadow: none !important;
+  }
