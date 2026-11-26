@@ -14671,7 +14671,7 @@
         '<div class="rd-cover-caption restaurant-gold-card-overlay">' +
           '<div class="rd-cover-identity"><h2 class="details-album">#' + rank + ' ' + escapeHtml(r.name) + visitsHtml + starsHtml + '</h2>' +
           (meta ? '<p class="details-artist">' + escapeHtml(meta) + '</p>' : '') + '</div>' +
-          (canManageVisits?'<button class="btn-ghost restaurant-visit-add-btn rd-cover-add" id="restaurant-visit-add-btn" type="button">+ New Visit</button>':'') +
+          (canManageVisits?'<button class="btn-ghost restaurant-visit-add-btn rd-cover-add" id="restaurant-visit-add-btn" type="button">+ Visit</button>':'') +
         '</div>' +
       '</div>' + tabBar + '</div><div class="rd-body">' +
       (isVisits ? visitsSectionHtml : restaurantDetailTab==='overview'?rdOverview(r,stats):restaurantDetailTab==='graphs'?rdGraphs(r,stats):rdCourses(stats))+'</div>';
