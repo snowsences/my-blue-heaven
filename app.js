@@ -13008,7 +13008,7 @@
   let courseAudioPending = false;
   const courseAudioTranscribing = new Set();
   const courseAudioStyle = document.createElement('style');
-  courseAudioStyle.textContent = '.course-audio-row{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--chalk-dim);font-size:12px;min-height:34px} .course-audio-row button{border:0;background:none;color:inherit;width:45px;height:45px;display:inline-flex;align-items:center;justify-content:center;padding:6px;cursor:pointer;flex:none} .course-audio-row button:disabled{opacity:.4;cursor:default} .course-audio-row button[hidden],.course-audio-row span[hidden]{display:none} .course-audio-row svg{width:31.5px;height:31.5px} .course-audio-row .is-recording svg{animation:courseAudioSpin 4s linear infinite;color:var(--amber)} @keyframes courseAudioSpin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.course-audio-row .is-recording svg{animation:none;color:var(--amber)}}';
+  courseAudioStyle.textContent = '.course-audio-row{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--chalk-dim);font-size:12px;min-height:34px} .course-audio-row button{border:0;background:none;color:inherit;width:45px;height:45px;display:inline-flex;align-items:center;justify-content:center;padding:6px;cursor:pointer;flex:none} .course-audio-row button:disabled{opacity:.4;cursor:default} .course-audio-row[hidden],.course-audio-row button[hidden],.course-audio-row span[hidden]{display:none} .course-audio-row svg{width:31.5px;height:31.5px} .course-audio-row .is-recording svg{animation:courseAudioSpin 4s linear infinite;color:var(--amber)} @keyframes courseAudioSpin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.course-audio-row .is-recording svg{animation:none;color:var(--amber)}}';
   courseAudioStyle.textContent += '.course-transcript{display:flex;align-items:flex-start;gap:8px;margin:0 10px 8px 40px;padding:4px 0 4px 10px;border-left:2px solid var(--panel-line)}.course-transcript[hidden]{display:none}.course-transcript .restaurant-course-text{color:var(--chalk-dim);min-height:24px;box-sizing:border-box}.course-transcript-clear{flex:none;width:32px;height:32px;border:0;background:transparent;color:var(--chalk-dim);cursor:pointer;font-size:16px}';
   document.head.appendChild(courseAudioStyle);
   function courseAudioDb(){
@@ -13053,9 +13053,19 @@
     const paths={record:'<path d="M12 3a9 9 0 1 1-5.8 2.1"/>',play:'<path d="m9 5 11 7-11 7z"/>',pause:'<path d="M9 5v14M15 5v14"/>',text:'<path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/>'};
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[name]+'</svg>';
   }
-  function courseAudioHtml(course){
+  // Compare local calendar dates, not elapsed hours, to avoid timezone and
+  // daylight-saving offsets at the boundaries of the three-day window.
+  function courseAudioDateAllowed(date, today = new Date()){
+    const visit=otdParse(date);
+    if(!visit)return false;
+    const visitDay=Date.UTC(visit.y,visit.m-1,visit.d);
+    const todayDay=Date.UTC(today.getFullYear(),today.getMonth(),today.getDate());
+    return Math.abs(visitDay-todayDay)<=86400000;
+  }
+  function courseAudioHtml(course, visitDate){
     const id=ensureCourseId(course);
-    return '<div class="course-audio-row" data-audio-id="'+escapeAttr(id)+'"><button type="button" data-audio-action="record" aria-label="Record audio" title="Record audio">'+courseAudioIcon('record')+'</button><span data-audio-info hidden></span><button type="button" data-audio-action="play" aria-label="Play recording" title="Play recording" hidden>'+courseAudioIcon('play')+'</button><button type="button" data-audio-action="text" aria-label="Transcribe recording" title="Transcribe recording" hidden>'+courseAudioIcon('text')+'</button></div>';
+    const active=courseAudioRecording && courseAudioRecording.id===id;
+    return '<div class="course-audio-row" data-audio-id="'+escapeAttr(id)+'" data-audio-visit-date="'+escapeAttr(visitDate||'')+'"'+(!active&&!courseAudioDateAllowed(visitDate)?' hidden':'')+'><button type="button" data-audio-action="record" aria-label="Record audio" title="Record audio">'+courseAudioIcon('record')+'</button><span data-audio-info hidden></span><button type="button" data-audio-action="play" aria-label="Play recording" title="Play recording" hidden>'+courseAudioIcon('play')+'</button><button type="button" data-audio-action="text" aria-label="Transcribe recording" title="Transcribe recording" hidden>'+courseAudioIcon('text')+'</button></div>';
   }
   async function refreshCourseAudioRows(){
     for(const row of restaurantDetailsPanelInner.querySelectorAll('[data-audio-id]')){
@@ -13063,6 +13073,7 @@
       let saved=null;try{saved=await courseAudioRead(id);}catch(e){}
       if(!row.isConnected)continue;
       const active=courseAudioRecording && courseAudioRecording.id===id;
+      row.hidden=!saved&&!active&&!courseAudioDateAllowed(row.dataset.audioVisitDate);
       const rec=row.querySelector('[data-audio-action="record"]');
       rec.classList.toggle('is-recording',!!active);
       rec.setAttribute('aria-label',active?'Stop recording':'Record audio');
@@ -13249,7 +13260,7 @@
                 '<button class="restaurant-course-remove-btn" type="button" data-remove-course-index="' + i + '" title="Remove">✕</button>' +
               '</div>' +
               '<div data-course-transcript data-transcript-id="' + escapeAttr(ensureCourseId(course)) + '" class="course-transcript"' + (course.transcript && course.transcript.trim() ? '' : ' hidden') + '><textarea class="restaurant-course-text" data-transcript-text aria-label="Transcribed description" placeholder="Transcribed description">' + escapeHtml(course.transcript || '') + '</textarea><button type="button" class="course-transcript-clear" data-transcript-clear aria-label="Clear transcription" title="Clear transcription">✕</button></div>' +
-              courseAudioHtml(course) +
+              courseAudioHtml(course, visit.date) +
             '</div>' +
             renderDrinkPairingCardHtml(course, i)
           );
